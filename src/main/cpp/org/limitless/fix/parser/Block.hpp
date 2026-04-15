@@ -14,7 +14,8 @@ struct Block
 {
     typedef uint8x16_t value_type;
 
-    static inline const value_type ZeroFiller = vdupq_n_u8(0);
+    static inline const value_type True = vdupq_n_u8(255);
+    static inline const value_type False = vdupq_n_u8(0);
 
     static inline const value_type AsciiZeros = vdupq_n_u8('0');
     static inline const value_type AsciiNines = vdupq_n_u8('9');
@@ -99,29 +100,14 @@ struct Block
     template <int N>
     [[nodiscard]] Block shiftLeft() const {
         static_assert(N >= 0 && N < 16, "Shift must be between 0 and 15");
-        return Block(vextq_u8(m_block, ZeroFiller, N));
-    }
-
-    template <int N>
-    Block& shiftLeft()
-    {
-        m_block = vextq_u8(m_block, ZeroFiller, N);
-        return *this;
+        return Block(vextq_u8(m_block, False, N));
     }
 
     template <int N>
     [[nodiscard]] Block shiftRight() const
     {
         static_assert(N >= 0 && N < 16, "Shift must be between 0 and 15");
-        return Block(vextq_u8(ZeroFiller, m_block, 16 - N));
-    }
-
-    template <int N>
-    Block& shiftRight()
-    {
-        static_assert(N >= 0 && N < 16, "Shift must be between 0 and 15");
-        m_block = vextq_u8(ZeroFiller, m_block, 16 - N);
-        return *this;
+        return Block(vextq_u8(False, m_block, 16 - N));
     }
 
     Block operator-(const Block& block) const

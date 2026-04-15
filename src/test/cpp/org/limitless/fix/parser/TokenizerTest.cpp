@@ -31,8 +31,13 @@ TEST(Tokenizer, Basics)
         "8=FIXT.1.1" SOH
         "          ";
     Tokenizer tokenizer;
-      // tokenizer.scanBlock(message, sizeof(message) - 1);
+
+    const auto start = std::chrono::high_resolution_clock::now();
     tokenizer.scan(message, sizeof(message) - 1);
+    const auto end = std::chrono::high_resolution_clock::now();
+    const auto  duration = std::chrono::nanoseconds(end - start);
+    std::printf("%8lld\n", duration.count());
+
 }
 
 }
