@@ -4,25 +4,9 @@
 
 #include <gtest/gtest.h>
 
-#include "org/limitless/fix/parser/Tokenizer.h"
+#include "org/limitless/fix/parser/Tokenizer.hpp"
 
 namespace org::limitless::fix::parser {
-
-void dump(size_t length, const char* buffer)
-{
-    for (int i = 0; i < length; ++i)
-    {
-        switch (auto ch = buffer[i])
-        {
-            case 1:
-                std::putchar('|');
-                break;
-            default:
-                std::putchar(std::isprint(ch) ? ch : '?');
-                break;
-        }
-    }
-}
 
 TEST(Tokenizer, Basics)
 {
@@ -31,7 +15,7 @@ TEST(Tokenizer, Basics)
         "8=FIXT.1.1" SOH
         "9=116" SOH
         "35=A" SOH
-        "49=BuySide" SOH
+        "49=Buyer" SOH
         "56=SellSide_1" SOH
         "34=1" SOH
         "52=20190605-11:51:27.848" SOH
@@ -43,8 +27,11 @@ TEST(Tokenizer, Basics)
         "554=Password" SOH
         "1137=9" SOH
         "10=079" SOH
-        "  ";
+        // next message
+        "8=FIXT.1.1" SOH
+        "          ";
     Tokenizer tokenizer;
+      // tokenizer.scanBlock(message, sizeof(message) - 1);
     tokenizer.scan(message, sizeof(message) - 1);
 }
 
