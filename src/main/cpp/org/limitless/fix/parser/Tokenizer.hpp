@@ -94,17 +94,10 @@ public:
             // pf |= digitFlags & pf.shiftRight<1>();
 
             simd::Block tagFlags{pb | pf};
-            simd::Block tags{tagFlags.ifElse(m_data - ZEROS, TRUE)};
-
-            //uint8x8_t narrowed = vshrn_n_u16(vreinterpretq_u16_u8(tagFlags.m_block), 4);
-            //uint64_t packed = vget_lane_u64(vreinterpret_u64_u8(narrowed), 0);
-            //std::printf("result = %016x\n", packed);
-            //tags.get(0, result);
-            //for (int i = 0; i < 16; ++i)
-            //{
-            //    std::printf("%03d ", result[i]);
-            //}
-            //std::printf("\n");
+            simd::Block tags{tagFlags.whenTrue(m_data - ZEROS)};
+            //auto tagMap = tags.toUint64();
+            //auto tagMap = tagFlags.toUint64();
+            // process(tagMap, buffer + offset, length - offset);
             tags.print();
             dump(16, buffer + offset);
             std::printf("\n");

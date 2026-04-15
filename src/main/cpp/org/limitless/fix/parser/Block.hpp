@@ -153,15 +153,27 @@ struct Block
         return Block{vcleq_u8(m_block, block.m_block)};
     }
 
+    /*
     [[nodiscard]] Block ifElse(const Block& trueBlock, const Block& falseBlock) const
     {
         return Block{vbslq_u8(m_block, trueBlock.m_block, falseBlock.m_block)};
+    }
+    */
+    [[nodiscard]] Block whenTrue(const Block& block) const
+    {
+        return Block{vbslq_u8(m_block, block.m_block, True)};
     }
 
     Block& equal(const Block& block, Block& result)
     {
         result.m_block = vceqq_u8(m_block, block.m_block);
         return *this;
+    }
+
+    [[nodiscard]] uint64_t toUint64() const
+    {
+        const uint8x8_t narrowed = vshrn_n_u16(vreinterpretq_u16_u8(m_block), 4);
+        return vget_lane_u64(vreinterpret_u64_u8(narrowed), 0);
     }
 
     void print() const
