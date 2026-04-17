@@ -10,7 +10,7 @@
 
 namespace org::limitless::simd {
 
-struct Block
+struct Block  // VEC_u8x16
 {
     typedef uint8x16_t value_type;
 
@@ -161,7 +161,7 @@ struct Block
     */
     [[nodiscard]] Block whenTrue(const Block& block) const
     {
-        return Block{vbslq_u8(m_block, block.m_block, True)};
+        return Block{vbslq_u8(m_block, block.m_block, False)};
     }
 
     Block& equal(const Block& block, Block& result)
@@ -172,7 +172,12 @@ struct Block
 
     [[nodiscard]] uint64_t toUint64() const
     {
-        const uint8x8_t narrowed = vshrn_n_u16(vreinterpretq_u16_u8(m_block), 4);
+        // 1. Create a mask: if lane != 0, result is 0xFF. If lane == 0, result is 0x00.
+        // vtstq_u8(v, v) is a "test bits" operation. Since 08 & 08 != 0, it becomes 0xFF.
+        uint8x16_t mask = vtstq_u8(m_block, m_block);
+
+        // 2. Now narrow the mask. Since the mask lanes are 0xFF, the 4-bit nibbles will be 0xF.
+        uint8x8_t narrowed = vshrn_n_u16(vreinterpretq_u16_u8(mask), 4);
         return vget_lane_u64(vreinterpret_u64_u8(narrowed), 0);
     }
 
