@@ -77,6 +77,9 @@ public:
         m_tag = 0;
 
         uint8_t digits[16];
+        m_tokens[0] = { 8, 2, 8 };
+        std::printf("token, tag = %d, len = %d, pos = %d\n", m_tokens->tag, m_tokens->valueLength, m_tokens->valueOffset);
+        m_count = 1;
 
         for (size_t offset = 0; offset + 15 < length; offset += 16)
         {
@@ -127,6 +130,11 @@ private:
         }
         std::printf("\n");
 
+        if (offset == 0) // FIXME
+        {
+            digitsMap >>= 4;
+            bits = 4;
+        }
         uint32_t position = 0;
         uint32_t digitCount = 0;
         while (digitsMap > 0)
@@ -140,13 +148,12 @@ private:
             if (position + digitCount < 16)
             {
                 auto& [tag, valueOffset, valueLength] = m_tokens[m_count];
-                m_tag = 0;
                 ++m_count;
                 tag = convertToDecimal(m_tag, digits, position, digitCount);
+                m_tag = 0;
                 valueOffset = offset + position + digitCount + 1;
-                valueLength = digitCount;
-                std::printf("token, tag = %d, len = %d, pos = %d/%d\n",
-                            tag, valueLength, valueOffset, position + digitCount);
+                valueLength = 0;
+                std::printf("token, tag = %d, len = %d, pos = %d\n", tag, valueLength, valueOffset);
                 digitsMap >>= digitBits;
                 bits += digitBits;
             }
