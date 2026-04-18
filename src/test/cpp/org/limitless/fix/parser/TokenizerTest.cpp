@@ -9,7 +9,6 @@
 namespace org::limitless::fix::parser {
 
 #define SOH "\x01"
-
 static constexpr uint8_t MESSAGE1[] =
     "8=FIXT.1.1" SOH
     "9=116" SOH
@@ -39,18 +38,39 @@ TEST(Tokenizer, Basics)
     const auto  duration = std::chrono::nanoseconds(end - start);
     std::printf("%8lld\n", duration.count());
 
-    tokenizer.forEach([](const Tokenizer::Token& token) {
-        std::printf("tag = %3d, pos = %d, len = %d\n", token.tag, token.valueOffset, token.valueLength);
-    });
-}
+    // FIXME: tag 141
+    // FIXME tag 1137
+    // tokenizer.forEach([](const Tokenizer::Token& token) {
+//        std::printf("tag = %3d, pos = %d, len = %d\n", token.tag, token.valueOffset, token.valueLength);
+  //  });
 
-TEST(Tokenizer, SplitTag)
-{
-    Tokenizer tokenizer;
-    const auto start = std::chrono::high_resolution_clock::now();
-    tokenizer.scan(MESSAGE1, sizeof(MESSAGE1) - 1);
-    const auto end = std::chrono::high_resolution_clock::now();
-    const auto  duration = std::chrono::nanoseconds(end - start);
-    std::printf("%8lld\n", duration.count());
+    const Tokenizer::Token expectedTokens[] =
+    {
+        { 8, 2, 8 },
+        { 9, 14, 3 },
+        { 35, 20, 1 },
+        { 49, 0, 5 },
+        { 56, 0, 10 },
+        { 34, 0, 1 },
+        { 52, 0, 21 },
+        { 1128, 0, 1 },
+        { 98, 0, 1 },
+        { 108, 0, 3 },
+        { 141, 0, 1 },
+        { 553, 0, 8 },
+        { 554, 0, 8 },
+        { 1137, 0, 1 },
+        { 10, 0, 3 },
+        { 0, 0, 0 }
+    };
+    int i = 0;
+    for (auto [tag, valueOffset, valueLength] : tokenizer)
+    {
+        std::printf("tag = %d, pos = %d, len = %d\n", tag, valueOffset, valueLength);
+        const Tokenizer::Token& expected = expectedTokens[i];
+        ++i;
+        ASSERT_EQ(expected.tag, tag);
+        ASSERT_EQ(expected.valueLength, valueLength);
+    }
 }
 }

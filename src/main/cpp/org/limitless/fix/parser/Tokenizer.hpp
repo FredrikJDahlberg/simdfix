@@ -33,43 +33,8 @@ public:
         uint32_t valueOffset;
         uint32_t valueLength;
     };
-private:
-    Token m_tokens[128]{};
-    size_t m_count = 0;
-    uint32_t m_tag = 0;
-
-    simd::Block m_data;
-
-public:
-    // produce a list of { | tag, offset, length, type | should be sorted by tag or group
-    // order, body = tag, group = pos, data = len + data
 
     Tokenizer() = default;
-
-    static void dump(size_t length, const uint8_t* buffer)
-    {
-        for (int i = 0; i < length; ++i)
-        {
-            if (const auto ch = buffer[i]; std::isprint(ch))
-            {
-                std::printf("%2c ", ch);
-            }
-            else
-            {
-                std::printf("%2c ", ch == 1 ? '|' : '?');
-            }
-        }
-    }
-
-    static void dump(const uint8x16_t& vector)
-    {
-        const auto data = reinterpret_cast<const uint8_t*>(&vector);
-        for (int j = 0; j < 16; ++j)
-        {
-            std::printf("%02x ", data[j]);
-        }
-        std::printf("\n");
-    }
 
     void scan(const uint8_t* buffer, const size_t length)
     {
@@ -84,7 +49,7 @@ public:
         for (size_t offset = 0; offset + 15 < length; offset += 16)
         {
             m_data.put(buffer + offset, length - offset);
-
+            dump(16, buffer + offset);
             // A digit is valid if followed by '=' or a validated digit
             const simd::Block digitFlags{m_data >= ZerosBlock & m_data <= NinesBlock};
             const simd::Block tagEnds{m_data == TagEndsBlock};
@@ -109,15 +74,57 @@ public:
         }
     }
 
-    template<typename F>
-    void forEach(F&& lambda) {
-        for (int i = 0; i < m_count; ++i) {
-            lambda(m_tokens[i]);
+    Token* begin()
+    {
+        return m_tokens;
+    }
+    Token* end()
+    {
+        return m_tokens + m_count;
+    }
+    [[nodiscard]] const Token* begin() const
+    {
+        return m_tokens;
+    }
+    [[nodiscard]] const Token* end() const
+    {
+        return m_tokens + m_count;
+    }
+
+    static void dump(const size_t length, const uint8_t* buffer)
+    {
+        for (int i = 0; i < length; ++i)
+        {
+            if (const auto ch = buffer[i]; std::isprint(ch))
+            {
+                std::printf("%2c ", ch);
+            }
+            else
+            {
+                std::printf("%2c ", ch == 1 ? '|' : '?');
+            }
         }
+        std::printf("\n");
+    }
+
+    static void dump(const uint8x16_t& vector)
+    {
+        const auto data = reinterpret_cast<const uint8_t*>(&vector);
+        for (int j = 0; j < 16; ++j)
+        {
+            std::printf("%02x ", data[j]);
+        }
+        std::printf("\n");
     }
 
 private:
+    Token m_tokens[128]{};
+    size_t m_count = 0;
+    uint32_t m_tag = 0;
 
+    simd::Block m_data;
+
+    // FIXME: move digitsMap and bits (class or argument)
     void process(const uint32_t offset, uint64_t digitsMap, const uint8_t* digits)
     {
         uint32_t bits = 0;
@@ -135,33 +142,30 @@ private:
             digitsMap >>= 4;
             bits = 4;
         }
-        uint32_t position = 0;
-        uint32_t digitCount = 0;
-        while (digitsMap > 0)
-        {
-            const int trailingZeros = std::countr_zero(digitsMap);
+
+        const uint64_t lastDigitMap = digitsMap >> 60 & 0xF;
+        uint64_t remainingMap = digitsMap & 0x0FFFFFFFFFFFFFFFULL;
+        while (remainingMap > 0) {
+            const auto trailingZeros = std::countr_zero(remainingMap);
             bits += trailingZeros;
-            digitsMap >>= trailingZeros;
-            const uint32_t digitBits = std::countr_one(digitsMap);
-            position = bits / 4;
-            digitCount = digitBits / 4;
-            if (position + digitCount < 16)
-            {
-                auto& [tag, valueOffset, valueLength] = m_tokens[m_count];
-                ++m_count;
-                tag = convertToDecimal(m_tag, digits, position, digitCount);
-                m_tag = 0;
-                valueOffset = offset + position + digitCount + 1;
-                valueLength = 0;
-                std::printf("token, tag = %d, len = %d, pos = %d\n", tag, valueLength, valueOffset);
-                digitsMap >>= digitBits;
-                bits += digitBits;
-            }
-            else
-            {
-                m_tag = digits[15];
-                digitsMap >>= 4;
-            }
+            remainingMap >>= trailingZeros;
+
+            const auto digitBits = std::countr_one(remainingMap);
+            const auto position = bits / 4;
+            const auto digitCount = digitBits / 4;
+            auto& previous = m_tokens[m_count - 1];
+            previous.valueLength = offset + position - previous.valueOffset - 1;
+
+            auto& [tag, valueOffset, valueLength] = m_tokens[m_count++];
+            tag = convertToDecimal(m_tag, digits, position, digitCount);
+            m_tag = 0;
+            valueOffset = offset + position + digitCount + 1;
+            valueLength = 0;
+            remainingMap >>= digitBits;
+            bits += digitBits;
+        }
+        if (lastDigitMap == 0xF) {
+            m_tag = digits[15];
         }
     }
 
@@ -175,7 +179,7 @@ private:
         const uint8_t* end = digit + length;
         while (digit < end)
         {
-            decimal = (decimal * 10) + *digit++;
+            decimal = decimal * 10 + *digit++;
         }
         return decimal;
     }
