@@ -29,9 +29,9 @@ class Tokenizer
 public:
     struct Token
     {
-        uint32_t tag;
-        uint32_t valueOffset;
-        uint32_t valueLength;
+        int32_t tag;
+        int32_t valueOffset;
+        int32_t valueLength;
     };
 
     Tokenizer() = default;
@@ -42,10 +42,11 @@ public:
         m_tag = 0;
 
         uint8_t digits[16];
-        m_tokens[0] = { 8, 2, 8 };
+        m_tokens[0] = { 8, 2, 6 };
         std::printf("token, tag = %d, len = %d, pos = %d\n", m_tokens->tag, m_tokens->valueLength, m_tokens->valueOffset);
         m_count = 1;
 
+        uint32_t bits = 4;
         for (size_t offset = 0; offset + 15 < length; offset += 16)
         {
             m_data.put(buffer + offset, length - offset);
@@ -68,9 +69,11 @@ public:
             // before |= digitFlags & before.shiftRight<1>();
             const simd::Block validTags{after | before};
             const simd::Block tags{validTags.whenTrue(m_data - ZerosBlock)};
-            const auto tagDigits = validTags.toUint64();  // 16 bytes to 4-bit nibble
+            auto tagDigits = validTags.toUint64();  // 16 bytes to 4-bit nibble
             tags.get(0, digits); // read into GPR
-            process(offset, tagDigits, digits);
+            tagDigits >>= bits;
+            process(offset, tagDigits, digits, bits);
+            bits = 0;
         }
     }
 
@@ -120,14 +123,14 @@ public:
 private:
     Token m_tokens[128]{};
     size_t m_count = 0;
-    uint32_t m_tag = 0;
+
+    int32_t m_tag = 0;
+    int32_t m_position = 0;
 
     simd::Block m_data;
 
-    // FIXME: move digitsMap and bits (class or argument)
-    void process(const uint32_t offset, uint64_t digitsMap, const uint8_t* digits)
+    void process(const int32_t offset, const uint64_t digitsMap, const uint8_t* digits, int32_t bits)
     {
-        uint32_t bits = 0;
         // FIXME: calculate first tag outside loop?
         // FIXME: handle value lengths
         // FIXME: handle unterminated values
@@ -137,35 +140,36 @@ private:
         }
         std::printf("\n");
 
-        if (offset == 0) // FIXME
-        {
-            digitsMap >>= 4;
-            bits = 4;
-        }
-
         const uint64_t lastDigitMap = digitsMap >> 60 & 0xF;
+        // FIXME: handle split tags with more than one digit
         uint64_t remainingMap = digitsMap & 0x0FFFFFFFFFFFFFFFULL;
+        int32_t tagPosition = 0;
+        int32_t digitCount = 0;
         while (remainingMap > 0) {
             const auto trailingZeros = std::countr_zero(remainingMap);
             bits += trailingZeros;
             remainingMap >>= trailingZeros;
-
             const auto digitBits = std::countr_one(remainingMap);
-            const auto position = bits / 4;
-            const auto digitCount = digitBits / 4;
-            auto& previous = m_tokens[m_count - 1];
-            previous.valueLength = offset + position - previous.valueOffset - 1;
+            digitCount = digitBits / 4;
+            tagPosition = bits / 4; //  + m_position;
+            auto& prevToken = m_tokens[m_count - 1];
+            prevToken.valueLength = offset + tagPosition - prevToken.valueOffset - 1 + m_position;
+            std::printf("TAG = %d len = %d offset = %d, pos = %d POS= %d \n",
+                prevToken.tag, prevToken.valueLength, prevToken.valueOffset, offset + tagPosition, m_position);
 
             auto& [tag, valueOffset, valueLength] = m_tokens[m_count++];
-            tag = convertToDecimal(m_tag, digits, position, digitCount);
+            tag = convertToDecimal(m_tag, digits, tagPosition, digitCount);
             m_tag = 0;
-            valueOffset = offset + position + digitCount + 1;
-            valueLength = 0;
+            m_position = 0;
+            valueOffset = offset + tagPosition + digitCount + 1;
             remainingMap >>= digitBits;
             bits += digitBits;
         }
-        if (lastDigitMap == 0xF) {
-            m_tag = digits[15];
+        if (lastDigitMap == 0xF)
+        {
+            m_tokens[m_count - 1].valueLength = 0;
+            m_tag = digits[15];  // store split tags
+            m_position = -digitCount + 1;
         }
     }
 

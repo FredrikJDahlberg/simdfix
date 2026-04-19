@@ -47,16 +47,16 @@ TEST(Tokenizer, Basics)
     const Tokenizer::Token expectedTokens[] =
     {
         { 8, 2, 8 },
-        { 9, 14, 3 },
+        { 9, 13, 3 },
         { 35, 20, 1 },
-        { 49, 0, 5 },
-        { 56, 0, 10 },
-        { 34, 0, 1 },
-        { 52, 0, 21 },
-        { 1128, 0, 1 },
-        { 98, 0, 1 },
-        { 108, 0, 3 },
-        { 141, 0, 1 },
+        { 49, 25, 5 },
+        { 56, 34, 10 },
+        { 34, 48, 1 },
+        { 52, 53, 21 },
+        { 1128, 80, 1 },
+        { 98, 85, 1 },
+        { 108, 91, 2 },
+        { 141, 96, 1 },
         { 553, 0, 8 },
         { 554, 0, 8 },
         { 1137, 0, 1 },
@@ -69,8 +69,9 @@ TEST(Tokenizer, Basics)
         std::printf("tag = %d, pos = %d, len = %d\n", tag, valueOffset, valueLength);
         const Tokenizer::Token& expected = expectedTokens[i];
         ++i;
-        ASSERT_EQ(expected.tag, tag);
-        ASSERT_EQ(expected.valueLength, valueLength);
+        ASSERT_EQ(expected.tag, tag) << "Invalid tag value " << tag;
+        ASSERT_EQ(expected.valueOffset, valueOffset) << "Tag " << expected.tag << " has invalid offset";
+        ASSERT_EQ(expected.valueLength, valueLength) << "Tag " << expected.tag << " has invalid length";
     }
 }
 }
