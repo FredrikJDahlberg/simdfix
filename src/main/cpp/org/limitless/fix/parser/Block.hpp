@@ -153,6 +153,11 @@ struct Block  // VEC_u8x16
         return Block{vcleq_u8(m_block, block.m_block)};
     }
 
+    [[nodiscard]] uint64_t sum() const
+    {
+        return vaddlvq_u8(m_block);
+    }
+
     /*
     [[nodiscard]] Block ifElse(const Block& trueBlock, const Block& falseBlock) const
     {
