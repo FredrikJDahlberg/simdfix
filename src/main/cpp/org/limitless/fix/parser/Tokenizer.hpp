@@ -5,6 +5,7 @@
 #ifndef SIMD_FIX_TOKENIZER_H
 #define SIMD_FIX_TOKENIZER_H
 
+#include <bit>
 #include <ostream>
 
 #include "org/limitless/fix/parser/Block.hpp"
@@ -129,7 +130,7 @@ private:
 
     simd::Block m_data;
 
-    void process(const int32_t offset, const uint64_t tagDigitsMap, const uint8_t* digits, uint32_t nonTagBits)
+    void process(const int32_t offset, const uint64_t tagDigitFlags, const uint8_t* digits, uint32_t nonTagBitPos)
     {
         for (int i = 0; i < 16; ++i)
         {
@@ -137,32 +138,23 @@ private:
         }
         std::printf("\n");
 
-        const uint16_t trailingTag = tagDigitsMap >> 52;
-        // const uint16_t bitCount = std::popcount(trailingTag);
-        uint64_t remainingDigits = tagDigitsMap & 0x0fffffffffffffffull;
-        if (trailingTag == 0xfff)
-        {
-            remainingDigits = tagDigitsMap & 0x000fffffffffffffull;
-        }
-        if (trailingTag == 0xff0)
-        {
-            remainingDigits = tagDigitsMap & 0x00ffffffffffffffull;
-        }
-
-        int32_t tagPosition = 0;
+        const uint16_t trailingTagFlags = tagDigitFlags >> 48; // 52
+        const int32_t trailingCount = std::countl_one(trailingTagFlags);
+        uint64_t remainingDigitFlags = tagDigitFlags & (-1ull >> std::max(4, trailingCount));
+        int32_t tagPosition = 0;  // FIXME: replace with m_position
         int32_t digitCount = 0;
-        while (remainingDigits > 0)
+        while (remainingDigitFlags > 0)
         {
-            const int32_t nonTags = std::countr_zero(remainingDigits);
-            nonTagBits += nonTags;
-            remainingDigits >>= nonTags;
-            const auto digitBits = std::countr_one(remainingDigits);
+            const int32_t nonTagCount = std::countr_zero(remainingDigitFlags);
+            nonTagBitPos += nonTagCount;
+            remainingDigitFlags >>= nonTagCount;
+            const auto digitBits = std::countr_one(remainingDigitFlags);
             digitCount = digitBits / 4;
-            tagPosition = nonTagBits / 4; //  + m_position;
+            tagPosition = nonTagBitPos / 4; //  + m_position;
             auto& prevToken = m_tokens[m_count - 1];
             prevToken.valueLength = offset + tagPosition - prevToken.valueOffset - 1 + m_position;
-            std::printf("TAG[%2d] = %d len = %d offset = %d, pos = %d POS= %d \n",
-                m_count, prevToken.tag, prevToken.valueLength, prevToken.valueOffset, offset + tagPosition, m_position);
+            std::printf("TAG = %d len = %d offset = %d, pos = %d POS= %d \n",
+                        prevToken.tag, prevToken.valueLength, prevToken.valueOffset, offset + tagPosition, m_position);
 
             auto& [tag, valuePosition, valueLength] = m_tokens[m_count];
             ++m_count;
@@ -170,23 +162,14 @@ private:
             m_tag = 0;
             m_position = 0;
             valuePosition = offset + tagPosition + digitCount + 1;
-            remainingDigits >>= digitBits;
-            nonTagBits += digitBits;
+            remainingDigitFlags >>= digitBits;
+            nonTagBitPos += digitBits;
         }
-        if (trailingTag == 0xfff)
+        if (trailingCount >= 4 && trailingCount <= 12)
         {
-            m_tag = digits[13] * 100 + digits[14] * 10 + digits[15];  // store split tags
-            m_position = -digitCount + 3;
-        }
-        if (trailingTag == 0xff0)
-        {
-            m_tag = digits[14] * 10 + digits[15];  // store split tags
-            m_position = -digitCount + 1;
-        }
-        if (trailingTag == 0xf00)
-        {
-            m_tag = digits[15];  // store split tags
-            m_position = -digitCount + 1;
+            const auto digitCount = trailingCount / 4;
+            m_position = -digitCount; // FIXME: use m_token.valuePosition
+            m_tag = convertToDecimal(0, digits, 16 - digitCount, digitCount); // FIXME: use m_token.tag
         }
     }
 
