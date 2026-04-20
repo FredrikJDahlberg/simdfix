@@ -36,7 +36,7 @@ public:
 
     Tokenizer() = default;
 
-    void scan(const uint8_t* buffer, const size_t length)
+    void scan(const uint8_t* buffer, const int32_t length)
     {
         m_count = 0;
         m_tag = 0;
@@ -47,7 +47,7 @@ public:
         m_count = 1;
 
         uint32_t bits = 4;
-        for (size_t offset = 0; offset + 15 < length; offset += 16)
+        for (int32_t offset = 0; offset + 15 < length; offset += 16)
         {
             m_data.put(buffer + offset, length - offset);
             dump(16, buffer + offset);
@@ -129,56 +129,73 @@ private:
 
     simd::Block m_data;
 
-    void process(const int32_t offset, const uint64_t digitsMap, const uint8_t* digits, int32_t bits)
+    void process(const int32_t offset, const uint64_t tagDigitsMap, const uint8_t* digits, uint32_t nonTagBits)
     {
-        // FIXME: calculate first tag outside loop?
-        // FIXME: handle value lengths
-        // FIXME: handle unterminated values
         for (int i = 0; i < 16; ++i)
         {
             std::printf("%02x ", digits[i]);
         }
         std::printf("\n");
 
-        const uint64_t lastDigitMap = digitsMap >> 60 & 0xF;
-        // FIXME: handle split tags with more than one digit
-        uint64_t remainingMap = digitsMap & 0x0FFFFFFFFFFFFFFFULL;
+        const uint16_t trailingTag = tagDigitsMap >> 52;
+        // const uint16_t bitCount = std::popcount(trailingTag);
+        uint64_t remainingDigits = tagDigitsMap & 0x0fffffffffffffffull;
+        if (trailingTag == 0xfff)
+        {
+            remainingDigits = tagDigitsMap & 0x000fffffffffffffull;
+        }
+        if (trailingTag == 0xff0)
+        {
+            remainingDigits = tagDigitsMap & 0x00ffffffffffffffull;
+        }
+
         int32_t tagPosition = 0;
         int32_t digitCount = 0;
-        while (remainingMap > 0) {
-            const auto trailingZeros = std::countr_zero(remainingMap);
-            bits += trailingZeros;
-            remainingMap >>= trailingZeros;
-            const auto digitBits = std::countr_one(remainingMap);
+        while (remainingDigits > 0)
+        {
+            const int32_t nonTags = std::countr_zero(remainingDigits);
+            nonTagBits += nonTags;
+            remainingDigits >>= nonTags;
+            const auto digitBits = std::countr_one(remainingDigits);
             digitCount = digitBits / 4;
-            tagPosition = bits / 4; //  + m_position;
+            tagPosition = nonTagBits / 4; //  + m_position;
             auto& prevToken = m_tokens[m_count - 1];
             prevToken.valueLength = offset + tagPosition - prevToken.valueOffset - 1 + m_position;
-            std::printf("TAG = %d len = %d offset = %d, pos = %d POS= %d \n",
-                prevToken.tag, prevToken.valueLength, prevToken.valueOffset, offset + tagPosition, m_position);
+            std::printf("TAG[%2d] = %d len = %d offset = %d, pos = %d POS= %d \n",
+                m_count, prevToken.tag, prevToken.valueLength, prevToken.valueOffset, offset + tagPosition, m_position);
 
-            auto& [tag, valueOffset, valueLength] = m_tokens[m_count++];
+            auto& [tag, valuePosition, valueLength] = m_tokens[m_count];
+            ++m_count;
             tag = convertToDecimal(m_tag, digits, tagPosition, digitCount);
             m_tag = 0;
             m_position = 0;
-            valueOffset = offset + tagPosition + digitCount + 1;
-            remainingMap >>= digitBits;
-            bits += digitBits;
+            valuePosition = offset + tagPosition + digitCount + 1;
+            remainingDigits >>= digitBits;
+            nonTagBits += digitBits;
         }
-        if (lastDigitMap == 0xF)
+        if (trailingTag == 0xfff)
         {
-            m_tokens[m_count - 1].valueLength = 0;
+            m_tag = digits[13] * 100 + digits[14] * 10 + digits[15];  // store split tags
+            m_position = -digitCount + 3;
+        }
+        if (trailingTag == 0xff0)
+        {
+            m_tag = digits[14] * 10 + digits[15];  // store split tags
+            m_position = -digitCount + 1;
+        }
+        if (trailingTag == 0xf00)
+        {
             m_tag = digits[15];  // store split tags
             m_position = -digitCount + 1;
         }
     }
 
-    static uint32_t convertToDecimal(const uint32_t& value,
+    static uint32_t convertToDecimal(const int32_t& value,
                                      const uint8_t* buffer,
-                                     const uint32_t position,
-                                     const uint32_t length)
+                                     const int32_t position,
+                                     const int32_t length)
     {
-        uint32_t decimal = value;
+        int32_t decimal = value;
         const uint8_t* digit = buffer + position;
         const uint8_t* end = digit + length;
         while (digit < end)
