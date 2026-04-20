@@ -34,6 +34,10 @@ public:
         int32_t valueOffset;
         int32_t valueLength;
     };
+    friend std::ostream& operator<<(std::ostream& os, const Token& obj)
+    {
+        return os << "{Token, tag = " << obj.tag << ", valueOffset = " << obj.valueOffset << ", valueLength = " << obj.valueLength << "}";
+    }
 
     Tokenizer() = default;
 
@@ -44,14 +48,17 @@ public:
 
         uint8_t digits[16];
         m_tokens[0] = { 8, 2, 6 };
-        std::printf("token, tag = %d, len = %d, pos = %d\n", m_tokens->tag, m_tokens->valueLength, m_tokens->valueOffset);
+        // std::printf("token, tag = %d, len = %d, pos = %d\n", m_tokens->tag, m_tokens->valueLength, m_tokens->valueOffset);
         m_count = 1;
 
         uint32_t bits = 4;
+        uint64_t checkSum = 0;
         for (int32_t offset = 0; offset + 15 < length; offset += 16)
         {
             m_data.put(buffer + offset, length - offset);
-            dump(16, buffer + offset);
+            checkSum += m_data.sum();
+
+            // dump(16, buffer + offset);
             // A digit is valid if followed by '=' or a validated digit
             const simd::Block digitFlags{m_data >= ZerosBlock & m_data <= NinesBlock};
             const simd::Block tagEnds{m_data == TagEndsBlock};
@@ -76,6 +83,8 @@ public:
             process(offset, tagDigits, digits, bits);
             bits = 0;
         }
+        // FIXME: adjust checksum and stop tokenizer after tag 10
+        // std::printf("%3d\n", checkSum % 256);
     }
 
     Token* begin()
@@ -132,44 +141,44 @@ private:
 
     void process(const int32_t offset, const uint64_t tagDigitFlags, const uint8_t* digits, uint32_t nonTagBitPos)
     {
+        /*
         for (int i = 0; i < 16; ++i)
         {
             std::printf("%02x ", digits[i]);
         }
         std::printf("\n");
-
+        */
         const uint16_t trailingTagFlags = tagDigitFlags >> 48; // 52
         const int32_t trailingCount = std::countl_one(trailingTagFlags);
         uint64_t remainingDigitFlags = tagDigitFlags & (-1ull >> std::max(4, trailingCount));
-        int32_t tagPosition = 0;  // FIXME: replace with m_position
-        int32_t digitCount = 0;
+        m_tokens[m_count - 1].valueLength = m_position;
         while (remainingDigitFlags > 0)
         {
             const int32_t nonTagCount = std::countr_zero(remainingDigitFlags);
             nonTagBitPos += nonTagCount;
             remainingDigitFlags >>= nonTagCount;
             const auto digitBits = std::countr_one(remainingDigitFlags);
-            digitCount = digitBits / 4;
-            tagPosition = nonTagBitPos / 4; //  + m_position;
+            const int32_t digitCount = digitBits / 4;
+            const int32_t tagPosition = nonTagBitPos / 4;
             auto& prevToken = m_tokens[m_count - 1];
-            prevToken.valueLength = offset + tagPosition - prevToken.valueOffset - 1 + m_position;
-            std::printf("TAG = %d len = %d offset = %d, pos = %d POS= %d \n",
-                        prevToken.tag, prevToken.valueLength, prevToken.valueOffset, offset + tagPosition, m_position);
+            prevToken.valueLength += offset + tagPosition - prevToken.valueOffset - 1;
+            // std::cout << prevToken << std::endl;
 
             auto& [tag, valuePosition, valueLength] = m_tokens[m_count];
             ++m_count;
+
             tag = convertToDecimal(m_tag, digits, tagPosition, digitCount);
             m_tag = 0;
-            m_position = 0;
             valuePosition = offset + tagPosition + digitCount + 1;
             remainingDigitFlags >>= digitBits;
             nonTagBitPos += digitBits;
         }
-        if (trailingCount >= 4 && trailingCount <= 12)
+        m_position = 0;
+        if (trailingCount >= 4)
         {
             const auto digitCount = trailingCount / 4;
-            m_position = -digitCount; // FIXME: use m_token.valuePosition
-            m_tag = convertToDecimal(0, digits, 16 - digitCount, digitCount); // FIXME: use m_token.tag
+            m_position = -digitCount;
+            m_tag = convertToDecimal(0, digits, 16 - digitCount, digitCount);
         }
     }
 

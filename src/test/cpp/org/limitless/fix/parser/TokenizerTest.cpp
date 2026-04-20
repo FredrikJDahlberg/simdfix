@@ -38,12 +38,6 @@ TEST(Tokenizer, Basics)
     const auto  duration = std::chrono::nanoseconds(end - start);
     std::printf("%8lld\n", duration.count());
 
-    // FIXME: tag 141
-    // FIXME tag 1137
-    // tokenizer.forEach([](const Tokenizer::Token& token) {
-//        std::printf("tag = %3d, pos = %d, len = %d\n", token.tag, token.valueOffset, token.valueLength);
-  //  });
-
     const Tokenizer::Token expectedTokens[] =
     {
         { 8, 2, 8 },
