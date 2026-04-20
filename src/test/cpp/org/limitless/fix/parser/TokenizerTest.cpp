@@ -32,11 +32,7 @@ static constexpr uint8_t MESSAGE1[] =
 TEST(Tokenizer, Basics)
 {
     Tokenizer tokenizer;
-    const auto start = std::chrono::high_resolution_clock::now();
     tokenizer.scan(MESSAGE1, sizeof(MESSAGE1) - 1);
-    const auto end = std::chrono::high_resolution_clock::now();
-    const auto  duration = std::chrono::nanoseconds(end - start);
-    std::printf("%8lld\n", duration.count());
 
     const Tokenizer::Token expectedTokens[] =
     {

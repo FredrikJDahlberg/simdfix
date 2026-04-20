@@ -41,16 +41,14 @@ public:
 
     Tokenizer() = default;
 
-    void scan(const uint8_t* buffer, const int32_t length)
+    size_t scan(const uint8_t* buffer, const int32_t length)
     {
         m_count = 0;
         m_tag = 0;
 
-        uint8_t digits[16];
-        m_tokens[0] = { 8, 2, 6 };
         // std::printf("token, tag = %d, len = %d, pos = %d\n", m_tokens->tag, m_tokens->valueLength, m_tokens->valueOffset);
+        m_tokens[0] = { buffer[0] - '0', 2, 8 };
         m_count = 1;
-
         uint32_t bits = 4;
         uint64_t checkSum = 0;
         for (int32_t offset = 0; offset + 15 < length; offset += 16)
@@ -75,16 +73,19 @@ public:
             before |= digitFlags & before.shiftRight<1>();
             before |= digitFlags & before.shiftRight<1>();
             // before |= digitFlags & before.shiftRight<1>();
+
             const simd::Block validTags{after | before};
             const simd::Block tags{validTags.whenTrue(m_data - ZerosBlock)};
             auto tagDigits = validTags.toUint64();  // 16 bytes to 4-bit nibble
-            tags.get(0, digits); // read into GPR
+            uint8_t digits[16];
+            tags.get(0, digits);
             tagDigits >>= bits;
             process(offset, tagDigits, digits, bits);
             bits = 0;
         }
         // FIXME: adjust checksum and stop tokenizer after tag 10
         // std::printf("%3d\n", checkSum % 256);
+        return 0; // FIXME: number of processed bytes
     }
 
     Token* begin()
@@ -132,11 +133,9 @@ public:
 
 private:
     Token m_tokens[128]{};
-    size_t m_count = 0;
-
-    int32_t m_tag = 0;
-    int32_t m_position = 0;
-
+    size_t m_count;
+    int32_t m_tag{};
+    int32_t m_position{};
     simd::Block m_data;
 
     void process(const int32_t offset, const uint64_t tagDigitFlags, const uint8_t* digits, uint32_t nonTagBitPos)
@@ -182,7 +181,7 @@ private:
         }
     }
 
-    static uint32_t convertToDecimal(const int32_t& value,
+    static int32_t convertToDecimal(const int32_t& value,
                                      const uint8_t* buffer,
                                      const int32_t position,
                                      const int32_t length)
