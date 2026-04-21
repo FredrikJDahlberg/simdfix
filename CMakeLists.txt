@@ -19,20 +19,15 @@ set(FIX_HEADERS
 )
 
 add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS})
-target_compile_options(SimdFix PRIVATE
-        -O3
-        -mcpu=apple-m1
-        -Wall
-)
+target_compile_options(SimdFix PRIVATE -O3 -Wall)
 target_include_directories(SimdFix PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
 
 add_executable(TokenizerTest src/test/cpp/org/limitless/fix/parser/TokenizerTest.cpp)
+target_compile_options(TokenizerTest PRIVATE -O0 -Wall)
 target_link_libraries(TokenizerTest SimdFix GTest::gtest GTest::gtest_main)
 
 add_executable(SimdFixBench src/test/cpp/org/limitless/fix/benchmark/SimdFixBench.cpp)
-target_compile_options(SimdFixBench PRIVATE
-        -O3
-        -Wall
-)
 target_link_libraries(SimdFixBench SimdFix)
+target_compile_options(SimdFixBench PRIVATE -O3 -Wall)
 target_include_directories(SimdFixBench PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/test/cpp")
+

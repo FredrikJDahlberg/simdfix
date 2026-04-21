@@ -10,7 +10,7 @@
 
 namespace org::limitless::simd {
 
-struct Block  // VEC_u8x16
+struct Uint8x16  // VEC_u8x16
 {
     typedef uint8x16_t value_type;
 
@@ -22,16 +22,16 @@ struct Block  // VEC_u8x16
 
     value_type m_block{};
 
-    Block() : Block{0}
+    Uint8x16() : Uint8x16{0}
     {
     }
 
-    explicit Block(const Block& block)
+    explicit Uint8x16(const Uint8x16& block)
     {
         m_block = block.m_block;
     }
 
-    explicit Block(const value_type block) : m_block(block)
+    explicit Uint8x16(const value_type block) : m_block(block)
     {
     }
 
@@ -41,7 +41,7 @@ struct Block  // VEC_u8x16
      * @param filler byte
      * @return 16 byte vector filled with filler bytes
      */
-    explicit Block(const uint8_t filler)
+    explicit Uint8x16(const uint8_t filler)
     {
         m_block = vdupq_n_u8(filler);
     }
@@ -53,7 +53,7 @@ struct Block  // VEC_u8x16
      * @param length valid data
      * @return 16 byte vector
      */
-    explicit Block(const uint8_t* buffer, const size_t length)
+    explicit Uint8x16(const uint8_t* buffer, const size_t length)
     {
         put(buffer, length);
     }
@@ -69,53 +69,53 @@ struct Block  // VEC_u8x16
         return success;
     }
 
-    const Block& get(const size_t position, uint8_t* buffer) const
+    const Uint8x16& get(const size_t position, uint8_t* buffer) const
     {
         vst1q_u8(buffer + position, m_block);
         return *this;
     }
 
-    Block& operator|=(const Block& block)
+    Uint8x16& operator|=(const Uint8x16& block)
     {
         m_block = vorrq_u8(m_block, block.m_block);
         return *this;
     }
 
-    Block operator|(const Block& block) const
+    Uint8x16 operator|(const Uint8x16& block) const
     {
-        return Block{vorrq_u8(this->m_block, block.m_block)};
+        return Uint8x16{vorrq_u8(this->m_block, block.m_block)};
     }
 
-    Block& operator&=(const Block& block)
+    Uint8x16& operator&=(const Uint8x16& block)
     {
         m_block = vandq_u8(m_block, block.m_block);
         return *this;
     }
 
-    Block operator&(const Block& block) const
+    Uint8x16 operator&(const Uint8x16& block) const
     {
-        return Block{vandq_u8(this->m_block, block.m_block)};
+        return Uint8x16{vandq_u8(this->m_block, block.m_block)};
     }
 
     template <int N>
-    [[nodiscard]] Block shiftLeft() const {
+    [[nodiscard]] Uint8x16 shiftLeft() const {
         static_assert(N >= 0 && N < 16, "Shift must be between 0 and 15");
-        return Block(vextq_u8(m_block, False, N));
+        return Uint8x16(vextq_u8(m_block, False, N));
     }
 
     template <int N>
-    [[nodiscard]] Block shiftRight() const
+    [[nodiscard]] Uint8x16 shiftRight() const
     {
         static_assert(N >= 0 && N < 16, "Shift must be between 0 and 15");
-        return Block(vextq_u8(False, m_block, 16 - N));
+        return Uint8x16(vextq_u8(False, m_block, 16 - N));
     }
 
-    Block operator-(const Block& block) const
+    Uint8x16 operator-(const Uint8x16& block) const
     {
-        return Block(vsubq_u8(m_block, block.m_block));
+        return Uint8x16(vsubq_u8(m_block, block.m_block));
     }
 
-    Block& operator-=(const Block& block)
+    Uint8x16& operator-=(const Uint8x16& block)
     {
         m_block = vsubq_u8(m_block, block.m_block);
         return *this;
@@ -123,13 +123,13 @@ struct Block  // VEC_u8x16
 
     // TODO +=
 
-    Block& operator=(const value_type& vector)
+    Uint8x16& operator=(const value_type& vector)
     {
         m_block = vector;
         return *this;
     }
 
-    Block& operator=(const Block& block)
+    Uint8x16& operator=(const Uint8x16& block)
     {
         if (&block != this)
         {
@@ -138,19 +138,19 @@ struct Block  // VEC_u8x16
         return *this;
     }
 
-    Block operator==(const Block& block) const
+    Uint8x16 operator==(const Uint8x16& block) const
     {
-        return Block{vceqq_u8(this->m_block, block.m_block)};
+        return Uint8x16{vceqq_u8(this->m_block, block.m_block)};
     }
 
-    Block operator>=(const Block& block) const
+    Uint8x16 operator>=(const Uint8x16& block) const
     {
-        return Block{vcgeq_u8(m_block, block.m_block)};
+        return Uint8x16{vcgeq_u8(m_block, block.m_block)};
     }
 
-    Block operator<=(const Block& block) const
+    Uint8x16 operator<=(const Uint8x16& block) const
     {
-        return Block{vcleq_u8(m_block, block.m_block)};
+        return Uint8x16{vcleq_u8(m_block, block.m_block)};
     }
 
     [[nodiscard]] uint64_t sum() const
@@ -164,12 +164,12 @@ struct Block  // VEC_u8x16
         return Block{vbslq_u8(m_block, trueBlock.m_block, falseBlock.m_block)};
     }
     */
-    [[nodiscard]] Block whenTrue(const Block& block) const
+    [[nodiscard]] Uint8x16 whenTrue(const Uint8x16& block) const
     {
-        return Block{vbslq_u8(m_block, block.m_block, False)};
+        return Uint8x16{vbslq_u8(m_block, block.m_block, False)};
     }
 
-    Block& equal(const Block& block, Block& result)
+    Uint8x16& equal(const Uint8x16& block, Uint8x16& result)
     {
         result.m_block = vceqq_u8(m_block, block.m_block);
         return *this;
@@ -192,6 +192,16 @@ struct Block  // VEC_u8x16
         for (int i = 0; i < 16; ++i)
         {
             std::printf("%02x ", data[i]);
+        }
+        std::printf("\n");
+    }
+
+    static void dump(const uint8x16_t& vector)
+    {
+        const auto data = reinterpret_cast<const uint8_t*>(&vector);
+        for (int j = 0; j < 16; ++j)
+        {
+            std::printf("%02x ", data[j]);
         }
         std::printf("\n");
     }

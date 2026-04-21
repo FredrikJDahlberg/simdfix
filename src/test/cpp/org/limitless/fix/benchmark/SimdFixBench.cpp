@@ -1,9 +1,12 @@
 //
 // Created by Fredrik Dahlberg on 2026-04-20.
 //
-#include <cstdint>
+#define NDEBUG 1
 
-#include "org/limitless/fix/parser/Block.hpp"
+#include <memory>
+#include <cstddef>
+
+#include "org/limitless/fix/parser/Uint8x16.hpp"
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 
 #define SOH "\x01"
@@ -26,30 +29,29 @@ static constexpr std::uint8_t MESSAGE1[] =
     // next message
     "                      ";
 
-
-
-static uint8_t buffer[4096*1000];
-
 int main(int argc, char** argv)
 {
     using namespace org::limitless::fix::parser;
     Tokenizer tokenizer;
 
-    const uint64_t sum = 1'000'000 * sizeof(MESSAGE1);
-    for (int i = 0; i < sizeof(buffer); i += sizeof(MESSAGE1))
+    constexpr size_t SIZE = 1024*1024*1024ull;
+    auto buffer = std::make_unique<std::uint8_t[]>(SIZE);
+    for (size_t i = 0; i < SIZE - sizeof(MESSAGE1); i += sizeof(MESSAGE1))
     {
-        memcpy(buffer + i, MESSAGE1, sizeof(MESSAGE1));
+        memcpy(&buffer[i], MESSAGE1, sizeof(MESSAGE1));
     }
-    std::printf("count = %lu\n", sizeof(buffer)/sizeof(MESSAGE1));
+    std::printf("count = %lu\n", SIZE/sizeof(MESSAGE1));
 
     const auto start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < sizeof(buffer); i += sizeof(MESSAGE1))
+    for (size_t i = 0; i < SIZE - sizeof(MESSAGE1); i += sizeof(MESSAGE1))
     {
-        tokenizer.scan(buffer + i, sizeof(MESSAGE1) - 1);
+        tokenizer.scan(&buffer[i], sizeof(MESSAGE1));
     }
     const auto end = std::chrono::high_resolution_clock::now();
     const auto  duration = std::chrono::nanoseconds(end - start);
-    double gbPerSec = 1'000'000'000.0*sizeof(buffer)/(duration.count()*1024*1024*1024);
-    std::printf("GB per second = %.2g\n", gbPerSec);
+    std::printf("Duration = %lld ms\n", duration.count()/1'000'000);
+
+    const auto gigaBytesPerSecond = 1'000'000'000.0/duration.count();
+    std::printf("GB per second = %.3f\n", gigaBytesPerSecond);
     return 0;
 }
