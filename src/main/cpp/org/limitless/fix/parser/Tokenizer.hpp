@@ -29,13 +29,13 @@ class Tokenizer
 public:
     struct Token
     {
-        uint32_t valueOffset;
+        uint32_t position;
         uint16_t tag;
-        uint16_t valueLength;
+        uint16_t length;
     };
     friend std::ostream& operator<<(std::ostream& os, const Token& obj)
     {
-        return os << "{Token, tag = " << obj.tag << ", valueOffset = " << obj.valueOffset << ", valueLength = " << obj.valueLength << "}";
+        return os << "{Token, tag = " << obj.tag << ", valueOffset = " << obj.position << ", valueLength = " << obj.length << "}";
     }
 
     Tokenizer() = default;
@@ -59,9 +59,9 @@ public:
         return m_tokens + m_count;
     }
 
-    static void dump(const size_t length, const uint8_t* buffer)
+    static void dump(const uint32_t length, const uint8_t* buffer)
     {
-        for (int i = 0; i < length; ++i)
+        for (uint32_t i = 0; i < length; ++i)
         {
             if (const auto ch = buffer[i]; std::isprint(ch))
             {
@@ -88,25 +88,28 @@ public:
 private:
     Token m_tokens[128]{};
     size_t m_count;
-    int32_t m_tag{};
+    uint16_t m_tag{};
     int32_t m_position{};
     simd::Uint8x16 m_data;
 
-    void process(const int32_t offset, const uint64_t tagDigitFlags, const uint8_t* digits, uint32_t nonTagBitPos);
+    bool process(int32_t offset, uint64_t tagDigitFlags, const uint8_t* digits, uint32_t nonTagBitPos);
 
-    static int32_t convertToDecimal(const int32_t& value,
-                                     const uint8_t* buffer,
-                                     const int32_t position,
-                                     const int32_t length)
+    template <uint8_t Base = 0>
+    static uint32_t convertToDecimal(const uint32_t& value, const uint8_t* buffer, const int32_t position, const int32_t length)
     {
-        int32_t decimal = value;
+        uint32_t decimal = value;
         const uint8_t* digit = buffer + position;
         const uint8_t* end = digit + length;
         while (digit < end)
         {
-            decimal = decimal * 10 + *digit++;
+            decimal = decimal * 10 + *digit++ - Base;
         }
         return decimal;
+    }
+
+    static uint32_t asciiToDecimal(const uint8_t* buffer, const int32_t position, const int32_t length)
+    {
+        return convertToDecimal<'0'>(0, buffer, position, length);
     }
 };
 }

@@ -12,7 +12,7 @@
 #define SOH "\x01"
 static constexpr std::uint8_t MESSAGE1[] =
     "8=FIXT.1.1" SOH
-    "9=116" SOH
+    "9=118" SOH
     "35=A" SOH
     "49=Buyer" SOH
     "56=SellSide_1" SOH
@@ -25,7 +25,7 @@ static constexpr std::uint8_t MESSAGE1[] =
     "553=Username" SOH
     "554=Password" SOH
     "1137=9" SOH
-    "10=079" SOH
+    "10=147" SOH
     // next message
     "                      ";
 
