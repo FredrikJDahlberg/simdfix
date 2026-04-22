@@ -177,12 +177,8 @@ struct Uint8x16  // VEC_u8x16
 
     [[nodiscard]] uint64_t toUint64() const
     {
-        // 1. Create a mask: if lane != 0, result is 0xFF. If lane == 0, result is 0x00.
-        // vtstq_u8(v, v) is a "test bits" operation. Since 08 & 08 != 0, it becomes 0xFF.
-        uint8x16_t mask = vtstq_u8(m_block, m_block);
-
-        // 2. Now narrow the mask. Since the mask lanes are 0xFF, the 4-bit nibbles will be 0xF.
-        uint8x8_t narrowed = vshrn_n_u16(vreinterpretq_u16_u8(mask), 4);
+        const uint8x16_t mask = vtstq_u8(m_block, m_block);
+        const uint8x8_t narrowed = vshrn_n_u16(vreinterpretq_u16_u8(mask), 4);
         return vget_lane_u64(vreinterpret_u64_u8(narrowed), 0);
     }
 

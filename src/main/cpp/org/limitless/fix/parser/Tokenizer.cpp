@@ -8,7 +8,6 @@
 #include <span>
 
 namespace org::limitless::fix::parser {
-
 size_t Tokenizer::scan(const data_t* buffer, const length_t length)
 {
     m_count = 0;
@@ -71,6 +70,86 @@ size_t Tokenizer::scan(const data_t* buffer, const length_t length)
     return token10.position + 4;
 }
 
+// this code is optimized for 4 digits
+bool Tokenizer::process(const position_t offset,
+                        const uint64_t tagDigitFlags,
+                        const data_t* digits,
+                        position_t nonTagBitPos)
+{
+    const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
+    const int32_t trailingCount = std::countl_one(trailingTagFlags);
+
+    auto* token = &m_tokens[m_count - 1];
+    token->length = m_position;
+
+    // Fixed mask since we only handle up to 4 digits (16 bits)
+    uint64_t remainingDigitFlags = tagDigitFlags & (~0ull >> std::max(4, trailingCount));
+
+    while (remainingDigitFlags > 0 && token->tag != 10)
+    {
+        const int32_t nonTagCount = std::countr_zero(remainingDigitFlags);
+        nonTagBitPos += nonTagCount;
+        remainingDigitFlags >>= nonTagCount;
+
+        const uint32_t digitBits = std::countr_one(remainingDigitFlags);
+        const uint32_t tagPos = nonTagBitPos >> 2;
+        token->length += offset + tagPos - token->position - 1;
+        token = &m_tokens[m_count++];
+
+        const uint32_t count = digitBits >> 2;
+        const data_t* digit = &digits[tagPos];
+        uint32_t value = 0;
+        if (m_tag != 0)
+        { // Handle split tag carry-over
+            value = m_tag;
+            m_tag = 0;
+        }
+        if (count >= 1)
+        {
+            value = value * 10 + digit[0];
+        }
+        if (count >= 2)
+        {
+            value = value * 10 + digit[1];
+        }
+        if (count >= 3)
+        {
+            value = value * 10 + digit[2];
+        }
+        if (count >= 4)
+        {
+            value = value * 10 + digit[3];
+        }
+        token->tag = value;
+        token->position = offset + tagPos + count + 1;
+        remainingDigitFlags >>= digitBits;
+        nonTagBitPos += digitBits;
+    }
+
+    m_position = 0;
+    if (trailingCount >= 4)
+    {
+        const int32_t count = trailingCount >> 2;
+        m_position = -count;
+        const data_t* digit = &digits[16 - count];
+        uint32_t value = digit[0];
+        if (count >= 2)
+        {
+            value = value * 10 + digit[1];
+        }
+        if (count >= 3)
+        {
+            value = value * 10 + digit[2];
+        }
+        if (count >= 4)
+        {
+            value = value * 10 + digit[3];
+        }
+        m_tag = value;
+    }
+    return m_tokens[m_count - 1].tag == 10;
+}
+
 void Tokenizer::checkRequiredFields(const position_t offset, data_t checkSum, const data_t* buffer) const
 {
 #if 0
@@ -116,42 +195,31 @@ void Tokenizer::checkRequiredFields(const position_t offset, data_t checkSum, co
     }
 }
 
-bool Tokenizer::process(const position_t offset,
-                        const uint64_t tagDigitFlags,
-                        const data_t* digits, position_t nonTagBitPos)
+uint32_t Tokenizer::asciiToDecimal(const data_t* buffer, const position_t position, const length_t length) const
 {
-    const uint16_t trailingTagFlags = tagDigitFlags >> 48; // 52
-    const int32_t trailingCount = std::countl_one(trailingTagFlags);
-    auto token = m_tokens + m_count - 1;
-    token->length = m_position;
-    uint64_t remainingDigitFlags = tagDigitFlags & -1ull >> std::max(4, trailingCount);
-    while (remainingDigitFlags > 0 && token->tag != 10)
+    const data_t* digit = buffer + position;
+    uint32_t value = digit[0] - '0';
+    if (length >= 2)
     {
-        const int32_t nonTagCount = std::countr_zero(remainingDigitFlags);
-        nonTagBitPos += nonTagCount;
-        remainingDigitFlags >>= nonTagCount;
-        const auto digitBits = std::countr_one(remainingDigitFlags);
-        const int32_t digitCount = digitBits / 4;
-        const uint32_t tagPosition = nonTagBitPos / 4;
-        token->length += offset + tagPosition - token->position - 1;
-        auto& [position, tag, length] = m_tokens[m_count];
-        ++m_count;
-        ++token;
-
-        tag = convertToDecimal(m_tag, digits, tagPosition, digitCount);
-        m_tag = 0;
-        position = offset + tagPosition + digitCount + 1;
-        remainingDigitFlags >>= digitBits;
-        nonTagBitPos += digitBits;
+        value = value * 10 + digit[1] - '0';
     }
-    m_position = 0;
-    if (trailingCount >= 4)
+    if (length >= 3)
     {
-        const auto digitCount = trailingCount / 4;
-        m_position = -digitCount;
-        m_tag = convertToDecimal(0, digits, 16 - digitCount, digitCount);
+        value = value * 10 + digit[2] - '0';
     }
-    return token->tag == 10;
+    if (length >= 4)
+    {
+        value = value * 10 + digit[3] - '0';
+    }
+    if (length >= 5)
+    {
+        value = value * 10 + digit[4] - '0';
+    }
+    if (length >= 6)
+    {
+        value = value * 10 + digit[5] - '0';
+    }
+    return value;
 }
 
 }

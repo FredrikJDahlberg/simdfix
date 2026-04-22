@@ -35,9 +35,7 @@ target_include_directories(SimdFixBench PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src
 target_link_options(SimdFixBench PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
 
 list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/include")
-
 find_package(pugixml REQUIRED)
-
 add_executable(Generator src/generator/org/limitless/generator/fix/Generator.cpp)
 target_compile_options(Generator PRIVATE -O0 -Wall)
 target_include_directories(Generator PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/cpp")
