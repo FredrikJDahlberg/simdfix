@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.20)
 project(simd_fix)
 
 set(CMAKE_CXX_STANDARD 23)
-
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
 
 enable_testing()
 
@@ -31,5 +31,14 @@ target_link_options(TokenizerTest PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
 add_executable(SimdFixBench src/test/cpp/org/limitless/fix/benchmark/SimdFixBench.cpp)
 target_link_libraries(SimdFixBench SimdFix)
 target_compile_options(SimdFixBench PRIVATE -O3 -Wall)
-target_include_directories(SimdFixBench PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/test/cpp")
+target_include_directories(SimdFixBench PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/test/cpp" "/opt/homebrew/include")
 target_link_options(SimdFixBench PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
+
+list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/include")
+
+find_package(pugixml REQUIRED)
+
+add_executable(Generator src/generator/org/limitless/generator/fix/Generator.cpp)
+target_compile_options(Generator PRIVATE -O0 -Wall)
+target_include_directories(Generator PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/cpp")
+target_link_libraries(Generator PRIVATE pugixml::pugixml)
