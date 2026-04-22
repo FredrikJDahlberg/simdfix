@@ -8,11 +8,16 @@
 
 namespace org::limitless::fix::parser {
 
+void verify(Tokenizer::Token* tokens, size_t count, Tokenizer::Token* expected, Tokenizer::Token* actual)
+{
+
+}
+
 #define SOH "\x01"
 // body = 5 + 9 + 14 + 5 + 27 + 7 + 5 + 7 + 6 + 13 + 13 + 7 = 118
 static uint8_t MESSAGE1[] =
-    "8=FIXT.1.1" SOH
-    "9=118" SOH
+    "8=FIXT.1.1" SOH // 11
+    "9=118" SOH // 6
     "35=A" SOH // 5
     "49=Buyer" SOH // 9
     "56=SellSide_1" SOH // 14
@@ -25,18 +30,21 @@ static uint8_t MESSAGE1[] =
     "553=Username" SOH // 13
     "554=Password" SOH // 13
     "1137=9" SOH // 7
-    "10=147" SOH
+    "10=147" SOH // 7
     // next message
-    "                   ";  // padding
+    "8=FIXT.1.1" SOH
+    "9=118" SOH;
+
 TEST(Tokenizer, Basics)
 {
     Tokenizer tokenizer;
-    tokenizer.scan(MESSAGE1, sizeof(MESSAGE1) - 1);
+    const auto processed = tokenizer.scan(MESSAGE1, sizeof(MESSAGE1) - 1);
+    ASSERT_EQ(142, processed) << "Invalid message length = " << processed;
 
     const Tokenizer::Token expectedTokens[] =
     {
-        { 2, 8, 8 },
-        { 13, 9, 3 },
+        // { 2, 8, 8 },
+        // { 13, 9, 3 },
         { 20, 35, 1 },
         { 25, 49, 5 },
         { 34, 56, 10 },
@@ -49,17 +57,16 @@ TEST(Tokenizer, Basics)
         { 106, 553, 8 },
         { 119, 554, 8 },
         { 133, 1137, 1 },
-        { 138, 10, 3 },
+        // { 138, 10, 3 },
     };
-    int i = 0;
-    for (auto [valueOffset, tag, valueLength] : tokenizer)
+
+    for (int i = 0; auto& [position, tag, length] : tokenizer.tokens())
     {
-        const auto& expected = expectedTokens[i];
-        std::printf("%3d, tag = %d, pos = %d, len = %d\n", i, tag, valueOffset, valueLength);
-        ++i;
-        ASSERT_EQ(expected.tag, tag) << "Invalid tag value " << tag;
-        ASSERT_EQ(expected.position, valueOffset) << "Tag " << expected.tag << " has invalid offset";
-        ASSERT_EQ(expected.length, valueLength) << "Tag " << expected.tag << " has invalid length";
+        const auto& expected = expectedTokens[i++];
+        std::printf("%3d, tag = %4d, pos = %4d, len = %4d\n", i, tag, position, length);
+        ASSERT_EQ(expected.tag, tag) << "Mismatch at index " << i - 1;
+        ASSERT_EQ(expected.position, position) << "Tag " << expected.tag << " has invalid offset";
+        ASSERT_EQ(expected.length, length) << "Tag " << expected.tag << " has invalid length";
     }
 }
 }

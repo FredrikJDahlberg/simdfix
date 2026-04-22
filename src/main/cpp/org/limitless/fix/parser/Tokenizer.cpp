@@ -56,7 +56,7 @@ size_t Tokenizer::scan(const data_t* buffer, const length_t length)
         }
         std::printf("\n");
 #endif
-        complete = process(offset, tagDigits, digits, bits);
+        complete = processBlock(offset, tagDigits, digits, bits);
         if (!complete)
         {
             checkSum += m_data.sum() & 0xff;
@@ -71,7 +71,7 @@ size_t Tokenizer::scan(const data_t* buffer, const length_t length)
 }
 
 // this code is optimized for 4 digits
-bool Tokenizer::process(const position_t offset,
+bool Tokenizer::processBlock(const position_t offset,
                         const uint64_t tagDigitFlags,
                         const data_t* digits,
                         position_t nonTagBitPos)
@@ -195,7 +195,7 @@ void Tokenizer::checkRequiredFields(const position_t offset, data_t checkSum, co
     }
 }
 
-uint32_t Tokenizer::asciiToDecimal(const data_t* buffer, const position_t position, const length_t length) const
+uint32_t Tokenizer::asciiToDecimal(const data_t* buffer, const position_t position, const length_t length)
 {
     const data_t* digit = buffer + position;
     uint32_t value = digit[0] - '0';
