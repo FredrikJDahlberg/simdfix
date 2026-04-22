@@ -9,19 +9,20 @@
 
 namespace org::limitless::fix::parser {
 
-size_t Tokenizer::scan(const uint8_t* buffer, const int32_t length)
+size_t Tokenizer::scan(const data_t* buffer, const length_t length)
 {
     m_count = 0;
     m_tag = 0;
-
-    m_tokens[0] = { 2, static_cast<uint16_t>(buffer[0] - '0'), 8 };
+    m_tokens[0].position = 2;
+    m_tokens[0].length = 8;
+    m_tokens[0].tag = buffer[0] - '0';
     m_count = 1;
     uint64_t checkSum = 0;
     uint32_t bits = 4;
-    int32_t offset = 0;
-    uint8_t digits[16];
-    bool complete = false;
-    for (; offset + 15 < length && !complete; offset += 16)
+    position_t offset = 0;
+    data_t digits[16];
+
+    for (bool complete = false; offset + 15 < length && !complete; offset += 16)
     {
         m_data.put(buffer + offset, length - offset);
 #if !defined(NDEBUG)
@@ -49,23 +50,38 @@ size_t Tokenizer::scan(const uint8_t* buffer, const int32_t length)
         auto tagDigits = validTags.toUint64();  // 16 bytes to 4-bit nibble
         tags.get(0, digits);
         tagDigits >>= bits;
+#if !defined(NDEBUG)
+        for (int i = 0; i < 16; ++i)
+        {
+            std::printf("%02x ", digits[i]);
+        }
+        std::printf("\n");
+#endif
         complete = process(offset, tagDigits, digits, bits);
         if (!complete)
         {
-            checkSum += m_data.sum();
+            checkSum += m_data.sum() & 0xff;
         }
         bits = 0;
     }
 
-    const auto& token8 = m_tokens[0];
-    if (token8.tag != 8)
+    checkRequiredFields(offset, checkSum, buffer);
+    auto& token10 = m_tokens[m_count - 1];
+    token10.length = 3;
+    return token10.position + 4;
+}
+
+void Tokenizer::checkRequiredFields(const position_t offset, data_t checkSum, const data_t* buffer) const
+{
+#if 0
+    if (const auto& token8 = m_tokens[0]; token8.tag != 8)
     {
         throw std::invalid_argument("invalid begin string tag");
     }
-    const auto& token9 = m_tokens[1];
-    if (token9.tag != 9)
+#endif
+    if (std::memcmp(buffer, BeginString, 11) != 0)
     {
-        throw std::invalid_argument("invalid body length tag");
+        throw std::invalid_argument("invalid begin string");
     }
     const auto& token35 = m_tokens[2];
     if (token35.tag != 35)
@@ -78,8 +94,12 @@ size_t Tokenizer::scan(const uint8_t* buffer, const int32_t length)
     {
         throw std::invalid_argument("invalid check sum tag");
     }
-    const auto bodyLength = token10.position - token35.position;
-    if (asciiToDecimal(buffer, token9.position, token9.length) != bodyLength)
+    const auto& [position, tag, length] = m_tokens[1];
+    if (tag != 9)
+    {
+        throw std::invalid_argument("invalid body length tag");
+    }
+    if (asciiToDecimal(buffer, position, length) != token10.position - token35.position)
     {
         throw std::invalid_argument("invalid body length");
     }
@@ -94,25 +114,17 @@ size_t Tokenizer::scan(const uint8_t* buffer, const int32_t length)
     {
         throw std::invalid_argument("invalid checksum");
     }
-
-    return checkSumEnd + 7;
 }
 
-bool Tokenizer::process(const int32_t offset, const uint64_t tagDigitFlags, const uint8_t* digits, uint32_t nonTagBitPos)
+bool Tokenizer::process(const position_t offset,
+                        const uint64_t tagDigitFlags,
+                        const data_t* digits, position_t nonTagBitPos)
 {
-#if !defined(NDEBUG)
-    for (int i = 0; i < 16; ++i)
-    {
-        std::printf("%02x ", digits[i]);
-    }
-    std::printf("\n");
-#endif
     const uint16_t trailingTagFlags = tagDigitFlags >> 48; // 52
     const int32_t trailingCount = std::countl_one(trailingTagFlags);
-    uint64_t remainingDigitFlags = tagDigitFlags & (-1ull >> std::max(4, trailingCount));
-
     auto token = m_tokens + m_count - 1;
     token->length = m_position;
+    uint64_t remainingDigitFlags = tagDigitFlags & -1ull >> std::max(4, trailingCount);
     while (remainingDigitFlags > 0 && token->tag != 10)
     {
         const int32_t nonTagCount = std::countr_zero(remainingDigitFlags);

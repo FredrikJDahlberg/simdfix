@@ -13,12 +13,18 @@ namespace org::limitless::fix::parser {
 
 class Tokenizer
 {
-    static constexpr char TagEnd = '=';
-    static constexpr char FieldEnd = '\x01';
-    static constexpr char Zero = '0';
-    static constexpr char Nine = '9';
-    static constexpr uint8_t True = 255;
-    static constexpr uint8_t False = 0;
+public:
+    typedef uint32_t position_t;
+    typedef uint32_t length_t;
+    typedef uint8_t data_t;
+
+    static constexpr data_t TagEnd = '=';
+    static constexpr data_t FieldEnd = '\x01';
+    static constexpr data_t Zero = '0';
+    static constexpr data_t Nine = '9';
+    static constexpr data_t True = 255;
+    static constexpr data_t False = 0;
+    static constexpr data_t BeginString[11] = { '8', '=', 'F', 'I', 'X', 'T', '.', '1', '.', '1', Tokenizer::FieldEnd };
 
     const simd::Uint8x16 TagEndsBlock{TagEnd};
     const simd::Uint8x16 FieldEndsBlock{FieldEnd};
@@ -26,21 +32,16 @@ class Tokenizer
     const simd::Uint8x16 NinesBlock{Nine};
     const simd::Uint8x16 TrueBlock{True};
 
-public:
     struct Token
     {
-        uint32_t position;
+        position_t position;
         uint16_t tag;
         uint16_t length;
     };
-    friend std::ostream& operator<<(std::ostream& os, const Token& obj)
-    {
-        return os << "{Token, tag = " << obj.tag << ", valueOffset = " << obj.position << ", valueLength = " << obj.length << "}";
-    }
 
     Tokenizer() = default;
 
-    size_t scan(const uint8_t* buffer, int32_t length);
+    size_t scan(const uint8_t* buffer, length_t length);
 
     Token* begin()
     {
@@ -59,9 +60,9 @@ public:
         return m_tokens + m_count;
     }
 
-    static void dump(const uint32_t length, const uint8_t* buffer)
+    static void dump(const length_t length, const data_t* buffer)
     {
-        for (uint32_t i = 0; i < length; ++i)
+        for (length_t i = 0; i < length; ++i)
         {
             if (const auto ch = buffer[i]; std::isprint(ch))
             {
@@ -77,8 +78,8 @@ public:
 
     static void dump(const uint8x16_t& vector)
     {
-        const auto data = reinterpret_cast<const uint8_t*>(&vector);
-        for (int j = 0; j < 16; ++j)
+        const auto data = reinterpret_cast<const data_t*>(&vector);
+        for (position_t j = 0; j < 16; ++j)
         {
             std::printf("%02x ", data[j]);
         }
@@ -92,14 +93,16 @@ private:
     int32_t m_position{};
     simd::Uint8x16 m_data;
 
-    bool process(int32_t offset, uint64_t tagDigitFlags, const uint8_t* digits, uint32_t nonTagBitPos);
+    bool process(position_t offset, uint64_t tagDigitFlags, const data_t* digits, position_t nonTagBitPos);
 
-    template <uint8_t Base = 0>
-    static uint32_t convertToDecimal(const uint32_t& value, const uint8_t* buffer, const int32_t position, const int32_t length)
+    void checkRequiredFields(position_t offset, data_t checkSum, const data_t* buffer) const;
+
+    template <data_t Base = 0>
+    static uint32_t convertToDecimal(const uint32_t& value, const data_t* buffer, const position_t position, const length_t length)
     {
         uint32_t decimal = value;
-        const uint8_t* digit = buffer + position;
-        const uint8_t* end = digit + length;
+        const data_t* digit = buffer + position;
+        const data_t* end = digit + length;
         while (digit < end)
         {
             decimal = decimal * 10 + *digit++ - Base;
@@ -107,7 +110,7 @@ private:
         return decimal;
     }
 
-    static uint32_t asciiToDecimal(const uint8_t* buffer, const int32_t position, const int32_t length)
+    static uint32_t asciiToDecimal(const data_t* buffer, const position_t position, const length_t length)
     {
         return convertToDecimal<'0'>(0, buffer, position, length);
     }

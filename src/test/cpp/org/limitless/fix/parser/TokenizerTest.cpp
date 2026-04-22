@@ -10,7 +10,7 @@ namespace org::limitless::fix::parser {
 
 #define SOH "\x01"
 // body = 5 + 9 + 14 + 5 + 27 + 7 + 5 + 7 + 6 + 13 + 13 + 7 = 118
-static constexpr uint8_t MESSAGE1[] =
+static uint8_t MESSAGE1[] =
     "8=FIXT.1.1" SOH
     "9=118" SOH
     "35=A" SOH // 5
