@@ -25,12 +25,6 @@ public:
     static constexpr data_t Nine = '9';
     static constexpr data_t True = 255;
     static constexpr data_t False = 0;
-    static constexpr data_t BeginString[11] = { '8', '=', 'F', 'I', 'X', 'T', '.', '1', '.', '1', Tokenizer::FieldEnd };
-
-    static constexpr uint32_t BeginStringTag = 8;
-    static constexpr uint32_t BodyLengthTag = 9;
-    static constexpr uint32_t MsgTypeTag = 35;
-    static constexpr uint32_t CheckSumTag = 10;
 
     const simd::Uint8x16 TagEndsBlock{TagEnd};
     const simd::Uint8x16 FieldEndsBlock{FieldEnd};
@@ -53,7 +47,7 @@ public:
     Tokenizer(Tokenizer&&) = delete;
     Tokenizer& operator=(Tokenizer&&) = delete;
 
-    size_t scan(std::span<const data_t> buffer);
+    size_t scan(std::span<const data_t> buffer, uint8_t& checkSum);
 
     [[nodiscard]] const Token* begin() const noexcept
     {
@@ -77,7 +71,6 @@ private:
     simd::Uint8x16 m_data;
 
     bool processBlock(position_t offset, uint64_t tagDigitFlags, const data_t* digits, position_t nonTagBitPos);
-    void checkRequiredFields(position_t offset, data_t checkSum, const data_t* buffer) const;
 };
 }
 

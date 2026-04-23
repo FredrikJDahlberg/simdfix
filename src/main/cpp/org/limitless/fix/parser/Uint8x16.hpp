@@ -10,9 +10,11 @@
 
 namespace org::limitless::simd {
 
-struct Uint8x16  // VEC_u8x16
+struct Uint8x16
 {
     typedef uint8x16_t value_type;
+
+    static size_t constexpr Size = 16;
 
     static inline const value_type True = vdupq_n_u8(255);
     static inline const value_type False = vdupq_n_u8(0);

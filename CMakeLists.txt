@@ -11,10 +11,12 @@ find_package(GTest REQUIRED)
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp ${CMAKE_SOURCE_DIR}/src/test/cpp)
 
 set(FIX_SOURCES
+        src/main/cpp/org/limitless/fix/parser/Parser.cpp
         src/main/cpp/org/limitless/fix/parser/Tokenizer.cpp)
 set(FIX_HEADERS
         src/main/cpp/org/limitless/fix/parser/Tokenizer.hpp
-        src/main/cpp/org/limitless/fix/parser/Utils.h)
+        src/main/cpp/org/limitless/fix/parser/Utils.h
+        src/main/cpp/org/limitless/fix/parser/Parser.hpp)
 
 add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS})
 target_include_directories(SimdFix PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")

@@ -9,71 +9,77 @@
 #include <span>
 
 namespace org::limitless::fix::parser {
-size_t Tokenizer::scan(std::span<const data_t> span)
+
+size_t Tokenizer::scan(const std::span<const data_t> buffer, uint8_t& checkSum)
 {
+    using simd::Uint8x16;
     m_count = 0;
     m_tag = 0;
-    const auto buffer = span.data();
-    const auto length = span.size();
+    const auto data = buffer.data();
+    const auto length = buffer.size();
     m_tokens[0].position = 2;
     m_tokens[0].length = 8;
-    m_tokens[0].tag = buffer[0] - '0';
+    m_tokens[0].tag = data[0] - '0';
     m_count = 1;
-    uint64_t checkSum = 0;
+    checkSum = 0;
     uint32_t bits = 4;
-    position_t offset = 0;
-    data_t digits[16];
+    data_t digits[Uint8x16::Size];
 
-    for (bool complete = false; offset + 15 < jj && !complete; offset += 16)
+    uint8_t lastSum = 0;
+    position_t offset = 0;
+    bool complete = false;
+    uint32_t checkSumValue = 0;
+    for (; offset + 15 < length && !complete; offset += Uint8x16::Size)
     {
-        m_data.put(buffer + offset, length - offset);
+        m_data.put(data + offset, length - offset);
 #if !defined(NDEBUG)
-        print(16, buffer + offset);
+        print(16, data + offset);
 #endif
         // A digit is valid if followed by '=' or a validated digit
-        const simd::Uint8x16 digitFlags{m_data >= ZerosBlock & m_data <= NinesBlock};
-        const simd::Uint8x16 tagEnds{m_data == TagEndsBlock};
-        simd::Uint8x16 after{digitFlags & tagEnds.shiftLeft<1>()};
+        const Uint8x16 digitFlags{m_data >= ZerosBlock & m_data <= NinesBlock};
+        const Uint8x16 tagEnds{m_data == TagEndsBlock};
+        Uint8x16 after{digitFlags & tagEnds.shiftLeft<1>()};
         after |= digitFlags & after.shiftLeft<1>();
         after |= digitFlags & after.shiftLeft<1>();
         after |= digitFlags & after.shiftLeft<1>();
         // after |= digitFlags & after.shiftLeft<1>();
 
         // A digit is valid if preceded by 0x01 or a validated digit
-        simd::Uint8x16 fieldEnds{m_data == FieldEndsBlock};
-        simd::Uint8x16 before = digitFlags & fieldEnds.shiftRight<1>();
+        Uint8x16 fieldEnds{m_data == FieldEndsBlock};
+        Uint8x16 before = digitFlags & fieldEnds.shiftRight<1>();
         before |= digitFlags & before.shiftRight<1>();
         before |= digitFlags & before.shiftRight<1>();
         before |= digitFlags & before.shiftRight<1>();
         // before |= digitFlags & before.shiftRight<1>();
 
-        const simd::Uint8x16 validTags{after | before};
-        const simd::Uint8x16 tags{validTags.whenTrue(m_data - ZerosBlock)};
+        const Uint8x16 validTags{after | before};
+        const Uint8x16 tags{validTags.whenTrue(m_data - ZerosBlock)};
         auto tagDigits = validTags.toUint64();  // 16 bytes to 4-bit nibble
         tags.get(0, digits);
         tagDigits >>= bits;
 #if !defined(NDEBUG)
-        for (int i = 0; i < 16; ++i)
+        for (const auto digit : digits)
         {
-            std::printf("%02x ", digits[i]);
+            std::printf("%02x ", digit);
         }
         std::printf("\n");
 #endif
+        lastSum = m_data.sum() & 0xff;
+        checkSumValue += lastSum;
         complete = processBlock(offset, tagDigits, digits, bits);
-        if (!complete)
-        {
-            checkSum += m_data.sum() & 0xff;
-        }
         bits = 0;
     }
-
-    checkRequiredFields(offset, checkSum, buffer);
-    auto& token10 = m_tokens[m_count - 1];
-    token10.length = 3;
-    return token10.position + 4;
+    auto& checkSumToken = m_tokens[m_count - 1];
+    checkSumValue -= lastSum;
+    for (uint32_t i = offset - 16; i < checkSumToken.position - 3; i++)
+    {
+        checkSumValue += data[i];
+    }
+    checkSum = checkSumValue & 0xff;
+    checkSumToken.length = 3;
+    return checkSumToken.position + 4;
 }
 
-// this code is optimized for 4 digits tags
 bool Tokenizer::processBlock(const position_t offset,
                              const uint64_t tagDigitFlags,
                              const data_t* digits,
@@ -115,48 +121,9 @@ bool Tokenizer::processBlock(const position_t offset,
     {
         const int32_t count = trailingCount >> 2;
         m_position = -count;
-        const data_t* digit = &digits[16 - count];
+        const data_t* digit = &digits[simd::Uint8x16::Size - count];
         m_tag = binaryToDecimal(0, digit, count);
     }
     return m_tokens[m_count - 1].tag == 10;
-}
-
-void Tokenizer::checkRequiredFields(const position_t offset, data_t messageCheckSum, const data_t* buffer) const
-{
-    if (std::memcmp(buffer, BeginString, sizeof(BeginString) - 1) != 0)
-    {
-        throw std::invalid_argument("invalid begin string");
-    }
-    const auto& bodyLength = m_tokens[2];
-    if (bodyLength.tag != MsgTypeTag)
-    {
-        throw std::invalid_argument("invalid message type tag");
-    }
-
-    const auto& checkSum = m_tokens[m_count - 1];
-    if (checkSum.tag != CheckSumTag)
-    {
-        throw std::invalid_argument("invalid check sum tag");
-    }
-    const auto& [position, tag, length] = m_tokens[1];
-    if (tag != BodyLengthTag)
-    {
-        throw std::invalid_argument("invalid body length tag");
-    }
-    if (asciiToDecimal(buffer + position, length) != checkSum.position - bodyLength.position)
-    {
-        throw std::invalid_argument("invalid body length");
-    }
-
-    const auto checkSumEnd = checkSum.position - 3;
-    for (uint32_t i = offset - 16; i < checkSumEnd; i++)
-    {
-        messageCheckSum += buffer[i];
-    }
-    messageCheckSum &= 0xff;
-    if (asciiToDecimal(buffer + checkSumEnd + 3, 3) != messageCheckSum)
-    {
-        throw std::invalid_argument("invalid checksum");
-    }
 }
 }

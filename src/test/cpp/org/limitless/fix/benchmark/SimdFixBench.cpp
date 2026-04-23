@@ -42,10 +42,11 @@ int main(int argc, char** argv)
     }
 
     const auto start = std::chrono::high_resolution_clock::now();
+    uint8_t checkSum;
     for (size_t i = 0; i < SIZE - sizeof(MESSAGE1); i += sizeof(MESSAGE1))
     {
         const std::span<const uint8_t> bytes(&buffer[i], sizeof(MESSAGE1));
-        tokenizer.scan(bytes);
+        tokenizer.scan(bytes, checkSum);
     }
     const auto end = std::chrono::high_resolution_clock::now();
     const auto  duration = std::chrono::nanoseconds(end - start);

@@ -8,8 +8,7 @@
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 
 namespace org::limitless::fix::parser {
-
-void print(const uint32_t length, const uint8_t* buffer)
+inline void print(const uint32_t length, const uint8_t* buffer)
 {
     for (uint32_t i = 0; i < length; ++i)
     {
@@ -19,7 +18,7 @@ void print(const uint32_t length, const uint8_t* buffer)
     std::printf("\n");
 }
 
-[[nodiscard]] uint32_t binaryToDecimal(uint32_t value, const uint8_t* digits, const int32_t count)
+[[nodiscard]] inline uint32_t binaryToDecimal(uint32_t value, const uint8_t* digits, const uint32_t count)
 {
     if (count >= 1)
     {
@@ -40,7 +39,7 @@ void print(const uint32_t length, const uint8_t* buffer)
     return value;
 }
 
-uint32_t asciiToDecimal(const uint8_t* digits, const uint32_t length)
+inline uint32_t asciiToDecimal(const uint8_t* digits, const uint32_t length)
 {
     uint32_t value = digits[0] - '0';
     if (length >= 2)
