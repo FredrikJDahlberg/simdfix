@@ -9,10 +9,12 @@
 #include <span>
 
 namespace org::limitless::fix::parser {
-size_t Tokenizer::scan(const data_t* buffer, const length_t length)
+size_t Tokenizer::scan(std::span<const data_t> span)
 {
     m_count = 0;
     m_tag = 0;
+    const auto buffer = span.data();
+    const auto length = span.size();
     m_tokens[0].position = 2;
     m_tokens[0].length = 8;
     m_tokens[0].tag = buffer[0] - '0';
@@ -22,7 +24,7 @@ size_t Tokenizer::scan(const data_t* buffer, const length_t length)
     position_t offset = 0;
     data_t digits[16];
 
-    for (bool complete = false; offset + 15 < length && !complete; offset += 16)
+    for (bool complete = false; offset + 15 < jj && !complete; offset += 16)
     {
         m_data.put(buffer + offset, length - offset);
 #if !defined(NDEBUG)
@@ -71,11 +73,11 @@ size_t Tokenizer::scan(const data_t* buffer, const length_t length)
     return token10.position + 4;
 }
 
-// this code is optimized for 4 digits
+// this code is optimized for 4 digits tags
 bool Tokenizer::processBlock(const position_t offset,
-                        const uint64_t tagDigitFlags,
-                        const data_t* digits,
-                        position_t nonTagBitPos)
+                             const uint64_t tagDigitFlags,
+                             const data_t* digits,
+                             position_t nonTagBitPos)
 {
     const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
     const int32_t trailingCount = std::countl_one(trailingTagFlags);

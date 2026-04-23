@@ -38,7 +38,8 @@ static uint8_t MESSAGE1[] =
 TEST(Tokenizer, Basics)
 {
     Tokenizer tokenizer;
-    const auto processed = tokenizer.scan(MESSAGE1, sizeof(MESSAGE1) - 1);
+
+    const auto processed = tokenizer.scan(std::span<const uint8_t>(MESSAGE1, sizeof(MESSAGE1) - 1));
     ASSERT_EQ(142, processed) << "Invalid message length = " << processed;
 
     const Tokenizer::Token expectedTokens[] =

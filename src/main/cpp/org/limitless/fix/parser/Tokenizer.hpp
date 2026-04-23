@@ -53,7 +53,7 @@ public:
     Tokenizer(Tokenizer&&) = delete;
     Tokenizer& operator=(Tokenizer&&) = delete;
 
-    size_t scan(const data_t* buffer, length_t length);
+    size_t scan(std::span<const data_t> buffer);
 
     [[nodiscard]] const Token* begin() const noexcept
     {
