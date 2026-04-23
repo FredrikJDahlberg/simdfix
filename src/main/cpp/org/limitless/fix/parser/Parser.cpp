@@ -6,44 +6,48 @@
 
 namespace org::limitless::fix::parser {
 
-void Parser::parse(std::span<const uint8_t> buffer)
+size_t Parser::parse(std::span<const uint8_t> buffer, Error& error)
 {
     uint8_t checkSum;
-    size_t processed = m_tokenizer.scan(buffer, checkSum);
-    checkRequiredFields(buffer.data(), checkSum);
+    const size_t processed = m_tokenizer.scan(buffer, checkSum);
+    error = checkRequiredFields(buffer.data(), checkSum);
+    return processed;
 }
 
-void Parser::checkRequiredFields(const uint8_t* buffer, const uint8_t messageCheckSum) const
+Parser::Error Parser::checkRequiredFields(const uint8_t* buffer, const uint8_t messageCheckSum) const
 {
     if (std::memcmp(buffer, BeginString, sizeof(BeginString) - 1) != 0)
     {
-        throw std::invalid_argument("invalid begin string");
+        return Error::InvalidBeginString;
     }
     auto tokens = m_tokenizer.begin();
     const auto count = m_tokenizer.end() - tokens;
-    const auto& bodyLength = tokens[2];
-    if (bodyLength.tag != MsgTypeTag)
+    const auto& messageType = tokens[2];
+    if (messageType.tag != MessageTypeTag)
     {
-        throw std::invalid_argument("invalid message type tag");
+        return Error::InvalidMessageTypeTag;
     }
+    // FIXME: check message type value
 
     const auto& checkSum = tokens[count - 1];
     if (checkSum.tag != CheckSumTag)
     {
-        throw std::invalid_argument("invalid check sum tag");
+        return Error::InvalidCheckSumTag;
     }
+
     const auto& [position, tag, length] = tokens[1];
     if (tag != BodyLengthTag)
     {
-        throw std::invalid_argument("invalid body length tag");
+        return Error::InvalidBodyLengthTag;
     }
-    if (asciiToDecimal(buffer + position, length) != checkSum.position - bodyLength.position)
+    if (asciiToDecimal(buffer + position, length) != checkSum.position - messageType.position)
     {
-        throw std::invalid_argument("invalid body length");
+        return Error::InvalidBodyLength;
     }
     if (asciiToDecimal(buffer + checkSum.position - 3, 3) != messageCheckSum)
     {
-        throw std::invalid_argument("invalid checksum");
+        return Error::InvalidCheckSum;
     }
+    return Error::Success;
 }
 }

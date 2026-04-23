@@ -13,19 +13,32 @@ class Parser
 {
     static constexpr uint32_t BeginStringTag = 8;
     static constexpr uint32_t BodyLengthTag = 9;
-    static constexpr uint32_t MsgTypeTag = 35;
+    static constexpr uint32_t MessageTypeTag = 35;
     static constexpr uint32_t CheckSumTag = 10;
-    static constexpr uint8_t BeginString[11] = { '8', '=', 'F', 'I', 'X', 'T', '.', '1', '.', '1', Tokenizer::FieldEnd };
+
+    static constexpr uint8_t FieldEnd = 0x01;
+    static constexpr uint8_t BeginString[11] = { '8', '=', 'F', 'I', 'X', 'T', '.', '1', '.', '1', FieldEnd };
 
     Tokenizer m_tokenizer{};
 
 public:
 
-    void parse(std::span<const uint8_t> buffer);
+    enum class Error
+    {
+        InvalidBeginString,
+        InvalidMessageTypeTag,
+        InvalidCheckSumTag,
+        InvalidBodyLengthTag,
+        InvalidBodyLength,
+        InvalidCheckSum,
+        Success
+    };
+
+    size_t parse(std::span<const uint8_t> buffer, Error& error);
 
 private:
 
-   void checkRequiredFields(const uint8_t* buffer, uint8_t messageCheckSum) const;
+   Error checkRequiredFields(const uint8_t* buffer, uint8_t messageCheckSum) const;
 };
 }
 

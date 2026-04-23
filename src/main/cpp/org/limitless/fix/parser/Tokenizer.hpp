@@ -19,18 +19,13 @@ public:
     using length_t = uint32_t;
     using data_t = uint8_t;
 
-    static constexpr data_t TagEnd = '=';
-    static constexpr data_t FieldEnd = '\x01';
-    static constexpr data_t Zero = '0';
-    static constexpr data_t Nine = '9';
-    static constexpr data_t True = 255;
     static constexpr data_t False = 0;
 
-    const simd::Uint8x16 TagEndsBlock{TagEnd};
-    const simd::Uint8x16 FieldEndsBlock{FieldEnd};
-    const simd::Uint8x16 ZerosBlock{Zero};
-    const simd::Uint8x16 NinesBlock{Nine};
-    const simd::Uint8x16 TrueBlock{True};
+    const simd::Uint8x16 TagEndsBlock{'='};
+    const simd::Uint8x16 FieldEndsBlock{0x01};
+    const simd::Uint8x16 ZerosBlock{'0'};
+    const simd::Uint8x16 NinesBlock{'9'};
+    const simd::Uint8x16 TrueBlock{0xff};
 
     struct Token
     {
