@@ -3,6 +3,7 @@
 //
 
 #include "org/limitless/fix/parser/Tokenizer.hpp"
+#include "org/limitless/fix/parser/Utils.h"
 
 #include <algorithm>
 #include <span>
@@ -25,7 +26,7 @@ size_t Tokenizer::scan(const data_t* buffer, const length_t length)
     {
         m_data.put(buffer + offset, length - offset);
 #if !defined(NDEBUG)
-        dump(16, buffer + offset);
+        print(16, buffer + offset);
 #endif
         // A digit is valid if followed by '=' or a validated digit
         const simd::Uint8x16 digitFlags{m_data >= ZerosBlock & m_data <= NinesBlock};
@@ -78,13 +79,10 @@ bool Tokenizer::processBlock(const position_t offset,
 {
     const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
     const int32_t trailingCount = std::countl_one(trailingTagFlags);
-
     auto* token = &m_tokens[m_count - 1];
     token->length = m_position;
 
-    // Fixed mask since we only handle up to 4 digits (16 bits)
     uint64_t remainingDigitFlags = tagDigitFlags & (~0ull >> std::max(4, trailingCount));
-
     while (remainingDigitFlags > 0 && token->tag != 10)
     {
         const int32_t nonTagCount = std::countr_zero(remainingDigitFlags);
@@ -100,27 +98,11 @@ bool Tokenizer::processBlock(const position_t offset,
         const data_t* digit = &digits[tagPos];
         uint32_t value = 0;
         if (m_tag != 0)
-        { // Handle split tag carry-over
+        { // split tag carry-over
             value = m_tag;
             m_tag = 0;
         }
-        if (count >= 1)
-        {
-            value = value * 10 + digit[0];
-        }
-        if (count >= 2)
-        {
-            value = value * 10 + digit[1];
-        }
-        if (count >= 3)
-        {
-            value = value * 10 + digit[2];
-        }
-        if (count >= 4)
-        {
-            value = value * 10 + digit[3];
-        }
-        token->tag = value;
+        token->tag = convertToDecimal(value, digit, count);
         token->position = offset + tagPos + count + 1;
         remainingDigitFlags >>= digitBits;
         nonTagBitPos += digitBits;
@@ -132,32 +114,13 @@ bool Tokenizer::processBlock(const position_t offset,
         const int32_t count = trailingCount >> 2;
         m_position = -count;
         const data_t* digit = &digits[16 - count];
-        uint32_t value = digit[0];
-        if (count >= 2)
-        {
-            value = value * 10 + digit[1];
-        }
-        if (count >= 3)
-        {
-            value = value * 10 + digit[2];
-        }
-        if (count >= 4)
-        {
-            value = value * 10 + digit[3];
-        }
-        m_tag = value;
+        m_tag = convertToDecimal(0, digit, count);
     }
     return m_tokens[m_count - 1].tag == 10;
 }
 
 void Tokenizer::checkRequiredFields(const position_t offset, data_t checkSum, const data_t* buffer) const
 {
-#if 0
-    if (const auto& token8 = m_tokens[0]; token8.tag != 8)
-    {
-        throw std::invalid_argument("invalid begin string tag");
-    }
-#endif
     if (std::memcmp(buffer, BeginString, 11) != 0)
     {
         throw std::invalid_argument("invalid begin string");
@@ -178,7 +141,7 @@ void Tokenizer::checkRequiredFields(const position_t offset, data_t checkSum, co
     {
         throw std::invalid_argument("invalid body length tag");
     }
-    if (asciiToDecimal(buffer, position, length) != token10.position - token35.position)
+    if (asciiToDecimal(buffer + position, length) != token10.position - token35.position)
     {
         throw std::invalid_argument("invalid body length");
     }
@@ -189,37 +152,9 @@ void Tokenizer::checkRequiredFields(const position_t offset, data_t checkSum, co
         checkSum += buffer[i];
     }
     checkSum &= 0xff;
-    if (asciiToDecimal(buffer, checkSumEnd + 3, 3) != checkSum)
+    if (asciiToDecimal(buffer + checkSumEnd + 3, 3) != checkSum)
     {
         throw std::invalid_argument("invalid checksum");
     }
 }
-
-uint32_t Tokenizer::asciiToDecimal(const data_t* buffer, const position_t position, const length_t length)
-{
-    const data_t* digit = buffer + position;
-    uint32_t value = digit[0] - '0';
-    if (length >= 2)
-    {
-        value = value * 10 + digit[1] - '0';
-    }
-    if (length >= 3)
-    {
-        value = value * 10 + digit[2] - '0';
-    }
-    if (length >= 4)
-    {
-        value = value * 10 + digit[3] - '0';
-    }
-    if (length >= 5)
-    {
-        value = value * 10 + digit[4] - '0';
-    }
-    if (length >= 6)
-    {
-        value = value * 10 + digit[5] - '0';
-    }
-    return value;
-}
-
 }

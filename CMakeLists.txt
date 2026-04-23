@@ -4,15 +4,17 @@ project(simd_fix)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-
 enable_testing()
 
 find_package(GTest REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp ${CMAKE_SOURCE_DIR}/src/test/cpp)
 
-set(FIX_SOURCES src/main/cpp/org/limitless/fix/parser/Tokenizer.cpp)
-set(FIX_HEADERS src/main/cpp/org/limitless/fix/parser/Tokenizer.hpp)
+set(FIX_SOURCES
+        src/main/cpp/org/limitless/fix/parser/Tokenizer.cpp)
+set(FIX_HEADERS
+        src/main/cpp/org/limitless/fix/parser/Tokenizer.hpp
+        src/main/cpp/org/limitless/fix/parser/Utils.h)
 
 add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS})
 target_include_directories(SimdFix PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")

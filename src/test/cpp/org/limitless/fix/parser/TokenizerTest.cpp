@@ -43,8 +43,8 @@ TEST(Tokenizer, Basics)
 
     const Tokenizer::Token expectedTokens[] =
     {
-        // { 2, 8, 8 },
-        // { 13, 9, 3 },
+        { 2, 8, 8 },
+        { 13, 9, 3 },
         { 20, 35, 1 },
         { 25, 49, 5 },
         { 34, 56, 10 },
@@ -57,7 +57,7 @@ TEST(Tokenizer, Basics)
         { 106, 553, 8 },
         { 119, 554, 8 },
         { 133, 1137, 1 },
-        // { 138, 10, 3 },
+        { 138, 10, 3 },
     };
 
     for (int i = 0; auto& [position, tag, length] : tokenizer.tokens())

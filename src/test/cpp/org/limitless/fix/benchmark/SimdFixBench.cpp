@@ -40,7 +40,6 @@ int main(int argc, char** argv)
     {
         memcpy(&buffer[i], MESSAGE1, sizeof(MESSAGE1));
     }
-    std::printf("count = %lu\n", SIZE/sizeof(MESSAGE1));
 
     const auto start = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < SIZE - sizeof(MESSAGE1); i += sizeof(MESSAGE1))
@@ -51,7 +50,7 @@ int main(int argc, char** argv)
     const auto  duration = std::chrono::nanoseconds(end - start);
     std::printf("Duration = %lld ms\n", duration.count()/1'000'000);
 
-    const auto gigaBytesPerSecond = 1'000'000'000.0/duration.count();
+    const auto gigaBytesPerSecond = ((static_cast<double>(SIZE) - sizeof(MESSAGE1)) / SIZE) * (1'000'000'000.0/duration.count());
     std::printf("GB per second = %.3f\n", gigaBytesPerSecond);
     return 0;
 }

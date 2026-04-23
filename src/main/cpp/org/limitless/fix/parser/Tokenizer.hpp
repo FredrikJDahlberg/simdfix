@@ -6,6 +6,7 @@
 #define SIMD_FIX_TOKENIZER_H
 
 #include <ostream>
+#include <span>
 
 #include "org/limitless/fix/parser/Uint8x16.hpp"
 
@@ -58,30 +59,20 @@ public:
         return m_tokens + m_count - 1;
     }
 
-    [[nodiscard]] std::span<const Token> tokens() const noexcept {
-        return { m_tokens, m_count };
-    }
-
-    static void dump(const length_t length, const data_t* buffer)
+    [[nodiscard]] std::span<const Token> tokens() const noexcept
     {
-        for (length_t i = 0; i < length; ++i)
-        {
-            const auto ch = buffer[i];
-            std::printf("%2c ", std::isprint(ch) ? ch : (ch == 1 ? '|' : '?'));
-        }
-        std::printf("\n");
+        return { m_tokens, m_count };
     }
 
 private:
     Token m_tokens[128]{};
-    size_t m_count;
+    size_t m_count{};
     uint16_t m_tag{};
     int32_t m_position{};
     simd::Uint8x16 m_data;
 
     bool processBlock(position_t offset, uint64_t tagDigitFlags, const data_t* digits, position_t nonTagBitPos);
     void checkRequiredFields(position_t offset, data_t checkSum, const data_t* buffer) const;
-    static uint32_t asciiToDecimal(const data_t* buffer, position_t position, length_t length);
 };
 }
 
