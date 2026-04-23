@@ -102,7 +102,7 @@ bool Tokenizer::processBlock(const position_t offset,
             value = m_tag;
             m_tag = 0;
         }
-        token->tag = convertToDecimal(value, digit, count);
+        token->tag = binaryToDecimal(value, digit, count);
         token->position = offset + tagPos + count + 1;
         remainingDigitFlags >>= digitBits;
         nonTagBitPos += digitBits;
@@ -114,45 +114,45 @@ bool Tokenizer::processBlock(const position_t offset,
         const int32_t count = trailingCount >> 2;
         m_position = -count;
         const data_t* digit = &digits[16 - count];
-        m_tag = convertToDecimal(0, digit, count);
+        m_tag = binaryToDecimal(0, digit, count);
     }
     return m_tokens[m_count - 1].tag == 10;
 }
 
-void Tokenizer::checkRequiredFields(const position_t offset, data_t checkSum, const data_t* buffer) const
+void Tokenizer::checkRequiredFields(const position_t offset, data_t messageCheckSum, const data_t* buffer) const
 {
-    if (std::memcmp(buffer, BeginString, 11) != 0)
+    if (std::memcmp(buffer, BeginString, sizeof(BeginString) - 1) != 0)
     {
         throw std::invalid_argument("invalid begin string");
     }
-    const auto& token35 = m_tokens[2];
-    if (token35.tag != 35)
+    const auto& bodyLength = m_tokens[2];
+    if (bodyLength.tag != MsgTypeTag)
     {
         throw std::invalid_argument("invalid message type tag");
     }
 
-    const auto& token10 = m_tokens[m_count - 1];
-    if (token10.tag != 10)
+    const auto& checkSum = m_tokens[m_count - 1];
+    if (checkSum.tag != CheckSumTag)
     {
         throw std::invalid_argument("invalid check sum tag");
     }
     const auto& [position, tag, length] = m_tokens[1];
-    if (tag != 9)
+    if (tag != BodyLengthTag)
     {
         throw std::invalid_argument("invalid body length tag");
     }
-    if (asciiToDecimal(buffer + position, length) != token10.position - token35.position)
+    if (asciiToDecimal(buffer + position, length) != checkSum.position - bodyLength.position)
     {
         throw std::invalid_argument("invalid body length");
     }
 
-    const auto checkSumEnd = token10.position - 3;
+    const auto checkSumEnd = checkSum.position - 3;
     for (uint32_t i = offset - 16; i < checkSumEnd; i++)
     {
-        checkSum += buffer[i];
+        messageCheckSum += buffer[i];
     }
-    checkSum &= 0xff;
-    if (asciiToDecimal(buffer + checkSumEnd + 3, 3) != checkSum)
+    messageCheckSum &= 0xff;
+    if (asciiToDecimal(buffer + checkSumEnd + 3, 3) != messageCheckSum)
     {
         throw std::invalid_argument("invalid checksum");
     }

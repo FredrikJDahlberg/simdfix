@@ -27,6 +27,11 @@ public:
     static constexpr data_t False = 0;
     static constexpr data_t BeginString[11] = { '8', '=', 'F', 'I', 'X', 'T', '.', '1', '.', '1', Tokenizer::FieldEnd };
 
+    static constexpr uint32_t BeginStringTag = 8;
+    static constexpr uint32_t BodyLengthTag = 9;
+    static constexpr uint32_t MsgTypeTag = 35;
+    static constexpr uint32_t CheckSumTag = 10;
+
     const simd::Uint8x16 TagEndsBlock{TagEnd};
     const simd::Uint8x16 FieldEndsBlock{FieldEnd};
     const simd::Uint8x16 ZerosBlock{Zero};

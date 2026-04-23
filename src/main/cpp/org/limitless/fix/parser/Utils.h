@@ -19,7 +19,7 @@ void print(const uint32_t length, const uint8_t* buffer)
     std::printf("\n");
 }
 
-[[nodiscard]] uint32_t convertToDecimal(uint32_t value, const uint8_t* digits, const int32_t count)
+[[nodiscard]] uint32_t binaryToDecimal(uint32_t value, const uint8_t* digits, const int32_t count)
 {
     if (count >= 1)
     {
