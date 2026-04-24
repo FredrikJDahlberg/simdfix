@@ -10,23 +10,20 @@
 
 namespace org::limitless::fix::parser {
 
-size_t Tokenizer::scan(const std::span<const data_t> buffer, uint8_t& checkSum)
+std::pair<uint16_t,uint8_t> Tokenizer::scan(const std::span<const data_t> buffer)
 {
     using simd::Uint8x16;
     m_count = 0;
     m_tag = 0;
     const auto data = buffer.data();
     const auto length = buffer.size();
-    m_tokens[0].position = 2;
-    m_tokens[0].length = 8;
-    m_tokens[0].tag = data[0] - '0';
+    m_tokens[0] = { 2, uint32_t(data[0] - '0'), 8 };
     m_count = 1;
-    checkSum = 0;
     uint32_t bits = 4;
     data_t digits[Uint8x16::Size];
 
     uint8_t lastSum = 0;
-    position_t offset = 0;
+    size_t offset = 0;
     bool complete = false;
     uint32_t checkSumValue = 0;
     for (; offset + 15 < length && !complete; offset += Uint8x16::Size)
@@ -75,9 +72,8 @@ size_t Tokenizer::scan(const std::span<const data_t> buffer, uint8_t& checkSum)
     {
         checkSumValue += data[i];
     }
-    checkSum = checkSumValue & 0xff;
     checkSumToken.length = 3;
-    return checkSumToken.position + 4;
+    return { checkSumToken.position + 4, checkSumValue & 0xff };
 }
 
 bool Tokenizer::processBlock(const position_t offset,

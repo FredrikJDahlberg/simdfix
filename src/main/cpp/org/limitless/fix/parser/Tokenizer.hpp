@@ -15,8 +15,8 @@ namespace org::limitless::fix::parser {
 class Tokenizer
 {
 public:
-    using position_t = uint32_t;
-    using length_t = uint32_t;
+    using position_t = int32_t;
+    using length_t = int32_t;
     using data_t = uint8_t;
 
     static constexpr data_t False = 0;
@@ -29,9 +29,9 @@ public:
 
     struct Token
     {
-        position_t position;
-        uint16_t tag;
-        uint16_t length;
+        uint32_t position;
+        uint32_t tag;
+        int32_t length;
     };
 
     Tokenizer() noexcept = default;
@@ -42,7 +42,7 @@ public:
     Tokenizer(Tokenizer&&) = delete;
     Tokenizer& operator=(Tokenizer&&) = delete;
 
-    size_t scan(std::span<const data_t> buffer, uint8_t& checkSum);
+    [[nodiscard]] std::pair<uint16_t, uint8_t> scan(std::span<const data_t> buffer); // processed and checksum
 
     [[nodiscard]] const Token* begin() const noexcept
     {

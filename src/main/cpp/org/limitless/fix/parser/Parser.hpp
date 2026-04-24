@@ -5,6 +5,8 @@
 #ifndef SIMD_FIX_PARSER_H
 #define SIMD_FIX_PARSER_H
 
+#include <expected>
+
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 
 namespace org::limitless::fix::parser {
@@ -34,7 +36,12 @@ public:
         Success
     };
 
-    size_t parse(std::span<const uint8_t> buffer, Error& error);
+    template <typename Handler>
+    std::pair<size_t, Error> parse(std::span<const uint8_t> buffer, const Handler handler)
+    {
+        auto [processed, checkSum] = m_tokenizer.scan(buffer);
+        return {processed, Error::Success};
+    }
 
 private:
 

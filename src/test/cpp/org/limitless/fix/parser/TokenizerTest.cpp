@@ -8,43 +8,36 @@
 
 namespace org::limitless::fix::parser {
 
-void verify(Tokenizer::Token* tokens, size_t count, Tokenizer::Token* expected, Tokenizer::Token* actual)
-{
-
-}
-
 #define SOH "\x01"
-// body = 5 + 9 + 14 + 5 + 27 + 7 + 5 + 7 + 6 + 13 + 13 + 7 = 118
-static uint8_t MESSAGE1[] =
-    "8=FIXT.1.1" SOH // 11
-    "9=118" SOH // 6
-    "35=A" SOH // 5
-    "49=Buyer" SOH // 9
-    "56=SellSide_1" SOH // 14
-    "34=1" SOH // 5
-    "52=20190605-11:51:27.84800" SOH // 27
-    "1128=9" SOH // 7
-    "98=0" SOH // 5
-    "108=30" SOH // 7
-    "141=Y" SOH // 6
-    "553=Username" SOH // 13
-    "554=Password" SOH // 13
-    "1137=9" SOH // 7
-    "10=147" SOH // 7
-    // next message
-    "8=FIXT.1.1" SOH
-    "9=118" SOH;
+
+void check(std::span<const Tokenizer::Token> result, const std::span<const Tokenizer::Token> expected)
+{
+    for (int i = 0; auto& [position, tag, length] : result)
+    {
+        const auto& token = expected[i++];
+        std::printf("%3d, tag = %4d, pos = %4d, len = %4d\n", i, tag, position, length);
+        ASSERT_EQ(token.tag, tag) << "Mismatch at index " << i - 1;
+        ASSERT_EQ(token.position, position) << "Tag " << token.tag << " has invalid offset";
+        ASSERT_EQ(token.length, length) << "Tag " << token.tag << " has invalid length";
+    }
+    ASSERT_EQ(expected.size(), result.size());
+}
 
 TEST(Tokenizer, Basics)
 {
+    static constexpr uint8_t MESSAGE[] =
+        "8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH "56=SellSide_1" SOH "34=1" SOH
+        "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH "141=Y" SOH "553=Username" SOH
+        "554=Password" SOH "1137=9" SOH "10=147" SOH
+        // next message
+        "8=FIXT.1.1" SOH "9=118" SOH;
+    constexpr size_t LENGTH = sizeof(MESSAGE) - 1;
+    constexpr std::span buffer(MESSAGE, LENGTH);
     Tokenizer tokenizer;
-
-    std::span<const uint8_t> buffer(MESSAGE1, sizeof(MESSAGE1) - 1);
-    uint8_t checkSum;
-    const auto processed = tokenizer.scan(buffer, checkSum);
-    ASSERT_EQ(142, processed) << "Invalid message length = " << processed;
+    auto [processed, checkSum] = tokenizer.scan(buffer);
+    ASSERT_EQ(LENGTH - 17, processed);
     ASSERT_EQ(147, checkSum);
-    const Tokenizer::Token expectedTokens[] =
+    constexpr Tokenizer::Token expectedTokens[] =
     {
         { 2, 8, 8 },
         { 13, 9, 3 },
@@ -62,14 +55,28 @@ TEST(Tokenizer, Basics)
         { 133, 1137, 1 },
         { 138, 10, 3 },
     };
-
-    for (int i = 0; auto& [position, tag, length] : tokenizer.tokens())
-    {
-        const auto& expected = expectedTokens[i++];
-        std::printf("%3d, tag = %4d, pos = %4d, len = %4d\n", i, tag, position, length);
-        ASSERT_EQ(expected.tag, tag) << "Mismatch at index " << i - 1;
-        ASSERT_EQ(expected.position, position) << "Tag " << expected.tag << " has invalid offset";
-        ASSERT_EQ(expected.length, length) << "Tag " << expected.tag << " has invalid length";
-    }
+    check(tokenizer.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
 }
+
+TEST(Tokenizer, SplitTagLast)
+{
+    static constexpr uint8_t MESSAGE[] = "8=FIXT.1.1" SOH "9=49" SOH "35=A" SOH "49=Buyer" SOH "56=SellSide" SOH "10=147" SOH;
+    constexpr size_t LENGTH = sizeof(MESSAGE) - 1;
+    constexpr std::span buffer(MESSAGE, LENGTH);
+    Tokenizer tokenizer{};
+    auto [processed, checkSum] = tokenizer.scan(buffer);
+    ASSERT_EQ(LENGTH, processed);
+    ASSERT_EQ(170, checkSum);
+    constexpr Tokenizer::Token expectedTokens[] =
+    {
+        { 2, 8, 8 },
+        { 13, 9, 2 },
+        { 19, 35, 1 },
+        { 24, 49, 5 },
+        { 33, 56, 10 },
+        { 46, 10, 3 }
+    };
+    check(tokenizer.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
+}
+
 }

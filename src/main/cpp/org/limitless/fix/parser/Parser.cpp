@@ -6,14 +6,6 @@
 
 namespace org::limitless::fix::parser {
 
-size_t Parser::parse(std::span<const uint8_t> buffer, Error& error)
-{
-    uint8_t checkSum;
-    const size_t processed = m_tokenizer.scan(buffer, checkSum);
-    error = checkRequiredFields(buffer.data(), checkSum);
-    return processed;
-}
-
 Parser::Error Parser::checkRequiredFields(const uint8_t* buffer, const uint8_t messageCheckSum) const
 {
     if (std::memcmp(buffer, BeginString, sizeof(BeginString) - 1) != 0)
