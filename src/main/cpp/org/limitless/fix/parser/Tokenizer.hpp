@@ -29,7 +29,7 @@ public:
 
     struct Token
     {
-        uint32_t position;
+        position_t position;
         uint32_t tag;
         int32_t length;
     };

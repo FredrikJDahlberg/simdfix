@@ -16,14 +16,14 @@ std::pair<uint16_t,uint8_t> Tokenizer::scan(const std::span<const data_t> buffer
     m_count = 0;
     m_tag = 0;
     const auto data = buffer.data();
-    const auto length = buffer.size();
-    m_tokens[0] = { 2, uint32_t(data[0] - '0'), 8 };
+    const auto length = static_cast<length_t>(buffer.size());
+    m_tokens[0] = { 2, static_cast<uint32_t>(data[0] - '0'), 8 };
     m_count = 1;
-    uint32_t bits = 4;
+    position_t bits = 4;
     data_t digits[Uint8x16::Size];
 
     uint8_t lastSum = 0;
-    size_t offset = 0;
+    position_t offset = 0;
     bool complete = false;
     uint32_t checkSumValue = 0;
     for (; offset + 15 < length && !complete; offset += Uint8x16::Size)
@@ -68,7 +68,7 @@ std::pair<uint16_t,uint8_t> Tokenizer::scan(const std::span<const data_t> buffer
     }
     auto& checkSumToken = m_tokens[m_count - 1];
     checkSumValue -= lastSum;
-    for (uint32_t i = offset - 16; i < checkSumToken.position - 3; i++)
+    for (auto i = offset - 16; i < checkSumToken.position - 3; i++)
     {
         checkSumValue += data[i];
     }
@@ -84,7 +84,20 @@ bool Tokenizer::processBlock(const position_t offset,
     const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
     const int32_t trailingCount = std::countl_one(trailingTagFlags);
     auto* token = &m_tokens[m_count - 1];
-    token->length = m_position;
+    if (m_tag != 0 && digits[0] == 0)
+    {  // handle split tag with = in first position
+        token->length = m_position + offset - 1 - token->position;
+        ++m_count;
+        ++token;
+        token->tag = m_tag;
+        token->position = offset + 1;
+        m_position = 0;
+        m_tag = 0;
+    }
+    else
+    {
+        token->length = m_position;
+    }
 
     uint64_t remainingDigitFlags = tagDigitFlags & (~0ull >> std::max(4, trailingCount));
     while (remainingDigitFlags > 0 && token->tag != 10)
@@ -93,12 +106,12 @@ bool Tokenizer::processBlock(const position_t offset,
         nonTagBitPos += nonTagCount;
         remainingDigitFlags >>= nonTagCount;
 
-        const uint32_t digitBits = std::countr_one(remainingDigitFlags);
-        const uint32_t tagPos = nonTagBitPos >> 2;
+        const position_t digitBits = std::countr_one(remainingDigitFlags);
+        const position_t tagPos = nonTagBitPos >> 2;
         token->length += offset + tagPos - token->position - 1;
         token = &m_tokens[m_count++];
 
-        const uint32_t count = digitBits >> 2;
+        const position_t count = digitBits >> 2;
         const data_t* digit = &digits[tagPos];
         uint32_t value = 0;
         if (m_tag != 0)

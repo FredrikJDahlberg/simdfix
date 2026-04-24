@@ -32,7 +32,7 @@ Parser::Error Parser::checkRequiredFields(const uint8_t* buffer, const uint8_t m
     {
         return Error::InvalidBodyLengthTag;
     }
-    if (asciiToDecimal(buffer + position, length) != checkSum.position - messageType.position)
+    if (asciiToDecimal(buffer + position, length) != static_cast<uint32_t>(checkSum.position - messageType.position))
     {
         return Error::InvalidBodyLength;
     }

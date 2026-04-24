@@ -73,8 +73,8 @@ TEST(Tokenizer, SplitTagLast)
         { 13, 9, 2 },
         { 19, 35, 1 },
         { 24, 49, 5 },
-        { 33, 56, 10 },
-        { 46, 10, 3 }
+        { 33, 56, 8 },
+        { 45, 10, 3 }
     };
     check(tokenizer.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
 }
