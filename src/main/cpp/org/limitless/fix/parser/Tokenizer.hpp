@@ -19,7 +19,9 @@ public:
     using length_t = int32_t;
     using data_t = uint8_t;
 
+    static constexpr size_t MaxSize = 128;
     static constexpr data_t False = 0;
+    static constexpr uint32_t CheckSumTag = 10;
 
     const simd::Uint8x16 TagEndsBlock{'='};
     const simd::Uint8x16 FieldEndsBlock{0x01};
@@ -30,8 +32,8 @@ public:
     struct Token
     {
         position_t position;
-        uint32_t tag;
-        int32_t length;
+        uint16_t tag;
+        uint16_t length;
     };
 
     Tokenizer() noexcept = default;
@@ -46,11 +48,11 @@ public:
 
     [[nodiscard]] const Token* begin() const noexcept
     {
-        return m_tokens + 2;
+        return m_tokens;
     }
     [[nodiscard]] const Token* end() const noexcept
     {
-        return m_tokens + m_count - 1;
+        return m_tokens + m_count;
     }
 
     [[nodiscard]] std::span<const Token> tokens() const noexcept
@@ -58,12 +60,18 @@ public:
         return { m_tokens, m_count };
     }
 
+    [[nodiscard]] size_t size() const noexcept
+    {
+        return m_count;
+    }
+
 private:
-    Token m_tokens[128]{};
+    Token m_tokens[MaxSize]{};
+
     size_t m_count{};
-    uint16_t m_tag{};
+    uint32_t m_tag{};
     int32_t m_position{};
-    simd::Uint8x16 m_data;
+    simd::Uint8x16 m_data{};
 
     bool processBlock(position_t offset, uint64_t tagDigitFlags, const data_t* digits, position_t nonTagBitPos);
 };

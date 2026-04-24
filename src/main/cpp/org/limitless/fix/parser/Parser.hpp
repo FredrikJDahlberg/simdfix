@@ -8,6 +8,8 @@
 #include <expected>
 
 #include "org/limitless/fix/parser/Tokenizer.hpp"
+#include "org/limitless/fix/parser/BitSet64.hpp"
+#include "org/limitless/fix/parser/Message.hpp"
 
 namespace org::limitless::fix::parser {
 
@@ -25,7 +27,7 @@ class Parser
 
 public:
 
-    enum class Error
+    enum class Status
     {
         InvalidBeginString,
         InvalidMessageTypeTag,
@@ -37,15 +39,51 @@ public:
     };
 
     template <typename Handler>
-    std::pair<size_t, Error> parse(std::span<const uint8_t> buffer, const Handler handler)
+    // FIXME: restrictions on handler
+    std::pair<size_t, Status> parse(const std::span<const uint8_t> buffer, const Handler handler)
     {
+        m_present.set();
         auto [processed, checkSum] = m_tokenizer.scan(buffer);
-        return {processed, Error::Success};
+        m_present >>= 64 - m_tokenizer.size();
+        auto status = checkRequiredFields(buffer.data(), checkSum);
+        if (status == Status::Success)
+        {
+            handler(nullptr);  // FIXME
+        }
+        return {processed, status};
+    }
+
+    const Tokenizer::Token* nextByTag(const uint16_t tag)
+    {  // assume that fields are access once in tag order
+        const uint32_t offset = m_present.zerosRight();
+        auto tokens = m_tokenizer.begin();
+        auto size = m_tokenizer.size();
+        for (uint32_t position = offset; position < size; ++position)
+        {
+            if (tokens[position].tag == tag)
+            {
+                m_present.clear(position);
+                return &tokens[position];
+            }
+        }
+        return nullptr;
+    }
+
+    const Tokenizer::Token* nextByPos(uint32_t position)
+    {  // assume that fields are access once in tag order
+        if (m_tokenizer.size() >= position || m_present.get(position) == 0)
+        {
+            return nullptr;
+        }
+        m_present.clear(position);
+        return m_tokenizer.begin() + position;
     }
 
 private:
 
-   Error checkRequiredFields(const uint8_t* buffer, uint8_t messageCheckSum) const;
+    BitSet64 m_present{}; // FIXME 128 bits
+
+    Status checkRequiredFields(const uint8_t* buffer, uint8_t messageCheckSum) const;
 };
 }
 

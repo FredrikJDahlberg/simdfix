@@ -17,7 +17,7 @@ std::pair<uint16_t,uint8_t> Tokenizer::scan(const std::span<const data_t> buffer
     m_tag = 0;
     const auto data = buffer.data();
     const auto length = static_cast<length_t>(buffer.size());
-    m_tokens[0] = { 2, static_cast<uint32_t>(data[0] - '0'), 8 };
+    m_tokens[0] = { 2, static_cast<uint16_t>(data[0] - '0'), 8 };
     m_count = 1;
     position_t bits = 4;
     data_t digits[Uint8x16::Size];
@@ -82,11 +82,11 @@ bool Tokenizer::processBlock(const position_t offset,
                              position_t nonTagBitPos)
 {
     const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
-    const int32_t trailingCount = std::countl_one(trailingTagFlags);
+    const auto trailingCount = std::countl_one(trailingTagFlags);
     auto* token = &m_tokens[m_count - 1];
     if (m_tag != 0 && digits[0] == 0)
-    {  // handle split tag with = in first position
-        token->length = m_position + offset - 1 - token->position;
+    {  // split tag ending in first position of next block
+        token->length = static_cast<int16_t>(m_position + offset - 1 - token->position);
         ++m_count;
         ++token;
         token->tag = m_tag;
@@ -94,13 +94,10 @@ bool Tokenizer::processBlock(const position_t offset,
         m_position = 0;
         m_tag = 0;
     }
-    else
-    {
-        token->length = m_position;
-    }
+    token->length = m_position;
 
     uint64_t remainingDigitFlags = tagDigitFlags & (~0ull >> std::max(4, trailingCount));
-    while (remainingDigitFlags > 0 && token->tag != 10)
+    while (remainingDigitFlags > 0 && token->tag != CheckSumTag)
     {
         const int32_t nonTagCount = std::countr_zero(remainingDigitFlags);
         nonTagBitPos += nonTagCount;
@@ -124,14 +121,13 @@ bool Tokenizer::processBlock(const position_t offset,
         remainingDigitFlags >>= digitBits;
         nonTagBitPos += digitBits;
     }
-
     m_position = 0;
     if (trailingCount >= 4)
     {
-        const int32_t count = trailingCount >> 2;
-        m_position = -count;
-        const data_t* digit = &digits[simd::Uint8x16::Size - count];
+        const auto count = trailingCount >> 2;
+        const auto digit = &digits[simd::Uint8x16::Size - count];
         m_tag = binaryToDecimal(0, digit, count);
+        m_position = -count;
     }
     return m_tokens[m_count - 1].tag == 10;
 }

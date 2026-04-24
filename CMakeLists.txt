@@ -16,7 +16,9 @@ set(FIX_SOURCES
 set(FIX_HEADERS
         src/main/cpp/org/limitless/fix/parser/Tokenizer.hpp
         src/main/cpp/org/limitless/fix/parser/Utils.hpp
-        src/main/cpp/org/limitless/fix/parser/Parser.hpp)
+        src/main/cpp/org/limitless/fix/parser/Parser.hpp
+        src/main/cpp/org/limitless/fix/parser/BitSet64.hpp
+        src/main/cpp/org/limitless/fix/parser/Message.hpp)
 
 add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS})
 target_include_directories(SimdFix PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
@@ -27,11 +29,6 @@ target_compile_options(SimdFix PRIVATE
 )
 target_link_options(SimdFix PRIVATE
         $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>)
-
-add_executable(TokenizerTest src/test/cpp/org/limitless/fix/parser/TokenizerTest.cpp)
-target_compile_options(TokenizerTest PRIVATE -O0 -Wall -fprofile-instr-generate -fcoverage-mapping)
-target_link_libraries(TokenizerTest SimdFix GTest::gtest GTest::gtest_main)
-target_link_options(TokenizerTest PRIVATE $<$<CONFIG:Debug>:-fsanitize=address> -fprofile-instr-generate)
 
 add_executable(SimdFixBench src/test/cpp/org/limitless/fix/benchmark/SimdFixBench.cpp)
 target_link_libraries(SimdFixBench SimdFix)
@@ -46,3 +43,15 @@ target_compile_options(Generator PRIVATE -O0 -Wall)
 target_include_directories(Generator PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/cpp")
 target_link_libraries(Generator PRIVATE pugixml::pugixml)
 
+function(add_limitless_test name source)
+    add_executable(${name} ${source})
+    target_compile_options(${name} PRIVATE -O0 -Wall -fprofile-instr-generate -fcoverage-mapping)
+    target_link_libraries(${name} PRIVATE SimdFix GTest::gtest GTest::gtest_main)
+    target_link_options(${name} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address> -fprofile-instr-generate)
+endfunction()
+
+# 2. Use the function to declare your tests
+set(BASE_PATH "src/test/cpp/org/limitless/fix/parser")
+add_limitless_test(TokenizerTest "${BASE_PATH}/TokenizerTest.cpp")
+add_limitless_test(BitSetTest    "${BASE_PATH}/BitSetTest.cpp")
+add_limitless_test(ParserTest    "${BASE_PATH}/ParserTest.cpp")

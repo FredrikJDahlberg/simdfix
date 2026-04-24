@@ -6,40 +6,40 @@
 
 namespace org::limitless::fix::parser {
 
-Parser::Error Parser::checkRequiredFields(const uint8_t* buffer, const uint8_t messageCheckSum) const
+Parser::Status Parser::checkRequiredFields(const uint8_t* buffer, const uint8_t messageCheckSum) const
 {
     if (std::memcmp(buffer, BeginString, sizeof(BeginString) - 1) != 0)
     {
-        return Error::InvalidBeginString;
+        return Status::InvalidBeginString;
     }
     auto tokens = m_tokenizer.begin();
     const auto count = m_tokenizer.end() - tokens;
     const auto& messageType = tokens[2];
     if (messageType.tag != MessageTypeTag)
     {
-        return Error::InvalidMessageTypeTag;
+        return Status::InvalidMessageTypeTag;
     }
     // FIXME: check message type value
 
     const auto& checkSum = tokens[count - 1];
     if (checkSum.tag != CheckSumTag)
     {
-        return Error::InvalidCheckSumTag;
+        return Status::InvalidCheckSumTag;
     }
 
     const auto& [position, tag, length] = tokens[1];
     if (tag != BodyLengthTag)
     {
-        return Error::InvalidBodyLengthTag;
+        return Status::InvalidBodyLengthTag;
     }
     if (asciiToDecimal(buffer + position, length) != static_cast<uint32_t>(checkSum.position - messageType.position))
     {
-        return Error::InvalidBodyLength;
+        return Status::InvalidBodyLength;
     }
-    if (asciiToDecimal(buffer + checkSum.position - 3, 3) != messageCheckSum)
+    if (asciiToDecimal(buffer + checkSum.position, 3) != messageCheckSum)
     {
-        return Error::InvalidCheckSum;
+        return Status::InvalidCheckSum;
     }
-    return Error::Success;
+    return Status::Success;
 }
 }
