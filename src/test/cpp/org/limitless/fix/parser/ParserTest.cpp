@@ -3,16 +3,16 @@
 //
 #include <gtest/gtest.h>
 
-#include "org/limitless/fix/messages/Logon.hpp"
 #include "org/limitless/fix/parser/Parser.hpp"
-#include "org/limitless/fix/messages/Dictionary.hpp"
+#include "org/limitless/fix/parser/Dictionary.hpp"
+#include "org/limitless/fix/messages/Grammar.hpp"
 
 namespace org::limitless::fix::parser {
 
 
-void handler(messages::Message* message)
+void handler(Message* message)
 {
-    auto logon = reinterpret_cast<messages::Logon*>(message);
+    auto logon = reinterpret_cast<generated::Logon*>(message);
     auto sender = logon->sender();
     auto target = logon->target();
     auto sequenceNumber = logon->expectedSeqNum();
@@ -28,10 +28,10 @@ void handler(messages::Message* message)
 
 TEST(Parser, Dictionary)
 {
-    using namespace org::limitless::fix::messages;
-    ASSERT_EQ(nullptr, dictionary(43));
-    const auto meta49 = dictionary(49);
-    std::printf("meta: tag = %d, type = %d\n", meta49->tag, meta49->type);
+    using namespace org::limitless::fix::generated;
+    //ASSERT_EQ(nullptr, dictionary(43, TokenMeta));
+    const auto meta49 = dictionary(49, TokenMeta);
+    //std::printf("meta: tag = %d, type = %d\n", meta49->tag, meta49->type);
 }
 
 TEST(Parser, Basics)

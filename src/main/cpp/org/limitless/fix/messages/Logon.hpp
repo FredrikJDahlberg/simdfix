@@ -7,17 +7,20 @@
 #ifndef SIMD_FIX_LOGON_HPP
 #define SIMD_FIX_LOGON_HPP
 
-#include <exception>
+#include <expected>
 
 #include "org/limitless/fix/parser/Message.hpp"
-#include "org/limitless/fix/messages/Dictionary.hpp"
+#include "org/limitless/fix/parser/Dictionary.hpp"
+#include "org/limitless/fix/parser/ParserStatus.hpp"
 
-namespace org::limitless::fix::messages {
+namespace org::limitless::fix::generated {
 
 using namespace org::limitless::fix::parser;
 
 struct Logon : parser::Message
 {
+    static constexpr uint16_t MessageId = 1;
+
     Logon(const std::span<const uint8_t> data, std::span<Token> tokens, parser::BitSet64 present)
         : Message(data, tokens, present)
     {
@@ -77,10 +80,10 @@ struct Logon : parser::Message
 
     struct HopGroup
     {
-        static constexpr std::array<const TokenMeta*, 3> meta =
-        {
-            dictionary(628), dictionary(629), dictionary(630)
-        };
+        //static constexpr std::array<const TokenMeta*, 3> meta =
+        //{
+        //    dictionary(628), dictionary(629), dictionary(630)
+        //};
 
         Message& m_message;
         Token* m_count;
