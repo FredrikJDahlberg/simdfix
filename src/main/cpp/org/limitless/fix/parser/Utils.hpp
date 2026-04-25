@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-04-23.
 //
 
-#ifndef SIMD_FIX_UTILS_H
-#define SIMD_FIX_UTILS_H
+#ifndef SIMD_FIX_UTILS_HPP
+#define SIMD_FIX_UTILS_HPP
 
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 
@@ -67,4 +67,4 @@ inline uint32_t asciiToDecimal(const uint8_t* digits, const uint32_t length)
 
 }
 
-#endif //SIMD_FIX_UTILS_H
+#endif //SIMD_FIX_UTILS_HPP

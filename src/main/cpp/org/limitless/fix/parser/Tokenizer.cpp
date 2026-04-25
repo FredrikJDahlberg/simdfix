@@ -15,13 +15,14 @@ std::pair<uint16_t,uint8_t> Tokenizer::scan(const std::span<const data_t> buffer
     using simd::Uint8x16;
     m_count = 0;
     m_tag = 0;
+
     const auto data = buffer.data();
     const auto length = static_cast<length_t>(buffer.size());
     m_tokens[0] = { 2, static_cast<uint16_t>(data[0] - '0'), 8 };
     m_count = 1;
+
     position_t bits = 4;
     data_t digits[Uint8x16::Size];
-
     uint8_t lastSum = 0;
     position_t offset = 0;
     bool complete = false;

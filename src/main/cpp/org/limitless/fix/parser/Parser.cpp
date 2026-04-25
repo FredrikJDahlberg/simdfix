@@ -6,40 +6,47 @@
 
 namespace org::limitless::fix::parser {
 
-Parser::Status Parser::checkRequiredFields(const uint8_t* buffer, const uint8_t messageCheckSum) const
+ParserStatus Parser::checkRequiredFields(const uint8_t* buffer, const uint8_t messageCheckSum) const
 {
     if (std::memcmp(buffer, BeginString, sizeof(BeginString) - 1) != 0)
     {
-        return Status::InvalidBeginString;
+        return ParserStatus::InvalidBeginString;
     }
+
+    // FIXME: check minimum number of required tokens
+
     auto tokens = m_tokenizer.begin();
     const auto count = m_tokenizer.end() - tokens;
     const auto& messageType = tokens[2];
-    if (messageType.tag != MessageTypeTag)
+    if (messageType.tag != Tags::MessageType)
     {
-        return Status::InvalidMessageTypeTag;
+        return ParserStatus::InvalidMessageTypeTag;
     }
     // FIXME: check message type value
 
     const auto& checkSum = tokens[count - 1];
-    if (checkSum.tag != CheckSumTag)
+    if (checkSum.tag != Tags::CheckSum)
     {
-        return Status::InvalidCheckSumTag;
+        return ParserStatus::InvalidCheckSumTag;
     }
-
     const auto& [position, tag, length] = tokens[1];
-    if (tag != BodyLengthTag)
+    if (tag != Tags::BodyLength)
     {
-        return Status::InvalidBodyLengthTag;
+        return ParserStatus::InvalidBodyLengthTag;
     }
     if (asciiToDecimal(buffer + position, length) != static_cast<uint32_t>(checkSum.position - messageType.position))
     {
-        return Status::InvalidBodyLength;
+        return ParserStatus::InvalidBodyLength;
     }
     if (asciiToDecimal(buffer + checkSum.position, 3) != messageCheckSum)
     {
-        return Status::InvalidCheckSum;
+        return ParserStatus::InvalidCheckSum;
     }
-    return Status::Success;
+
+    // FIXME:
+    //static constexpr uint32_t SenderCompID = 49;
+    //static constexpr uint32_t TargetCompID = 56;
+
+    return ParserStatus::Success;
 }
 }

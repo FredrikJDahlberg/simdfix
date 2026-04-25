@@ -15,7 +15,7 @@ namespace org::limitless::fix::parser {
 class Tokenizer
 {
 public:
-    using position_t = int32_t;
+    using position_t = int16_t;
     using length_t = int32_t;
     using data_t = uint8_t;
 
@@ -46,6 +46,20 @@ public:
 
     [[nodiscard]] std::pair<uint16_t, uint8_t> scan(std::span<const data_t> buffer); // processed and checksum
 
+    [[nodiscard]] Token* begin() noexcept
+    {
+        return m_tokens;
+    }
+    [[nodiscard]] Token* end() noexcept
+    {
+        return m_tokens + m_count;
+    }
+
+    [[nodiscard]] std::span<Token> tokens() noexcept
+    {
+        return { m_tokens, m_count };
+    }
+
     [[nodiscard]] const Token* begin() const noexcept
     {
         return m_tokens;
@@ -60,7 +74,7 @@ public:
         return { m_tokens, m_count };
     }
 
-    [[nodiscard]] size_t size() const noexcept
+    [[nodiscard]] size_t size() noexcept
     {
         return m_count;
     }

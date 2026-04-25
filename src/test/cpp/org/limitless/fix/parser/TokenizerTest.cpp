@@ -26,9 +26,9 @@ void check(std::span<const Tokenizer::Token> result, const std::span<const Token
 TEST(Tokenizer, Basics)
 {
     static constexpr uint8_t MESSAGE[] =
-        "8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH "56=SellSide_1" SOH "34=1" SOH
+        "8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH "56=SellerSide" SOH "34=1" SOH
         "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH "141=Y" SOH "553=Username" SOH
-        "554=Password" SOH "1137=9" SOH "10=147" SOH
+        "554=Password" SOH "1137=9" SOH "10=218" SOH
         // next message
         "8=FIXT.1.1" SOH "9=118" SOH;
     constexpr size_t LENGTH = sizeof(MESSAGE) - 1;
@@ -36,7 +36,7 @@ TEST(Tokenizer, Basics)
     Tokenizer tokenizer;
     auto [processed, checkSum] = tokenizer.scan(buffer);
     ASSERT_EQ(LENGTH - 17, processed);
-    ASSERT_EQ(147, checkSum);
+    ASSERT_EQ(218, checkSum);
     constexpr Tokenizer::Token expectedTokens[] =
     {
         { 2, 8, 8 },
