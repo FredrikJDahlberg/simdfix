@@ -25,7 +25,8 @@ set(FIX_HEADERS
         src/main/cpp/org/limitless/fix/messages/MessageTypes.hpp
         src/main/cpp/org/limitless/fix/parser/Dictionary.hpp
         src/main/cpp/org/limitless/fix/messages/Grammar.hpp
-        src/main/cpp/org/limitless/fix/parser/GroupDecoder.hpp)
+        src/main/cpp/org/limitless/fix/parser/GroupDecoder.hpp
+        src/main/cpp/org/limitless/fix/parser/PerfectHashMap.hpp)
 
 add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS})
 target_include_directories(SimdFix PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
@@ -62,3 +63,4 @@ set(BASE_PATH "src/test/cpp/org/limitless/fix/parser")
 add_limitless_test(TokenizerTest "${BASE_PATH}/TokenizerTest.cpp")
 add_limitless_test(BitSetTest    "${BASE_PATH}/BitSetTest.cpp")
 add_limitless_test(ParserTest    "${BASE_PATH}/ParserTest.cpp")
+add_limitless_test(PerfectHashTest  "${BASE_PATH}/PerfectHashTest.cpp")

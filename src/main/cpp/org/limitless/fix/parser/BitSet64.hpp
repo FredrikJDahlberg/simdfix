@@ -21,13 +21,13 @@ public:
     BitSet64& operator=(const BitSet64& other) = default;
     BitSet64& operator=(BitSet64&& other) noexcept = default;
 
-    BitSet64& operator>>=(int32_t position) noexcept
+    BitSet64& operator>>=(size_t position) noexcept
     {
         m_bits >>= position;
         return *this;
     }
 
-    BitSet64& operator<<=(const int32_t position) noexcept
+    BitSet64& operator<<=(const size_t position) noexcept
     {
         m_bits <<= position;
         return *this;
@@ -56,7 +56,7 @@ public:
         return *this;
     }
 
-    BitSet64& clear(const int32_t position) noexcept
+    BitSet64& clear(const size_t position) noexcept
     {
         m_bits &= ~(1ULL << position);
         return *this;

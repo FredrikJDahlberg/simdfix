@@ -5,6 +5,8 @@
 #ifndef SIMD_FIX_GRAMMAR_HPP
 #define SIMD_FIX_GRAMMAR_HPP
 
+#include <span>
+
 #include "org/limitless/fix/parser/Dictionary.hpp"
 
 namespace org::limitless::fix::generated {

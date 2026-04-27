@@ -1,0 +1,164 @@
+//
+// Created by Fredrik Dahlberg on 2026-04-27.
+//
+
+#ifndef SIMD_FIX_PERFECT_HASH_MAP_HPP
+#define SIMD_FIX_PERFECT_HASH_MAP_HPP
+
+#include <array>
+#include <optional>
+#include <cstdint>
+
+struct BucketInfo
+{
+    uint32_t salt = 0;
+    uint32_t offset = 0;
+    uint16_t size = 0;
+};
+
+
+template<typename T>
+struct Entry
+{
+    uint32_t tag;
+    T data; // Your 16-byte metadata (including tag)
+};
+
+template<size_t N, typename T>
+class PerfectHashMap
+{
+    // Using N buckets makes finding salts significantly faster for the compiler
+    static constexpr size_t NumBuckets = (N > 0) ? N : 1;
+
+    struct BucketInfo
+    {
+        uint32_t salt = 0;
+        uint32_t offset = 0;
+        uint32_t size = 0;
+    };
+
+    std::array<Entry<T>, N> values{};
+    std::array<BucketInfo, NumBuckets> index{};
+
+    // Fast bit mixer to distribute tags into buckets
+    static constexpr uint32_t hash1(uint32_t tag)
+    {
+        uint32_t h = tag * 0x45d9f3b;
+        return h % NumBuckets;
+    }
+
+    // High-entropy mixer for resolving local collisions
+    static constexpr uint32_t hash2(const uint32_t tag, uint32_t salt, uint32_t size)
+    {
+        if (size <= 1) return 0;
+        uint32_t h = tag ^ salt;
+        h ^= h >> 16;
+        h *= 0x85ebca6b;
+        h ^= h >> 13;
+        h *= 0xc2b2ae35;
+        h ^= h >> 16;
+        return h % size;
+    }
+
+public:
+    constexpr PerfectHashMap(const std::array<Entry<T>, N> input)
+    {
+        for (size_t i = 0; i < N; ++i)
+        {
+            for (size_t j = i + 1; j < N; ++j)
+            {
+                if (input[i].tag == input[j].tag)
+                {
+                    throw std::invalid_argument("PerfectHashMap: Duplicate tag found in input array!");
+                }
+            }
+        }
+
+        // 1. Distribution Phase
+        std::array<uint32_t, NumBuckets> bucket_sizes{};
+        for (const auto& item: input)
+        {
+            ++bucket_sizes[hash1(item.tag)];
+        }
+
+        uint32_t current_offset = 0;
+        for (size_t i = 0; i < NumBuckets; ++i)
+        {
+            index[i].offset = current_offset;
+            index[i].size = bucket_sizes[i];
+            current_offset += bucket_sizes[i];
+        }
+
+        // 2. Salt Finding Phase
+        for (size_t i = 0; i < NumBuckets; ++i)
+        {
+            if (index[i].size == 0)
+            {
+                continue;
+            }
+            // Collect tags for this specific bucket
+            uint32_t local_tags[N];
+            uint32_t count = 0;
+            for (const auto& item: input)
+            {
+                if (hash1(item.tag) == i) local_tags[count++] = item.tag;
+            }
+
+            uint32_t salt = 0;
+            bool collision = true;
+            while (collision)
+            {
+                // Safety valve for compiler step limit
+                if (salt > 2000)
+                {
+                    throw std::invalid_argument("PerfectHashMap: Could not find salt.");
+                }
+                collision = false;
+                for (uint32_t a = 0; a < count; ++a)
+                {
+                    for (uint32_t b = a + 1; b < count; ++b)
+                    {
+                        if (hash2(local_tags[a], salt, count) ==
+                            hash2(local_tags[b], salt, count))
+                        {
+                            collision = true;
+                            break;
+                        }
+                    }
+                    if (collision)
+                    {
+                        break;
+                    }
+                }
+                if (collision)
+                {
+                    salt++;
+                }
+            }
+            index[i].salt = salt;
+
+            // 3. Placement Phase
+            for (const auto& item: input)
+            {
+                if (hash1(item.tag) == i)
+                {
+                    uint32_t pos = index[i].offset + hash2(item.tag, salt, count);
+                    values[pos] = item;
+                }
+            }
+        }
+    }
+
+    constexpr std::optional<T> lookup(uint32_t tag) const
+    {
+        const auto& bucket = index[hash1(tag)];
+        if (bucket.size == 0)
+        {
+            return std::nullopt;
+        }
+        const auto& entry = values[bucket.offset + hash2(tag, bucket.salt, bucket.size)];
+        return (entry.tag == tag) ? std::make_optional(entry.data) : std::nullopt;
+    }
+};
+
+#endif //SIMD_FIX_PERFECT_HASH_MAP_HPP
