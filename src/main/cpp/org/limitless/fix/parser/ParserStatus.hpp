@@ -16,6 +16,7 @@ enum class ParserStatus
     InvalidBodyLength,
     InvalidCheckSum,
     RequiredFieldMissing,
+    NullValue,
     Success
 };
 }

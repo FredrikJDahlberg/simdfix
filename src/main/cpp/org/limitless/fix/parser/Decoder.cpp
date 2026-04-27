@@ -1,12 +1,12 @@
 //
 // Created by Fredrik Dahlberg on 2026-04-23.
 //
-#include "org/limitless/fix/parser/Parser.hpp"
+#include "org/limitless/fix/parser/Decoder.hpp"
 #include "org/limitless/fix/parser/Utils.hpp"
 
 namespace org::limitless::fix::parser {
 
-ParserStatus Parser::checkRequiredFields(const uint8_t* buffer, const uint8_t messageCheckSum) const
+ParserStatus Decoder::checkRequiredFields(const uint8_t* buffer, const uint8_t messageCheckSum) const
 {
     if (std::memcmp(buffer, BeginString, sizeof(BeginString) - 1) != 0)
     {

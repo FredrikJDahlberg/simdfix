@@ -2,32 +2,37 @@
 // Created by Fredrik Dahlberg on 2026-04-25.
 //
 
-#ifndef SIMD_FIX_MESSAGEHANDLER_HPP
-#define SIMD_FIX_MESSAGEHANDLER_HPP
+#ifndef SIMD_FIX_MESSAGE_HANDLER_HPP
+#define SIMD_FIX_MESSAGE_HANDLER_HPP
 
-#include "org/limitless/fix/messages/Logon.hpp"
+#include "org/limitless/fix/messages/LogonDecoder.hpp"
 
-namespace org::limitless::fix::messages {
+namespace org::limitless::fix::generated {
 
-struct MessageHandler
+template <typename Derived>
+class MessageHandler
 {
-    void handle(const Message* message)
+public:
+    template <typename Event>
+    void receive(Event&& event)
     {
-#if 0
-        auto type = message->messageType();
-        switch (type)
+        static_cast<Derived*>(this)->handle(std::forward<Event>(event));
+    }
+
+    void handle(MessageDecoder& message)
+    {
+        switch (message.type())
         {
-            case MessageType::Logon:
-                handleLogon(reinterpret_cast<const Logon*>(message));
+            case 'A':
+                receive(reinterpret_cast<generated::LogonDecoder&>(message).wrap());
+                break;
+            default:
                 break;
         }
-#endif
     }
 
-    void handleLogon(const Logon* message)
-    {
-
-    }
+protected:
+    void handle(LogonDecoder* m) {}
 };
 
 }

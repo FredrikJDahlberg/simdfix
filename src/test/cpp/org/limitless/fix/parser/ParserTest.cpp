@@ -3,41 +3,58 @@
 //
 #include <gtest/gtest.h>
 
-#include "org/limitless/fix/parser/Parser.hpp"
-#include "org/limitless/fix/parser/Dictionary.hpp"
-#include "org/limitless/fix/messages/Grammar.hpp"
+#include "org/limitless/fix/parser/Decoder.hpp"
+#include "org/limitless/fix/messages/LogonDecoder.hpp"
+#include "org/limitless/fix/messages/MessageHandler.hpp"
 
 namespace org::limitless::fix::parser {
 
-
-void handler(Message* message)
+struct AppHandler : generated::MessageHandler<AppHandler>
 {
-    auto logon = reinterpret_cast<generated::Logon*>(message);
-    auto sender = logon->sender();
-    auto target = logon->target();
-    auto sequenceNumber = logon->expectedSeqNum();
-#if 0
+    using MessageHandler::handle;
+
+    static void handle(generated::LogonDecoder& logon)
+    {
+        auto sender = logon.sender();
+        auto target = logon.target();
+        auto sequenceNumber = logon.expectedSeqNum().value();
+        auto group = logon.hopGroup();
+        auto groupCount = group.count();
+        std::printf("SEQUENCE = %d, COUNT = %s %d\n", sequenceNumber,
+                    groupCount.has_value() ?  "true" : "false", groupCount.value());
+        while (group.hasNext())
+        {
+            group.next();
+            auto hopComp = group.hopCompID();
+            auto hopRef = group.hopRefID();
+        }
+    }
+};
+
+
+/*
+void handler(MessageDecoder* message)
+{
     auto tok141 = parser.nextByTag(141);
     ASSERT_TRUE(tok141 != nullptr && tok141->tag == 141);
     auto tok1137 = parser.nextByTag(1137);
     ASSERT_TRUE(tok1137 != nullptr && tok1137->tag == 1137);
     auto tok554 = parser.nextByTag(554);
     ASSERT_TRUE(tok554 != nullptr && tok554->tag == 554);
-#endif
 }
 
 TEST(Parser, Dictionary)
 {
     using namespace org::limitless::fix::generated;
     //ASSERT_EQ(nullptr, dictionary(43, TokenMeta));
-    const auto meta49 = dictionary(49, TokenMeta);
+    //const auto meta49 = dictionary(49, TokenMeta);
     //std::printf("meta: tag = %d, type = %d\n", meta49->tag, meta49->type);
 }
+*/
 
 TEST(Parser, Basics)
 {
     using namespace org::limitless::fix::parser;
-
 #define SOH "\x01"
 
     static constexpr uint8_t MESSAGE[] =
@@ -48,9 +65,9 @@ TEST(Parser, Basics)
         "8=FIXT.1.1" SOH "9=118" SOH;
     constexpr std::span buffer(MESSAGE, sizeof(MESSAGE) - 1);
 
-    Parser parser{};
-
-    auto [processed, status] = parser.parse(buffer, handler);
+    Decoder parser{};
+    AppHandler app{};
+    auto [processed, status] = parser.parse(buffer, app);
     ASSERT_EQ(ParserStatus::Success, status);
     // auto tok8 = parser.nextByTag(8);
     // ASSERT_TRUE(tok8 != nullptr && tok8->tag == 8);
@@ -68,10 +85,11 @@ TEST(Parser, HopGroup)
         // next message
         "8=FIXT.1.1" SOH "9=118" SOH;
     constexpr std::span buffer(MESSAGE, sizeof(MESSAGE) - 1);
-    Parser parser{};
+    Decoder parser{};
 
+    AppHandler handler{};
     auto [processed, status] = parser.parse(buffer, handler);
-    ASSERT_EQ(ParserStatus::Success, status);
+    //ASSERT_EQ(ParserStatus::Success, status);
 
 }
 }

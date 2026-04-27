@@ -11,20 +11,21 @@ find_package(GTest REQUIRED)
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp ${CMAKE_SOURCE_DIR}/src/test/cpp)
 
 set(FIX_SOURCES
-        src/main/cpp/org/limitless/fix/parser/Parser.cpp
+        src/main/cpp/org/limitless/fix/parser/Decoder.cpp
         src/main/cpp/org/limitless/fix/parser/Tokenizer.cpp)
 set(FIX_HEADERS
         src/main/cpp/org/limitless/fix/parser/Tokenizer.hpp
         src/main/cpp/org/limitless/fix/parser/Utils.hpp
-        src/main/cpp/org/limitless/fix/parser/Parser.hpp
+        src/main/cpp/org/limitless/fix/parser/Decoder.hpp
         src/main/cpp/org/limitless/fix/parser/BitSet64.hpp
-        src/main/cpp/org/limitless/fix/parser/Message.hpp
-        src/main/cpp/org/limitless/fix/messages/Logon.hpp
+        src/main/cpp/org/limitless/fix/parser/MessageDecoder.hpp
+        src/main/cpp/org/limitless/fix/messages/LogonDecoder.hpp
         src/main/cpp/org/limitless/fix/messages/MessageHandler.hpp
         src/main/cpp/org/limitless/fix/parser/ParserStatus.hpp
         src/main/cpp/org/limitless/fix/messages/MessageTypes.hpp
         src/main/cpp/org/limitless/fix/parser/Dictionary.hpp
-        src/main/cpp/org/limitless/fix/messages/Grammar.hpp)
+        src/main/cpp/org/limitless/fix/messages/Grammar.hpp
+        src/main/cpp/org/limitless/fix/parser/GroupDecoder.hpp)
 
 add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS})
 target_include_directories(SimdFix PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")

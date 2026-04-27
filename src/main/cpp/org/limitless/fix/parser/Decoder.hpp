@@ -2,21 +2,21 @@
 // Created by Fredrik Dahlberg on 2026-04-22.
 //
 
-#ifndef SIMD_FIX_PARSER_HPP
-#define SIMD_FIX_PARSER_HPP
+#ifndef SIMD_FIX_DECODER_HPP
+#define SIMD_FIX_DECODER_HPP
 
 #include <expected>
 
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 #include "org/limitless/fix/parser/BitSet64.hpp"
-#include "org/limitless/fix/parser/Message.hpp"
+#include "org/limitless/fix/parser/MessageDecoder.hpp"
 #include "org/limitless/fix/parser/ParserStatus.hpp"
 
-#include "org/limitless/fix/messages/Logon.hpp"
+#include "org/limitless/fix/messages/LogonDecoder.hpp"
 
 namespace org::limitless::fix::parser {
 
-class Parser
+class Decoder
 {
     struct Tags
     {
@@ -35,11 +35,12 @@ class Parser
     Tokenizer m_tokenizer{};
     BitSet64 m_present{}; // FIXME 128 bits
 
+    MessageDecoder m_message;
+
 public:
 
     template <typename Handler>
-    // FIXME: restrictions on handler
-    std::pair<size_t, ParserStatus> parse(const std::span<const uint8_t> buffer, const Handler handler)
+    std::pair<size_t, ParserStatus> parse(const std::span<const uint8_t> buffer, Handler& handler)
     {
         m_present.set();
         auto [processed, checkSum] = m_tokenizer.scan(buffer);
@@ -50,8 +51,8 @@ public:
         m_present.clear(0).clear(1).clear(2).clear(count - 1);
         if (status == ParserStatus::Success)
         {
-            Message message{buffer, std::span(tokens, count), m_present};
-            handler(&message);
+            m_message.wrap(buffer, std::span(tokens, count), m_present);
+            handler.handle(m_message);
         }
         return {processed, status};
     }
@@ -62,4 +63,4 @@ private:
 };
 }
 
-#endif //SIMD_FIX_PARSER_HPP
+#endif //SIMD_FIX_DECODER_HPP

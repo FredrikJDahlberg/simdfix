@@ -9,19 +9,23 @@
 
 namespace org::limitless::fix::generated {
 
-inline constexpr std::array<messages::Dictionary, 8> TokenMeta{
-    {
-        {1, 0, false}, // add required and optional
-        {10, 0, true},
-        {49, 12, true},
-        {102, 24, true},
-        {627, 10, false},
-        {628, 10, false},
-        {629, 10, false},
-        {630, 10, false}
-        // ... total of 64 fields
-    }
+
+static inline constexpr std::array<messages::Dictionary, 8> TokenMeta{
+        {
+            {1, 0, false},
+            {10, 0, true},
+            {49, 12, true},
+            {102, 24, true},
+            {627, 10, false},
+            {628, 10, false},
+            {629, 10, false},
+            {630, 10, false}
+            // ...
+        }
 };
+
+static inline constexpr std::span<const messages::Dictionary> Grammar{TokenMeta};
+
 }
 
 #endif //SIMD_FIX_GRAMMAR_HPP

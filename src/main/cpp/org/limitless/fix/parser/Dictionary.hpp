@@ -10,18 +10,19 @@
 
 namespace org::limitless::fix::messages {
 
-struct Dictionary {
+struct Dictionary
+{
     uint16_t tag;
-    uint16_t type;   // tag, group id
+    uint16_t type;
     bool mandatory;
 };
 
-template <size_t Size>
-[[nodiscard]] static consteval const Dictionary* dictionary(uint16_t tag, const std::array<Dictionary, Size>& grammar) noexcept
+[[nodiscard]] static consteval const Dictionary* dictionary(uint16_t tag, std::span<const Dictionary> grammar) noexcept
 {
     const auto it = std::lower_bound(grammar.begin(), grammar.end(), tag,
                                      [](const Dictionary& lhs, uint16_t rhs){ return lhs.tag < rhs; });
-    if (it != grammar.end() && it->tag == tag) {
+    if (it != grammar.end() && it->tag == tag)
+    {
         return &(*it);
     }
     return nullptr;
