@@ -2,56 +2,67 @@
 // Created by Fredrik Dahlberg on 2026-04-24.
 //
 
+#ifndef SIMD_FIX_MESSAGE_DECODER_HPP
+#define SIMD_FIX_MESSAGE_DECODER_HPP
+
 #include <span>
 
+#include <array>
 #include "org/limitless/fix/parser/Dictionary.hpp"
+
 #include "org/limitless/fix/parser/ParserStatus.hpp"
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 #include "org/limitless/fix/parser/Utils.hpp"
 #include "org/limitless/fix/parser/BitSet64.hpp"
-
-#ifndef SIMD_FIX_MESSAGE_DECODER_HPP
-#define SIMD_FIX_MESSAGE_DECODER_HPP
+#include "org/limitless/fix/parser/PerfectHashMap.hpp"
 
 namespace org::limitless::fix::parser {
 
+template <typename Grammar>
 struct MessageDecoder
 {
     using Token = Tokenizer::Token;
+    using Message = MessageDecoder<Grammar>;
 
     std::span<const uint8_t> m_data{};
     std::span<Token> m_tokens{};
     BitSet64 m_present{};
 
-    // FIXME: nested group stack
-    static constexpr std::span<uint8_t> NullSpan{};
+    // FIXME: nested groups stack
+
+    static constexpr std::array<Entry<Dictionary>, 9> LocalMeta = Grammar::Meta;
+    static constexpr auto MessageGrammar = PerfectHashMap(
+        std::span<const Entry<Dictionary>, LocalMeta.size()>(LocalMeta)
+    );
 
     MessageDecoder() = default;
-#if 0
-    MessageDecoder(const std::span<const uint8_t> data, const std::span<Token> tokens, const BitSet64 present)
-        : m_data{data}, m_tokens{tokens}, m_present{present}
+
+    explicit MessageDecoder(const std::span<Token> tokens)
+        : m_tokens{tokens}
     {
     }
-#endif
-    void wrap(const std::span<const uint8_t> data, const std::span<Token> tokens, const BitSet64 present)
+
+    MessageDecoder(const std::span<const uint8_t> data, const std::span<Token> tokens)
+        : m_data{data}, m_tokens{tokens}
+    {
+    }
+
+    void wrap(const std::span<const uint8_t> data, const std::span<Token> tokens)
     {
         m_data = data;
         m_tokens = tokens;
-        m_present = present;
-    }
-#if 0
-    [[nodiscard]] uint8_t messageType() const
-    {
-        auto messageType = m_tokens[2];
-        return m_data[messageType.position];
-    }
-#endif
-    [[nodiscard]] uint8_t type() const noexcept
-    {
-        return m_data[m_tokens[2].position];
+        m_present.set();
+        const auto size = tokens.size();
+        m_present >>= m_present.capacity() - size;
+        m_present.clear(0).clear(1).clear(2).clear(size - 1); // already checked
     }
 
-    template <uint16_t Tag>
+    [[nodiscard]] uint8_t type() const noexcept
+    {
+        return m_data[m_tokens[2].position]; // FIXME
+    }
+
+    template <int32_t Tag>
     std::expected<std::span<const uint8_t>, ParserStatus> getString(const bool required)
     {
         const auto token = next(Tag);
@@ -62,7 +73,7 @@ struct MessageDecoder
         return m_data.subspan(token->position, token->length);
     }
 
-    template <uint16_t Tag>
+    template <int32_t Tag>
     std::expected<uint32_t, ParserStatus> getUnsigned(const bool required)
     {
         const auto token = next(Tag);
@@ -73,7 +84,7 @@ struct MessageDecoder
         return convertToUnsigned(token);
     }
 
-    Tokenizer::Token* next(const uint16_t tag)
+    Tokenizer::Token* next(const int32_t tag)
     {  // assume that fields are access once in tag order
         const auto tokens = m_tokens;
         BitSet64 present{m_present};
@@ -112,6 +123,27 @@ struct MessageDecoder
         return m_data.subspan(token->position, token->length);
     }
 
+    [[nodiscard]] ParserStatus checkRequired()
+    {
+        auto sender = getString<49>(true);
+        if (!sender || sender.value().size() == 0)
+        {
+            return ParserStatus::InvalidSenderCompId;
+        }
+
+        const auto target = getString<56>(true);
+        if (!target || target.value().size() == 0)
+        {
+            return ParserStatus::InvalidTargetCompId;
+        }
+
+        const auto sequenceNumber = getUnsigned<34>(true);
+        if (!sequenceNumber)
+        {
+            return ParserStatus::InvalidSequenceNumber;
+        }
+        return ParserStatus::Success;
+    }
 };
 }
 

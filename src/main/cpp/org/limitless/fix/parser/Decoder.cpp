@@ -8,21 +8,23 @@ namespace org::limitless::fix::parser {
 
 ParserStatus Decoder::checkRequiredFields(const uint8_t* buffer, const uint8_t messageCheckSum) const
 {
+    auto tokens = m_tokenizer.begin();
+    const auto count = m_tokenizer.end() - tokens;
+    if (count < 4)
+    {
+        return ParserStatus::RequiredFieldMissing;
+    }
     if (std::memcmp(buffer, BeginString, sizeof(BeginString) - 1) != 0)
     {
         return ParserStatus::InvalidBeginString;
     }
 
-    // FIXME: check minimum number of required tokens
-
-    auto tokens = m_tokenizer.begin();
-    const auto count = m_tokenizer.end() - tokens;
-    const auto& messageType = tokens[2];
+    const auto& messageType = tokens[Position::MessageType];
     if (messageType.tag != Tags::MessageType)
     {
         return ParserStatus::InvalidMessageTypeTag;
     }
-    // FIXME: check message type value
+    // message type is validated in the message handler
 
     const auto& checkSum = tokens[count - 1];
     if (checkSum.tag != Tags::CheckSum)
@@ -34,7 +36,7 @@ ParserStatus Decoder::checkRequiredFields(const uint8_t* buffer, const uint8_t m
     {
         return ParserStatus::InvalidBodyLengthTag;
     }
-    if (asciiToDecimal(buffer + position, length) != static_cast<uint32_t>(checkSum.position - messageType.position))
+    if (asciiToDecimal(buffer + position, length) != checkSum.position - messageType.position)
     {
         return ParserStatus::InvalidBodyLength;
     }
@@ -43,10 +45,9 @@ ParserStatus Decoder::checkRequiredFields(const uint8_t* buffer, const uint8_t m
         return ParserStatus::InvalidCheckSum;
     }
 
-    // FIXME:
-    //static constexpr uint32_t SenderCompID = 49;
-    //static constexpr uint32_t TargetCompID = 56;
+    // sender, target and message sequence number are validated in message decoder
 
     return ParserStatus::Success;
 }
+
 }

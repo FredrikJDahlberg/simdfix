@@ -16,24 +16,22 @@ struct Meta
 
 TEST(PerfechHash, Basics)
 {
-    static constexpr std::array<Entry<Meta>, 3> dictionary = {{
+    static constexpr std::array<Entry<Meta>, 3> entries = {{
         {100, {}}, {500, {}}, {9999, {}}
     }};
 
-    static constexpr PerfectHashMap map(dictionary);
-
+    static constexpr PerfectHashMap map(std::span{entries});
     auto result = map.lookup(500);
     EXPECT_TRUE(result.has_value());
     }
 
 TEST(PerfechHash, Duplicates)
 {
-    static constexpr std::array<Entry<Meta>, 3> dictionary = {{
-        {100, {}}, {100, {}}, {9999, {}}
+    static constexpr std::array<Entry<Meta>, 3> entries = {{
+        {100, {}}, {101, {}}, {9999, {}}
     }};
-
     EXPECT_THROW({
-           PerfectHashMap map(dictionary);
-       }, const char*); // We threw a "string literal", which is a const char*
+                 static constexpr PerfectHashMap map(std::span{entries});
+       }, std::invalid_argument); // We threw a "string literal", which is a const char*
 }
 }

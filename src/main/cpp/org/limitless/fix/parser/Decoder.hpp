@@ -8,11 +8,8 @@
 #include <expected>
 
 #include "org/limitless/fix/parser/Tokenizer.hpp"
-#include "org/limitless/fix/parser/BitSet64.hpp"
 #include "org/limitless/fix/parser/MessageDecoder.hpp"
 #include "org/limitless/fix/parser/ParserStatus.hpp"
-
-#include "org/limitless/fix/messages/LogonDecoder.hpp"
 
 namespace org::limitless::fix::parser {
 
@@ -29,30 +26,32 @@ class Decoder
         static constexpr uint16_t CheckSum = 10;
     };
 
+    struct Position
+    {
+        static constexpr uint32_t BeginString = 0;
+        static constexpr uint32_t BodyLength = 1;
+        static constexpr uint32_t MessageType = 2;
+    };
+
     static constexpr uint8_t FieldEnd = 0x01;
     static constexpr uint8_t BeginString[11] = { '8', '=', 'F', 'I', 'X', 'T', '.', '1', '.', '1', FieldEnd };
 
     Tokenizer m_tokenizer{};
-    BitSet64 m_present{}; // FIXME 128 bits
-
-    MessageDecoder m_message;
 
 public:
+
+    Decoder() = default;
 
     template <typename Handler>
     std::pair<size_t, ParserStatus> parse(const std::span<const uint8_t> buffer, Handler& handler)
     {
-        m_present.set();
         auto [processed, checkSum] = m_tokenizer.scan(buffer);
         const auto tokens = m_tokenizer.begin();
         const auto count = static_cast<int32_t>(m_tokenizer.size());
-        m_present >>= 64 - count;
         auto status = checkRequiredFields(buffer.data(), checkSum);
-        m_present.clear(0).clear(1).clear(2).clear(count - 1);
         if (status == ParserStatus::Success)
         {
-            m_message.wrap(buffer, std::span(tokens, count), m_present);
-            handler.handle(m_message);
+            status = handler.handle(buffer, std::span(tokens, count));
         }
         return {processed, status};
     }

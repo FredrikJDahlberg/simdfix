@@ -21,10 +21,19 @@ public:
     BitSet64& operator=(const BitSet64& other) = default;
     BitSet64& operator=(BitSet64&& other) noexcept = default;
 
+    explicit BitSet64(const uint64_t bits) : m_bits(bits)
+    {
+    }
+
     BitSet64& operator>>=(size_t position) noexcept
     {
         m_bits >>= position;
         return *this;
+    }
+
+    [[nodiscard]] size_t capacity() const
+    {
+        return sizeof(m_bits) * 8;
     }
 
     BitSet64& operator<<=(const size_t position) noexcept

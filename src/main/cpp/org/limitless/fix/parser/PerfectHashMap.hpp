@@ -5,6 +5,7 @@
 #ifndef SIMD_FIX_PERFECT_HASH_MAP_HPP
 #define SIMD_FIX_PERFECT_HASH_MAP_HPP
 
+#include <span>
 #include <array>
 #include <optional>
 #include <cstdint>
@@ -15,7 +16,6 @@ struct BucketInfo
     uint32_t offset = 0;
     uint16_t size = 0;
 };
-
 
 template<typename T>
 struct Entry
@@ -61,8 +61,13 @@ class PerfectHashMap
     }
 
 public:
-    constexpr PerfectHashMap(const std::array<Entry<T>, N> input)
+    constexpr PerfectHashMap(std::span<const Entry<T>, N> span)
     {
+        std::array<Entry<T>, N> input;
+        for(size_t i = 0; i < N; ++i)
+        {
+            input[i] = span[i];
+        }
         for (size_t i = 0; i < N; ++i)
         {
             for (size_t j = i + 1; j < N; ++j)
@@ -75,18 +80,18 @@ public:
         }
 
         // 1. Distribution Phase
-        std::array<uint32_t, NumBuckets> bucket_sizes{};
+        std::array<uint32_t, NumBuckets> bucketSizes{};
         for (const auto& item: input)
         {
-            ++bucket_sizes[hash1(item.tag)];
+            ++bucketSizes[hash1(item.tag)];
         }
 
-        uint32_t current_offset = 0;
+        uint32_t currentOffset = 0;
         for (size_t i = 0; i < NumBuckets; ++i)
         {
-            index[i].offset = current_offset;
-            index[i].size = bucket_sizes[i];
-            current_offset += bucket_sizes[i];
+            index[i].offset = currentOffset;
+            index[i].size = bucketSizes[i];
+            currentOffset += bucketSizes[i];
         }
 
         // 2. Salt Finding Phase
@@ -97,11 +102,11 @@ public:
                 continue;
             }
             // Collect tags for this specific bucket
-            uint32_t local_tags[N];
+            uint32_t localTags[N];
             uint32_t count = 0;
             for (const auto& item: input)
             {
-                if (hash1(item.tag) == i) local_tags[count++] = item.tag;
+                if (hash1(item.tag) == i) localTags[count++] = item.tag;
             }
 
             uint32_t salt = 0;
@@ -116,10 +121,9 @@ public:
                 collision = false;
                 for (uint32_t a = 0; a < count; ++a)
                 {
-                    for (uint32_t b = a + 1; b < count; ++b)
+                    for (uint32_t bucket = a + 1; bucket < count; ++bucket)
                     {
-                        if (hash2(local_tags[a], salt, count) ==
-                            hash2(local_tags[b], salt, count))
+                        if (hash2(localTags[a], salt, count) == hash2(localTags[bucket], salt, count))
                         {
                             collision = true;
                             break;
@@ -160,5 +164,7 @@ public:
         return (entry.tag == tag) ? std::make_optional(entry.data) : std::nullopt;
     }
 };
+
+template<size_t N, typename T> PerfectHashMap(std::span<const Entry<T>, N>) -> PerfectHashMap<N, T>;
 
 #endif //SIMD_FIX_PERFECT_HASH_MAP_HPP

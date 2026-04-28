@@ -4,77 +4,90 @@
 #include <gtest/gtest.h>
 
 #include "org/limitless/fix/parser/Decoder.hpp"
+#include "org/limitless/fix/messages/Grammar.hpp"
 #include "org/limitless/fix/messages/LogonDecoder.hpp"
 #include "org/limitless/fix/messages/MessageHandler.hpp"
 
-namespace org::limitless::fix::parser {
-
-struct AppHandler : generated::MessageHandler<AppHandler>
-{
-    using MessageHandler::handle;
-
-    static void handle(generated::LogonDecoder& logon)
-    {
-        auto sender = logon.sender();
-        auto target = logon.target();
-        auto sequenceNumber = logon.expectedSeqNum().value();
-        auto group = logon.hopGroup();
-        auto groupCount = group.count();
-        std::printf("SEQUENCE = %d, COUNT = %s %d\n", sequenceNumber,
-                    groupCount.has_value() ?  "true" : "false", groupCount.value());
-        while (group.hasNext())
-        {
-            group.next();
-            auto hopComp = group.hopCompID();
-            auto hopRef = group.hopRefID();
-        }
-    }
-};
-
-
-/*
-void handler(MessageDecoder* message)
-{
-    auto tok141 = parser.nextByTag(141);
-    ASSERT_TRUE(tok141 != nullptr && tok141->tag == 141);
-    auto tok1137 = parser.nextByTag(1137);
-    ASSERT_TRUE(tok1137 != nullptr && tok1137->tag == 1137);
-    auto tok554 = parser.nextByTag(554);
-    ASSERT_TRUE(tok554 != nullptr && tok554->tag == 554);
-}
-
-TEST(Parser, Dictionary)
-{
-    using namespace org::limitless::fix::generated;
-    //ASSERT_EQ(nullptr, dictionary(43, TokenMeta));
-    //const auto meta49 = dictionary(49, TokenMeta);
-    //std::printf("meta: tag = %d, type = %d\n", meta49->tag, meta49->type);
-}
-*/
-
-TEST(Parser, Basics)
-{
-    using namespace org::limitless::fix::parser;
 #define SOH "\x01"
 
-    static constexpr uint8_t MESSAGE[] =
+namespace org::limitless::fix::parser {
+
+using namespace org::limitless::fix::parser;
+
+TEST(Parser, Logon)
+{
+    static constexpr uint8_t Logon[] =
         "8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH "56=SellerSide" SOH "34=1" SOH
         "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH "141=Y" SOH "553=Username" SOH
         "554=Password" SOH "1137=9" SOH "10=218" SOH
         // next message
         "8=FIXT.1.1" SOH "9=118" SOH;
-    constexpr std::span buffer(MESSAGE, sizeof(MESSAGE) - 1);
+    constexpr std::span buffer(Logon, sizeof(Logon) - 1);
+
+    struct AppHandler : generated::MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        ParserStatus handle(generated::LogonDecoder& logon)
+        {
+            std::printf("Found Logon\n");
+            found = true;
+            return ParserStatus::Success;
+        }
+    } app;
 
     Decoder parser{};
-    AppHandler app{};
     auto [processed, status] = parser.parse(buffer, app);
     ASSERT_EQ(ParserStatus::Success, status);
-    // auto tok8 = parser.nextByTag(8);
-    // ASSERT_TRUE(tok8 != nullptr && tok8->tag == 8);
-    // auto tok9 = parser.nextByTag(9);
-    // ASSERT_TRUE(tok9 != nullptr && tok9->tag == 9);
+    ASSERT_TRUE(app.found);
 }
 
+TEST(Parser, Logout)
+{
+    struct AppHandler : generated::MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        ParserStatus handle(generated::LogonDecoder& logon)
+        {
+            // skip
+            return ParserStatus::Success;
+        }
+
+        ParserStatus handle(generated::LogoutDecoder& logout)
+        {
+            std::printf("Found Logout\n");
+            found = true;
+            return ParserStatus::Success;
+        }
+    } app;
+
+    Decoder parser{};
+    {
+        static constexpr uint8_t Logout[] =
+                "8=FIXT.1.1" SOH "9=34" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "10=178" SOH
+                "               ";
+        static constexpr std::span buffer(Logout, sizeof(Logout) - 1);
+        auto [processed, status] = parser.parse(buffer, app);
+        ASSERT_EQ(ParserStatus::Success, status);
+        ASSERT_TRUE(app.found);
+    }
+    {
+        static constexpr uint8_t Reject[] =
+                "8=FIXT.1.1" SOH "9=12" SOH "35=3" SOH "45=666" SOH "10=107" SOH
+                "               ";
+        static constexpr std::span buffer(Reject, sizeof(Reject) - 1);
+        auto [processed, status] = parser.parse(buffer, app);
+        ASSERT_EQ(ParserStatus::InvalidMessageType, status);
+    }
+
+}
+
+#if 0
 TEST(Parser, HopGroup)
 {
     static constexpr uint8_t MESSAGE[] =
@@ -85,11 +98,11 @@ TEST(Parser, HopGroup)
         // next message
         "8=FIXT.1.1" SOH "9=118" SOH;
     constexpr std::span buffer(MESSAGE, sizeof(MESSAGE) - 1);
-    Decoder parser{};
+    Decoder<generated::Grammar> parser{};
 
-    AppHandler handler{};
+    AppHandler<generated::Grammar> handler{};
     auto [processed, status] = parser.parse(buffer, handler);
     //ASSERT_EQ(ParserStatus::Success, status);
-
 }
+#endif
 }

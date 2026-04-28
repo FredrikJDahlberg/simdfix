@@ -5,36 +5,61 @@
 #ifndef SIMD_FIX_MESSAGE_HANDLER_HPP
 #define SIMD_FIX_MESSAGE_HANDLER_HPP
 
+#include "org/limitless/fix/parser/ParserStatus.hpp"
 #include "org/limitless/fix/messages/LogonDecoder.hpp"
+#include "org/limitless/fix/messages/LogoutDecoder.hpp"
 
 namespace org::limitless::fix::generated {
 
-template <typename Derived>
+template <typename Handler>
 class MessageHandler
 {
+    LogonDecoder m_logon{};
+    LogoutDecoder m_logout{};
+
 public:
+    using Token = Tokenizer::Token;
+
     template <typename Event>
-    void receive(Event&& event)
+    ParserStatus receive(Event&& event)
     {
-        static_cast<Derived*>(this)->handle(std::forward<Event>(event));
+        return static_cast<Handler*>(this)->handle(std::forward<Event>(event));
     }
 
-    void handle(MessageDecoder& message)
+    ParserStatus handle(const std::span<const uint8_t> data, const std::span<Token> tokens)
     {
-        switch (message.type())
+        const auto messageType = data[tokens[2].position]; // FIXME
+        ParserStatus status = ParserStatus::InvalidMessageType;
+        switch (messageType)
         {
-            case 'A':
-                receive(reinterpret_cast<generated::LogonDecoder&>(message).wrap());
+            case LogonDecoder::MessageId:
+                m_logon.wrap(data, tokens);
+                status = m_logon.checkRequired();
+                if (status == ParserStatus::Success)
+                {
+                    status = receive(m_logon);
+                }
                 break;
+            case LogoutDecoder::MessageId:
+                m_logout.wrap(data, tokens);
+                status = m_logout.checkRequired();
+                if (status == ParserStatus::Success)
+                {
+                    status = receive(m_logout);
+                }
+                break;
+
             default:
                 break;
         }
+        return status;
     }
 
 protected:
-    void handle(LogonDecoder* m) {}
+    ParserStatus handle(LogonDecoder& message) { return ParserStatus::Success; }
+    ParserStatus handle(LogoutDecoder& message) { return ParserStatus::Success; }
 };
 
 }
 
-#endif //SIMD_FIX_MESSAGEHANDLER_HPP
+#endif // SIMD_FIX_MESSAGE_HANDLER_HPP

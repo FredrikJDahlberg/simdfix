@@ -15,8 +15,9 @@ namespace org::limitless::fix::parser {
 class Tokenizer
 {
 public:
-    using position_t = int16_t;
-    using length_t = int32_t;
+    using position_t = uint32_t;
+    using length_t = uint16_t;
+    using value_t = uint16_t;
     using data_t = uint8_t;
 
     static constexpr size_t MaxSize = 128;
@@ -32,8 +33,8 @@ public:
     struct Token
     {
         position_t position;
-        uint16_t tag;
-        uint16_t length;
+        value_t tag;
+        length_t length;
     };
 
     Tokenizer() noexcept = default;

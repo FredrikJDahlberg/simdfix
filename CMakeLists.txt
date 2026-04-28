@@ -9,26 +9,29 @@ enable_testing()
 find_package(GTest REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp ${CMAKE_SOURCE_DIR}/src/test/cpp)
-
+set(MAIN_PATH "src/main/cpp/org/limitless/fix/parser")
+set(TEST_PATH "src/test/cpp/org/limitless/fix/parser")
+set(GEN_PATH "src/main/cpp/org/limitless/fix/messages")
+set(GENERATED_HEADERS
+        ${GEN_PATH}/Grammar.hpp
+        ${GEN_PATH}/LogonDecoder.hpp
+        ${GEN_PATH}/LogoutDecoder.hpp
+        ${GEN_PATH}/MessageHandler.hpp)
 set(FIX_SOURCES
-        src/main/cpp/org/limitless/fix/parser/Decoder.cpp
-        src/main/cpp/org/limitless/fix/parser/Tokenizer.cpp)
+        ${MAIN_PATH}/Decoder.cpp
+        ${MAIN_PATH}/Tokenizer.cpp)
 set(FIX_HEADERS
-        src/main/cpp/org/limitless/fix/parser/Tokenizer.hpp
-        src/main/cpp/org/limitless/fix/parser/Utils.hpp
-        src/main/cpp/org/limitless/fix/parser/Decoder.hpp
-        src/main/cpp/org/limitless/fix/parser/BitSet64.hpp
-        src/main/cpp/org/limitless/fix/parser/MessageDecoder.hpp
-        src/main/cpp/org/limitless/fix/messages/LogonDecoder.hpp
-        src/main/cpp/org/limitless/fix/messages/MessageHandler.hpp
-        src/main/cpp/org/limitless/fix/parser/ParserStatus.hpp
-        src/main/cpp/org/limitless/fix/messages/MessageTypes.hpp
-        src/main/cpp/org/limitless/fix/parser/Dictionary.hpp
-        src/main/cpp/org/limitless/fix/messages/Grammar.hpp
-        src/main/cpp/org/limitless/fix/parser/GroupDecoder.hpp
-        src/main/cpp/org/limitless/fix/parser/PerfectHashMap.hpp)
+        ${MAIN_PATH}/Tokenizer.hpp
+        ${MAIN_PATH}/Utils.hpp
+        ${MAIN_PATH}/Decoder.hpp
+        ${MAIN_PATH}/BitSet64.hpp
+        ${MAIN_PATH}/MessageDecoder.hpp
+        ${MAIN_PATH}/ParserStatus.hpp
+        ${MAIN_PATH}/Dictionary.hpp
+        ${MAIN_PATH}/GroupDecoder.hpp
+        ${MAIN_PATH}/PerfectHashMap.hpp)
 
-add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS})
+add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_include_directories(SimdFix PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
 target_compile_options(SimdFix PRIVATE
         -Wall -Wextra
@@ -51,16 +54,14 @@ target_compile_options(Generator PRIVATE -O0 -Wall)
 target_include_directories(Generator PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/cpp")
 target_link_libraries(Generator PRIVATE pugixml::pugixml)
 
-function(add_limitless_test name source)
+function(add_test name source)
     add_executable(${name} ${source})
     target_compile_options(${name} PRIVATE -O0 -Wall -fprofile-instr-generate -fcoverage-mapping)
     target_link_libraries(${name} PRIVATE SimdFix GTest::gtest GTest::gtest_main)
     target_link_options(${name} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address> -fprofile-instr-generate)
 endfunction()
 
-# 2. Use the function to declare your tests
-set(BASE_PATH "src/test/cpp/org/limitless/fix/parser")
-add_limitless_test(TokenizerTest "${BASE_PATH}/TokenizerTest.cpp")
-add_limitless_test(BitSetTest    "${BASE_PATH}/BitSetTest.cpp")
-add_limitless_test(ParserTest    "${BASE_PATH}/ParserTest.cpp")
-add_limitless_test(PerfectHashTest  "${BASE_PATH}/PerfectHashTest.cpp")
+add_test(TokenizerTest   "${TEST_PATH}/TokenizerTest.cpp")
+add_test(BitSetTest      "${TEST_PATH}/BitSetTest.cpp")
+add_test(ParserTest      "${TEST_PATH}/ParserTest.cpp")
+add_test(PerfectHashTest "${TEST_PATH}/PerfectHashMapTest.cpp")

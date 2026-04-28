@@ -15,6 +15,12 @@ enum class ParserStatus
     InvalidBodyLengthTag,
     InvalidBodyLength,
     InvalidCheckSum,
+    InvalidTargetCompTag,
+    InvalidTargetCompId,
+    InvalidSenderCompTag,
+    InvalidSenderCompId,
+    InvalidSequenceNumber,
+    InvalidMessageType,
     RequiredFieldMissing,
     NullValue,
     Success

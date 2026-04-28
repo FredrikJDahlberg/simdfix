@@ -6,9 +6,8 @@
 #define SIMD_FIX_DICTIONARY_HPP
 
 #include <algorithm>
-#include <array>
 
-namespace org::limitless::fix::messages {
+namespace org::limitless::fix::parser {
 
 struct Dictionary
 {
