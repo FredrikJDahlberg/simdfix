@@ -5,9 +5,10 @@
 #ifndef SIMD_FIX_TOKENIZER_H
 #define SIMD_FIX_TOKENIZER_H
 
-#include <ostream>
 #include <span>
+#include <ostream>
 
+#include "org/limitless/fix/parser/Token.hpp"
 #include "org/limitless/fix/parser/Uint8x16.hpp"
 
 namespace org::limitless::fix::parser {
@@ -30,13 +31,6 @@ public:
     const simd::Uint8x16 NinesBlock{'9'};
     const simd::Uint8x16 TrueBlock{0xff};
 
-    struct Token
-    {
-        position_t position;
-        value_t tag;
-        length_t length;
-    };
-
     Tokenizer() noexcept = default;
     ~Tokenizer() = default;
 
@@ -51,6 +45,7 @@ public:
     {
         return m_tokens;
     }
+
     [[nodiscard]] Token* end() noexcept
     {
         return m_tokens + m_count;
@@ -65,6 +60,7 @@ public:
     {
         return m_tokens;
     }
+
     [[nodiscard]] const Token* end() const noexcept
     {
         return m_tokens + m_count;
@@ -75,7 +71,7 @@ public:
         return { m_tokens, m_count };
     }
 
-    [[nodiscard]] size_t size() noexcept
+    [[nodiscard]] size_t size() const noexcept
     {
         return m_count;
     }

@@ -4,7 +4,6 @@
 #include <gtest/gtest.h>
 
 #include "org/limitless/fix/parser/Decoder.hpp"
-#include "org/limitless/fix/messages/Grammar.hpp"
 #include "org/limitless/fix/messages/LogonDecoder.hpp"
 #include "org/limitless/fix/messages/MessageHandler.hpp"
 

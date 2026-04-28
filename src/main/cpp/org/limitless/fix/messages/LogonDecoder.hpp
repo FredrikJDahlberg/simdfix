@@ -12,32 +12,16 @@
 #include "org/limitless/fix/parser/MessageDecoder.hpp"
 #include "org/limitless/fix/parser/GroupDecoder.hpp"
 #include "org/limitless/fix/parser/ParserStatus.hpp"
+#include "org/limitless/fix/messages/Grammar.hpp"
 
 namespace org::limitless::fix::generated {
 
-using namespace org::limitless::fix::parser;
+using namespace org::limitless::fix;
 
-struct LogonGrammar
-{
-    static constexpr std::array<Entry<Dictionary>, 9> Meta {
-        {
-            {1, {1, 0, false} },
-            {10, {10, 0, true}},
-            {34, {34, 0, true}},
-            {49, {49, 12, true}},
-            {102, {102, 24, true}},
-            {627, {627, 10, false}},
-            {628, {628, 10, false}},
-            {629, {629, 10, false}},
-            {630, {630, 10, false}}
-        }};
-};
-
-struct LogonDecoder : MessageDecoder<LogonGrammar>
+struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
 {
     using Message = MessageDecoder;
-    using Group = GroupDecoder<LogonDecoder>;
-    using Token = Tokenizer::Token;
+    using Group = parser::GroupDecoder<LogonDecoder>;
 
     static constexpr uint16_t MessageId = 'A';
     static constexpr size_t MemberCount = 3;
@@ -103,27 +87,27 @@ struct LogonDecoder : MessageDecoder<LogonGrammar>
         return *this;
     }
 
-    std::expected<std::span<const uint8_t>, ParserStatus> sender()
+    std::expected<std::span<const uint8_t>, parser::ParserStatus> sender()
     {
         return this->template getString<56>(true);
     }
 
-    std::expected<std::span<const uint8_t>, ParserStatus> target()
+    std::expected<std::span<const uint8_t>, parser::ParserStatus> target()
     {
         return this->template getString<49>(true);
     }
 
-    std::expected<uint32_t, ParserStatus> expectedSeqNum()
+    std::expected<uint32_t, parser::ParserStatus> expectedSeqNum()
     {
         return this->template getUnsigned<34>(true);
     }
 
-    std::expected<std::span<const uint8_t>, ParserStatus> onBehalfOfCompID()
+    std::expected<std::span<const uint8_t>, parser::ParserStatus> onBehalfOfCompID()
     {
         return this->template getString<115>(false);
     }
 
-    std::expected<uint32_t, ParserStatus> nextExpectedSeqNum()
+    std::expected<uint32_t, parser::ParserStatus> nextExpectedSeqNum()
     {
         return this->template getUnsigned<789>(false);
     }

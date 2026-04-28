@@ -29,7 +29,9 @@ set(FIX_HEADERS
         ${MAIN_PATH}/ParserStatus.hpp
         ${MAIN_PATH}/Dictionary.hpp
         ${MAIN_PATH}/GroupDecoder.hpp
-        ${MAIN_PATH}/PerfectHashMap.hpp)
+        ${MAIN_PATH}/PerfectHashMap.hpp
+        src/main/cpp/org/limitless/fix/messages/Grammar.hpp
+        src/main/cpp/org/limitless/fix/parser/Token.hpp)
 
 add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_include_directories(SimdFix PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")

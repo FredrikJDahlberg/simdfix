@@ -18,8 +18,6 @@ class MessageHandler
     LogoutDecoder m_logout{};
 
 public:
-    using Token = Tokenizer::Token;
-
     template <typename Event>
     ParserStatus receive(Event&& event)
     {

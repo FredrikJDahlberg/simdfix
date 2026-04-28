@@ -7,9 +7,8 @@
 
 #include <span>
 
-#include <array>
 #include "org/limitless/fix/parser/Dictionary.hpp"
-
+#include "org/limitless/fix/parser/Token.hpp"
 #include "org/limitless/fix/parser/ParserStatus.hpp"
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 #include "org/limitless/fix/parser/Utils.hpp"
@@ -21,24 +20,18 @@ namespace org::limitless::fix::parser {
 template <typename Grammar>
 struct MessageDecoder
 {
-    using Token = Tokenizer::Token;
-    using Message = MessageDecoder<Grammar>;
-
     std::span<const uint8_t> m_data{};
     std::span<Token> m_tokens{};
     BitSet64 m_present{};
 
     // FIXME: nested groups stack
 
-    static constexpr std::array<Entry<Dictionary>, 9> LocalMeta = Grammar::Meta;
-    static constexpr auto MessageGrammar = PerfectHashMap(
-        std::span<const Entry<Dictionary>, LocalMeta.size()>(LocalMeta)
-    );
+    using MetaType = std::span<const Entry<Dictionary>, Grammar::Grammar.size()>;
+    static constexpr auto MessageGrammar = PerfectHashMap(MetaType(Grammar::Grammar));
 
     MessageDecoder() = default;
 
-    explicit MessageDecoder(const std::span<Token> tokens)
-        : m_tokens{tokens}
+    explicit MessageDecoder(const std::span<Token> tokens) : m_tokens{tokens}
     {
     }
 
@@ -57,9 +50,16 @@ struct MessageDecoder
         m_present.clear(0).clear(1).clear(2).clear(size - 1); // already checked
     }
 
-    [[nodiscard]] uint8_t type() const noexcept
+    [[nodiscard]] uint16_t type() const noexcept
     {
-        return m_data[m_tokens[2].position]; // FIXME
+        const auto token = m_tokens[2];
+        const auto position = token.position;
+        uint16_t type = m_data[position];
+        if (token.length == 2)
+        {
+            type = type + m_data[position + 1] * 256;
+        }
+        return type;
     }
 
     template <int32_t Tag>
@@ -84,7 +84,7 @@ struct MessageDecoder
         return convertToUnsigned(token);
     }
 
-    Tokenizer::Token* next(const int32_t tag)
+    Token* next(const int32_t tag)
     {  // assume that fields are access once in tag order
         const auto tokens = m_tokens;
         BitSet64 present{m_present};
@@ -125,7 +125,7 @@ struct MessageDecoder
 
     [[nodiscard]] ParserStatus checkRequired()
     {
-        auto sender = getString<49>(true);
+        const auto sender = getString<49>(true);
         if (!sender || sender.value().size() == 0)
         {
             return ParserStatus::InvalidSenderCompId;
@@ -137,8 +137,7 @@ struct MessageDecoder
             return ParserStatus::InvalidTargetCompId;
         }
 
-        const auto sequenceNumber = getUnsigned<34>(true);
-        if (!sequenceNumber)
+        if (!getUnsigned<34>(true))
         {
             return ParserStatus::InvalidSequenceNumber;
         }

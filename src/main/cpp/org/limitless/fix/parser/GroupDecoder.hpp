@@ -7,12 +7,11 @@
 
 namespace org::limitless::fix::parser {
 
-#include "org/limitless/fix/parser/Tokenizer.hpp"
+#include "org/limitless/fix/parser/Token.hpp"
 
 template <typename Grammar>
 struct GroupDecoder
 {
-    using Token = Tokenizer::Token;
     using base_t = MessageDecoder<Grammar>;
 
 protected:
