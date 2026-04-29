@@ -10,7 +10,7 @@ namespace org::limitless::fix::parser {
 
 #define SOH "\x01"
 
-void check(std::span<const Tokenizer::Token> result, const std::span<const Tokenizer::Token> expected)
+void check(std::span<const Token> result, const std::span<const Token> expected)
 {
     for (int i = 0; auto& [position, tag, length] : result)
     {
@@ -37,7 +37,7 @@ TEST(Tokenizer, Basics)
     auto [processed, checkSum] = tokenizer.scan(buffer);
     ASSERT_EQ(LENGTH - 17, processed);
     ASSERT_EQ(218, checkSum);
-    constexpr Tokenizer::Token expectedTokens[] =
+    constexpr Token expectedTokens[] =
     {
         { 2, 8, 8 },
         { 13, 9, 3 },
@@ -67,7 +67,7 @@ TEST(Tokenizer, SplitTagLast)
     auto [processed, checkSum] = tokenizer.scan(buffer);
     ASSERT_EQ(LENGTH, processed);
     ASSERT_EQ(170, checkSum);
-    constexpr Tokenizer::Token expectedTokens[] =
+    constexpr Token expectedTokens[] =
     {
         { 2, 8, 8 },
         { 13, 9, 2 },

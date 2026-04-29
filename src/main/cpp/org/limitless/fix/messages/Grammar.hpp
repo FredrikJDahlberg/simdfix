@@ -9,13 +9,12 @@
 #include "org/limitless/fix/parser/PerfectHashMap.hpp"
 
 namespace org::limitless::fix::protocols {
-
 struct Logon
 {
     static constexpr std::array<Entry<parser::Dictionary>, 9> Grammar
     {
         {
-            {1, {1, 0, false} },
+            {1, {1, 0, false}},
             {10, {10, 0, true}},
             {34, {34, 0, true}},
             {49, {49, 12, true}},
@@ -33,7 +32,7 @@ struct Logout
     static constexpr std::array<Entry<parser::Dictionary>, 9> Grammar
     {
         {
-            {1, {1, 0, false} },
+            {1, {1, 0, false}},
             {10, {10, 0, true}},
             {34, {34, 0, true}},
             {49, {49, 12, true}},
@@ -46,6 +45,18 @@ struct Logout
     };
 };
 
+struct HopGroup
+{
+    static constexpr std::array<Entry<parser::Dictionary>, 4> Grammar
+    {
+        {
+            {627, {627, 10, false}},
+            {628, {628, 10, false}},
+            {629, {629, 10, false}},
+            {630, {630, 10, false}}
+        }
+    };
+};
 }
 
 #endif //SIMD_FIX_GRAMMAR_HPP

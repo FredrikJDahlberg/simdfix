@@ -71,6 +71,13 @@ inline uint32_t asciiToDecimal(const uint8_t* digits, const uint32_t length)
     return value;
 }
 
+
+template<size_t N>
+[[nodiscard]] constexpr auto make_span(const char (&str)[N]) noexcept
+{
+    return std::span<const uint8_t, N - 1>(reinterpret_cast<const uint8_t*>(str), N - 1);
+}
+
 }
 
 #endif //SIMD_FIX_UTILS_HPP

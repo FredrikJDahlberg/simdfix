@@ -40,20 +40,30 @@ class Decoder
 
 public:
 
+    struct Result
+    {
+        size_t processed;
+        ParserStatus status;
+    };
     Decoder() = default;
 
     template <typename Handler>
-    std::pair<size_t, ParserStatus> parse(const std::span<const uint8_t> buffer, Handler& handler)
+    Result parse(const std::span<const uint8_t> buffer, Handler& handler)
     {
-        auto [processed, checkSum] = m_tokenizer.scan(buffer);
+        auto [processed, checkSum, status ] = m_tokenizer.scan(buffer);
+        if (status != ParserStatus::Success)
+        {
+            return { processed, status };
+        }
+
         const auto tokens = m_tokenizer.begin();
         const auto count = static_cast<int32_t>(m_tokenizer.size());
-        auto status = checkRequiredFields(buffer.data(), checkSum);
-        if (status == ParserStatus::Success)
+        auto result = checkRequiredFields(buffer.data(), checkSum);
+        if (result == ParserStatus::Success)
         {
-            status = handler.handle(buffer, std::span(tokens, count));
+            result = handler.handle(buffer, std::span(tokens, count));
         }
-        return {processed, status};
+        return { processed, result};
     }
 
 private:

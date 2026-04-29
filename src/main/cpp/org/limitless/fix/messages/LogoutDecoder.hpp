@@ -16,14 +16,27 @@ using namespace org::limitless::fix::parser;
 struct LogoutDecoder : MessageDecoder<protocols::Logout>
 {
     using Message = MessageDecoder;
+    using Header = messages::HeaderDecoder<MessageDecoder>;
+    using Group = messages::HopGroupDecoder<MessageDecoder>;
 
     static constexpr uint16_t MessageId = '5';
 
-    LogoutDecoder& wrap(std::span<const uint8_t> data, const std::span<Token> tokens)
+    Header m_header{this};
+    // Group m_hopGroup{this};
+
+    LogoutDecoder() = default;
+
+    LogoutDecoder& wrap(const std::span<const uint8_t> data, const std::span<Token> tokens)
     {
         Message::wrap(data,tokens);
         return *this;
     }
+
+    Header& header()
+    {
+        return m_header;
+    }
+
 };
 
 }

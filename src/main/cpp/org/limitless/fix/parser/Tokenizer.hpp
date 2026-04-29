@@ -5,17 +5,30 @@
 #ifndef SIMD_FIX_TOKENIZER_H
 #define SIMD_FIX_TOKENIZER_H
 
+#include <expected>
 #include <span>
 #include <ostream>
 
 #include "org/limitless/fix/parser/Token.hpp"
 #include "org/limitless/fix/parser/Uint8x16.hpp"
+#include "org/limitless/fix/parser/ParserStatus.hpp"
 
 namespace org::limitless::fix::parser {
 
 class Tokenizer
 {
 public:
+    struct Result
+    {
+        Result(uint32_t bytes, uint32_t check, ParserStatus error) :
+            processed(static_cast<uint16_t>(bytes)), checkSum(static_cast<uint8_t>(check)), status(error)
+        {
+        }
+
+        uint16_t processed;
+        uint8_t checkSum;
+        ParserStatus status;
+    };
     using position_t = uint32_t;
     using length_t = uint16_t;
     using value_t = uint16_t;
@@ -39,7 +52,7 @@ public:
     Tokenizer(Tokenizer&&) = delete;
     Tokenizer& operator=(Tokenizer&&) = delete;
 
-    [[nodiscard]] std::pair<uint16_t, uint8_t> scan(std::span<const data_t> buffer); // processed and checksum
+    Result scan(std::span<const data_t> buffer);
 
     [[nodiscard]] Token* begin() noexcept
     {

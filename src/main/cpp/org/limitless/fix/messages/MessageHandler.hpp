@@ -27,7 +27,7 @@ public:
     ParserStatus handle(const std::span<const uint8_t> data, const std::span<Token> tokens)
     {
         const auto messageType = data[tokens[2].position]; // FIXME
-        ParserStatus status = ParserStatus::InvalidMessageType;
+        auto status = ParserStatus::InvalidMessageType;
         switch (messageType)
         {
             case LogonDecoder::MessageId:

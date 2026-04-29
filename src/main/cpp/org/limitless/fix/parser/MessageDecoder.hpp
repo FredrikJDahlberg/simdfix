@@ -22,7 +22,7 @@ struct MessageDecoder
 {
     std::span<const uint8_t> m_data{};
     std::span<Token> m_tokens{};
-    BitSet64 m_present{};
+    mutable BitSet64 m_present{};
 
     // FIXME: nested groups stack
 
@@ -62,8 +62,13 @@ struct MessageDecoder
         return type;
     }
 
+    [[nodiscard]] uint16_t tokenType(const uint16_t tag) const
+    {
+        return MessageGrammar.lookup(tag).value().type;
+    }
+
     template <int32_t Tag>
-    std::expected<std::span<const uint8_t>, ParserStatus> getString(const bool required)
+    std::expected<std::span<const uint8_t>, ParserStatus> getString(const bool required) const
     {
         const auto token = next(Tag);
         if (token == nullptr && required)
@@ -74,7 +79,7 @@ struct MessageDecoder
     }
 
     template <int32_t Tag>
-    std::expected<uint32_t, ParserStatus> getUnsigned(const bool required)
+    std::expected<uint32_t, ParserStatus> getUnsigned(const bool required) const
     {
         const auto token = next(Tag);
         if (token == nullptr && required)
@@ -84,7 +89,7 @@ struct MessageDecoder
         return convertToUnsigned(token);
     }
 
-    Token* next(const int32_t tag)
+    [[nodiscard]] Token* next(const int32_t tag) const
     {  // assume that fields are access once in tag order
         const auto tokens = m_tokens;
         BitSet64 present{m_present};
@@ -123,7 +128,7 @@ struct MessageDecoder
         return m_data.subspan(token->position, token->length);
     }
 
-    [[nodiscard]] ParserStatus checkRequired()
+    [[nodiscard]] ParserStatus checkRequired() const
     {
         const auto sender = getString<49>(true);
         if (!sender || sender.value().size() == 0)

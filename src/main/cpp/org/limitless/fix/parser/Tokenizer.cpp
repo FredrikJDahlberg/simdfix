@@ -6,11 +6,13 @@
 #include <span>
 
 #include "org/limitless/fix/parser/Tokenizer.hpp"
+
+#include "ParserStatus.hpp"
 #include "org/limitless/fix/parser/Utils.hpp"
 
 namespace org::limitless::fix::parser {
 
-std::pair<uint16_t,uint8_t> Tokenizer::scan(const std::span<const data_t> buffer)
+Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
 {
     using simd::Uint8x16;
     m_count = 0;
@@ -18,7 +20,12 @@ std::pair<uint16_t,uint8_t> Tokenizer::scan(const std::span<const data_t> buffer
 
     const auto data = buffer.data();
     const auto length = static_cast<length_t>(buffer.size());
-    m_tokens[0] = { 2, static_cast<uint16_t>(data[0] - '0'), 8 };
+
+    if (std::memcmp(data, "8=FIXT.1.1\x01", 10) != 0)
+    {
+        return { 8, 0, ParserStatus::InvalidBeginString };
+    }
+    m_tokens[0] = { 2, 8, 8 };
     m_count = 1;
 
     position_t bits = 4;
@@ -67,14 +74,25 @@ std::pair<uint16_t,uint8_t> Tokenizer::scan(const std::span<const data_t> buffer
         complete = processBlock(offset, tagDigits, digits, bits);
         bits = 0;
     }
-    auto& checkSumToken = m_tokens[m_count - 1];
-    checkSumValue -= lastSum;
-    for (auto i = offset - 16; i < checkSumToken.position - 3; i++)
+
+    auto& last = m_tokens[m_count - 1];
+    Result result{ last.position + last.length + 1, 0, ParserStatus::Success };
+    if (m_count < 7)
+    {
+        result.status = ParserStatus::RequiredFieldMissing;
+        return result;
+    }
+    if (last.tag != CheckSumTag)
+    {
+        result.status = ParserStatus::InvalidCheckSumTag;
+    }
+
+    for (auto i = offset - 16; i < last.position - 3; i++)
     {
         checkSumValue += data[i];
     }
-    checkSumToken.length = 3;
-    return { checkSumToken.position + 4, checkSumValue & 0xff };
+    result.checkSum = checkSumValue & 0xff;
+    return result;
 }
 
 bool Tokenizer::processBlock(const position_t offset,

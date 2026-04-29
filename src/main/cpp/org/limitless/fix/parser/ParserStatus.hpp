@@ -7,10 +7,10 @@
 
 namespace org::limitless::fix::parser {
 
-enum class ParserStatus
+enum class ParserStatus : uint8_t
 {
+    Success,
     InvalidBeginString,
-    InvalidMessageTypeTag,
     InvalidCheckSumTag,
     InvalidBodyLengthTag,
     InvalidBodyLength,
@@ -20,10 +20,10 @@ enum class ParserStatus
     InvalidSenderCompTag,
     InvalidSenderCompId,
     InvalidSequenceNumber,
+    InvalidMessageTypeTag,
     InvalidMessageType,
     RequiredFieldMissing,
     NullValue,
-    Success
 };
 }
 

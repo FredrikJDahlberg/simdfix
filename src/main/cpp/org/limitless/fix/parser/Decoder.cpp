@@ -10,15 +10,6 @@ ParserStatus Decoder::checkRequiredFields(const uint8_t* buffer, const uint8_t m
 {
     auto tokens = m_tokenizer.begin();
     const auto count = m_tokenizer.end() - tokens;
-    if (count < 4)
-    {
-        return ParserStatus::RequiredFieldMissing;
-    }
-    if (std::memcmp(buffer, BeginString, sizeof(BeginString) - 1) != 0)
-    {
-        return ParserStatus::InvalidBeginString;
-    }
-
     const auto& messageType = tokens[Position::MessageType];
     if (messageType.tag != Tags::MessageType)
     {
@@ -40,7 +31,7 @@ ParserStatus Decoder::checkRequiredFields(const uint8_t* buffer, const uint8_t m
     {
         return ParserStatus::InvalidBodyLength;
     }
-    if (asciiToDecimal(buffer + checkSum.position, 3) != messageCheckSum)
+    if (asciiToDecimal(buffer + checkSum.position, 3) != messageCheckSum)  // checkSum.length != 3 ||
     {
         return ParserStatus::InvalidCheckSum;
     }
