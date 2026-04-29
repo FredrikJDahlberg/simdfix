@@ -31,33 +31,33 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
 
     LogonDecoder() = default;
 
-    LogonDecoder& wrap(std::span<const uint8_t> data, const std::span<Token> tokens)
+    LogonDecoder& wrap(const std::span<const uint8_t> data, const std::span<Token> tokens)
     {
         Message::wrap(data, tokens);
         return *this;
     }
 
-    std::expected<std::span<const uint8_t>, parser::ParserStatus> sender()
+    std::expected<std::span<const uint8_t>, parser::ParserStatus> sender() const
     {
         return this->getString<56>(true);
     }
 
-    std::expected<std::span<const uint8_t>, parser::ParserStatus> target()
+    std::expected<std::span<const uint8_t>, parser::ParserStatus> target() const
     {
         return this->getString<49>(true);
     }
 
-    std::expected<uint32_t, parser::ParserStatus> expectedSeqNum()
+    std::expected<uint32_t, parser::ParserStatus> expectedSeqNum() const
     {
         return this->getUnsigned<34>(true);
     }
 
-    std::expected<std::span<const uint8_t>, parser::ParserStatus> onBehalfOfCompID()
+    std::expected<std::span<const uint8_t>, parser::ParserStatus> onBehalfOfCompID() const
     {
         return this->getString<115>(false);
     }
 
-    std::expected<uint32_t, parser::ParserStatus> nextExpectedSeqNum()
+    std::expected<uint32_t, parser::ParserStatus> nextExpectedSeqNum() const
     {
         return this->getUnsigned<789>(false);
     }

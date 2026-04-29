@@ -5,7 +5,6 @@
 #ifndef SIMD_FIX_TOKENIZER_H
 #define SIMD_FIX_TOKENIZER_H
 
-#include <expected>
 #include <span>
 #include <ostream>
 
@@ -20,7 +19,7 @@ class Tokenizer
 public:
     struct Result
     {
-        Result(uint32_t bytes, uint32_t check, ParserStatus error) :
+        Result(const uint32_t bytes, const uint32_t check, const ParserStatus error) :
             processed(static_cast<uint16_t>(bytes)), checkSum(static_cast<uint8_t>(check)), status(error)
         {
         }

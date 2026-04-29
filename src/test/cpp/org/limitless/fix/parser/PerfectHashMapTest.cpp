@@ -7,6 +7,7 @@
 #include "org/limitless/fix/parser/PerfectHashMap.hpp"
 
 namespace org::limitless::fix::parser {
+
 struct Meta
 {
     int32_t tag;
@@ -21,9 +22,9 @@ TEST(PerfechHash, Basics)
     }};
 
     static constexpr PerfectHashMap map(std::span{entries});
-    auto result = map.lookup(500);
+    const auto result = map.lookup(500);
     EXPECT_TRUE(result.has_value());
-    }
+}
 
 TEST(PerfechHash, Duplicates)
 {
@@ -32,6 +33,6 @@ TEST(PerfechHash, Duplicates)
     }};
     EXPECT_THROW({
                  static constexpr PerfectHashMap map(std::span{entries});
-       }, std::invalid_argument); // We threw a "string literal", which is a const char*
+                 }, std::invalid_argument); // We threw a "string literal", which is a const char*
 }
 }

@@ -5,8 +5,6 @@
 #ifndef SIMD_FIX_DECODER_HPP
 #define SIMD_FIX_DECODER_HPP
 
-#include <expected>
-
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 #include "org/limitless/fix/parser/MessageDecoder.hpp"
 #include "org/limitless/fix/parser/ParserStatus.hpp"

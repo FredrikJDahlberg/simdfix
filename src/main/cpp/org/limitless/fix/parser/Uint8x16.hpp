@@ -5,8 +5,9 @@
 #ifndef SIMD_H
 #define SIMD_H
 
-#include <arm_neon.h>
 #include <iostream>
+
+#include <arm_neon.h>
 
 namespace org::limitless::simd {
 

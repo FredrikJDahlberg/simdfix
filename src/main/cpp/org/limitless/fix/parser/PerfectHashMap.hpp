@@ -41,27 +41,30 @@ class PerfectHashMap
     std::array<BucketInfo, NumBuckets> index{};
 
     // Fast bit mixer to distribute tags into buckets
-    static constexpr uint32_t hash1(uint32_t tag)
+    static constexpr uint32_t hash1(const uint32_t tag)
     {
-        uint32_t h = tag * 0x45d9f3b;
-        return h % NumBuckets;
+        const uint32_t hash = tag * 0x45d9f3b;
+        return hash % NumBuckets;
     }
 
     // High-entropy mixer for resolving local collisions
-    static constexpr uint32_t hash2(const uint32_t tag, uint32_t salt, uint32_t size)
+    static constexpr uint32_t hash2(const uint32_t tag, const uint32_t salt, const uint32_t size)
     {
-        if (size <= 1) return 0;
-        uint32_t h = tag ^ salt;
-        h ^= h >> 16;
-        h *= 0x85ebca6b;
-        h ^= h >> 13;
-        h *= 0xc2b2ae35;
-        h ^= h >> 16;
-        return h % size;
+        if (size <= 1)
+        {
+            return 0;
+        }
+        uint32_t hash = tag ^ salt;
+        hash ^= hash >> 16;
+        hash *= 0x85ebca6b;
+        hash ^= hash >> 13;
+        hash *= 0xc2b2ae35;
+        hash ^= hash >> 16;
+        return hash % size;
     }
 
 public:
-    constexpr PerfectHashMap(std::span<const Entry<T>, N> span)
+    explicit constexpr PerfectHashMap(std::span<const Entry<T>, N> span)
     {
         std::array<Entry<T>, N> input;
         for(size_t i = 0; i < N; ++i)

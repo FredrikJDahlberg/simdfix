@@ -13,7 +13,6 @@ namespace org::limitless::fix::messages {
 template <typename Message>
 struct HopGroupDecoder : parser::GroupDecoder<Message>
 {
-    // using Message = parser::MessageDecoder<Grammar>;
     using Group = parser::GroupDecoder<Message>;
 
     static constexpr uint32_t Type = 10;

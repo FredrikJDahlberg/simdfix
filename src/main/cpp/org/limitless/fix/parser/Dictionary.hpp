@@ -16,10 +16,13 @@ struct Dictionary
     bool mandatory;
 };
 
-[[nodiscard]] static consteval const Dictionary* dictionary(uint16_t tag, std::span<const Dictionary> grammar) noexcept
+[[nodiscard]] static consteval const Dictionary* dictionary(const uint16_t tag, std::span<const Dictionary> grammar) noexcept
 {
     const auto it = std::lower_bound(grammar.begin(), grammar.end(), tag,
-                                     [](const Dictionary& lhs, uint16_t rhs){ return lhs.tag < rhs; });
+                                     [](const Dictionary& lhs, const uint16_t rhs)
+                                     {
+                                         return lhs.tag < rhs;
+                                     });
     if (it != grammar.end() && it->tag == tag)
     {
         return &(*it);

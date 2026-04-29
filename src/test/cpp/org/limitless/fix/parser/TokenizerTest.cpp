@@ -17,7 +17,7 @@ void check(std::span<const Token> result, const std::span<const Token> expected)
         const auto& token = expected[i++];
         std::printf("%3d, tag = %4d, pos = %4d, len = %4d\n", i, tag, position, length);
         ASSERT_EQ(token.tag, tag) << "Mismatch at index " << i - 1;
-        ASSERT_EQ(token.position, position) << "Tag " << token.tag << " has invalid offset";
+        ASSERT_EQ(to, position) << "Tag " << token.tag << " has invalid offset";
         ASSERT_EQ(token.length, length) << "Tag " << token.tag << " has invalid length";
     }
     ASSERT_EQ(expected.size(), result.size());
@@ -34,7 +34,8 @@ TEST(Tokenizer, Basics)
     constexpr size_t LENGTH = sizeof(MESSAGE) - 1;
     constexpr std::span buffer(MESSAGE, LENGTH);
     Tokenizer tokenizer;
-    auto [processed, checkSum] = tokenizer.scan(buffer);
+    auto [processed, checkSum, status] = tokenizer.scan(buffer);
+    ASSERT_EQ(ParserStatus::Success, status);
     ASSERT_EQ(LENGTH - 17, processed);
     ASSERT_EQ(218, checkSum);
     constexpr Token expectedTokens[] =
@@ -64,7 +65,8 @@ TEST(Tokenizer, SplitTagLast)
     constexpr size_t LENGTH = sizeof(MESSAGE) - 1;
     constexpr std::span buffer(MESSAGE, LENGTH);
     Tokenizer tokenizer{};
-    auto [processed, checkSum] = tokenizer.scan(buffer);
+    auto [processed, checkSum, status] = tokenizer.scan(buffer);
+    ASSERT_EQ(ParserStatus::Success, status);
     ASSERT_EQ(LENGTH, processed);
     ASSERT_EQ(170, checkSum);
     constexpr Token expectedTokens[] =

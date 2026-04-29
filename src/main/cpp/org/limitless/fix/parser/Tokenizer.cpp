@@ -75,7 +75,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
         bits = 0;
     }
 
-    auto& last = m_tokens[m_count - 1];
+    const auto& last = m_tokens[m_count - 1];
     Result result{ last.position + last.length + 1, 0, ParserStatus::Success };
     if (m_count < 7)
     {

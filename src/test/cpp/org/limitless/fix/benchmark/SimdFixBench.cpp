@@ -57,7 +57,7 @@ int main(int argc, char** argv)
         for (size_t i = 0; i < SIZE - sizeof(MESSAGE1); i += sizeof(MESSAGE1))
         {
             const std::span<const uint8_t> bytes(&buffer[i], sizeof(MESSAGE1));
-            auto [processed, checkSum] = tokenizer.scan(bytes);
+            auto [processed, checkSum, status] = tokenizer.scan(bytes);
         }
     });
     std::printf("LEXER Duration = %lld ms\n",  std::chrono::duration_cast<milliseconds>(duration).count());

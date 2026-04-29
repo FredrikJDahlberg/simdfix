@@ -25,7 +25,7 @@ public:
     {
     }
 
-    BitSet64& operator>>=(size_t position) noexcept
+    BitSet64& operator>>=(const size_t position) noexcept
     {
         m_bits >>= position;
         return *this;
@@ -56,7 +56,7 @@ public:
 
     [[nodiscard]] uint64_t get(const int32_t position) const noexcept
     {
-        return m_bits & (1ULL << position);
+        return m_bits & 1ULL << position;
     }
 
     BitSet64& clear() noexcept
