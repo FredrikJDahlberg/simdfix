@@ -5,6 +5,8 @@
 #ifndef SIMD_FIX_TOKEN_HPP
 #define SIMD_FIX_TOKEN_HPP
 
+#include <cstdint>
+
 struct Token
 {
     uint32_t position;

@@ -17,32 +17,40 @@ inline void print(const uint32_t length, const uint8_t* buffer)
     std::printf("\n");
 }
 
-[[nodiscard]] inline uint32_t binaryToDecimal(uint32_t value, const uint8_t* digits, const uint32_t count)
+[[nodiscard]] inline uint32_t binaryToDecimal(uint32_t value, const uint8_t* digits, const uint32_t length)
 {
-    if (count >= 1)
+    if (length >= 5)
     {
-        value = value * 10 + digits[0];
+        for (uint32_t position = 0; position < length; ++position)
+        {
+            value = value * 10 + digits[position];
+        }
     }
-    if (count >= 2)
+    else
     {
-        value = value * 10 + digits[1];
-    }
-    if (count >= 3)
-    {
-        value = value * 10 + digits[2];
-    }
-    if (count >= 4)
-    {
-        value = value * 10 + digits[3];
+        if (length >= 1)
+        {
+            value = value * 10 + digits[0];
+        }
+        if (length >= 2)
+        {
+            value = value * 10 + digits[1];
+        }
+        if (length >= 3)
+        {
+            value = value * 10 + digits[2];
+        }
+        if (length >= 4)
+        {
+            value = value * 10 + digits[3];
+        }
     }
     return value;
 }
 
-// FIXME: there are faster methods
-inline uint32_t asciiToDecimal(const uint8_t* digits, const uint32_t length)
+inline uint32_t asciiToDecimal(uint32_t value, const uint8_t* digits, const uint32_t length)
 {
-    uint32_t value = digits[0] - '0';
-    if (length >= 6)
+    if (length >= 5)
     {
         for (uint32_t position = 0; position < length; ++position)
         {
@@ -51,6 +59,10 @@ inline uint32_t asciiToDecimal(const uint8_t* digits, const uint32_t length)
     }
     else
     {
+        if (length >= 1)
+        {
+            value = value * 10 + digits[0] - '0';
+        }
         if (length >= 2)
         {
             value = value * 10 + digits[1] - '0';
@@ -63,20 +75,32 @@ inline uint32_t asciiToDecimal(const uint8_t* digits, const uint32_t length)
         {
             value = value * 10 + digits[3] - '0';
         }
-        if (length >= 5)
-        {
-            value = value * 10 + digits[4] - '0';
-        }
     }
     return value;
 }
 
 
 template<size_t N>
-[[nodiscard]] constexpr auto make_span(const char (&str)[N]) noexcept
+[[nodiscard]] constexpr auto makeSpan(const char (&str)[N]) noexcept
 {
     return std::span<const uint8_t, N - 1>(reinterpret_cast<const uint8_t*>(str), N - 1);
 }
+
+[[nodiscard]] inline uint64_t findByte(const uint8_t value, uint64_t bytes)
+{
+    const uint64_t mask = 0x01010101'01010101ULL*value;
+    bytes ^= mask;
+    bytes = (bytes - 0x01010101'01010101ULL) & ~bytes & 0x80808080'80808080ULL;
+    return bytes;
+}
+
+[[nodiscard]] inline uint32_t nextPosition(uint64_t& mask)
+{
+    const uint32_t position = std::countr_zero(mask);
+    mask &= ~(1ULL << position);
+    return position / 8;
+};
+
 
 }
 

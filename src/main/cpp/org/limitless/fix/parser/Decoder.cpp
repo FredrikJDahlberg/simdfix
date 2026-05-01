@@ -27,11 +27,11 @@ ParserStatus Decoder::checkRequiredFields(const uint8_t* buffer, const uint8_t m
     {
         return ParserStatus::InvalidBodyLengthTag;
     }
-    if (asciiToDecimal(buffer + position, length) != checkSum.position - messageType.position)
+    if (asciiToDecimal(0, buffer + position, length) != checkSum.position - messageType.position)
     {
         return ParserStatus::InvalidBodyLength;
     }
-    if (asciiToDecimal(buffer + checkSum.position, 3) != messageCheckSum)  // checkSum.length != 3 ||
+    if (asciiToDecimal(0, buffer + checkSum.position, 3) != messageCheckSum)
     {
         return ParserStatus::InvalidCheckSum;
     }

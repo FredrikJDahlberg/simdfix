@@ -37,6 +37,10 @@ public:
     static constexpr data_t False = 0;
     static constexpr uint32_t CheckSumTag = 10;
 
+    static constexpr uint8_t TagEnd = '=';
+    static constexpr uint8_t FieldEnd = 0x01;
+    static constexpr uint8_t BeginString[11] = { '8', '=', 'F', 'I', 'X', 'T', '.', '1', '.', '1', FieldEnd };
+
     const simd::Uint8x16 TagEndsBlock{'='};
     const simd::Uint8x16 FieldEndsBlock{0x01};
     const simd::Uint8x16 ZerosBlock{'0'};
@@ -97,6 +101,7 @@ private:
     simd::Uint8x16 m_data{};
 
     bool processBlock(position_t offset, uint64_t tagDigitFlags, const data_t* digits, position_t nonTagBitPos);
+    void processTrailer(position_t offset, std::span<const uint8_t> buffer);
 };
 }
 

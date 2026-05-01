@@ -32,7 +32,6 @@ class Decoder
     };
 
     static constexpr uint8_t FieldEnd = 0x01;
-    static constexpr uint8_t BeginString[11] = { '8', '=', 'F', 'I', 'X', 'T', '.', '1', '.', '1', FieldEnd };
 
     Tokenizer m_tokenizer{};
 

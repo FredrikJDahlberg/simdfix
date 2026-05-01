@@ -4,20 +4,21 @@
 
 #include <gtest/gtest.h>
 
+#include "org/limitless/fix/parser/Utils.hpp"
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 
 namespace org::limitless::fix::parser {
 
 #define SOH "\x01"
 
-void check(std::span<const Token> result, const std::span<const Token> expected)
+void check(std::span<Token> result, const std::span<const Token> expected)
 {
     for (int i = 0; auto& [position, tag, length] : result)
     {
         const auto& token = expected[i++];
         std::printf("%3d, tag = %4d, pos = %4d, len = %4d\n", i, tag, position, length);
         ASSERT_EQ(token.tag, tag) << "Mismatch at index " << i - 1;
-        ASSERT_EQ(to, position) << "Tag " << token.tag << " has invalid offset";
+        ASSERT_EQ(token.position, position) << "Tag " << token.tag << " has invalid offset";
         ASSERT_EQ(token.length, length) << "Tag " << token.tag << " has invalid length";
     }
     ASSERT_EQ(expected.size(), result.size());
@@ -25,18 +26,15 @@ void check(std::span<const Token> result, const std::span<const Token> expected)
 
 TEST(Tokenizer, Basics)
 {
-    static constexpr uint8_t MESSAGE[] =
-        "8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH "56=SellerSide" SOH "34=1" SOH
-        "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH "141=Y" SOH "553=Username" SOH
-        "554=Password" SOH "1137=9" SOH "10=218" SOH
+    auto message = makeSpan("8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH
+        "56=SellerSide" SOH "34=1" SOH "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH
+        "141=Y" SOH "553=Username" SOH "554=Password" SOH "1137=9" SOH "10=218" SOH
         // next message
-        "8=FIXT.1.1" SOH "9=118" SOH;
-    constexpr size_t LENGTH = sizeof(MESSAGE) - 1;
-    constexpr std::span buffer(MESSAGE, LENGTH);
+        "8=FIXT.1.1" SOH "9=118" SOH);
     Tokenizer tokenizer;
-    auto [processed, checkSum, status] = tokenizer.scan(buffer);
+    auto [processed, checkSum, status] = tokenizer.scan(message);
     ASSERT_EQ(ParserStatus::Success, status);
-    ASSERT_EQ(LENGTH - 17, processed);
+    ASSERT_EQ(message.size() - 17, processed);
     ASSERT_EQ(218, checkSum);
     constexpr Token expectedTokens[] =
     {
@@ -59,26 +57,46 @@ TEST(Tokenizer, Basics)
     check(tokenizer.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
 }
 
-TEST(Tokenizer, SplitTagLast)
+TEST(Tokenizer, TrailerSplitCheckSum)
 {
-    static constexpr uint8_t MESSAGE[] = "8=FIXT.1.1" SOH "9=49" SOH "35=A" SOH "49=Buyer" SOH "56=SellSide" SOH "10=147" SOH;
-    constexpr size_t LENGTH = sizeof(MESSAGE) - 1;
-    constexpr std::span buffer(MESSAGE, LENGTH);
+    auto message = makeSpan("8=FIXT.1.1" SOH "9=49" SOH "35=A" SOH
+        "666=66" SOH "49=Buyer" SOH "56=Seller" SOH "10=054" SOH);
     Tokenizer tokenizer{};
-    auto [processed, checkSum, status] = tokenizer.scan(buffer);
+    auto [processed, checkSum, status] = tokenizer.scan(message);
     ASSERT_EQ(ParserStatus::Success, status);
-    ASSERT_EQ(LENGTH, processed);
-    ASSERT_EQ(170, checkSum);
+    ASSERT_EQ(message.size(), processed);
+    ASSERT_EQ(72, checkSum);
+
     constexpr Token expectedTokens[] =
     {
         { 2, 8, 8 },
         { 13, 9, 2 },
         { 19, 35, 1 },
-        { 24, 49, 5 },
-        { 33, 56, 8 },
-        { 45, 10, 3 }
+        { 25, 666, 2 },
+        { 31, 49, 5 },
+        { 40, 56, 6 },
+        { 50, 10, 3 }
     };
     check(tokenizer.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
+}
+
+TEST(Tokenizer, TrailerFieldEnd)
+{
+    const auto message = makeSpan("8=FIXT.1.1" SOH "9=27" SOH "35=66" SOH
+        "666=66" SOH "1=1" SOH "2=2" SOH "10=239" SOH);
+    Tokenizer tokenizer{};
+    auto [processed, checkSum, status] = tokenizer.scan(message);
+    ASSERT_EQ(ParserStatus::Success, status);
+    ASSERT_EQ(239, checkSum);
+}
+
+TEST(Tokenizer, Fragment)
+{
+    const auto message = makeSpan("8=FIXT.");
+    Tokenizer tokenizer{};
+    auto [processed, checkSum, status] = tokenizer.scan(message);
+    ASSERT_EQ(ParserStatus::MessageFragment, status);
+    ASSERT_EQ(0, processed);
 }
 
 }

@@ -7,6 +7,8 @@
 
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 
+#include <chrono>
+
 #include "ParserStatus.hpp"
 #include "org/limitless/fix/parser/Utils.hpp"
 
@@ -14,6 +16,11 @@ namespace org::limitless::fix::parser {
 
 Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
 {
+    if (buffer.size() < 32)
+    {
+        return { 0, 0, ParserStatus::MessageFragment };
+    }
+
     using simd::Uint8x16;
     m_count = 0;
     m_tag = 0;
@@ -21,7 +28,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
     const auto data = buffer.data();
     const auto length = static_cast<length_t>(buffer.size());
 
-    if (std::memcmp(data, "8=FIXT.1.1\x01", 10) != 0)
+    if (std::memcmp(data, BeginString, sizeof(BeginString) - 1) != 0)
     {
         return { 8, 0, ParserStatus::InvalidBeginString };
     }
@@ -75,23 +82,37 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
         bits = 0;
     }
 
-    const auto& last = m_tokens[m_count - 1];
-    Result result{ last.position + last.length + 1, 0, ParserStatus::Success };
+    auto* last = &m_tokens[m_count - 1];
+    Result result{ 0, 0, ParserStatus::Success };
+    if (complete)
+    {
+  //      last->length = 3;
+    }
+    else
+    {
+        print(buffer.size() % 16, buffer.data() + offset);
+        processTrailer(offset, buffer);
+        auto index = m_tokens[m_count - 1].position;
+        if (data[index - 3] != '1' || data[index - 2] != '0' || data[index -1] != '=' || data[index - 4] != FieldEnd)
+        {
+            result.status = ParserStatus::InvalidCheckSumTag;
+            result.processed = last->position + last->length + 1;
+            return result;
+        }
+    }
     if (m_count < 7)
     {
         result.status = ParserStatus::RequiredFieldMissing;
         return result;
     }
-    if (last.tag != CheckSumTag)
-    {
-        result.status = ParserStatus::InvalidCheckSumTag;
-    }
-
-    for (auto i = offset - 16; i < last.position - 3; i++)
+    checkSumValue -= lastSum;
+    for (auto i = offset - 16; i < m_tokens[m_count - 1].position - 3; i++)
     {
         checkSumValue += data[i];
     }
     result.checkSum = checkSumValue & 0xff;
+    last = &m_tokens[m_count - 1];
+    result.processed = last->position + last->length + 1;
     return result;
 }
 
@@ -150,4 +171,40 @@ bool Tokenizer::processBlock(const position_t offset,
     }
     return m_tokens[m_count - 1].tag == 10;
 }
+
+void Tokenizer::processTrailer(const position_t offset, const std::span<const uint8_t> buffer)
+{
+    const uint8_t* data = buffer.data();
+    auto* last = &m_tokens[m_count - 1];
+    if (buffer.size() - offset < 8)
+    { // only check sum remains
+        last->length = offset - 2 - last->position;
+    }
+    else
+    {
+        const uint64_t bytes = *reinterpret_cast<const uint64_t*>(data + offset);
+        uint64_t tagEnds = findByte(TagEnd, bytes);
+        uint64_t fieldEnds = findByte(FieldEnd, bytes);
+        if (m_tag != 0)
+        { // split tag
+            const uint32_t length = nextPosition(tagEnds);
+            last->tag = binaryToDecimal(m_tag, data, length);
+            m_tag = 0;
+        }
+        if (std::countr_zero(fieldEnds) < std::countr_zero(tagEnds))
+        { // calculate length for previous token
+            last->length = offset + nextPosition(fieldEnds) - last->position;
+        }
+        while (tagEnds != 0 && fieldEnds != 0)
+        { // only tag value pairs remain
+            auto& next = m_tokens[m_count++];
+            next.position = offset + nextPosition(tagEnds) + 1;
+            next.length = (offset + nextPosition(fieldEnds)) - next.position;
+            next.tag = asciiToDecimal(0, data + next.position - next.length - 1, next.length);
+        }
+        last = &m_tokens[m_count - 1];
+    }
+    m_tokens[m_count++] = { last->position + last->length + 4, 10, 3 };
+}
+
 }
