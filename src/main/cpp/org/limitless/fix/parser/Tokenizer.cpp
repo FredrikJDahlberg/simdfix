@@ -54,7 +54,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
         after |= digitFlags & after.shiftLeft<1>();
         after |= digitFlags & after.shiftLeft<1>();
         after |= digitFlags & after.shiftLeft<1>();
-        // after |= digitFlags & after.shiftLeft<1>();
+        after |= digitFlags & after.shiftLeft<1>();
 
         // A digit is valid if preceded by 0x01 or a validated digit
         Uint8x16 fieldEnds{m_data == FieldEndsBlock};
@@ -62,7 +62,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
         before |= digitFlags & before.shiftRight<1>();
         before |= digitFlags & before.shiftRight<1>();
         before |= digitFlags & before.shiftRight<1>();
-        // before |= digitFlags & before.shiftRight<1>();
+        before |= digitFlags & before.shiftRight<1>();
 
         const Uint8x16 validTags{after | before};
         const Uint8x16 tags{validTags.whenTrue(m_data - ZerosBlock)};
@@ -86,14 +86,18 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
     Result result{ 0, 0, ParserStatus::Success };
     if (complete)
     {
-  //      last->length = 3;
+        last->length = 3; // previous field is checksum
     }
     else
     {
+#ifdef NDEBUG
         print(buffer.size() % 16, buffer.data() + offset);
+#endif
         processTrailer(offset, buffer);
-        auto index = m_tokens[m_count - 1].position;
-        if (data[index - 3] != '1' || data[index - 2] != '0' || data[index -1] != '=' || data[index - 4] != FieldEnd)
+
+        uint64_t checks = 0;
+        memcpy(&checks, data + m_tokens[m_count - 1].position - 4, sizeof(uint64_t));
+        if ((checks & CheckSumMask) != CheckSumMask)
         {
             result.status = ParserStatus::InvalidCheckSumTag;
             result.processed = last->position + last->length + 1;
@@ -105,6 +109,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
         result.status = ParserStatus::RequiredFieldMissing;
         return result;
     }
+
     checkSumValue -= lastSum;
     for (auto i = offset - 16; i < m_tokens[m_count - 1].position - 3; i++)
     {

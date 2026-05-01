@@ -40,6 +40,7 @@ public:
     static constexpr uint8_t TagEnd = '=';
     static constexpr uint8_t FieldEnd = 0x01;
     static constexpr uint8_t BeginString[11] = { '8', '=', 'F', 'I', 'X', 'T', '.', '1', '.', '1', FieldEnd };
+    static constexpr uint64_t CheckSumMask = 1 |  '1' << 8 | '0' << 16 | '=' << 24 | 1ULL << 56;
 
     const simd::Uint8x16 TagEndsBlock{'='};
     const simd::Uint8x16 FieldEndsBlock{0x01};
