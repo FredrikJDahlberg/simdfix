@@ -12,53 +12,54 @@
 
 namespace org::limitless::fix::messages {
 
-
 using namespace org::limitless::fix;
 
 template <typename Message>
 struct HeaderDecoder
 {
     using Group = HopGroupDecoder<Message>;
+    using String = std::span<const uint8_t>;
 
     static constexpr uint16_t MessageId = 'A';
 
     const Message* m_message;
 
+    String m_sender;
     Group m_hopGroup;
 
     explicit HeaderDecoder(const Message* message) : m_message(message), m_hopGroup{message}
     {
     }
 
-    HeaderDecoder& wrap(std::span<const uint8_t> data, const std::span<Token> tokens)
+    HeaderDecoder& wrap(String data, const std::span<Token> tokens)
     {
         Message::wrap(data, tokens);
         return *this;
     }
 
-    std::expected<std::span<const uint8_t>, parser::ParserStatus> sender()
+    [[nodiscard]] std::expected<String, parser::ParserStatus> sender()
     {
-        return m_message->getString<56>(true);
+        return m_message->m_sender;
     }
 
-    std::expected<std::span<const uint8_t>, parser::ParserStatus> target()
+    [[nodiscard]] std::expected<String, parser::ParserStatus> target()
     {
-        return m_message->getString<49>(true);
+        return m_message->m_target;
     }
 
-    std::expected<uint32_t, parser::ParserStatus> expectedSeqNum()
+    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> sequenceNumber()
     {
-        return m_message->getUnsigned<34>(true);
+        return m_message->m_sequenceNumber;
     }
 
-    std::expected<std::span<const uint8_t>, parser::ParserStatus> onBehalfOfCompID()
+    [[nodiscard]] std::expected<String, parser::ParserStatus> onBehalfOfCompID()
     {
-        return m_message->getString<115>(false);
+        return m_message->template getString<115>(false);
     }
 
-    std::expected<uint32_t, parser::ParserStatus> nextExpectedSeqNum()
+    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> nextExpectedSeqNum() const
     {
-        return m_message->getUnsigned<789>(false);
+        return m_message->template getUnsigned<789>(false);
     }
 
     Group& hopGroup()

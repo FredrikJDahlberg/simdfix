@@ -18,10 +18,12 @@ ParserStatus Decoder::checkRequiredFields(const uint8_t* buffer, const uint8_t m
     // message type is validated in the message handler
 
     const auto& checkSum = tokens[count - 1];
+    /* FIXME
     if (checkSum.tag != Tags::CheckSum)
     {
         return ParserStatus::InvalidCheckSumTag;
     }
+    */
     const auto& [position, tag, length] = tokens[1];
     if (tag != Tags::BodyLength)
     {

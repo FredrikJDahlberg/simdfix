@@ -11,11 +11,11 @@
 namespace org::limitless::fix::protocols {
 struct Logon
 {
+    // FIXME: generate
     static constexpr std::array<Entry<parser::Dictionary>, 9> Grammar
     {
         {
             {1, {1, 0, false}},
-            {10, {10, 0, true}},
             {34, {34, 0, true}},
             {49, {49, 12, true}},
             {102, {102, 24, true}},

@@ -8,6 +8,7 @@
 #include <span>
 #include <ostream>
 
+#include "Utils.hpp"
 #include "org/limitless/fix/parser/Token.hpp"
 #include "org/limitless/fix/parser/Uint8x16.hpp"
 #include "org/limitless/fix/parser/ParserStatus.hpp"
@@ -28,17 +29,20 @@ public:
         uint8_t checkSum;
         ParserStatus status;
     };
+
     using position_t = uint32_t;
     using length_t = uint16_t;
     using value_t = uint16_t;
     using data_t = uint8_t;
 
-    static constexpr size_t MaxSize = 128;
+    // FIXME: bitmap64 should handle max size bits
+    static constexpr size_t MaxSize = 64;
     static constexpr data_t False = 0;
     static constexpr uint32_t CheckSumTag = 10;
 
     static constexpr uint8_t TagEnd = '=';
     static constexpr uint8_t FieldEnd = 0x01;
+
     static constexpr uint8_t BeginString[11] = { '8', '=', 'F', 'I', 'X', 'T', '.', '1', '.', '1', FieldEnd };
     static constexpr uint64_t CheckSumMask = 1 |  '1' << 8 | '0' << 16 | '=' << 24 | 1ULL << 56;
 

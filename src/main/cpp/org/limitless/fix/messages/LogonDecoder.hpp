@@ -23,6 +23,7 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
     using Message = MessageDecoder;
     using Header = messages::HeaderDecoder<MessageDecoder>;
     using Group = messages::HopGroupDecoder<MessageDecoder>;
+    using String = std::span<const uint8_t>;
 
     static constexpr uint16_t MessageId = 'A';
 
@@ -37,12 +38,12 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
         return *this;
     }
 
-    std::expected<std::span<const uint8_t>, parser::ParserStatus> sender() const
+    std::expected<String, parser::ParserStatus> sender()
     {
         return this->getString<56>(true);
     }
 
-    std::expected<std::span<const uint8_t>, parser::ParserStatus> target() const
+    std::expected<String, parser::ParserStatus> target()
     {
         return this->getString<49>(true);
     }
@@ -52,14 +53,14 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
         return this->getUnsigned<34>(true);
     }
 
-    std::expected<std::span<const uint8_t>, parser::ParserStatus> onBehalfOfCompID() const
+    std::expected<String, parser::ParserStatus> onBehalfOfCompID()
     {
         return this->getString<115>(false);
     }
 
     std::expected<uint32_t, parser::ParserStatus> nextExpectedSeqNum() const
     {
-        return this->getUnsigned<789>(false);
+        return this->template getUnsigned<789>(false);
     }
 
     Header& header()

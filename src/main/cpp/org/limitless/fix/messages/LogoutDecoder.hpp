@@ -22,7 +22,7 @@ struct LogoutDecoder : MessageDecoder<protocols::Logout>
     static constexpr uint16_t MessageId = '5';
 
     Header m_header{this};
-    // Group m_hopGroup{this};
+    Group m_hopGroup{this};
 
     LogoutDecoder() = default;
 
@@ -37,6 +37,10 @@ struct LogoutDecoder : MessageDecoder<protocols::Logout>
         return m_header;
     }
 
+    Group& hopGroup()
+    {
+        return m_hopGroup;
+    }
 };
 
 }

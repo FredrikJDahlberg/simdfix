@@ -101,6 +101,16 @@ template<size_t N>
     return position / 8;
 };
 
+constexpr uint64_t littleEndianUint64(std::string_view str)
+{
+    size_t n = str.size() > 8 ? 8 : str.size();
+    uint64_t result = 0;
+    for (size_t i = 0; i < n; ++i)
+    {
+        result |= (static_cast<uint64_t>(static_cast<uint8_t>(str[i])) << (i * 8));
+    }
+    return result;
+}
 
 }
 

@@ -90,19 +90,11 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
     }
     else
     {
-#ifdef NDEBUG
+#if !defined(NDEBUG)
         print(buffer.size() % 16, buffer.data() + offset);
 #endif
         processTrailer(offset, buffer);
 
-        uint64_t checks = 0;
-        memcpy(&checks, data + m_tokens[m_count - 1].position - 4, sizeof(uint64_t));
-        if ((checks & CheckSumMask) != CheckSumMask)
-        {
-            result.status = ParserStatus::InvalidCheckSumTag;
-            result.processed = last->position + last->length + 1;
-            return result;
-        }
     }
     if (m_count < 7)
     {
@@ -110,14 +102,24 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
         return result;
     }
 
+    uint64_t checks = 0;
+    memcpy(&checks, data + m_tokens[m_count - 1].position - 4, sizeof(uint64_t));
+    if ((checks & CheckSumMask) != CheckSumMask)
+    {
+        result.status = ParserStatus::InvalidCheckSumTag;
+        result.processed = last->end();
+        return result;
+    }
+
     checkSumValue -= lastSum;
-    for (auto i = offset - 16; i < m_tokens[m_count - 1].position - 3; i++)
+    const auto end = m_tokens[m_count - 1].position - 3;
+    for (auto i = offset - 16; i < end; i++)
     {
         checkSumValue += data[i];
     }
     result.checkSum = checkSumValue & 0xff;
     last = &m_tokens[m_count - 1];
-    result.processed = last->position + last->length + 1;
+    result.processed = last->end();
     return result;
 }
 
@@ -187,9 +189,9 @@ void Tokenizer::processTrailer(const position_t offset, const std::span<const ui
     }
     else
     {
-        const uint64_t bytes = *reinterpret_cast<const uint64_t*>(data + offset);
-        uint64_t tagEnds = findByte(TagEnd, bytes);
-        uint64_t fieldEnds = findByte(FieldEnd, bytes);
+        const auto bytes = *reinterpret_cast<const uint64_t*>(data + offset);
+        auto tagEnds = findByte(TagEnd, bytes);
+        auto fieldEnds = findByte(FieldEnd, bytes);
         if (m_tag != 0)
         { // split tag
             const uint32_t length = nextPosition(tagEnds);
@@ -209,7 +211,7 @@ void Tokenizer::processTrailer(const position_t offset, const std::span<const ui
         }
         last = &m_tokens[m_count - 1];
     }
-    m_tokens[m_count++] = { last->position + last->length + 4, 10, 3 };
+    m_tokens[m_count++] = { last->end() + 3, 10, 3 };
 }
 
 }

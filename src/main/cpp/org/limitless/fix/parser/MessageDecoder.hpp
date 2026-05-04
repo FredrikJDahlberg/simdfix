@@ -21,9 +21,15 @@ namespace org::limitless::fix::parser {
 template <typename Grammar>
 struct MessageDecoder
 {
-    std::span<const uint8_t> m_data{};
+    using String = std::span<const uint8_t>;
+
+    String m_data{};
+    String m_sender{};
+    String m_target{};
+    uint32_t m_sequenceNumber{};
     std::span<Token> m_tokens{};
     mutable BitSet64 m_present{};
+
 
     // FIXME: nested groups stack
 
@@ -36,12 +42,12 @@ struct MessageDecoder
     {
     }
 
-    MessageDecoder(const std::span<const uint8_t> data, const std::span<Token> tokens)
+    MessageDecoder(const String data, const std::span<Token> tokens)
         : m_data{data}, m_tokens{tokens}
     {
     }
 
-    void wrap(const std::span<const uint8_t> data, const std::span<Token> tokens)
+    void wrap(const String data, const std::span<Token> tokens)
     {
         m_data = data;
         m_tokens = tokens;
@@ -69,7 +75,7 @@ struct MessageDecoder
     }
 
     template <int32_t Tag>
-    std::expected<std::span<const uint8_t>, ParserStatus> getString(const bool required) const
+    std::expected<String, ParserStatus> getString(const bool required) const
     {
         const auto token = next(Tag);
         if (token == nullptr && required)
@@ -94,12 +100,14 @@ struct MessageDecoder
     {  // assume that fields are access once in tag order
         const auto tokens = m_tokens;
         BitSet64 present{m_present};
+        std::printf("%d = %016llx\n", tag, present);
         while (!present.empty())
         {
             const int32_t position = present.zerosRight();
             if (tokens[position].tag == tag)
             {
                 m_present.clear(position);
+                std::printf("FOUND: TAG = %d = %016llx POS = %d\n", tag, present, position);
                 return &tokens[position];
             }
             present.clear(position);
@@ -121,7 +129,7 @@ struct MessageDecoder
 #endif
     uint32_t convertToUnsigned(const Token* token) const
     {
-        return asciiToDecimal(m_data.data() + token->position, token->length);
+        return asciiToDecimal(0, m_data.data() + token->position, token->length);
     }
 
     std::span<const uint8_t> convertToSpan(const Token* token) const
@@ -129,21 +137,33 @@ struct MessageDecoder
         return m_data.subspan(token->position, token->length);
     }
 
-    [[nodiscard]] ParserStatus checkRequired() const
+    [[nodiscard]] ParserStatus checkRequired()
     {
-        const auto sender = getString<49>(true);
-        if (!sender || sender.value().size() == 0)
+        const auto sender = this->getString<49>(true);
+        if (sender)
+        {
+            m_sender = sender.value();
+        }
+        else
         {
             return ParserStatus::InvalidSenderCompId;
         }
-
-        const auto target = getString<56>(true);
-        if (!target || target.value().size() == 0)
+        const auto target = this->getString<56>(true);
+        if (target)
+        {
+            m_target = target.value();
+        }
+        else
         {
             return ParserStatus::InvalidTargetCompId;
         }
 
-        if (!getUnsigned<34>(true))
+        const auto sequenceNumber = getUnsigned<34>(true);
+        if (sequenceNumber)
+        {
+            m_sequenceNumber = sequenceNumber.value();
+        }
+        else
         {
             return ParserStatus::InvalidSequenceNumber;
         }
