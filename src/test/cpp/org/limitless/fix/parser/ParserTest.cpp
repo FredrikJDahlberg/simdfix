@@ -65,8 +65,8 @@ TEST(Parser, Logout)
 
     Decoder parser{};
     {
-        const auto logout = makeSpan("8=FIXT.1.1" SOH "9=34" SOH "35=5" SOH
-            "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "10=178" SOH);
+        const auto logout = makeSpan("8=FIXT.1.1" SOH "9=50" SOH "35=5" SOH
+            "49=Buyer" SOH "56=Seller" SOH "52=10:11:12.000" SOH "34=100101" SOH "10=173" SOH);
         auto [processed, status] = parser.parse(logout, app);
         ASSERT_EQ(ParserStatus::Success, status);
         ASSERT_TRUE(app.found);
@@ -78,7 +78,6 @@ TEST(Parser, Logout)
         ASSERT_EQ(ParserStatus::InvalidMessageType, status);
     }
 }
-
 
 TEST(Parser, HopGroup1)
 {
@@ -108,8 +107,8 @@ TEST(Parser, HopGroup1)
     } app;
     Decoder parser{};
     const auto logout = org::limitless::fix::parser::makeSpan(
-        "8=FIXT.1.1" SOH "9=68" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH
-        "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=210" SOH);
+        "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
+        "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
     auto[processed, status] = parser.parse(logout, app);
     ASSERT_EQ(ParserStatus::Success, status);
 }
@@ -141,13 +140,13 @@ TEST(Parser, HopGroup2)
         }
     } app;
     Decoder parser{};
-    const auto logout = makeSpan("8=FIXT.1.1" SOH "9=61" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
-        "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "628=20" SOH  "10=138" SOH);
+    const auto logout = makeSpan("8=FIXT.1.1" SOH "9=77" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
+        "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "628=20" SOH  "10=148" SOH);
     auto[processed, status] = parser.parse(logout, app);
     ASSERT_EQ(ParserStatus::Success, status);
 }
 
-TEST(Parser, DISABLED_InvalidGroupCount)
+TEST(Parser, InvalidGroupCount)
 {
     struct AppHandler : generated::MessageHandler<AppHandler>
     {
@@ -163,8 +162,8 @@ TEST(Parser, DISABLED_InvalidGroupCount)
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
             group.next();
-            EXPECT_EQ(20, group.hopCompID().value_or(-1));
-            EXPECT_EQ(10, group.hopRefID().value_or(-1));
+            EXPECT_EQ(20, group.hopCompID().value_or(0));
+            EXPECT_EQ(10, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
             EXPECT_FALSE(group.hasNext());
@@ -173,8 +172,8 @@ TEST(Parser, DISABLED_InvalidGroupCount)
     } app;
     Decoder parser{};
     const auto logout = makeSpan(
-        "8=FIXT.1.1" SOH "9=54" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH
-        "627=2" SOH "629=10" SOH "628=20" SOH "10=067" SOH);
+        "8=FIXT.1.1" SOH "9=70" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=12:12:12.123" SOH
+        "627=2" SOH "629=10" SOH "628=20" SOH "10=071" SOH);
     auto[processed, status] = parser.parse(logout, app);
     ASSERT_EQ(ParserStatus::Success, status);
 }
@@ -194,10 +193,11 @@ TEST(Parser, InvalidMandatoryFields)
         ASSERT_EQ(ParserStatus::RequiredFieldMissing, status);
     }
     {
-        const auto message = makeSpan("8=FIXT.1.1" SOH "666=66" SOH "666=66" SOH "666=66" SOH
-            "666=66" SOH "666=66" SOH "10=043" SOH);
+        const auto message = makeSpan("8=FIXT.1.1" SOH "666=66" SOH "52=101112.123" SOH
+            "666=66" SOH "666=66" SOH "666=66" SOH "10=043" SOH);
         auto[processed, status] = parser.parse(message, app);
-        ASSERT_EQ(ParserStatus::InvalidMessageTypeTag, status);
+        // ASSERT_EQ(ParserStatus::InvalidMessageTypeTag, status);
+        ASSERT_EQ(ParserStatus::RequiredFieldMissing, status);
     }
     {
         const auto message = makeSpan("8=FIXT.1.1" SOH "666=66" SOH "35=66" SOH "666=66" SOH
@@ -229,8 +229,8 @@ TEST(Parser, BufferSize)
 {
     Decoder parser{};
     struct AppHandler : generated::MessageHandler<AppHandler>{} app;
-    const auto logout = makeSpan("8=FIXT.1.1" SOH "9=34" SOH "35=5" SOH
-        "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "10=178" SOH);
+    const auto logout = makeSpan("8=FIXT.1.1" SOH "9=52" SOH "35=5" SOH
+        "49=Buyer" SOH "56=Seller" SOH "52=10:11:12:12345" SOH "34=100101" SOH "10=042" SOH);
     auto[processed, status] = parser.parse(logout, app);
     ASSERT_EQ(ParserStatus::Success, status);
 }

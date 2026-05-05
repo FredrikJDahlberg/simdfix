@@ -25,6 +25,7 @@ enum class ParserStatus : uint8_t
     InvalidSequenceNumber,
     InvalidMessageTypeTag,
     InvalidMessageType,
+    InvalidSendingTime,
     RequiredFieldMissing,
     InvalidLength,
     NullValue,

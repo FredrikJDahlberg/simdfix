@@ -52,6 +52,11 @@ struct HeaderDecoder
         return m_message->m_sequenceNumber;
     }
 
+    [[nodiscard]] std::expected<String, parser::ParserStatus> sendingTime()
+    {
+        return m_message->m_sendingTime;
+    }
+
     [[nodiscard]] std::expected<String, parser::ParserStatus> onBehalfOfCompID()
     {
         return m_message->template getString<115>(false);

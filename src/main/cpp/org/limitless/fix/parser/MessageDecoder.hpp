@@ -23,15 +23,14 @@ struct MessageDecoder
 {
     using String = std::span<const uint8_t>;
 
-    String m_data{};
-    String m_sender{};
-    String m_target{};
-    uint32_t m_sequenceNumber{};
     std::span<Token> m_tokens{};
     mutable BitSet64 m_present{};
 
-
-    // FIXME: nested groups stack
+    String m_data{};
+    String m_sender{};
+    String m_target{};
+    String m_sendingTime{};
+    uint32_t m_sequenceNumber{};
 
     using MetaType = std::span<const Entry<Dictionary>, Grammar::Grammar.size()>;
     static constexpr auto MessageGrammar = PerfectHashMap(MetaType(Grammar::Grammar));
@@ -78,9 +77,9 @@ struct MessageDecoder
     std::expected<String, ParserStatus> getString(const bool required) const
     {
         const auto token = next(Tag);
-        if (token == nullptr && required)
+        if (token == nullptr)
         {
-            return std::unexpected{ParserStatus::RequiredFieldMissing};
+            return std::unexpected{required ? ParserStatus::RequiredFieldMissing : ParserStatus::NullValue};
         }
         return m_data.subspan(token->position, token->length);
     }
@@ -89,9 +88,9 @@ struct MessageDecoder
     std::expected<uint32_t, ParserStatus> getUnsigned(const bool required) const
     {
         const auto token = next(Tag);
-        if (token == nullptr && required)
+        if (token == nullptr)
         {
-            return std::unexpected(ParserStatus::RequiredFieldMissing);
+            return std::unexpected{required ? ParserStatus::RequiredFieldMissing : ParserStatus::NullValue};
         }
         return convertToUnsigned(token);
     }
@@ -100,14 +99,12 @@ struct MessageDecoder
     {  // assume that fields are access once in tag order
         const auto tokens = m_tokens;
         BitSet64 present{m_present};
-        std::printf("%d = %016llx\n", tag, present);
         while (!present.empty())
         {
             const int32_t position = present.zerosRight();
             if (tokens[position].tag == tag)
             {
                 m_present.clear(position);
-                std::printf("FOUND: TAG = %d = %016llx POS = %d\n", tag, present, position);
                 return &tokens[position];
             }
             present.clear(position);
@@ -139,8 +136,7 @@ struct MessageDecoder
 
     [[nodiscard]] ParserStatus checkRequired()
     {
-        const auto sender = this->getString<49>(true);
-        if (sender)
+        if (const auto sender = this->getString<49>(true))
         {
             m_sender = sender.value();
         }
@@ -148,8 +144,7 @@ struct MessageDecoder
         {
             return ParserStatus::InvalidSenderCompId;
         }
-        const auto target = this->getString<56>(true);
-        if (target)
+        if (const auto target = this->getString<56>(true))
         {
             m_target = target.value();
         }
@@ -157,15 +152,21 @@ struct MessageDecoder
         {
             return ParserStatus::InvalidTargetCompId;
         }
-
-        const auto sequenceNumber = getUnsigned<34>(true);
-        if (sequenceNumber)
+        if (const auto sequenceNumber = getUnsigned<34>(true))
         {
             m_sequenceNumber = sequenceNumber.value();
         }
         else
         {
             return ParserStatus::InvalidSequenceNumber;
+        }
+        if (const auto sendingTime = getString<52>(true))
+        {
+            m_sendingTime = sendingTime.value();
+        }
+        else
+        {
+            return ParserStatus::InvalidSendingTime;
         }
         return ParserStatus::Success;
     }
