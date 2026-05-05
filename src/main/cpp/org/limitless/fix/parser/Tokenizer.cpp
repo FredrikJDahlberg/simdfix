@@ -82,11 +82,10 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
         bits = 0;
     }
 
-    auto* last = &m_tokens[m_count - 1];
     Result result{ 0, 0, ParserStatus::Success };
     if (complete)
     {
-        last->length = 3; // previous field is checksum
+        m_tokens[m_count - 1].length = 3; // previous field is checksum
     }
     else
     {
@@ -104,22 +103,21 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
 
     uint64_t checks = 0;
     memcpy(&checks, data + m_tokens[m_count - 1].position - 4, sizeof(uint64_t));
+    const auto& checkSum = m_tokens[m_count - 1];
     if ((checks & CheckSumMask) != CheckSumMask)
     {
         result.status = ParserStatus::InvalidCheckSumTag;
-        result.processed = last->end();
+        result.processed = checkSum.position + checkSum.length + 1;
         return result;
     }
 
     checkSumValue -= lastSum;
-    const auto end = m_tokens[m_count - 1].position - 3;
-    for (auto i = offset - 16; i < end; i++)
+    for (auto i = offset - 16; i < checkSum.position - 3; i++)
     {
         checkSumValue += data[i];
     }
     result.checkSum = checkSumValue & 0xff;
-    last = &m_tokens[m_count - 1];
-    result.processed = last->end();
+    result.processed = checkSum.position + checkSum.length + 1;
     return result;
 }
 
@@ -211,7 +209,7 @@ void Tokenizer::processTrailer(const position_t offset, const std::span<const ui
         }
         last = &m_tokens[m_count - 1];
     }
-    m_tokens[m_count++] = { last->end() + 3, 10, 3 };
+    m_tokens[m_count++] = { last->position + last->length + 4, 10, 3 };
 }
 
 }

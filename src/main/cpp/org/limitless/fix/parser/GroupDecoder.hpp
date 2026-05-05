@@ -7,8 +7,6 @@
 
 namespace org::limitless::fix::parser {
 
-#include "org/limitless/fix/parser/Token.hpp"
-
 template <typename Message>
 struct GroupDecoder
 {
@@ -94,20 +92,17 @@ public:
 
     [[nodiscard]] Token* next(uint16_t tag) const
     {
-
         return m_message->next(tag);
     }
 
     void next()
     {
-        //  && m_groupType == m_message->tokenType(m_group->tag)
         while (m_group->tag != m_delim)
         {
             ++m_offset;
             ++m_group;
         }
         ++m_position;
-        std::printf("NEXT: TAG = %d, OFS = %d, POS = %d\n", m_group->tag, m_offset, m_position);
     }
 
     [[nodiscard]] size_t count() const

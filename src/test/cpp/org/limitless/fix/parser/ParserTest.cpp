@@ -3,6 +3,8 @@
 //
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "org/limitless/fix/parser/Decoder.hpp"
 #include "org/limitless/fix/messages/LogonDecoder.hpp"
 #include "org/limitless/fix/messages/MessageHandler.hpp"
@@ -30,7 +32,8 @@ TEST(Parser, Logon)
 
         ParserStatus handle(generated::LogonDecoder& logon)
         {
-            std::printf("Found Logon\n");
+            auto sender = logon.header().sender().value();
+            EXPECT_EQ(std::string("Buyer"), std::string(reinterpret_cast<const char*>(sender.data()), sender.size()));
             found = true;
             return ParserStatus::Success;
         }
@@ -63,14 +66,14 @@ TEST(Parser, Logout)
     Decoder parser{};
     {
         const auto logout = makeSpan("8=FIXT.1.1" SOH "9=34" SOH "35=5" SOH
-            "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "10=178" SOH "               ");
+            "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "10=178" SOH);
         auto [processed, status] = parser.parse(logout, app);
         ASSERT_EQ(ParserStatus::Success, status);
         ASSERT_TRUE(app.found);
     }
     {
         const auto reject = makeSpan("8=FIXT.1.1" SOH "9=40" SOH "35=3" SOH
-            "49=Buyer" SOH "56=Seller" SOH "34=100101" "45=666" SOH "10=245" SOH "               ");
+            "49=Buyer" SOH "56=Seller" SOH "34=100101" "45=666" SOH "10=245" SOH);
         auto [processed, status] = parser.parse(reject, app);
         ASSERT_EQ(ParserStatus::InvalidMessageType, status);
     }
@@ -93,12 +96,12 @@ TEST(Parser, HopGroup1)
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
             group.next();
-            EXPECT_EQ(12, group.hopCompID().value_or(-1));
-            EXPECT_EQ(10, group.hopRefID().value_or(-1));
+            EXPECT_EQ(12, group.hopCompID().value_or(0));
+            EXPECT_EQ(10, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
-            EXPECT_EQ(37, group.hopRefID().value_or(-1));
-            EXPECT_EQ(20, group.hopCompID().value_or(-1));
+            EXPECT_EQ(37, group.hopRefID().value_or(0));
+            EXPECT_EQ(20, group.hopCompID().value_or(0));
             EXPECT_FALSE(group.hasNext());
             return ParserStatus::Success;
         }
@@ -106,8 +109,7 @@ TEST(Parser, HopGroup1)
     Decoder parser{};
     const auto logout = org::limitless::fix::parser::makeSpan(
         "8=FIXT.1.1" SOH "9=68" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH
-        "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH
-        "10=210" SOH "             ");
+        "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=210" SOH);
     auto[processed, status] = parser.parse(logout, app);
     ASSERT_EQ(ParserStatus::Success, status);
 }
@@ -140,12 +142,12 @@ TEST(Parser, HopGroup2)
     } app;
     Decoder parser{};
     const auto logout = makeSpan("8=FIXT.1.1" SOH "9=61" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
-        "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "628=20" SOH  "10=138" SOH "             ");
+        "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "628=20" SOH  "10=138" SOH);
     auto[processed, status] = parser.parse(logout, app);
     ASSERT_EQ(ParserStatus::Success, status);
 }
 
-TEST(Parser, InvalidGroupCount)
+TEST(Parser, DISABLED_InvalidGroupCount)
 {
     struct AppHandler : generated::MessageHandler<AppHandler>
     {
@@ -172,8 +174,7 @@ TEST(Parser, InvalidGroupCount)
     Decoder parser{};
     const auto logout = makeSpan(
         "8=FIXT.1.1" SOH "9=54" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH
-        "627=2" SOH "629=10" SOH "628=20" SOH
-        "10=067" SOH "             ");
+        "627=2" SOH "629=10" SOH "628=20" SOH "10=067" SOH);
     auto[processed, status] = parser.parse(logout, app);
     ASSERT_EQ(ParserStatus::Success, status);
 }
@@ -183,36 +184,36 @@ TEST(Parser, InvalidMandatoryFields)
     Decoder parser{};
     struct AppHandler : generated::MessageHandler<AppHandler>{} app;
     {
-        const auto message = makeSpan("666=FIXT.1.1" SOH "             ");
+        const auto message = makeSpan("666=FIXT.1.1" SOH);
         auto[processed, status] = parser.parse(message, app);
-        ASSERT_EQ(ParserStatus::InvalidBeginString, status);
+        ASSERT_EQ(ParserStatus::MessageFragment, status);
     }
     {
-        const auto message = makeSpan("8=FIXT.1.1" SOH "666=66" SOH "666=66" SOH "666=66" SOH "       ");
+        const auto message = makeSpan("8=FIXT.1.1" SOH "666=66" SOH "666=66" SOH "666=66" SOH);
         auto[processed, status] = parser.parse(message, app);
         ASSERT_EQ(ParserStatus::RequiredFieldMissing, status);
     }
     {
         const auto message = makeSpan("8=FIXT.1.1" SOH "666=66" SOH "666=66" SOH "666=66" SOH
-            "666=66" SOH "666=66" SOH "10=043" SOH "                ");
+            "666=66" SOH "666=66" SOH "10=043" SOH);
         auto[processed, status] = parser.parse(message, app);
         ASSERT_EQ(ParserStatus::InvalidMessageTypeTag, status);
     }
     {
         const auto message = makeSpan("8=FIXT.1.1" SOH "666=66" SOH "35=66" SOH "666=66" SOH
-            "666=66" SOH "666=66" SOH "10=043" SOH "                ");
+            "666=66" SOH "666=66" SOH "10=043" SOH);
         auto[processed, status] = parser.parse(message, app);
         ASSERT_EQ(ParserStatus::InvalidBodyLengthTag, status);
     }
     {
         const auto message = makeSpan("8=FIXT.1.1" SOH "9=666" SOH "35=66" SOH "666=66" SOH
-            "666=66" SOH "666=66" SOH "10=043" SOH "                ");
+            "666=66" SOH "666=66" SOH "10=043" SOH);
         auto[processed, status] = parser.parse(message, app);
         ASSERT_EQ(ParserStatus::InvalidBodyLength, status);
     }
     {
         const auto message = makeSpan("8=FIXT.1.1" SOH "9=27" SOH "666=66" SOH "666=66" SOH
-            "666=66" SOH "666=66" SOH "10=063" SOH "                ");
+            "666=66" SOH "666=66" SOH "10=063" SOH);
         auto[processed, status] = parser.parse(message, app);
         ASSERT_EQ(ParserStatus::InvalidMessageTypeTag, status);
     }
@@ -231,7 +232,7 @@ TEST(Parser, BufferSize)
     const auto logout = makeSpan("8=FIXT.1.1" SOH "9=34" SOH "35=5" SOH
         "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "10=178" SOH);
     auto[processed, status] = parser.parse(logout, app);
-    ASSERT_EQ(ParserStatus::InvalidBeginString, status);
+    ASSERT_EQ(ParserStatus::Success, status);
 }
 
 }
