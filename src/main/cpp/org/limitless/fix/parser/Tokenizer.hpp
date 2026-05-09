@@ -8,9 +8,8 @@
 #include <span>
 #include <ostream>
 
-#include "Utils.hpp"
 #include "org/limitless/fix/parser/Token.hpp"
-#include "org/limitless/fix/parser/Uint8x16.hpp"
+#include "org/limitless/fix/simd/Uint8x16.hpp"
 #include "org/limitless/fix/parser/ParserStatus.hpp"
 
 namespace org::limitless::fix::parser {

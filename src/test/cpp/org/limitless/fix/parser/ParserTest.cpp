@@ -129,12 +129,12 @@ TEST(Parser, HopGroup2)
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
             group.next();
-            EXPECT_EQ(-1, group.hopCompID().value_or(-1));
-            EXPECT_EQ(10, group.hopRefID().value_or(-1));
+            EXPECT_EQ(0, group.hopCompID().value_or(0));
+            EXPECT_EQ(10, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
-            EXPECT_EQ(37, group.hopRefID().value_or(-1));
-            EXPECT_EQ(20, group.hopCompID().value_or(-1));
+            EXPECT_EQ(37, group.hopRefID().value_or(0));
+            EXPECT_EQ(20, group.hopCompID().value_or(0));
             EXPECT_FALSE(group.hasNext());
             return ParserStatus::Success;
         }

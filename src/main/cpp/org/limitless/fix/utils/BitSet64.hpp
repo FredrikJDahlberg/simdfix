@@ -5,7 +5,7 @@
 #ifndef SIMD_FIX_BITSET_HPP
 #define SIMD_FIX_BITSET_HPP
 
-#include <cstdint>
+#include <bit>
 
 namespace org::limitless::fix::parser {
 

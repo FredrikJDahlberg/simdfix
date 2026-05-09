@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-04-11.
 //
 
-#ifndef SIMD_H
-#define SIMD_H
+#ifndef SIMD_UNT8X16_H
+#define SIMD_UNT8X16_H
 
 #include <iostream>
 
@@ -161,6 +161,11 @@ struct Uint8x16
         return vaddlvq_u8(m_block);
     }
 
+    [[nodiscard]] value_type data() const
+    {
+        return m_block;
+    }
+
     /*
     [[nodiscard]] Block ifElse(const Block& trueBlock, const Block& falseBlock) const
     {
@@ -208,4 +213,4 @@ struct Uint8x16
 
 }
 
-#endif // SIMD_H
+#endif // SIMD_UNT8X16_H

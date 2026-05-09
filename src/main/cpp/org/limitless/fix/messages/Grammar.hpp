@@ -6,12 +6,24 @@
 #define SIMD_FIX_GRAMMAR_HPP
 
 #include "org/limitless/fix/parser/Dictionary.hpp"
-#include "org/limitless/fix/parser/PerfectHashMap.hpp"
+#include "../utils/PerfectHashMap.hpp"
 
 namespace org::limitless::fix::protocols {
+
 struct Logon
 {
     // FIXME: generate
+    static constexpr uint16_t arr[] =
+    {
+    1,
+    34,
+    49,
+    102,
+    627,
+    628,
+    629,
+    630,
+    };
     static constexpr std::array<Entry<parser::Dictionary>, 9> Grammar
     {
         {

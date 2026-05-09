@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "org/limitless/fix/parser/Utils.hpp"
+#include "../../../../../../main/cpp/org/limitless/fix/utils/Utils.hpp"
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 
 namespace org::limitless::fix::parser {
@@ -99,4 +99,30 @@ TEST(Tokenizer, Fragment)
     ASSERT_EQ(0, processed);
 }
 
+TEST(Tokenizer, HopGroup)
+{ // FIXME: processTrailer has a fault
+    const auto logout = org::limitless::fix::parser::makeSpan(
+        "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
+        "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
+    Tokenizer tokenizer{};
+    auto [processed, checkSum, status] = tokenizer.scan(logout);
+    ASSERT_EQ(ParserStatus::Success, status);
+    constexpr Token expectedTokens[] =
+    {
+        { 2, 8, 8 },
+        { 13, 9, 2 },
+        { 19, 35, 1 },
+        { 24, 49, 5 },
+        { 33, 56, 6 },
+        { 43, 34, 6 },
+        { 53, 52, 12 },
+        { 70, 627, 1 },
+        { 76, 629, 2 },
+        { 83, 628, 2 },
+        { 90, 629, 2 },
+        { 97, 628, 2, },
+        { 103, 10, 3 }
+    };
+    check(tokenizer.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
+}
 }

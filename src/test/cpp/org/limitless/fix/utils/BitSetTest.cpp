@@ -3,7 +3,7 @@
 //
 #include <gtest/gtest.h>
 
-#include "org/limitless/fix/parser/BitSet64.hpp"
+#include "../../../../../../main/cpp/org/limitless/fix/utils/BitSet64.hpp"
 
 namespace org::limitless::fix::parser {
 

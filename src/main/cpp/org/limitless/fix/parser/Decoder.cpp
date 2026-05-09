@@ -2,9 +2,11 @@
 // Created by Fredrik Dahlberg on 2026-04-23.
 //
 #include "org/limitless/fix/parser/Decoder.hpp"
-#include "org/limitless/fix/parser/Utils.hpp"
+#include "org/limitless/fix/utils/Utils.hpp"
 
 namespace org::limitless::fix::parser {
+
+using namespace org::limitless::fix::utils;
 
 ParserStatus Decoder::checkRequiredFields(const uint8_t* buffer, const uint8_t messageCheckSum) const
 {
@@ -31,6 +33,13 @@ ParserStatus Decoder::checkRequiredFields(const uint8_t* buffer, const uint8_t m
     {
         return ParserStatus::InvalidCheckSum;
     }
+
+    for (int i = 0; i < count; ++i)
+    {
+        auto [position, tag, length] = tokens[i];
+        std::printf("%3d tag = %3d, pos = %3d, len = %3d\n", i, tag, position, length);
+    }
+
 
     // sender, target and message sequence number are validated in message decoder
 

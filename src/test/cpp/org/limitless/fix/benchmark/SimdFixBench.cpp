@@ -6,7 +6,7 @@
 #include <memory>
 #include <cstddef>
 
-#include "org/limitless/fix/parser/Uint8x16.hpp"
+#include "../../../../../../main/cpp/org/limitless/fix/simd/Uint8x16.hpp"
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 
 #define SOH "\x01"

@@ -9,31 +9,29 @@ enable_testing()
 find_package(GTest REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp ${CMAKE_SOURCE_DIR}/src/test/cpp)
-set(MAIN_PATH "src/main/cpp/org/limitless/fix/parser")
-set(TEST_PATH "src/test/cpp/org/limitless/fix/parser")
+set(MAIN_PATH "src/main/cpp/org/limitless/fix")
 set(GEN_PATH "src/main/cpp/org/limitless/fix/messages")
+set(TEST_PATH "src/test/cpp/org/limitless/fix")
 set(GENERATED_HEADERS
         ${GEN_PATH}/Grammar.hpp
         ${GEN_PATH}/LogonDecoder.hpp
         ${GEN_PATH}/LogoutDecoder.hpp
         ${GEN_PATH}/MessageHandler.hpp)
 set(FIX_SOURCES
-        ${MAIN_PATH}/Decoder.cpp
-        ${MAIN_PATH}/Tokenizer.cpp)
+        ${MAIN_PATH}/parser/Decoder.cpp
+        ${MAIN_PATH}/parser/Tokenizer.cpp)
 set(FIX_HEADERS
-        ${MAIN_PATH}/Tokenizer.hpp
-        ${MAIN_PATH}/Utils.hpp
-        ${MAIN_PATH}/Decoder.hpp
-        ${MAIN_PATH}/BitSet64.hpp
-        ${MAIN_PATH}/MessageDecoder.hpp
-        ${MAIN_PATH}/ParserStatus.hpp
-        ${MAIN_PATH}/Dictionary.hpp
-        ${MAIN_PATH}/GroupDecoder.hpp
-        ${MAIN_PATH}/PerfectHashMap.hpp
-        src/main/cpp/org/limitless/fix/messages/Grammar.hpp
-        src/main/cpp/org/limitless/fix/parser/Token.hpp
-        src/main/cpp/org/limitless/fix/messages/HopGroupDecoder.hpp
-        src/main/cpp/org/limitless/fix/messages/HeaderDecoder.hpp)
+        ${MAIN_PATH}/parser/Tokenizer.hpp
+        ${MAIN_PATH}/utils/Utils.hpp
+        ${MAIN_PATH}/utils/BitSet64.hpp
+        ${MAIN_PATH}/utils/PerfectHashMap.hpp
+        ${MAIN_PATH}/parser/Decoder.hpp
+        ${MAIN_PATH}/parser/MessageDecoder.hpp
+        ${MAIN_PATH}/parser/ParserStatus.hpp
+        ${MAIN_PATH}/parser/Dictionary.hpp
+        ${MAIN_PATH}/parser/GroupDecoder.hpp
+        ${MAIN_PATH}/parser/Token.hpp
+        ${MAIN_PATH}/simd/Uint16x8.hpp)
 
 add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_include_directories(SimdFix PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
@@ -65,7 +63,7 @@ function(add_test name source)
     target_link_options(${name} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address> -fprofile-instr-generate)
 endfunction()
 
-add_test(TokenizerTest   "${TEST_PATH}/TokenizerTest.cpp")
-add_test(BitSetTest      "${TEST_PATH}/BitSetTest.cpp")
-add_test(ParserTest      "${TEST_PATH}/ParserTest.cpp")
-add_test(PerfectHashTest "${TEST_PATH}/PerfectHashMapTest.cpp")
+add_test(TokenizerTest   "${TEST_PATH}/parser/TokenizerTest.cpp")
+add_test(ParserTest      "${TEST_PATH}/parser/ParserTest.cpp")
+add_test(UtilsTest       "${TEST_PATH}/utils/UtilsTest.cpp")
+add_test(BitSetTest      "${TEST_PATH}/utils/BitSetTest.cpp")

@@ -12,28 +12,31 @@
 #include "org/limitless/fix/parser/Token.hpp"
 #include "org/limitless/fix/parser/ParserStatus.hpp"
 #include "org/limitless/fix/parser/Tokenizer.hpp"
-#include "org/limitless/fix/parser/Utils.hpp"
-#include "org/limitless/fix/parser/BitSet64.hpp"
-#include "org/limitless/fix/parser/PerfectHashMap.hpp"
+#include "../utils/Utils.hpp"
+#include "../utils/BitSet64.hpp"
+#include "../utils/PerfectHashMap.hpp"
 
 namespace org::limitless::fix::parser {
 
-template <typename Grammar>
+template <typename Protocol>
 struct MessageDecoder
 {
     using String = std::span<const uint8_t>;
 
+    std::span<const uint8_t> m_data{};
     std::span<Token> m_tokens{};
     mutable BitSet64 m_present{};
 
-    String m_data{};
-    String m_sender{};
-    String m_target{};
+    // required fields access more than once will be cached
+    // FIXME: cache all parsed fields?
+    String m_sender{};           // FIXME: configuration and verification
+    String m_target{};           // FIXME: configuration and verification
     String m_sendingTime{};
     uint32_t m_sequenceNumber{};
 
-    using MetaType = std::span<const Entry<Dictionary>, Grammar::Grammar.size()>;
-    static constexpr auto MessageGrammar = PerfectHashMap(MetaType(Grammar::Grammar));
+    using MetaType = std::span<const Entry<Dictionary>, Protocol::Grammar.size()>;
+    //static constexpr auto MessageGrammar = PerfectHashMap(MetaType(Protocol::Grammar));
+    static constexpr auto MessageGrammar = Protocol::Grammar;
 
     MessageDecoder() = default;
 
@@ -41,8 +44,7 @@ struct MessageDecoder
     {
     }
 
-    MessageDecoder(const String data, const std::span<Token> tokens)
-        : m_data{data}, m_tokens{tokens}
+    MessageDecoder(const String data, const std::span<Token> tokens) : m_data{data}, m_tokens{tokens}
     {
     }
 
@@ -70,7 +72,9 @@ struct MessageDecoder
 
     [[nodiscard]] uint16_t tokenType(const uint16_t tag) const
     {
-        return MessageGrammar.lookup(tag).value().type;
+        //return MessageGrammar.lookup(tag).value().type;
+        throw std::invalid_argument("not implemented");
+        return 0;
     }
 
     template <int32_t Tag>
@@ -96,7 +100,7 @@ struct MessageDecoder
     }
 
     [[nodiscard]] Token* next(const int32_t tag) const
-    {  // assume that fields are access once in tag order
+    {  // assume that fields are accessed once in tag order
         const auto tokens = m_tokens;
         BitSet64 present{m_present};
         while (!present.empty())

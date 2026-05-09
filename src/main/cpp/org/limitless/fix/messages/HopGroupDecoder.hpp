@@ -44,7 +44,7 @@ struct HopGroupDecoder : parser::GroupDecoder<Message>
         return *this;
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> hopCompID() const
+    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> hopCompID()
     {
         auto token = Group::next(628, Group::m_delim);
         if (token != nullptr)
@@ -56,7 +56,7 @@ struct HopGroupDecoder : parser::GroupDecoder<Message>
         return std::unexpected(status);
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> hopRefID() const
+    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> hopRefID()
     {
         return Group::m_message->template getUnsigned<629>(Group::m_delim == 629);
     }
