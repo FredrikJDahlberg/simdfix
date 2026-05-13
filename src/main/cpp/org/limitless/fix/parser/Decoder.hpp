@@ -34,6 +34,7 @@ class Decoder
     static constexpr uint8_t FieldEnd = 0x01;
 
     Tokenizer m_tokenizer{};
+    uint16_t m_tags[128]; // FIXME
 
 public:
 
@@ -47,7 +48,7 @@ public:
     template <typename Handler>
     Result parse(const std::span<const uint8_t> buffer, Handler& handler)
     {
-        auto [processed, checkSum, status ] = m_tokenizer.scan(buffer);
+        auto [processed, checkSum, status ] = m_tokenizer.scan(buffer, m_tags);
         if (status != ParserStatus::Success)
         {
             return { processed, status };
@@ -58,7 +59,7 @@ public:
         auto result = checkRequiredFields(buffer.data(), checkSum);
         if (result == ParserStatus::Success)
         {
-            result = handler.handle(buffer, std::span(tokens, count));
+            result = handler.handle(buffer, std::span(tokens, count), m_tags);
         }
         return { processed, result};
     }

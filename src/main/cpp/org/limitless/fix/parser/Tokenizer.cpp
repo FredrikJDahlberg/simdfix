@@ -7,6 +7,7 @@
 
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 
+#include <assert.h>
 #include <chrono>
 
 #include "../utils/BitSet64.hpp"
@@ -15,7 +16,7 @@
 
 namespace org::limitless::fix::parser {
 
-Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
+Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer, uint16_t* tags)
 {
     if (buffer.size() < 32)
     {
@@ -34,6 +35,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
         return { 8, 0, ParserStatus::InvalidBeginString };
     }
     m_tokens[0] = { 2, 8, 8 };
+    tags[0] = 8;
     m_count = 1;
 
     position_t bits = 4;
@@ -66,9 +68,9 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
         before |= digitFlags & before.shiftRight<1>();
 
         const Uint8x16 validTags{after | before};
-        const Uint8x16 tags{validTags.whenTrue(m_data - ZerosBlock)};
+        const Uint8x16 tagsBlock{validTags.whenTrue(m_data - ZerosBlock)};
         auto tagDigits = validTags.toUint64();  // 16 bytes to 4-bit nibble
-        tags.get(0, digits);
+        tagsBlock.get(0, digits);
         tagDigits >>= bits;
 #if !defined(NDEBUG)
         for (const auto digit : digits)
@@ -79,7 +81,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
 #endif
         lastSum = m_data.sum() & 0xff;
         checkSumValue += lastSum;
-        complete = processBlock(offset, tagDigits, digits, bits);
+        complete = processBlock(offset, tagDigits, digits, bits, tags);
         bits = 0;
     }
 
@@ -90,7 +92,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
     }
     else
     {
-        processTrailer(offset, buffer);
+        processTrailer(offset, buffer, tags);
     }
     if (m_count < 7)
     {
@@ -103,8 +105,8 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
     const auto& checkSum = m_tokens[m_count - 1];
     if ((checks & CheckSumMask) != CheckSumMask)
     {
-        std::printf("ERROR: tag=%d, pos=%d, len=%d\n", checkSum.tag, checkSum.position, checkSum.length);
-        std::printf("%016llx %016llx %16llx\n", checks, CheckSumMask, checks&CheckSumMask);
+        std::println("error: tag={}, pos={}, len={}", checkSum.tag, checkSum.position, checkSum.length);
+        std::println("check: {:016x}, mask={:016x}, res={:016x}", checks, CheckSumMask, checks&CheckSumMask);
         result.status = ParserStatus::InvalidCheckSumTag;
         result.processed = checkSum.position + checkSum.length + 1;
         return result;
@@ -123,7 +125,8 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
 bool Tokenizer::processBlock(const position_t offset,
                              const uint64_t tagDigitFlags,
                              const data_t* digits,
-                             position_t nonTagBitPos)
+                             position_t nonTagBitPos,
+                             uint16_t* tags)
 {
     const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
     const auto trailingCount = std::countl_one(trailingTagFlags);
@@ -135,6 +138,7 @@ bool Tokenizer::processBlock(const position_t offset,
         ++token;
         token->tag = m_tag;
         token->position = offset + 1;
+        tags[m_count - 1] = token->tag;
         m_position = 0;
         m_tag = 0;
     }
@@ -161,6 +165,7 @@ bool Tokenizer::processBlock(const position_t offset,
             m_tag = 0;
         }
         token->tag = utils::binaryToDecimal(value, digit, count);
+        tags[m_count - 1] = token->tag;
         token->position = offset + tagPos + count + 1;
         remainingDigitFlags >>= digitBits;
         nonTagBitPos += digitBits;
@@ -176,52 +181,90 @@ bool Tokenizer::processBlock(const position_t offset,
     return m_tokens[m_count - 1].tag == 10;
 }
 
-void Tokenizer::processTrailer(const position_t offset, const std::span<const uint8_t> buffer)
+/*
+tag
+6 0=222|                   1
+10 =A|        10=222|      1
+14 1234=A|    10=222|      2
+14 =A|2=B|    10=222|      3
+14 0=A|2=B|   10=222|      3
+
+val
+8 |           10=222|      2
+9 A|          10=222|      2
+...
+15 ABCDEFG|   10=222|      2
+
+ok
+7 10=222|                  1
+
+ok
+11 1=A|       10=222|      2
+...
+15 1=ABCDE|   10=222|      2
+15 1=A|2=B|   10=222|      3
+ */
+void Tokenizer::processTrailer(const position_t offset, const std::span<const uint8_t> buffer, uint16_t* tags)
 {
 #if !defined(NDEBUG)
     utils::print(buffer.size() % 16, buffer.data() + offset);
 #endif
-    m_tokens[m_count - 1].length = offset + m_position - 1 - m_tokens[m_count - 1].position;
-    auto* last = &m_tokens[m_count++];
-    size_t remaining = buffer.size() - offset;
+    auto* last = &m_tokens[m_count - 1];
     const uint8_t* data = buffer.data() + offset;
     uint64_t bytes;
     memcpy(&bytes, data, sizeof(uint64_t));
-    uint32_t tagEndPos = 0;
     auto tagEnds = BitSet64{utils::findByte(TagEnd, bytes)};
     auto fieldEnds = BitSet64{utils::findByte(FieldEnd, bytes)};
-    const uint32_t tagEndBit = tagEnds.zerosRight();
+    uint32_t tagEndBit = tagEnds.zerosRight();
+    uint32_t tagEndPos = tagEndBit / 8;
+    uint32_t p = 0;
+    uint32_t fieldEndBit = fieldEnds.zerosRight();
+    uint32_t fieldEndPos = fieldEndBit / 8;
     if (m_tag != 0)
     { // split tag
-        tagEnds.clear(tagEndBit);
-        tagEndPos = tagEndBit / 8;
-        last->tag = utils::binaryToDecimal(m_tag, m_position + tagEndPos + data, tagEndPos);
+        p += tagEndPos + 1;
+        last->tag = utils::asciiToDecimal(m_tag, data, tagEndPos);
         last->position = offset + tagEndPos + 1;
+        last->length = fieldEndPos - tagEndPos - 1;
+        std::println("SPLIT TAG: tag={}, pos={}, len={}", last->tag, last->position, last->length);
         m_tag = 0;
-        remaining -= tagEndPos + 1;
+        p += last->length + 1;// - m_position;
     }
-    if (remaining < 8)
-    { // only check sum remains
-        // last->position = offset + tagEndBit/8;
-        last->length = offset - 2 - last->position;
+    else if (fieldEndPos < tagEndPos)
+    { // handle split value
+        fieldEnds.clear(fieldEndBit);
+        fieldEndBit = fieldEnds.zerosRight();
+        fieldEndPos = fieldEndBit / 8;
+        last->length += fieldEndPos - tagEndPos - 1;
+        std::println("SPLIT VAL: tag={}, pos={}, len={}", last->tag, last->position, last->length);
+        p += last->length + 1;
+        last = &m_tokens[m_count++];
     }
-    else
+    std::println("tag = {}, fld = {} pos = {}", tagEndPos, fieldEndPos, p);
+    while (p + 7 < buffer.size() - offset)
     {
-        auto fieldEndBit = fieldEnds.zerosRight();
-        auto tagEndBit = tagEnds.zerosRight();
-        last->length = tagEndBit/8 - fieldEndBit/8 - 1;
-        if (remaining >= 7)
-        {
-            auto& next = m_tokens[m_count++];
-            next.position = offset + tagEndBit/8 + 1;
-            next.length = tagEndBit/8 - fieldEndBit/8;
-            next.tag = utils::asciiToDecimal(0, data + fieldEndBit/8 + 1,  2);
-        }
-        else
-        {
-            m_tokens[m_count++] = { offset + tagEndBit/8 + 1, 10, 3 };
-        }
+        last->tag = utils::asciiToDecimal(0, data + p, tagEndPos - p);
+        p += tagEndPos - p + 1;
+        tagEnds.clear(tagEndBit);
+        tagEndBit = tagEnds.zerosRight();
+
+        last->position = p + offset;
+        last->length = fieldEndPos - p;
+        fieldEndBit = fieldEnds.zerosRight();
+        fieldEnds.clear(fieldEndBit);
+        fieldEndPos = fieldEndBit / 8;
+        tagEndPos = tagEndBit / 8;
+        p += last->length + 1;
+        std::println("LAST : tag={}, pos={}, len={}", last->tag, last->position, last->length);
+        last = &m_tokens[m_count++];
     }
+    if (p < buffer.size() - offset)
+    {
+        last->tag = 10;
+        last->position = offset + p + 3;
+        last->length = 3;
+        std::println("CHECK: tag={}, pos={}, len={}", last->tag, last->position, last->length);
+    }
+}
 }
 
-}

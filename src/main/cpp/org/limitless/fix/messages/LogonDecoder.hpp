@@ -32,9 +32,9 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
 
     LogonDecoder() = default;
 
-    LogonDecoder& wrap(const std::span<const uint8_t> data, const std::span<Token> tokens)
+    LogonDecoder& wrap(const std::span<const uint8_t> data, const std::span<Token> tokens, const uint16_t* tags)
     {
-        Message::wrap(data, tokens);
+        Message::wrap(data, tokens, tags);
         return *this;
     }
 
@@ -43,7 +43,7 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
         return this->getString<56>(true);
     }
 
-    std::expected<String, parser::ParserStatus> target()
+    std::expected<String, parser::ParserStatus> target() const
     {
         return this->getString<49>(true);
     }

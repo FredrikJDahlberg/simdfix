@@ -31,7 +31,8 @@ set(FIX_HEADERS
         ${MAIN_PATH}/parser/Dictionary.hpp
         ${MAIN_PATH}/parser/GroupDecoder.hpp
         ${MAIN_PATH}/parser/Token.hpp
-        ${MAIN_PATH}/simd/Uint16x8.hpp)
+        ${MAIN_PATH}/simd/Uint16x8.hpp
+        src/main/cpp/org/limitless/fix/simd/QuadSearch.hpp)
 
 add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_include_directories(SimdFix PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")

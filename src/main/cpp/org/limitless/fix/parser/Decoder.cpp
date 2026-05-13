@@ -39,10 +39,7 @@ ParserStatus Decoder::checkRequiredFields(const uint8_t* buffer, const uint8_t m
         auto [position, tag, length] = tokens[i];
         std::printf("%3d tag = %3d, pos = %3d, len = %3d\n", i, tag, position, length);
     }
-
-
     // sender, target and message sequence number are validated in message decoder
-
     return ParserStatus::Success;
 }
 

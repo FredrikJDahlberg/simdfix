@@ -24,14 +24,14 @@ public:
         return static_cast<Handler*>(this)->handle(std::forward<Event>(event));
     }
 
-    ParserStatus handle(const std::span<const uint8_t> data, const std::span<Token> tokens)
+    ParserStatus handle(const std::span<const uint8_t> data, const std::span<Token> tokens, const uint16_t* tags)
     {
         const auto messageType = data[tokens[2].position]; // FIXME
         auto status = ParserStatus::InvalidMessageType;
         switch (messageType)
         {
             case LogonDecoder::MessageId:
-                m_logon.wrap(data, tokens);
+                m_logon.wrap(data, tokens, tags);
                 status = m_logon.checkRequired();
                 if (status == ParserStatus::Success)
                 {
@@ -39,7 +39,7 @@ public:
                 }
                 break;
             case LogoutDecoder::MessageId:
-                m_logout.wrap(data, tokens);
+                m_logout.wrap(data, tokens, tags);
                 status = m_logout.checkRequired();
                 if (status == ParserStatus::Success)
                 {

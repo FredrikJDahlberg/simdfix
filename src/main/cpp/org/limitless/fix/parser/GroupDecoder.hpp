@@ -67,6 +67,8 @@ public:
 
     [[nodiscard]] Token* next(const int32_t tag, const int32_t sentinel)
     {  // assume that fields are access once in tag order
+        throw std::runtime_error("Not implemented");
+#if 0
         const auto tokens = m_message->m_tokens;
         BitSet64 present{m_message->m_present};
         if (present.empty())
@@ -96,6 +98,7 @@ public:
             position = present.zerosRight();
         } while (!present.empty() && tokens[position].tag != sentinel);
         return nullptr;
+#endif
     }
 
     [[nodiscard]] Token* next(uint16_t tag) const

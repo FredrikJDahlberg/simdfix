@@ -26,13 +26,14 @@ void check(std::span<Token> result, const std::span<const Token> expected)
 
 TEST(Tokenizer, Basics)
 {
-    auto message = makeSpan("8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH
+    const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH
         "56=SellerSide" SOH "34=1" SOH "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH
         "141=Y" SOH "553=Username" SOH "554=Password" SOH "1137=9" SOH "10=218" SOH
         // next message
         "8=FIXT.1.1" SOH "9=118" SOH);
     Tokenizer tokenizer;
-    auto [processed, checkSum, status] = tokenizer.scan(message);
+    uint16_t tags[16];
+    auto [processed, checkSum, status] = tokenizer.scan(message, tags);
     ASSERT_EQ(ParserStatus::Success, status);
     ASSERT_EQ(message.size() - 17, processed);
     ASSERT_EQ(218, checkSum);
@@ -59,53 +60,57 @@ TEST(Tokenizer, Basics)
 
 TEST(Tokenizer, TrailerSplitCheckSum)
 {
-    auto message = makeSpan("8=FIXT.1.1" SOH "9=49" SOH "35=A" SOH
-        "666=66" SOH "49=Buyer" SOH "56=Seller" SOH "10=054" SOH);
+    const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=49" SOH "35=A" SOH
+        "49=Buyer" SOH "56=Seller" SOH "34=2000001" SOH "52=20190605" SOH "10=048" SOH);
     Tokenizer tokenizer{};
-    auto [processed, checkSum, status] = tokenizer.scan(message);
+    uint16_t tags[16];
+    auto [processed, checkSum, status] = tokenizer.scan(message, tags);
     ASSERT_EQ(ParserStatus::Success, status);
     ASSERT_EQ(message.size(), processed);
-    ASSERT_EQ(72, checkSum);
+    ASSERT_EQ(48, checkSum);
 
     constexpr Token expectedTokens[] =
     {
         { 2, 8, 8 },
         { 13, 9, 2 },
         { 19, 35, 1 },
-        { 25, 666, 2 },
-        { 31, 49, 5 },
-        { 40, 56, 6 },
-        { 50, 10, 3 }
+        { 24, 49, 5 },
+        { 33, 56, 6 },
+        { 43, 34, 7 },
+        { 66, 10, 3 }
     };
     check(tokenizer.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
 }
 
 TEST(Tokenizer, TrailerFieldEnd)
 {
-    const auto message = makeSpan("8=FIXT.1.1" SOH "9=27" SOH "35=66" SOH
+    const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=27" SOH "35=66" SOH
         "666=66" SOH "1=1" SOH "2=2" SOH "10=239" SOH);
     Tokenizer tokenizer{};
-    auto [processed, checkSum, status] = tokenizer.scan(message);
+    uint16_t tags[16];
+    auto [processed, checkSum, status] = tokenizer.scan(message, tags);
     ASSERT_EQ(ParserStatus::Success, status);
     ASSERT_EQ(239, checkSum);
 }
 
 TEST(Tokenizer, Fragment)
 {
-    const auto message = makeSpan("8=FIXT.");
+    const auto message = utils::makeSpan("8=FIXT.");
     Tokenizer tokenizer{};
-    auto [processed, checkSum, status] = tokenizer.scan(message);
+    uint16_t tags[16];
+    auto [processed, checkSum, status] = tokenizer.scan(message, tags);
     ASSERT_EQ(ParserStatus::MessageFragment, status);
     ASSERT_EQ(0, processed);
 }
 
 TEST(Tokenizer, HopGroup)
-{ // FIXME: processTrailer has a fault
-    const auto logout = org::limitless::fix::parser::makeSpan(
+{
+    const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
     Tokenizer tokenizer{};
-    auto [processed, checkSum, status] = tokenizer.scan(logout);
+    uint16_t tags[16]{};
+    auto [processed, checkSum, status] = tokenizer.scan(logout, tags);
     ASSERT_EQ(ParserStatus::Success, status);
     constexpr Token expectedTokens[] =
     {
