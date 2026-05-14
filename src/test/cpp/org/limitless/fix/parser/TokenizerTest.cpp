@@ -16,7 +16,9 @@ void check(std::span<Token> result, const std::span<const Token> expected)
     for (int i = 0; auto& [position, tag, length] : result)
     {
         const auto& token = expected[i++];
+#if !defined(NDEBUG)
         std::printf("%3d, tag = %4d, pos = %4d, len = %4d\n", i, tag, position, length);
+#endif
         ASSERT_EQ(token.tag, tag) << "Mismatch at index " << i - 1;
         ASSERT_EQ(token.position, position) << "Tag " << token.tag << " has invalid offset";
         ASSERT_EQ(token.length, length) << "Tag " << token.tag << " has invalid length";
@@ -77,6 +79,7 @@ TEST(Tokenizer, TrailerSplitCheckSum)
         { 24, 49, 5 },
         { 33, 56, 6 },
         { 43, 34, 7 },
+        { 54, 52, 8 },
         { 66, 10, 3 }
     };
     check(tokenizer.tokens(), std::span(expectedTokens, std::size(expectedTokens)));

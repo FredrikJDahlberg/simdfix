@@ -7,12 +7,11 @@
 
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 
-#include <assert.h>
 #include <chrono>
 
-#include "../utils/BitSet64.hpp"
-#include "ParserStatus.hpp"
-#include "../utils/Utils.hpp"
+#include "org/limitless/fix/utils/BitSet64.hpp"
+#include "org/limitless/fix/parser/ParserStatus.hpp"
+#include "org/limitless/fix/utils/Utils.hpp"
 
 namespace org::limitless::fix::parser {
 
@@ -181,29 +180,6 @@ bool Tokenizer::processBlock(const position_t offset,
     return m_tokens[m_count - 1].tag == 10;
 }
 
-/*
-tag
-6 0=222|                   1
-10 =A|        10=222|      1
-14 1234=A|    10=222|      2
-14 =A|2=B|    10=222|      3
-14 0=A|2=B|   10=222|      3
-
-val
-8 |           10=222|      2
-9 A|          10=222|      2
-...
-15 ABCDEFG|   10=222|      2
-
-ok
-7 10=222|                  1
-
-ok
-11 1=A|       10=222|      2
-...
-15 1=ABCDE|   10=222|      2
-15 1=A|2=B|   10=222|      3
- */
 void Tokenizer::processTrailer(const position_t offset, const std::span<const uint8_t> buffer, uint16_t* tags)
 {
 #if !defined(NDEBUG)
@@ -217,53 +193,46 @@ void Tokenizer::processTrailer(const position_t offset, const std::span<const ui
     auto fieldEnds = BitSet64{utils::findByte(FieldEnd, bytes)};
     uint32_t tagEndBit = tagEnds.zerosRight();
     uint32_t tagEndPos = tagEndBit / 8;
-    uint32_t p = 0;
     uint32_t fieldEndBit = fieldEnds.zerosRight();
     uint32_t fieldEndPos = fieldEndBit / 8;
+    uint32_t position = 0;
     if (m_tag != 0)
-    { // split tag
-        p += tagEndPos + 1;
+    { // handle split tag
+        last->length = offset + m_position - 1 - last->position;
+        last = &m_tokens[m_count++];
         last->tag = utils::asciiToDecimal(m_tag, data, tagEndPos);
         last->position = offset + tagEndPos + 1;
         last->length = fieldEndPos - tagEndPos - 1;
-        std::println("SPLIT TAG: tag={}, pos={}, len={}", last->tag, last->position, last->length);
+        position = fieldEndPos + 1;
         m_tag = 0;
-        p += last->length + 1;// - m_position;
     }
     else if (fieldEndPos < tagEndPos)
     { // handle split value
-        fieldEnds.clear(fieldEndBit);
-        fieldEndBit = fieldEnds.zerosRight();
-        fieldEndPos = fieldEndBit / 8;
+        fieldEndPos = fieldEnds.clear(fieldEndBit).zerosRight() / 8;
         last->length += fieldEndPos - tagEndPos - 1;
-        std::println("SPLIT VAL: tag={}, pos={}, len={}", last->tag, last->position, last->length);
-        p += last->length + 1;
+        position = fieldEndPos + 1;
         last = &m_tokens[m_count++];
     }
-    std::println("tag = {}, fld = {} pos = {}", tagEndPos, fieldEndPos, p);
-    while (p + 7 < buffer.size() - offset)
+    while (position + 7 < buffer.size() - offset)
     {
-        last->tag = utils::asciiToDecimal(0, data + p, tagEndPos - p);
-        p += tagEndPos - p + 1;
-        tagEnds.clear(tagEndBit);
-        tagEndBit = tagEnds.zerosRight();
-
-        last->position = p + offset;
-        last->length = fieldEndPos - p;
-        fieldEndBit = fieldEnds.zerosRight();
-        fieldEnds.clear(fieldEndBit);
-        fieldEndPos = fieldEndBit / 8;
+        last->tag = utils::asciiToDecimal(0, data + position, tagEndPos - position);
+        position += tagEndPos - position + 1;
+        last->position = position + offset;
+        last->length = fieldEndPos - position;
+        position += last->length + 1;
+        last = &m_tokens[m_count++];
+        tagEndBit = tagEnds.clear(tagEndBit).zerosRight();
         tagEndPos = tagEndBit / 8;
-        p += last->length + 1;
-        std::println("LAST : tag={}, pos={}, len={}", last->tag, last->position, last->length);
-        last = &m_tokens[m_count++];
+        fieldEndBit = fieldEnds.zerosRight();
+        fieldEndPos = fieldEndBit / 8;
+        fieldEnds.clear(fieldEndBit);
     }
-    if (p < buffer.size() - offset)
-    {
+    if (position < buffer.size() - offset)
+    { // checked by decoder
+        last = &m_tokens[m_count++];
         last->tag = 10;
-        last->position = offset + p + 3;
+        last->position = offset + position + 3;
         last->length = 3;
-        std::println("CHECK: tag={}, pos={}, len={}", last->tag, last->position, last->length);
     }
 }
 }
