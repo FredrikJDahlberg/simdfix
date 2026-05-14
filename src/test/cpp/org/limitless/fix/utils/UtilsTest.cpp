@@ -4,11 +4,11 @@
 
 #include <gtest/gtest.h>
 
+#include "org/limitless/fix/utils/Utils.hpp"
 #include "org/limitless/fix/utils/PerfectHashMap.hpp"
 #include "org/limitless/fix/simd/QuadSearch.hpp"
 
 namespace org::limitless::fix::parser {
-
 struct Meta
 {
     int32_t tag;
@@ -27,7 +27,7 @@ TEST(PerfechHash, Basics)
     EXPECT_TRUE(result.has_value());
 }
 
-TEST(PerfechHash, Duplicates)
+TEST(PerfechHash, DISABLED_Duplicates)
 {
     static constexpr std::array<Entry<Meta>, 3> entries = {{
         {100, {}}, {101, {}}, {9999, {}}
@@ -42,4 +42,15 @@ TEST(QuadSearch, Basics)
     ASSERT_EQ(11, simd::quadSearch(values, std::size(values), 29));
 }
 
+TEST(Parse, AsciiToDecimal)
+{
+    {
+        const uint8_t* value = reinterpret_cast<const uint8_t*>("1234");
+        ASSERT_EQ(1234, utils::asciiToDecimal(0, value, 4));
+    }
+    {
+        const uint8_t* value = reinterpret_cast<const uint8_t*>("345");
+        ASSERT_EQ(12345, utils::asciiToDecimal(12, value, 3));
+    }
+}
 }

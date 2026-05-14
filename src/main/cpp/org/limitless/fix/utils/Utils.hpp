@@ -48,36 +48,44 @@ inline void print(const uint32_t length, const uint8_t* buffer)
     return value;
 }
 
-inline uint32_t asciiToDecimal(uint32_t value, const uint8_t* digits, const uint32_t length)
+//
+// See https://lemire.me/blog/2022/01/21/swar-explained-parsing-eight-digits/
+//
+[[nodiscard]] inline uint32_t asciiToDecimal(const uint8_t* digits, const uint32_t length)
 {
-    if (length >= 5)
-    {
-        for (uint32_t position = 0; position < length; ++position)
-        {
-            value = value * 10 + digits[position] - '0';
-        }
-    } else
-    {
-        if (length >= 1)
-        {
-            value = value * 10 + digits[0] - '0';
-        }
-        if (length >= 2)
-        {
-            value = value * 10 + digits[1] - '0';
-        }
-        if (length >= 3)
-        {
-            value = value * 10 + digits[2] - '0';
-        }
-        if (length >= 4)
-        {
-            value = value * 10 + digits[3] - '0';
-        }
-    }
-    return value;
+    constexpr uint64_t SwarMask = 0x000000FF000000FF;
+    constexpr uint64_t SwarFactor1 = 0x000F424000000064; // 100 + (1000000ULL << 32)
+    constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 32)
+    uint64_t number = 0x3030303030303030;
+    memcpy(reinterpret_cast<uint8_t*>(&number) + sizeof(uint64_t) - length, digits, length);
+    number -= 0x3030303030303030;
+    number = number * 10 + (number >> 8); // val = (val * 2561) >> 8;
+    number = ((number & SwarMask) * SwarFactor1 + (number >> 16 & SwarMask) * SwarFactor2) >> 32;
+    return number;
 }
 
+[[nodiscard]] inline uint32_t scale(uint32_t value, const uint32_t power)
+{
+    static constexpr uint32_t Powers10[] =
+    {
+        1ul,
+        10ul,
+        100ul,
+        1'000ul,
+        10'000ul,
+        100'000ul,
+        1'000'000ul,
+        10'000'000ul,
+        100'000'000ul,
+        1'000'000'000ul,
+    };
+    return value * Powers10[power];
+}
+
+[[nodiscard]] inline uint32_t asciiToDecimal(const uint32_t value, const uint8_t* digits, const uint32_t length)
+{
+    return scale(value, length) + asciiToDecimal(digits, length);
+}
 
 template<size_t N>
 [[nodiscard]] constexpr auto makeSpan(const char (& str)[N]) noexcept

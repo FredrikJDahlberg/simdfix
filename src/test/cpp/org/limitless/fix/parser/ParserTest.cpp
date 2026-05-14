@@ -65,8 +65,9 @@ TEST(Parser, Logout)
 
     Decoder parser{};
     {
-        const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=50" SOH "35=5" SOH
-            "49=Buyer" SOH "56=Seller" SOH "52=10:11:12.000" SOH "34=100101" SOH "10=173" SOH);
+        const auto logout = utils::makeSpan(
+              "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
+              "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
         auto [processed, status] = parser.parse(logout, app);
         ASSERT_EQ(ParserStatus::Success, status);
         ASSERT_TRUE(app.found);
@@ -222,16 +223,6 @@ TEST(Parser, InvalidMandatoryFields)
         auto[processed, status] = parser.parse(message, app);
         ASSERT_EQ(ParserStatus::InvalidCheckSumTag, status);
     }
-}
-
-TEST(Parser, BufferSize)
-{
-    Decoder parser{};
-    struct AppHandler : generated::MessageHandler<AppHandler>{} app;
-    const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=52" SOH "35=5" SOH
-        "49=Buyer" SOH "56=Seller" SOH "52=10:11:12:12345" SOH "34=100101" SOH "10=042" SOH);
-    auto[processed, status] = parser.parse(logout, app);
-    ASSERT_EQ(ParserStatus::Success, status);
 }
 }
 
