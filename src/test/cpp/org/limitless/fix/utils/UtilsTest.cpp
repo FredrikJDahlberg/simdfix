@@ -23,7 +23,7 @@ TEST(PerfechHash, Basics)
     }};
 
     static constexpr PerfectHashMap map(std::span{entries});
-    const auto result = map.lookup(500);
+    constexpr auto result = map.lookup(500);
     EXPECT_TRUE(result.has_value());
 }
 

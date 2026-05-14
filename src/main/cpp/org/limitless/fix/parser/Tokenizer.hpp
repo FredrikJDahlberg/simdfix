@@ -59,7 +59,7 @@ public:
     Tokenizer(Tokenizer&&) = delete;
     Tokenizer& operator=(Tokenizer&&) = delete;
 
-    Result scan(std::span<const data_t> buffer, uint16_t* tags);
+    [[nodiscard]] Result scan(std::span<const data_t> buffer);
 
     [[nodiscard]] Token* begin() noexcept
     {
@@ -96,16 +96,22 @@ public:
         return m_count;
     }
 
+    [[nodiscard]] const uint16_t* tags() const noexcept
+    {
+        return m_tags;
+    }
+
 private:
     Token m_tokens[MaxSize]{};
+    uint16_t m_tags[MaxSize]{};
 
-    size_t m_count{};
+    simd::Uint8x16 m_data{};
     uint32_t m_tag{};
     int32_t m_position{};
-    simd::Uint8x16 m_data{};
+    size_t m_count{};
 
-    bool processBlock(position_t offset, uint64_t tagDigitFlags, const data_t* digits, position_t nonTagBitPos, uint16_t* tags);
-    void processTrailer(position_t offset, std::span<const uint8_t> buffer, uint16_t* tags);
+    bool processBlock(position_t offset, uint64_t tagDigitFlags, const data_t* digits, position_t nonTagBitPos);
+    void processTrailer(position_t offset, std::span<const uint8_t> buffer);
 };
 }
 

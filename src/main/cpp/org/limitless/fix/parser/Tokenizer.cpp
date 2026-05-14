@@ -15,7 +15,7 @@
 
 namespace org::limitless::fix::parser {
 
-Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer, uint16_t* tags)
+Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer)
 {
     if (buffer.size() < 32)
     {
@@ -34,7 +34,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer, uint16_t
         return { 8, 0, ParserStatus::InvalidBeginString };
     }
     m_tokens[0] = { 2, 8, 8 };
-    tags[0] = 8;
+    m_tags[0] = 8;
     m_count = 1;
 
     position_t bits = 4;
@@ -80,7 +80,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer, uint16_t
 #endif
         lastSum = m_data.sum() & 0xff;
         checkSumValue += lastSum;
-        complete = processBlock(offset, tagDigits, digits, bits, tags);
+        complete = processBlock(offset, tagDigits, digits, bits);
         bits = 0;
     }
 
@@ -91,7 +91,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer, uint16_t
     }
     else
     {
-        processTrailer(offset, buffer, tags);
+        processTrailer(offset, buffer);
     }
     if (m_count < 7)
     {
@@ -124,8 +124,7 @@ Tokenizer::Result Tokenizer::scan(const std::span<const data_t> buffer, uint16_t
 bool Tokenizer::processBlock(const position_t offset,
                              const uint64_t tagDigitFlags,
                              const data_t* digits,
-                             position_t nonTagBitPos,
-                             uint16_t* tags)
+                             position_t nonTagBitPos)
 {
     const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
     const auto trailingCount = std::countl_one(trailingTagFlags);
@@ -137,7 +136,7 @@ bool Tokenizer::processBlock(const position_t offset,
         ++token;
         token->tag = m_tag;
         token->position = offset + 1;
-        tags[m_count - 1] = token->tag;
+        m_tags[m_count - 1] = token->tag;
         m_position = 0;
         m_tag = 0;
     }
@@ -164,7 +163,7 @@ bool Tokenizer::processBlock(const position_t offset,
             m_tag = 0;
         }
         token->tag = utils::binaryToDecimal(value, digit, count);
-        tags[m_count - 1] = token->tag;
+        m_tags[m_count - 1] = token->tag;
         token->position = offset + tagPos + count + 1;
         remainingDigitFlags >>= digitBits;
         nonTagBitPos += digitBits;
@@ -180,7 +179,7 @@ bool Tokenizer::processBlock(const position_t offset,
     return m_tokens[m_count - 1].tag == 10;
 }
 
-void Tokenizer::processTrailer(const position_t offset, const std::span<const uint8_t> buffer, uint16_t* tags)
+void Tokenizer::processTrailer(const position_t offset, const std::span<const uint8_t> buffer)
 {
 #if !defined(NDEBUG)
     utils::print(buffer.size() % 16, buffer.data() + offset);
@@ -203,6 +202,7 @@ void Tokenizer::processTrailer(const position_t offset, const std::span<const ui
         last->tag = utils::asciiToDecimal(m_tag, data, tagEndPos);
         last->position = offset + tagEndPos + 1;
         last->length = fieldEndPos - tagEndPos - 1;
+        m_tags[m_count - 1] = last->tag;
         position = fieldEndPos + 1;
         m_tag = 0;
     }
@@ -216,6 +216,7 @@ void Tokenizer::processTrailer(const position_t offset, const std::span<const ui
     while (position + 7 < buffer.size() - offset)
     {
         last->tag = utils::asciiToDecimal(0, data + position, tagEndPos - position);
+        m_tags[m_count - 1] = last->tag;
         position += tagEndPos - position + 1;
         last->position = position + offset;
         last->length = fieldEndPos - position;
@@ -233,6 +234,7 @@ void Tokenizer::processTrailer(const position_t offset, const std::span<const ui
         last->tag = 10;
         last->position = offset + position + 3;
         last->length = 3;
+        m_tags[m_count - 1] = last->tag;
     }
 }
 }

@@ -5,7 +5,6 @@
 #ifndef SIMD_FIX_QUADSEARCH_HPP
 #define SIMD_FIX_QUADSEARCH_HPP
 
-#include <cstdint>
 #include <arm_neon.h>
 #include <bit>
 
@@ -13,9 +12,9 @@ namespace org::limitless::fix::simd {
 //
 // https://lemire.me/blog/2026/04/27/you-can-beat-the-binary-search/
 //
-// modified to return index instead of presence
+// modified to return position instead of presence
 //
-[[nodiscard]] inline int32_t quadSearch(const uint16_t* carr, int32_t cardinality, uint16_t value)
+[[nodiscard]] inline int32_t quadSearch(const uint16_t* carr, const int32_t cardinality, const uint16_t value)
 {
     constexpr int32_t gap = 16;
     if (cardinality < gap)
@@ -47,7 +46,7 @@ namespace org::limitless::fix::simd {
     }
     while (n > 1)
     {
-        int32_t half = n >> 1;
+        const int32_t half = n >> 1;
         base = (carr[(base + half + 1) * gap - 1] < value) ? base + half : base;
         n -= half;
     }
@@ -75,7 +74,6 @@ namespace org::limitless::fix::simd {
     }
     return -1;
 }
-
 }
 
 #endif //SIMD_FIX_QUADSEARCH_HPP

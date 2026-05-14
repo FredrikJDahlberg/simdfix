@@ -105,9 +105,9 @@ template<size_t N>
     return bytes;
 }
 
-constexpr uint64_t littleEndianUint64(std::string_view str)
+constexpr uint64_t littleEndianUint64(const std::string_view str)
 {
-    const size_t n = str.size() > 8 ? 8 : str.size();
+    const size_t n = std::min(8zu, str.size());
     uint64_t result = 0;
     for (size_t i = 0; i < n; ++i)
     {

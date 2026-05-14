@@ -32,7 +32,7 @@ TEST(Parser, Logon)
 
         ParserStatus handle(generated::LogonDecoder& logon)
         {
-            auto sender = logon.header().sender().value();
+            const auto sender = logon.header().sender().value();
             EXPECT_EQ(std::string("Buyer"), std::string(reinterpret_cast<const char*>(sender.data()), sender.size()));
             found = true;
             return ParserStatus::Success;

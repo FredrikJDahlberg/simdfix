@@ -24,7 +24,7 @@ struct MessageDecoder
 
     std::span<const uint8_t> m_data{};
     std::span<Token> m_tokens{};
-    const uint16_t* m_tags;
+    const uint16_t* m_tags{};
 
     // required fields access more than once will be cached
     // FIXME: cache all parsed fields?
@@ -74,7 +74,7 @@ struct MessageDecoder
     }
 
     template <int32_t Tag>
-    std::expected<String, ParserStatus> getString(const bool required) const
+    [[nodiscard]] std::expected<String, ParserStatus> getString(const bool required) const
     {
         const auto token = next(Tag);
         if (token == nullptr)
@@ -85,7 +85,7 @@ struct MessageDecoder
     }
 
     template <int32_t Tag>
-    std::expected<uint32_t, ParserStatus> getUnsigned(const bool required) const
+    [[nodiscard]] std::expected<uint32_t, ParserStatus> getUnsigned(const bool required) const
     {
         const auto token = next(Tag);
         if (token == nullptr)

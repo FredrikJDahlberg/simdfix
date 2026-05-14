@@ -38,17 +38,17 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
         return *this;
     }
 
-    std::expected<String, parser::ParserStatus> sender()
+    [[nodiscard]] std::expected<String, parser::ParserStatus> sender() const
     {
         return this->getString<56>(true);
     }
 
-    std::expected<String, parser::ParserStatus> target() const
+    [[nodiscard]] std::expected<String, parser::ParserStatus> target() const
     {
         return this->getString<49>(true);
     }
 
-    std::expected<uint32_t, parser::ParserStatus> expectedSeqNum() const
+    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> expectedSeqNum() const
     {
         return this->getUnsigned<34>(true);
     }
@@ -58,7 +58,7 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
         return this->getString<115>(false);
     }
 
-    std::expected<uint32_t, parser::ParserStatus> nextExpectedSeqNum() const
+    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> nextExpectedSeqNum() const
     {
         return this->template getUnsigned<789>(false);
     }
