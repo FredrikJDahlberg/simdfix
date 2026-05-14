@@ -17,74 +17,78 @@ inline void print(const uint32_t length, const uint8_t* buffer)
     std::printf("\n");
 }
 
-[[nodiscard]] inline uint32_t binaryToDecimal(uint32_t value, const uint8_t* digits, const uint32_t length)
+
+[[nodiscard]] inline uint32_t scale(const uint32_t value, const uint32_t power)
 {
-    if (length >= 5)
+    switch (power)
     {
-        for (uint32_t position = 0; position < length; ++position)
-        {
-            value = value * 10 + digits[position];
-        }
+        case 0: return value;
+        case 1: return value * 10;
+        case 2: return value * 100;
+        case 3: return value * 1'000;
+        case 4: return value * 10'000;
+        case 5: return value * 100'000;
+        case 6: return value * 1'000'000;
+        case 7: return value * 10'000'000;
+        case 8: return value * 100'000'000;
+        case 9: return value * 1'000'000'000;
+        default: return value;
+
     }
-    else
+}
+
+[[nodiscard]] inline uint64_t scale(const uint64_t value, const uint32_t power)
+{
+    switch (power)
     {
-        if (length >= 1)
-        {
-            value = value * 10 + digits[0];
-        }
-        if (length >= 2)
-        {
-            value = value * 10 + digits[1];
-        }
-        if (length >= 3)
-        {
-            value = value * 10 + digits[2];
-        }
-        if (length >= 4)
-        {
-            value = value * 10 + digits[3];
-        }
+        case 0: return value;
+        case 1: return value * 10ULL;
+        case 2: return value * 100ULL;
+        case 3: return value * 1'000ULL;
+        case 4: return value * 10'000ULL;
+        case 5: return value * 100'000ULL;
+        case 6: return value * 1'000'000ULL;
+        case 7: return value * 10'000'000ULL;
+        case 8: return value * 100'000'000ULL;
+        case 9: return value * 1'000'000'000ULL;
+        case 10: return value * 10'000'000'000ULL;
+        case 11: return value * 100'000'000'000ULL;
+        case 12: return value * 1'000'000'000'000ULL;
+        case 13: return value * 10'000'000'000'000ULL;
+        case 14: return value * 100'000'000'000'000ULL;
+        case 15: return value * 1'000'000'000'000'000ULL;
+        case 16: return value * 10'000'000'000'000'000ULL;
+        case 17: return value * 100'000'000'000'000'000ULL;
+        case 18: return value * 1'000'000'000'000'000'000ULL;
+        case 19: return value * 10'000'000'000'000'000'000ULL;
+        default: return value; // 18'446'744'073'709'551'615
     }
-    return value;
 }
 
 //
 // See https://lemire.me/blog/2022/01/21/swar-explained-parsing-eight-digits/
 //
-[[nodiscard]] inline uint32_t asciiToDecimal(const uint8_t* digits, const uint32_t length)
+inline constexpr uint64_t SwarMask = 0x000000FF000000FF;
+inline constexpr uint64_t SwarFactor1 = 0x000F424000000064; // 100 + (1000000ULL << 32)
+inline constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 32)
+
+[[nodiscard]] inline uint32_t binaryToDecimal(const uint32_t value, const uint8_t* digits, const uint32_t length)
 {
-    constexpr uint64_t SwarMask = 0x000000FF000000FF;
-    constexpr uint64_t SwarFactor1 = 0x000F424000000064; // 100 + (1000000ULL << 32)
-    constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 32)
+    uint64_t number = 0;
+    memcpy(reinterpret_cast<uint8_t*>(&number) + sizeof(uint64_t) - length, digits, length);
+    number = number * 10 + (number >> 8); // val = (val * 2561) >> 8;
+    number = ((number & SwarMask) * SwarFactor1 + (number >> 16 & SwarMask) * SwarFactor2) >> 32;
+    return scale(value, length) + number;
+}
+
+[[nodiscard]] inline uint64_t asciiToDecimal(const uint64_t value, const uint8_t* digits, const uint32_t length)
+{
     uint64_t number = 0x3030303030303030;
     memcpy(reinterpret_cast<uint8_t*>(&number) + sizeof(uint64_t) - length, digits, length);
     number -= 0x3030303030303030;
     number = number * 10 + (number >> 8); // val = (val * 2561) >> 8;
     number = ((number & SwarMask) * SwarFactor1 + (number >> 16 & SwarMask) * SwarFactor2) >> 32;
-    return number;
-}
-
-[[nodiscard]] inline uint32_t scale(uint32_t value, const uint32_t power)
-{
-    static constexpr uint32_t Powers10[] =
-    {
-        1ul,
-        10ul,
-        100ul,
-        1'000ul,
-        10'000ul,
-        100'000ul,
-        1'000'000ul,
-        10'000'000ul,
-        100'000'000ul,
-        1'000'000'000ul,
-    };
-    return value * Powers10[power];
-}
-
-[[nodiscard]] inline uint32_t asciiToDecimal(const uint32_t value, const uint8_t* digits, const uint32_t length)
-{
-    return scale(value, length) + asciiToDecimal(digits, length);
+    return scale(value, length) + number;
 }
 
 template<size_t N>

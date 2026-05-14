@@ -45,12 +45,24 @@ TEST(QuadSearch, Basics)
 TEST(Parse, AsciiToDecimal)
 {
     {
-        const uint8_t* value = reinterpret_cast<const uint8_t*>("1234");
+        const auto value = reinterpret_cast<const uint8_t*>("1234");
         ASSERT_EQ(1234, utils::asciiToDecimal(0, value, 4));
     }
     {
-        const uint8_t* value = reinterpret_cast<const uint8_t*>("345");
+        const auto value = reinterpret_cast<const uint8_t*>("345");
         ASSERT_EQ(12345, utils::asciiToDecimal(12, value, 3));
+    }
+}
+
+TEST(Parse, BinaryToDecimal)
+{
+    {
+        constexpr uint8_t value[]= { 1, 2, 3, 4 };
+        ASSERT_EQ(1234, utils::binaryToDecimal(0, value, 4));
+    }
+    {
+        constexpr uint8_t value[]= { 3, 4, 5 };
+        ASSERT_EQ(12345, utils::binaryToDecimal(12, value, 3));
     }
 }
 }
