@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <cstddef>
+#include <chrono>
 
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 

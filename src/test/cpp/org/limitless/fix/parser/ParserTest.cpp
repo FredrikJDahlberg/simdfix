@@ -7,6 +7,7 @@
 
 #include "org/limitless/fix/parser/Decoder.hpp"
 #include "org/limitless/fix/messages/LogonDecoder.hpp"
+#include "org/limitless/fix/messages/LogoutDecoder.hpp"
 #include "org/limitless/fix/messages/MessageHandler.hpp"
 
 #define SOH "\x01"

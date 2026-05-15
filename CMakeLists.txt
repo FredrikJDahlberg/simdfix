@@ -28,8 +28,9 @@ set(FIX_HEADERS
         ${MAIN_PATH}/parser/GroupDecoder.hpp
         ${MAIN_PATH}/parser/Token.hpp
         ${MAIN_PATH}/simd/Uint8x16.hpp
-        src/main/cpp/org/limitless/fix/simd/QuadSearch.hpp)
+        ${MAIN_PATH}/simd/QuadSearch.hpp)
 add_library(SimdFix INTERFACE)
+target_sources(SimdFix INTERFACE ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_include_directories(SimdFix INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
 target_compile_definitions(SimdFix INTERFACE
         $<$<CONFIG:Debug>:DEBUG_MODE>
@@ -44,9 +45,11 @@ target_link_options(SimdFix INTERFACE
         $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>
 )
 
-add_executable(SimdFixBench src/test/cpp/org/limitless/fix/benchmark/SimdFixBench.cpp)
+add_executable(SimdFixBench ${TEST_PATH}/benchmark/SimdFixBench.cpp)
+target_include_directories(SimdFixBench PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/test/cpp")
 target_link_libraries(SimdFixBench PRIVATE SimdFix)
-target_include_directories(SimdFixBench PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/test/cpp")
 target_compile_definitions(SimdFixBench PRIVATE $<$<CONFIG:Release>:NDEBUG>)
 target_compile_options(SimdFixBench PRIVATE -Wall
         $<$<CONFIG:Debug>:-g -O0 -fsanitize=address -fno-omit-frame-pointer>

@@ -8,6 +8,7 @@
 #include <expected>
 
 #include "org/limitless/fix/messages/Grammar.hpp"
+#include "org/limitless/fix/parser/MessageDecoder.hpp"
 
 namespace org::limitless::fix::generated {
 
