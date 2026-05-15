@@ -6,7 +6,6 @@
 #define SIMD_FIX_GRAMMAR_HPP
 
 #include "org/limitless/fix/parser/Dictionary.hpp"
-#include "../utils/PerfectHashMap.hpp"
 
 namespace org::limitless::fix::protocols {
 

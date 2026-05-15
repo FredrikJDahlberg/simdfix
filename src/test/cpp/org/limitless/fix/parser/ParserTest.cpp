@@ -80,6 +80,44 @@ TEST(Parser, Logout)
     }
 }
 
+TEST(Parser, MessageFragment)
+{
+    struct AppHandler : generated::MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        // skip logon
+
+        ParserStatus handle(generated::LogoutDecoder& logout)
+        {
+            std::printf("Found Logout\n");
+            found = true;
+            return ParserStatus::Success;
+        }
+    } app;
+
+    Decoder parser{};
+    {
+        const auto logout1 = utils::makeSpan(
+              "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH );
+        auto [processed, status] = parser.parse(logout1, app);
+        ASSERT_EQ(ParserStatus::MessageFragment, status);
+        ASSERT_EQ(0, processed);
+        ASSERT_FALSE(app.found);
+    }
+    {
+        const auto logout2 = utils::makeSpan(
+              "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
+              "34=100101" SOH "52=10:11:12.123" SOH "627=2" SOH "629=10" SOH
+              "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
+        auto [processed, status] = parser.parse(logout2, app);
+        ASSERT_EQ(ParserStatus::Success, status);
+        ASSERT_EQ(107, processed);
+    }
+}
+
 TEST(Parser, HopGroup1)
 {
     struct AppHandler : generated::MessageHandler<AppHandler>
@@ -245,7 +283,7 @@ TEST(Parser, InvalidMandatoryFields)
         ASSERT_EQ(ParserStatus::InvalidBodyLength, status);
     }
     {
-        const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=27" SOH "666=66" SOH "666=66" SOH
+        const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=34" SOH "666=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "10=063" SOH);
         auto[processed, status] = parser.parse(message, app);
         ASSERT_EQ(ParserStatus::InvalidMessageTypeTag, status);

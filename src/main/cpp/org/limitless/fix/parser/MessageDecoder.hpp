@@ -10,7 +10,6 @@
 
 #include "org/limitless/fix/parser/Token.hpp"
 #include "org/limitless/fix/parser/ParserStatus.hpp"
-#include "org/limitless/fix/parser/Tokenizer.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 #include "org/limitless/fix/simd/QuadSearch.hpp"
 
@@ -70,6 +69,12 @@ struct MessageDecoder
         return position >= 0 ? Protocol::Grammar[position].type : 0;
     }
 
+    [[nodiscard]] Token* next(const uint32_t tag) const
+    {
+        const auto index = simd::quadSearch(m_tags.data(), m_tags.size(), tag);
+        return index >= 0 ? &m_tokens[index] : nullptr;
+    }
+
     template <int32_t Tag>
     [[nodiscard]] std::expected<String, ParserStatus> getString(const bool required) const
     {
@@ -90,12 +95,6 @@ struct MessageDecoder
             return std::unexpected{required ? ParserStatus::RequiredFieldMissing : ParserStatus::NullValue};
         }
         return convertToUnsigned(token);
-    }
-
-    [[nodiscard]] Token* next(const uint32_t tag) const
-    {
-        const auto index = simd::quadSearch(m_tags.data(), m_tags.size(), tag);
-        return index >= 0 ? &m_tokens[index] : nullptr;
     }
 
     uint32_t convertToUnsigned(const Token* token) const

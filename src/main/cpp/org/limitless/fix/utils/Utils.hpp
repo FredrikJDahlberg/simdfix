@@ -19,7 +19,6 @@ inline void print(const uint32_t length, const uint8_t* buffer)
     std::printf("\n");
 }
 
-
 [[nodiscard]] inline uint32_t scale(const uint32_t value, const uint32_t power)
 {
     switch (power)

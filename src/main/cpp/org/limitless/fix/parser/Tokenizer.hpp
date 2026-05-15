@@ -16,6 +16,8 @@
 
 namespace org::limitless::fix::parser {
 
+// FIXME: do not clear token count and position on fragment
+//
 class Tokenizer
 {
 public:
@@ -100,7 +102,7 @@ public:
         return std::span(m_tags, m_count);
     }
 
-    Result processCheckSum(const std::span<const data_t>::pointer data)
+    Result processCheckSum(const std::span<const data_t>::pointer data) const
     {
         Result result{0, 0, ParserStatus::Success};
         uint64_t checks = 0;
@@ -158,21 +160,21 @@ public:
         position_t bits = 4;
         for (; offset + 15 < length && !complete; offset += Uint8x16::Size)
         {
-            m_data.load(data + offset);
+            m_block.load(data + offset);
 #if !defined(NDEBUG)
             utils::print(16, data + offset);
 #endif
             // A digit is valid when followed by '=' or a digit
-            const Uint8x16 shifted{m_data - ZerosBlock};
+            const Uint8x16 shifted{m_block - ZerosBlock};
             const Uint8x16 digitFlags{shifted <= NineMask};
-            const Uint8x16 tagEnds{m_data == TagEndsBlock};
+            const Uint8x16 tagEnds{m_block == TagEndsBlock};
             Uint8x16 after{digitFlags & tagEnds.shiftLeft<1>()};
             after |= digitFlags & after.shiftLeft<1>();
             after |= digitFlags & after.shiftLeft<1>();
             after |= digitFlags & after.shiftLeft<1>();
 
             // A digit is valid if preceded by 0x1 or a digit
-            Uint8x16 fieldEnds{m_data == FieldEndsBlock};
+            Uint8x16 fieldEnds{m_block == FieldEndsBlock};
             Uint8x16 before = digitFlags & fieldEnds.shiftRight<1>();
             before |= digitFlags & before.shiftRight<1>();
             before |= digitFlags & before.shiftRight<1>();
@@ -193,18 +195,35 @@ public:
             complete = processBlock(offset, tagDigits, digits, bits);
             bits = 0;
         }
-
         if (complete)
         {
             m_tokens[m_count - 1].length = 3; // previous field is checksum
         }
-        else
+        else if (offset < buffer.size())
         {
             processTrailer(offset, buffer);
         }
         for (size_t i = 0; i < m_count; ++i)
         {
             m_tags[i] = m_tokens[i].tag;
+        }
+        if (m_tokens[1].tag == 9) // FIXME: constant
+        {
+            const auto token = &m_tokens[1];
+            const auto bodyLength = utils::asciiToDecimal(0, data + token->position, token->length);
+            const auto last = &m_tokens[m_count - 1];
+            const uint32_t count = last->position - token->position - token->length - 4;
+            if (count < bodyLength)
+            {
+                if (last->tag != CheckSumTag)
+                {
+                    return { 0, 0, ParserStatus::MessageFragment };
+                }
+            }
+            if (count > bodyLength)
+            {
+                return { count, 0, ParserStatus::InvalidBodyLength };
+            }
         }
         if (m_count < 7)
         {
@@ -218,7 +237,7 @@ private:
     Token m_tokens[MaxSize]{};
     uint16_t m_tags[MaxSize]{};
 
-    simd::Uint8x16 m_data{};
+    simd::Uint8x16 m_block{};
     uint32_t m_tag{};
     int32_t m_position{};
     size_t m_count{};
@@ -287,8 +306,8 @@ private:
         auto* last = &m_tokens[m_count - 1];
         const uint8_t* data = buffer.data() + offset;
         const auto remaining = static_cast<uint32_t>(buffer.size()) - offset;
-        uint64_t bytes;
-        memcpy(&bytes, data, sizeof(uint64_t));
+        uint64_t bytes = 0;
+        memcpy(&bytes, data, std::min(remaining, static_cast<uint32_t>(sizeof(uint64_t))));
         auto tagEnds = BitSet64{utils::findByte(TagEnd, bytes)};
         auto fieldEnds = BitSet64{utils::findByte(FieldEnd, bytes)};
         uint32_t tagEndBit = tagEnds.zerosRight();

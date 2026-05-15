@@ -56,17 +56,14 @@ public:
 
     [[nodiscard]] Token* member(const int32_t tag)
     {
-        auto tags = m_message->m_tags;
-        auto tokens = m_message->m_tokens;
+        const auto tokens = m_message->m_tokens;
         const size_t  size = tokens.size();
         uint32_t end = m_offset + 1;
         while (end < size && tokens[end].tag != m_delim)
         {
             ++end;
         }
-
-        const int32_t len = static_cast<int32_t>(end - m_offset);
-        const int32_t position = simd::quadSearch(m_message->m_tags.data() + m_offset, len, tag);
+        const int32_t position = simd::quadSearch(m_message->m_tags.data() + m_offset, end - m_offset, tag);
         return position >= 0 ? &m_message->m_tokens[m_offset + position] : nullptr;
     }
 
