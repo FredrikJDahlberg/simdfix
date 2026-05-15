@@ -24,7 +24,7 @@ public:
         return static_cast<Handler*>(this)->handle(std::forward<Event>(event));
     }
 
-    ParserStatus handle(const std::span<const uint8_t> data, const std::span<Token> tokens, const uint16_t* tags)
+    ParserStatus handle(const std::span<const uint8_t> data, const std::span<Token> tokens, const std::span<uint16_t> tags)
     {
         const auto messageType = data[tokens[2].position]; // FIXME
         auto status = ParserStatus::InvalidMessageType;

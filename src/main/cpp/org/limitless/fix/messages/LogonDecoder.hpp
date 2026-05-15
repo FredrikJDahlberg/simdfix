@@ -32,7 +32,7 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
 
     LogonDecoder() = default;
 
-    LogonDecoder& wrap(const std::span<const uint8_t> data, const std::span<Token> tokens, const uint16_t* tags)
+    LogonDecoder& wrap(const std::span<const uint8_t> data, const std::span<Token> tokens, const std::span<uint16_t> tags)
     {
         Message::wrap(data, tokens, tags);
         return *this;

@@ -29,7 +29,7 @@ struct HopGroupDecoder : parser::GroupDecoder<Message>
 
     HopGroupDecoder& clear()
     {
-        Message::clear();
+        Group::clear();
         return *this;
     }
 
@@ -46,19 +46,22 @@ struct HopGroupDecoder : parser::GroupDecoder<Message>
 
     [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> hopCompID()
     {
-        auto token = Group::next(628, Group::m_delim);
+        const auto token = Group::findInHop(628);
         if (token != nullptr)
         {
             return Group::m_message->convertToUnsigned(token);
         }
-        auto required = Group::m_delim == 628;
-        auto status = required ? parser::ParserStatus::RequiredFieldMissing : parser::ParserStatus::NullValue;
-        return std::unexpected(status);
+        return std::unexpected{parser::ParserStatus::NullValue};
     }
 
     [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> hopRefID()
     {
-        return Group::m_message->template getUnsigned<629>(Group::m_delim == 629);
+        const auto token = Group::findInHop(629);
+        if (token != nullptr)
+        {
+            return Group::m_message->convertToUnsigned(token);
+        }
+        return std::unexpected{parser::ParserStatus::NullValue};
     }
 };
 }

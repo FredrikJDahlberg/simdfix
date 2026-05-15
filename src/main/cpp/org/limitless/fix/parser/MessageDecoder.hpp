@@ -12,7 +12,6 @@
 #include "org/limitless/fix/parser/ParserStatus.hpp"
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
-#include "org/limitless/fix/utils/BitSet64.hpp"
 #include "org/limitless/fix/simd/QuadSearch.hpp"
 
 namespace org::limitless::fix::parser {
@@ -24,7 +23,7 @@ struct MessageDecoder
 
     std::span<const uint8_t> m_data{};
     std::span<Token> m_tokens{};
-    const uint16_t* m_tags{};
+    std::span<uint16_t> m_tags{};
 
     // required fields access more than once will be cached
     // FIXME: cache all parsed fields?
@@ -33,21 +32,19 @@ struct MessageDecoder
     String m_sendingTime{};
     uint32_t m_sequenceNumber{};
 
-    static constexpr auto MessageGrammar = Protocol::Grammar;
-
     MessageDecoder() = default;
 
-    explicit MessageDecoder(const std::span<Token> tokens, const uint16_t* tags)
+    explicit MessageDecoder(const std::span<Token> tokens, const std::span<uint16_t> tags)
         : m_tokens{tokens}, m_tags{tags}
     {
     }
 
-    MessageDecoder(const String data, const std::span<Token> tokens, const uint16_t* tags)
+    MessageDecoder(const String data, const std::span<Token> tokens, const std::span<uint16_t> tags)
         : m_data{data}, m_tokens{tokens}, m_tags{tags}
     {
     }
 
-    void wrap(const String data, const std::span<Token> tokens, const uint16_t* tags)
+    void wrap(const String data, const std::span<Token> tokens, const std::span<uint16_t> tags)
     {
         m_data = data;
         m_tokens = tokens;
@@ -68,9 +65,9 @@ struct MessageDecoder
 
     [[nodiscard]] uint16_t tokenType(const uint16_t tag) const
     {
-        //return MessageGrammar.lookup(tag).value().type;
-        throw std::invalid_argument("not implemented");
-        return 0;
+        constexpr auto& tags = Protocol::Tags;
+        const auto position = simd::quadSearch(tags.data(), tags.size(), tag);
+        return position >= 0 ? Protocol::Grammar[position].type : 0;
     }
 
     template <int32_t Tag>
@@ -97,12 +94,8 @@ struct MessageDecoder
 
     [[nodiscard]] Token* next(const int32_t tag) const
     {
-        auto index = simd::quadSearch(m_tags, m_tokens.size(), tag);
-        if (index >= 0)
-        {
-            return &m_tokens[index];
-        }
-        return nullptr;
+        const auto index = simd::quadSearch(m_tags.data(), m_tags.size(), tag);
+        return index >= 0 ? &m_tokens[index] : nullptr;
     }
 
 #if 0

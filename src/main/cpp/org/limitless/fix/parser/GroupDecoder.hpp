@@ -5,6 +5,8 @@
 #ifndef SIMD_FIX_GROUP_DECODER_HPP
 #define SIMD_FIX_GROUP_DECODER_HPP
 
+#include "org/limitless/fix/simd/QuadSearch.hpp"
+
 namespace org::limitless::fix::parser {
 
 template <typename Message>
@@ -17,11 +19,9 @@ protected:
     Token* m_groupCount{};
     Token* m_group{};
 
-    uint16_t m_delim{};
-
     uint32_t m_count{};
     int32_t m_repeat{};
-    //int32_t m_offset{};
+    uint16_t m_delim{};
 
 public:
     explicit GroupDecoder(const uint32_t groupType, const Message* grammar) : m_message(grammar), m_groupType(groupType)
@@ -35,84 +35,50 @@ public:
 
     [[nodiscard]] bool hasNext() const
     {
-        //auto tag = m_message->m_tokens[m_offset].tag;
-        auto tag = m_group->tag;
-        auto tokenType = m_message->tokenType(tag);
-        std::printf("HAS NEXT: TYPE TAG = %d TYPE = %d / %d\n", m_group->tag, tokenType, m_groupType);
-        if (m_groupType != tokenType)
-        {
-            std::printf("DONE\n");
-            return false;
-        }
-
         return m_repeat < m_count;
     }
 
     void prepare(Token* token)
     {
         m_group = token;
-        //m_offset = static_cast<int32_t>(m_group - &m_message->m_tokens[0]);
         m_repeat = 0;
         m_count = m_message->convertToUnsigned(m_group);
-        m_delim = (m_group + 1)->tag; // m_message->m_tokens[m_offset + 1].tag;
-        std::printf("COUNT = %d, DELIM = %d, GROUP = %d\n", m_count, m_delim, m_group - &m_message->m_tokens[0]);
+        m_delim = (m_group + 1)->tag;
     }
 
     void clear()
     {
         m_count = 0;
         m_repeat = 0;
-        // m_offset = 0;
     }
 
-    [[nodiscard]] Token* next(const int32_t tag, const int32_t sentinel)
-    {  // assume that fields are access once in tag order
-        throw std::runtime_error("Not implemented");
-#if 0
-        const auto tokens = m_message->m_tokens;
-        BitSet64 present{m_message->m_present};
-        if (present.empty())
-        {
-            return nullptr;
-        }
-        int32_t position = present.zerosRight();
-
-        // tokens[] = { 627, 628, 629, 628, 629 }
-        // first: pointing to count
-        // next -> pointing to first rep
-        // next ->
-        ++m_group;
-        if (tokens[position].tag == tag)
-        {
-            m_message->m_present.clear(position);
-            return &tokens[position];
-        }
-        do
-        {
-            if (tokens[position].tag == tag)
-            {
-                m_message->m_present.clear(position);
-                return &tokens[position];
-            }
-            present.clear(position);
-            position = present.zerosRight();
-        } while (!present.empty() && tokens[position].tag != sentinel);
-        return nullptr;
-#endif
-    }
-
-    [[nodiscard]] Token* next(uint16_t tag) const
+    [[nodiscard]] Token* findInHop(const int32_t tag)
     {
-        return m_message->next(tag);
+        const Token* base = m_message->m_tokens.data();
+        const size_t  size = m_message->m_tokens.size();
+        const uint32_t offset = static_cast<uint32_t>(m_group - base);
+        uint32_t end = offset + 1;
+        while (end < size && base[end].tag != m_delim)
+        {
+            ++end;
+        }
+
+        const int32_t len = static_cast<int32_t>(end - offset);
+        const int32_t position = simd::quadSearch(m_message->m_tags.data() + offset, len, tag);
+        return position >= 0 ? &m_message->m_tokens[offset + position] : nullptr;
+    }
+
+    [[nodiscard]] Token* next(const uint32_t tag) const
+    {
+        return m_message->next(static_cast<uint16_t>(tag));
     }
 
     void next()
     {
-        auto size = m_message->m_tokens.size();
-        std::printf("NEXT: pos = %d, tag = %d\n", m_group - &m_message->m_tokens[0], m_group->tag);
+        const size_t size = m_message->m_tokens.size();
+        ++m_group;
         while (m_group - m_message->m_tokens.data() < size && m_group->tag != m_delim)
         {
-            // ++m_offset;
             ++m_group;
         }
         ++m_repeat;

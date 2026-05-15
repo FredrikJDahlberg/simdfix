@@ -95,9 +95,9 @@ public:
         return m_count;
     }
 
-    [[nodiscard]] const uint16_t* tags() const noexcept
+    [[nodiscard]] std::span<uint16_t> tags() noexcept
     {
-        return m_tags;
+        return std::span(m_tags, m_count);
     }
 
     static Result processCheckSum(const std::span<const data_t>::pointer data, const Token& checkSum)
@@ -148,6 +148,7 @@ public:
 #if !defined(NDEBUG)
             utils::print(16, data + offset);
 #endif
+            // A digit is valid when followed by '=' or a digit
             const Uint8x16 shifted{m_data - ZerosBlock};
             const Uint8x16 digitFlags{shifted <= NineMask};
             const Uint8x16 tagEnds{m_data == TagEndsBlock};
@@ -156,6 +157,7 @@ public:
             after |= digitFlags & after.shiftLeft<1>();
             after |= digitFlags & after.shiftLeft<1>();
 
+            // A digit is valid if preceded by 0x1 or a digit
             Uint8x16 fieldEnds{m_data == FieldEndsBlock};
             Uint8x16 before = digitFlags & fieldEnds.shiftRight<1>();
             before |= digitFlags & before.shiftRight<1>();

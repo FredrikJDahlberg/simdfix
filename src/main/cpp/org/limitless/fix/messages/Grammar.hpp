@@ -12,7 +12,7 @@ namespace org::limitless::fix::protocols {
 
 struct Logon
 {
-    static constexpr uint16_t Tags[] = {1, 8, 9, 10, 34, 35, 49, 52, 56, 102, 627, 628, 629, 630 };
+    static constexpr std::array<uint16_t, 14> Tags = {1, 8, 9, 10, 34, 35, 49, 52, 56, 102, 627, 628, 629, 630 };
 
     static constexpr std::array<parser::Dictionary, 14> Grammar
     {
@@ -37,20 +37,20 @@ struct Logon
 
 struct Logout
 {
-    static constexpr uint16_t Tags[] = { 8, 9, 10, 34, 35, 49, 52, 56, 102, 627, 628, 629, 630 };
+    static constexpr std::array<uint16_t, 14> Tags = { 8, 9, 10, 34, 35, 49, 52, 56, 102, 627, 628, 629, 630 };
 
     static constexpr std::array<parser::Dictionary, 14> Grammar
     {
-            {
+            {  // 0 0 0 0 0 0 10 10 10 1
                 {8, 0, true},
                 {9, 0, true},
-                {10, 0, true},
+                {10, 1, true},
                 {34, 0, true},
                 {35, 0, true},
-                {49, 12, true},
+                {49, 0, true},
                 {52, 0, true},
                 {56, 0, true},
-                {102, 24, true},
+                {102, 0, true},
                 {627, 10, false},
                 {628, 10, false},
                 {629, 10, false},
@@ -61,7 +61,7 @@ struct Logout
 
 struct HopGroup
 {
-    static constexpr uint16_t Tags[] = { 627, 628, 629, 630 };
+    static constexpr std::array<uint16_t, 4> Tags = { 627, 628, 629, 630 };
 
     static constexpr std::array<parser::Dictionary, 4> Grammar
     {
