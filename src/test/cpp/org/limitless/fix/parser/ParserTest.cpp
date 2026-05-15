@@ -180,7 +180,7 @@ TEST(Parser, HopGroup3)
     ASSERT_EQ(ParserStatus::Success, status);
 }
 
-TEST(Parser, DISABLED_InvalidGroupCount)
+TEST(Parser, InvalidGroupCount)
 {
     struct AppHandler : generated::MessageHandler<AppHandler>
     {

@@ -171,12 +171,6 @@ struct Uint8x16
         return m_block;
     }
 
-    /*
-    [[nodiscard]] Block ifElse(const Block& trueBlock, const Block& falseBlock) const
-    {
-        return Block{vbslq_u8(m_block, trueBlock.m_block, falseBlock.m_block)};
-    }
-    */
     [[nodiscard]] Uint8x16 whenTrue(const Uint8x16& block) const
     {
     return Uint8x16{vbslq_u8(m_block, block.m_block, Zeros)};

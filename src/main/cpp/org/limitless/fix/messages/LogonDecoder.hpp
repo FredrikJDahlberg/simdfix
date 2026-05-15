@@ -60,7 +60,7 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
 
     [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> nextExpectedSeqNum() const
     {
-        return this->template getUnsigned<789>(false);
+        return this->getUnsigned<789>(false);
     }
 
     Header& header()
@@ -72,7 +72,6 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
     {
         return m_hopGroup;
     }
-
 };
 }
 

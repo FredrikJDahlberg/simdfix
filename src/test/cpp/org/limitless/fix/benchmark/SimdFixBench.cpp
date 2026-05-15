@@ -73,7 +73,7 @@ int main()
     auto coldBuf = std::make_unique<uint8_t[]>(COLD_SIZE);
     fillBuffer(coldBuf.get(), COLD_SIZE);
 
-    const size_t coldMessages = COLD_SIZE / MESSAGE_LENGTH;
+    constexpr size_t coldMessages = COLD_SIZE / MESSAGE_LENGTH;
     const auto coldDuration = timer([&]()
     {
         for (size_t i = 0; i < coldMessages; ++i)

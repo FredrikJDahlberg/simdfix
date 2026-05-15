@@ -5,6 +5,8 @@
 #ifndef SIMD_FIX_UTILS_HPP
 #define SIMD_FIX_UTILS_HPP
 
+#include <cstdint>
+
 namespace org::limitless::fix::utils {
 
 inline void print(const uint32_t length, const uint8_t* buffer)
