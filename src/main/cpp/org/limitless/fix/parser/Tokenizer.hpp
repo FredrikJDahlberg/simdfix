@@ -50,7 +50,7 @@ public:
     static inline const simd::Uint8x16 TagEndsBlock{'='};
     static inline const simd::Uint8x16 FieldEndsBlock{0x01};
     static inline const simd::Uint8x16 ZerosBlock{'0'};
-    static inline const simd::Uint8x16 NinesBlock{'9'};
+    static inline const simd::Uint8x16 NineMask{9};
 
     Tokenizer() noexcept = default;
     ~Tokenizer() = default;
@@ -100,6 +100,24 @@ public:
         return m_tags;
     }
 
+    static Result processCheckSum(const std::span<const data_t>::pointer data, const Token& checkSum)
+    {
+        uint32_t checkSumValue = 0;
+        const auto checkSumEnd = checkSum.position - 3;
+        position_t i = 0;
+        simd::Uint8x16 block;
+        for (; i + simd::Uint8x16::Size <= checkSumEnd; i += simd::Uint8x16::Size)
+        {
+            block.load(data + i);
+            checkSumValue += static_cast<uint32_t>(block.sum());
+        }
+        for (; i < checkSumEnd; ++i)
+        {
+            checkSumValue += data[i];
+        }
+        return Result{checkSum.position + checkSum.length + 1, checkSumValue & 0xff, ParserStatus::Success};
+    }
+
     Result scan(const std::span<const data_t> buffer)
     {
         if (buffer.size() < 32)
@@ -121,10 +139,8 @@ public:
         m_count = 1;
 
         data_t digits[Uint8x16::Size];
-        uint8_t lastSum = 0;
         position_t offset = 0;
         bool complete = false;
-        uint32_t checkSumValue = 0;
         position_t bits = 4;
         for (; offset + 15 < length && !complete; offset += Uint8x16::Size)
         {
@@ -132,25 +148,22 @@ public:
 #if !defined(NDEBUG)
             utils::print(16, data + offset);
 #endif
-            // A digit is valid if followed by '=' or a validated digit
-            const Uint8x16 digitFlags{m_data >= ZerosBlock & m_data <= NinesBlock};
+            const Uint8x16 shifted{m_data - ZerosBlock};
+            const Uint8x16 digitFlags{shifted <= NineMask};
             const Uint8x16 tagEnds{m_data == TagEndsBlock};
             Uint8x16 after{digitFlags & tagEnds.shiftLeft<1>()};
             after |= digitFlags & after.shiftLeft<1>();
             after |= digitFlags & after.shiftLeft<1>();
             after |= digitFlags & after.shiftLeft<1>();
-            after |= digitFlags & after.shiftLeft<1>();
 
-            // A digit is valid if preceded by 0x01 or a validated digit
             Uint8x16 fieldEnds{m_data == FieldEndsBlock};
             Uint8x16 before = digitFlags & fieldEnds.shiftRight<1>();
             before |= digitFlags & before.shiftRight<1>();
             before |= digitFlags & before.shiftRight<1>();
             before |= digitFlags & before.shiftRight<1>();
-            before |= digitFlags & before.shiftRight<1>();
 
             const Uint8x16 validTags{after | before};
-            const Uint8x16 tagsBlock{validTags.whenTrue(m_data - ZerosBlock)};
+            const Uint8x16 tagsBlock{validTags.whenTrue(shifted)};
             auto tagDigits = validTags.toUint64();  // 16 bytes to 4-bit nibble
             tagsBlock.get(0, digits);
             tagDigits >>= bits;
@@ -161,8 +174,6 @@ public:
             }
             std::printf("\n");
 #endif
-            lastSum = m_data.sum() & 0xff;
-            checkSumValue += lastSum;
             complete = processBlock(offset, tagDigits, digits, bits);
             bits = 0;
         }
@@ -195,14 +206,7 @@ public:
             return result;
         }
 
-        checkSumValue -= lastSum;
-        for (auto i = offset - 16; i < checkSum.position - 3; i++)
-        {
-            checkSumValue += data[i];
-        }
-        result.checkSum = checkSumValue & 0xff;
-        result.processed = checkSum.position + checkSum.length + 1;
-        return result;
+        return processCheckSum(data, checkSum);
     }
 
 private:

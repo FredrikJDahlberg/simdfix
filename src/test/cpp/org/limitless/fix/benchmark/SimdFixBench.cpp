@@ -6,11 +6,11 @@
 #include <memory>
 #include <cstddef>
 
-#include "../../../../../../main/cpp/org/limitless/fix/simd/Uint8x16.hpp"
 #include "org/limitless/fix/parser/Tokenizer.hpp"
 
 #define SOH "\x01"
-static constexpr std::uint8_t MESSAGE1[] =
+
+static constexpr std::uint8_t MESSAGE[] =
     "8=FIXT.1.1" SOH
     "9=118" SOH
     "35=A" SOH
@@ -25,47 +25,99 @@ static constexpr std::uint8_t MESSAGE1[] =
     "553=Username" SOH
     "554=Password" SOH
     "1137=9" SOH
-    "10=147" SOH
-    // next message
-    "                      ";
+    "10=147" SOH;
+
+// Actual message length, excluding the C-string null terminator.
+static constexpr size_t MESSAGE_LENGTH = sizeof(MESSAGE) - 1;
 
 using namespace std::chrono;
 
 template <typename Handler>
-auto timer(Handler handler)
+nanoseconds timer(Handler handler)
 {
     const auto start = high_resolution_clock::now();
     handler();
     return nanoseconds(high_resolution_clock::now() - start);
 }
 
-int main(int argc, char** argv)
+static void fillBuffer(uint8_t* buf, size_t bufSize)
+{
+    size_t i = 0;
+    for (; i + MESSAGE_LENGTH <= bufSize; i += MESSAGE_LENGTH)
+    {
+        std::memcpy(&buf[i], MESSAGE, MESSAGE_LENGTH);
+    }
+    std::memset(&buf[i], ' ', bufSize - i);
+}
+
+static void report(const char* label, nanoseconds duration, size_t msgCount, size_t msgBytes)
+{
+    const auto ms       = duration_cast<milliseconds>(duration).count();
+    const auto seconds  = ::duration<double>(duration).count();
+    const auto gbps     = static_cast<double>(msgCount) * static_cast<double>(msgBytes) / 1e9 / seconds;
+    const auto nsPerMsg = static_cast<double>(duration.count()) / static_cast<double>(msgCount);
+    std::printf("%-12s %6lld ms   %6.3f GB/s   %5.1f ns/msg\n", label, ms, gbps, nsPerMsg);
+}
+
+int main()
 {
     using namespace org::limitless::fix::parser;
     Tokenizer tokenizer;
 
-    constexpr size_t SIZE = 1024*1024*1024ull;
-    auto buffer = std::make_unique<std::uint8_t[]>(SIZE);
+    std::printf("Message length = %zu bytes\n\n", MESSAGE_LENGTH);
 
-    for (size_t i = 0; i < SIZE - sizeof(MESSAGE1); i += sizeof(MESSAGE1))
-    {
-        memcpy(&buffer[i], MESSAGE1, sizeof(MESSAGE1));
-    }
+    // -------------------------------------------------------------------------
+    // COLD: 1 GB buffer — data comes from DRAM for most of the run.
+    // -------------------------------------------------------------------------
+    constexpr size_t COLD_SIZE = 1024ULL * 1024 * 1024;
+    auto coldBuf = std::make_unique<uint8_t[]>(COLD_SIZE);
+    fillBuffer(coldBuf.get(), COLD_SIZE);
 
-    const auto duration = timer([&]()
+    const size_t coldMessages = COLD_SIZE / MESSAGE_LENGTH;
+    const auto coldDuration = timer([&]()
     {
-        for (size_t i = 0; i < SIZE - sizeof(MESSAGE1); i += sizeof(MESSAGE1))
+        for (size_t i = 0; i < coldMessages; ++i)
         {
-            const std::span<const uint8_t> bytes(&buffer[i], sizeof(MESSAGE1));
-            auto [processed, checkSum, status] = tokenizer.scan(bytes);
+            const std::span<const uint8_t> bytes(&coldBuf[i * MESSAGE_LENGTH], MESSAGE_LENGTH);
+            (void) tokenizer.scan(bytes);
         }
     });
-    std::printf("LEXER Duration = %lld ms\n",  std::chrono::duration_cast<milliseconds>(duration).count());
+    report("COLD CACHE", coldDuration, coldMessages, MESSAGE_LENGTH);
 
-    constexpr auto bytesSent = static_cast<double>(SIZE) - sizeof(MESSAGE1);
-    const auto seconds = ::duration<double>(duration).count();
-    const auto gigaBytesPerSecond = bytesSent / SIZE / seconds;
-    std::printf("GigaBytes per second = %.3f\n", gigaBytesPerSecond);
+    // -------------------------------------------------------------------------
+    // HOT: 256 KB buffer — fits in L2, measures pure compute throughput.
+    // -------------------------------------------------------------------------
+    constexpr size_t HOT_SIZE  = 256 * 1024;
+    constexpr size_t HOT_COUNT = 4096;
+    auto hotBuf = std::make_unique<uint8_t[]>(HOT_SIZE);
+    fillBuffer(hotBuf.get(), HOT_SIZE);
+
+    // Warm up i-cache and d-cache before timing.
+    constexpr size_t msgsPerPass = HOT_SIZE / MESSAGE_LENGTH;
+    for (int w = 0; w < 4; ++w)
+    {
+        for (size_t i = 0; i < msgsPerPass; ++i)
+        {
+            const std::span<const uint8_t> bytes(&hotBuf[i * MESSAGE_LENGTH], MESSAGE_LENGTH);
+            auto result = tokenizer.scan(bytes);
+            (void)result;
+        }
+    }
+
+    constexpr size_t hotMsgs = msgsPerPass * HOT_COUNT;
+    const auto hotDuration = timer([&]()
+    {
+        for (size_t iter = 0; iter < HOT_COUNT; ++iter)
+        {
+            for (size_t i = 0; i < msgsPerPass; ++i)
+            {
+                const std::span<const uint8_t> bytes(&hotBuf[i * MESSAGE_LENGTH], MESSAGE_LENGTH);
+                auto result = tokenizer.scan(bytes);
+                (void)result;
+            }
+        }
+    });
+    report("HOT CACHE", hotDuration, hotMsgs, MESSAGE_LENGTH);
 
     return 0;
 }
