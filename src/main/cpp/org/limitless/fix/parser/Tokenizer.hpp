@@ -100,22 +100,36 @@ public:
         return std::span(m_tags, m_count);
     }
 
-    static Result processCheckSum(const std::span<const data_t>::pointer data, const Token& checkSum)
+    Result processCheckSum(const std::span<const data_t>::pointer data)
     {
-        uint32_t checkSumValue = 0;
+        Result result{0, 0, ParserStatus::Success};
+        uint64_t checks = 0;
+        memcpy(&checks, data + m_tokens[m_count - 1].position - 4, sizeof(uint64_t));
+        const auto& checkSum = m_tokens[m_count - 1];
+        if ((checks & CheckSumMask) != CheckSumMask)
+        {
+            result.status = ParserStatus::InvalidCheckSumTag;
+            result.processed = checkSum.position + checkSum.length + 1;
+            return result;
+        }
+
+        uint64_t checkSumValue = 0;
         const auto checkSumEnd = checkSum.position - 3;
         position_t i = 0;
         simd::Uint8x16 block;
         for (; i + simd::Uint8x16::Size <= checkSumEnd; i += simd::Uint8x16::Size)
         {
             block.load(data + i);
-            checkSumValue += static_cast<uint32_t>(block.sum());
+            checkSumValue += block.sum();
         }
         for (; i < checkSumEnd; ++i)
         {
             checkSumValue += data[i];
         }
-        return Result{checkSum.position + checkSum.length + 1, checkSumValue & 0xff, ParserStatus::Success};
+        result.processed = checkSum.position + checkSum.length + 1;
+        result.checkSum = checkSumValue & 0xff;
+        result.status = ParserStatus::Success;
+        return result;
     }
 
     Result scan(const std::span<const data_t> buffer)
@@ -180,7 +194,6 @@ public:
             bits = 0;
         }
 
-        Result result{ 0, 0, ParserStatus::Success };
         if (complete)
         {
             m_tokens[m_count - 1].length = 3; // previous field is checksum
@@ -189,26 +202,16 @@ public:
         {
             processTrailer(offset, buffer);
         }
-        for (size_t i = 0; i < m_count; ++i) m_tags[i] = m_tokens[i].tag;
+        for (size_t i = 0; i < m_count; ++i)
+        {
+            m_tags[i] = m_tokens[i].tag;
+        }
         if (m_count < 7)
         {
-            result.status = ParserStatus::RequiredFieldMissing;
-            return result;
+            auto last = &m_tokens[m_count - 1];
+            return { last->position + last->length + 1, 0, ParserStatus::RequiredFieldMissing};
         }
-
-        uint64_t checks = 0;
-        memcpy(&checks, data + m_tokens[m_count - 1].position - 4, sizeof(uint64_t));
-        const auto& checkSum = m_tokens[m_count - 1];
-        if ((checks & CheckSumMask) != CheckSumMask)
-        {
-            std::println("error: tag={}, pos={}, len={}", checkSum.tag, checkSum.position, checkSum.length);
-            std::println("check: {:016x}, mask={:016x}, res={:016x}", checks, CheckSumMask, checks&CheckSumMask);
-            result.status = ParserStatus::InvalidCheckSumTag;
-            result.processed = checkSum.position + checkSum.length + 1;
-            return result;
-        }
-
-        return processCheckSum(data, checkSum);
+        return processCheckSum(data);
     }
 
 private:

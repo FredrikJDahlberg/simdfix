@@ -16,12 +16,12 @@ protected:
     const Message* m_message;
     const uint32_t m_groupType;
 
-    Token* m_groupCount{};
-    Token* m_group{};
+    std::span<Token> m_tokens{};
 
     uint32_t m_count{};
     int32_t m_repeat{};
     uint16_t m_delim{};
+    uint32_t m_offset{};
 
 public:
     explicit GroupDecoder(const uint32_t groupType, const Message* grammar) : m_message(grammar), m_groupType(groupType)
@@ -38,48 +38,50 @@ public:
         return m_repeat < m_count;
     }
 
-    void prepare(Token* token)
+    void wrap(Token* token)
     {
-        m_group = token;
+        m_offset = token - m_tokens.data();
+        m_count = m_message->convertToUnsigned(&m_tokens[m_offset]);
+        m_delim = m_tokens[m_offset + 1].tag;
         m_repeat = 0;
-        m_count = m_message->convertToUnsigned(m_group);
-        m_delim = (m_group + 1)->tag;
+        m_offset = 0;
     }
 
     void clear()
     {
         m_count = 0;
         m_repeat = 0;
+        m_offset = 0;
     }
 
-    [[nodiscard]] Token* findInHop(const int32_t tag)
+    [[nodiscard]] Token* member(const int32_t tag)
     {
-        const Token* base = m_message->m_tokens.data();
-        const size_t  size = m_message->m_tokens.size();
-        const uint32_t offset = static_cast<uint32_t>(m_group - base);
-        uint32_t end = offset + 1;
-        while (end < size && base[end].tag != m_delim)
+        auto tags = m_message->m_tags;
+        auto tokens = m_message->m_tokens;
+        const size_t  size = tokens.size();
+        uint32_t end = m_offset + 1;
+        while (end < size && tokens[end].tag != m_delim)
         {
             ++end;
         }
 
-        const int32_t len = static_cast<int32_t>(end - offset);
-        const int32_t position = simd::quadSearch(m_message->m_tags.data() + offset, len, tag);
-        return position >= 0 ? &m_message->m_tokens[offset + position] : nullptr;
+        const int32_t len = static_cast<int32_t>(end - m_offset);
+        const int32_t position = simd::quadSearch(m_message->m_tags.data() + m_offset, len, tag);
+        return position >= 0 ? &m_message->m_tokens[m_offset + position] : nullptr;
     }
 
     [[nodiscard]] Token* next(const uint32_t tag) const
     {
-        return m_message->next(static_cast<uint16_t>(tag));
+        return m_message->next(tag);
     }
 
     void next()
     {
-        const size_t size = m_message->m_tokens.size();
-        ++m_group;
-        while (m_group - m_message->m_tokens.data() < size && m_group->tag != m_delim)
+        auto tokens = m_message->m_tokens;
+        ++m_offset;
+        while (m_offset < tokens.size() && tokens[m_offset].tag != m_delim)
         {
-            ++m_group;
+            ++m_offset;
         }
         ++m_repeat;
     }

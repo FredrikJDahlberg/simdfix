@@ -92,24 +92,12 @@ struct MessageDecoder
         return convertToUnsigned(token);
     }
 
-    [[nodiscard]] Token* next(const int32_t tag) const
+    [[nodiscard]] Token* next(const uint32_t tag) const
     {
         const auto index = simd::quadSearch(m_tags.data(), m_tags.size(), tag);
         return index >= 0 ? &m_tokens[index] : nullptr;
     }
 
-#if 0
-    Tokenizer::Token* next(const int32_t position)
-    {  // assume that fields are access once in tag order
-        // m_position should reside here
-        if (m_tokens.size() >= position || m_present.get(position) == 0)
-        {
-            return nullptr;
-        }
-        m_present.clear(position);
-        return &m_tokens[position];
-    }
-#endif
     uint32_t convertToUnsigned(const Token* token) const
     {
         return utils::asciiToDecimal(0, m_data.data() + token->position, token->length);

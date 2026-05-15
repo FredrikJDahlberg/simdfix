@@ -23,7 +23,7 @@ struct HopGroupDecoder : parser::GroupDecoder<Message>
 
     HopGroupDecoder& wrap()
     {
-        Group::prepare(Group::next(627));
+        Group::wrap(Group::next(627));
         return *this;
     }
 
@@ -46,7 +46,7 @@ struct HopGroupDecoder : parser::GroupDecoder<Message>
 
     [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> hopCompID()
     {
-        const auto token = Group::findInHop(628);
+        const auto token = Group::member(628);
         if (token != nullptr)
         {
             return Group::m_message->convertToUnsigned(token);
@@ -56,7 +56,7 @@ struct HopGroupDecoder : parser::GroupDecoder<Message>
 
     [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> hopRefID()
     {
-        const auto token = Group::findInHop(629);
+        const auto token = Group::member(629);
         if (token != nullptr)
         {
             return Group::m_message->convertToUnsigned(token);

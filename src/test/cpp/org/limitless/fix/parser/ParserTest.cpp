@@ -147,6 +147,39 @@ TEST(Parser, HopGroup2)
     ASSERT_EQ(ParserStatus::Success, status);
 }
 
+TEST(Parser, HopGroup3)
+{
+    struct AppHandler : generated::MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        ParserStatus handle(generated::LogoutDecoder& logout)
+        {
+            std::printf("Got logout\n");
+            auto group = logout.header().hopGroup();
+            const auto count = group.count().value_or(0);
+            std::printf("Group hops=%d\n", count);
+            EXPECT_EQ(2, count);
+            group.next();
+            EXPECT_EQ(0, group.hopCompID().value_or(0));
+            EXPECT_EQ(10, group.hopRefID().value_or(0));
+            EXPECT_TRUE(group.hasNext());
+            group.next();
+            EXPECT_EQ(37, group.hopRefID().value_or(0));
+            EXPECT_EQ(0, group.hopCompID().value_or(0));
+            EXPECT_FALSE(group.hasNext());
+            return ParserStatus::Success;
+        }
+    } app;
+    Decoder parser{};
+    const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=70" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
+        "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "10=077" SOH);
+    auto[processed, status] = parser.parse(logout, app);
+    ASSERT_EQ(ParserStatus::Success, status);
+}
+
 TEST(Parser, DISABLED_InvalidGroupCount)
 {
     struct AppHandler : generated::MessageHandler<AppHandler>
