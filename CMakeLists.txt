@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(simd_fix)
+project(simdfix)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -18,8 +18,7 @@ set(GENERATED_HEADERS
         ${GEN_PATH}/LogoutDecoder.hpp
         ${GEN_PATH}/MessageHandler.hpp)
 set(FIX_SOURCES
-        ${MAIN_PATH}/parser/Decoder.cpp
-        ${MAIN_PATH}/parser/Tokenizer.cpp)
+        ${MAIN_PATH}/parser/Decoder.cpp)
 set(FIX_HEADERS
         ${MAIN_PATH}/parser/Tokenizer.hpp
         ${MAIN_PATH}/utils/Utils.hpp
@@ -31,24 +30,34 @@ set(FIX_HEADERS
         ${MAIN_PATH}/parser/Dictionary.hpp
         ${MAIN_PATH}/parser/GroupDecoder.hpp
         ${MAIN_PATH}/parser/Token.hpp
-        ${MAIN_PATH}/simd/Uint16x8.hpp
+        ${MAIN_PATH}/simd/Uint8x16.hpp
         src/main/cpp/org/limitless/fix/simd/QuadSearch.hpp)
-
 add_library(SimdFix STATIC ${FIX_SOURCES} ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_include_directories(SimdFix PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
+target_compile_definitions(SimdFix PRIVATE
+        $<$<CONFIG:Debug>:DEBUG_MODE>
+        $<$<CONFIG:Release>:NDEBUG>
+)
 target_compile_options(SimdFix PRIVATE
         -Wall -Wextra
-        $<$<CONFIG:Debug>:-g -O0 -fsanitize=address -fno-omit-frame-pointer -fprofile-instr-generate -fcoverage-mapping -DDEBUG_MODE>
-        $<$<CONFIG:Release>:-O3 -DNDEBUG>
+        $<$<CONFIG:Debug>:-g -O0 -fsanitize=address -fno-omit-frame-pointer -fprofile-instr-generate -fcoverage-mapping>
+        $<$<CONFIG:Release>:-O3 -march=native>
 )
 target_link_options(SimdFix PRIVATE
-        $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>)
+        $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>
+)
+set_target_properties(SimdFix PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 
 add_executable(SimdFixBench src/test/cpp/org/limitless/fix/benchmark/SimdFixBench.cpp)
-target_link_libraries(SimdFixBench SimdFix)
-target_compile_options(SimdFixBench PRIVATE -O3 -Wall)
+target_link_libraries(SimdFixBench PRIVATE SimdFix)
 target_include_directories(SimdFixBench PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/test/cpp")
-target_link_options(SimdFixBench PRIVATE $<$<CONFIG:Debug>:-fsanitize=address> -fprofile-instr-generate)
+target_compile_definitions(SimdFixBench PRIVATE $<$<CONFIG:Release>:NDEBUG>)
+target_compile_options(SimdFixBench PRIVATE -Wall
+        $<$<CONFIG:Debug>:-g -O0 -fsanitize=address -fno-omit-frame-pointer>
+        $<$<CONFIG:Release>:-O3 -march=native>
+)
+target_link_options(SimdFixBench PRIVATE $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>)
+set_target_properties(SimdFixBench PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 
 list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/include")
 find_package(pugixml REQUIRED)

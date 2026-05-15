@@ -34,8 +34,7 @@ TEST(Tokenizer, Basics)
         // next message
         "8=FIXT.1.1" SOH "9=118" SOH);
     Tokenizer tokenizer;
-    uint16_t tags[16];
-    auto [processed, checkSum, status] = tokenizer.scan(message, tags);
+    auto [processed, checkSum, status] = tokenizer.scan(message);
     ASSERT_EQ(ParserStatus::Success, status);
     ASSERT_EQ(message.size() - 17, processed);
     ASSERT_EQ(218, checkSum);
@@ -65,8 +64,7 @@ TEST(Tokenizer, TrailerSplitCheckSum)
     const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=49" SOH "35=A" SOH
         "49=Buyer" SOH "56=Seller" SOH "34=2000001" SOH "52=20190605" SOH "10=048" SOH);
     Tokenizer tokenizer{};
-    uint16_t tags[16];
-    auto [processed, checkSum, status] = tokenizer.scan(message, tags);
+    auto [processed, checkSum, status] = tokenizer.scan(message);
     ASSERT_EQ(ParserStatus::Success, status);
     ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(48, checkSum);
@@ -90,8 +88,7 @@ TEST(Tokenizer, TrailerFieldEnd)
     const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=27" SOH "35=66" SOH
         "666=66" SOH "1=1" SOH "2=2" SOH "10=239" SOH);
     Tokenizer tokenizer{};
-    uint16_t tags[16];
-    auto [processed, checkSum, status] = tokenizer.scan(message, tags);
+    auto [processed, checkSum, status] = tokenizer.scan(message);
     ASSERT_EQ(ParserStatus::Success, status);
     ASSERT_EQ(239, checkSum);
 }
@@ -100,8 +97,7 @@ TEST(Tokenizer, Fragment)
 {
     const auto message = utils::makeSpan("8=FIXT.");
     Tokenizer tokenizer{};
-    uint16_t tags[16];
-    auto [processed, checkSum, status] = tokenizer.scan(message, tags);
+    auto [processed, checkSum, status] = tokenizer.scan(message);
     ASSERT_EQ(ParserStatus::MessageFragment, status);
     ASSERT_EQ(0, processed);
 }
@@ -112,8 +108,7 @@ TEST(Tokenizer, HopGroup)
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
     Tokenizer tokenizer{};
-    uint16_t tags[16]{};
-    auto [processed, checkSum, status] = tokenizer.scan(logout, tags);
+    auto [processed, checkSum, status] = tokenizer.scan(logout);
     ASSERT_EQ(ParserStatus::Success, status);
     constexpr Token expectedTokens[] =
     {

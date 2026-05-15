@@ -17,8 +17,8 @@ struct Uint8x16
 
     static size_t constexpr Size = 16;
 
-    static inline const value_type True = vdupq_n_u8(255);
-    static inline const value_type False = vdupq_n_u8(0);
+    static inline const value_type Ones = vdupq_n_u8(255);
+    static inline const value_type Zeros = vdupq_n_u8(0);
 
     static inline const value_type AsciiZeros = vdupq_n_u8('0');
     static inline const value_type AsciiNines = vdupq_n_u8('9');
@@ -72,6 +72,11 @@ struct Uint8x16
         return success;
     }
 
+    void load(const uint8_t* buffer)
+    {
+        m_block = vld1q_u8(buffer);
+    }
+
     const Uint8x16& get(const size_t position, uint8_t* buffer) const
     {
         vst1q_u8(buffer + position, m_block);
@@ -103,14 +108,14 @@ struct Uint8x16
     template <int N>
     [[nodiscard]] Uint8x16 shiftLeft() const {
         static_assert(N >= 0 && N < 16, "Shift must be between 0 and 15");
-        return Uint8x16(vextq_u8(m_block, False, N));
+        return Uint8x16(vextq_u8(m_block, Zeros, N));
     }
 
     template <int N>
     [[nodiscard]] Uint8x16 shiftRight() const
     {
         static_assert(N >= 0 && N < 16, "Shift must be between 0 and 15");
-        return Uint8x16(vextq_u8(False, m_block, 16 - N));
+        return Uint8x16(vextq_u8(Zeros, m_block, 16 - N));
     }
 
     Uint8x16 operator-(const Uint8x16& block) const
@@ -174,7 +179,7 @@ struct Uint8x16
     */
     [[nodiscard]] Uint8x16 whenTrue(const Uint8x16& block) const
     {
-        return Uint8x16{vbslq_u8(m_block, block.m_block, False)};
+    return Uint8x16{vbslq_u8(m_block, block.m_block, Zeros)};
     }
 
     Uint8x16& equal(const Uint8x16& block, Uint8x16& result)

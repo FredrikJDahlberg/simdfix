@@ -39,7 +39,8 @@ TEST(QuadSearch, Basics)
 {
     const uint16_t values[] = {1, 2, 5, 7, 9, 12, 14, 15, 18, 23, 24, 29, 33, 35, 37, 40, 42 };
     ASSERT_EQ(-1, simd::quadSearch(values, std::size(values), 47));
-    ASSERT_EQ(11, simd::quadSearch(values, std::size(values), 29));
+    ASSERT_EQ(0, simd::quadSearch(values, std::size(values), 1));
+    ASSERT_EQ(16, simd::quadSearch(values, std::size(values), 42));
 }
 
 TEST(Parse, AsciiToDecimal)
