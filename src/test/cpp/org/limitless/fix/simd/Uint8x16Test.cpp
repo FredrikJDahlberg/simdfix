@@ -130,7 +130,7 @@ TEST(Uint8x16, WhenTrueAndSum)
     uint8_t mask_data[16], val_data[16];
     for (int i = 0; i < 16; ++i)
     {
-        mask_data[i] = (i % 2 == 0) ? 0xFF : 0x00;
+        mask_data[i] = i % 2 == 0 ? 0xFF : 0x00;
         val_data[i]  = static_cast<uint8_t>(i + 1);  // 1..16
     }
     Uint8x16 mask, val;
@@ -141,7 +141,7 @@ TEST(Uint8x16, WhenTrueAndSum)
     extract(mask.whenTrue(val), selected);
     for (int i = 0; i < 16; ++i)
     {
-        const uint8_t expected = (i % 2 == 0) ? val_data[i] : 0;
+        const uint8_t expected = i % 2 == 0 ? val_data[i] : 0;
         EXPECT_EQ(expected, selected[i]) << "whenTrue mismatch at lane " << i;
     }
 

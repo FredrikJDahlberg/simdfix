@@ -8,12 +8,6 @@
 #include "org/limitless/fix/simd/QuadSearch.hpp"
 
 namespace org::limitless::fix::parser {
-struct Meta
-{
-    int32_t tag;
-    int32_t type;
-    bool required;
-};
 
 TEST(QuadSearch, Basics)
 {

@@ -15,13 +15,13 @@ void check(std::span<Token> result, const std::span<const Token> expected)
 {
     for (int i = 0; auto& [position, tag, length] : result)
     {
-        const auto& token = expected[i++];
+        const auto [expectedPos, expectedTag, expectedLen ] = expected[i++];
 #if !defined(NDEBUG)
         std::printf("%3d, tag = %4d, pos = %4d, len = %4d\n", i, tag, position, length);
 #endif
-        ASSERT_EQ(token.tag, tag) << "Mismatch at index " << i - 1;
-        ASSERT_EQ(token.position, position) << "Tag " << token.tag << " has invalid offset";
-        ASSERT_EQ(token.length, length) << "Tag " << token.tag << " has invalid length";
+        ASSERT_EQ(expectedTag, tag) << "Mismatch at index " << i - 1;
+        ASSERT_EQ(expectedPos, position) << "Tag " << expectedTag << " has invalid offset";
+        ASSERT_EQ(expectedLen, length) << "Tag " << expectedTag << " has invalid length";
     }
     ASSERT_EQ(expected.size(), result.size());
 }

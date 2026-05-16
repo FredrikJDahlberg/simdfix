@@ -54,8 +54,8 @@ public:
     }
 
 protected:
-    ParserStatus handle(LogonDecoder& message) { return ParserStatus::Success; }
-    ParserStatus handle(LogoutDecoder& message) { return ParserStatus::Success; }
+    ParserStatus handle(LogonDecoder&) { return ParserStatus::Success; }
+    ParserStatus handle(LogoutDecoder&) { return ParserStatus::Success; }
 };
 
 }

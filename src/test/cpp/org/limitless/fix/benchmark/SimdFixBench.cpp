@@ -41,7 +41,7 @@ nanoseconds timer(Handler handler)
     return nanoseconds(high_resolution_clock::now() - start);
 }
 
-static void fillBuffer(uint8_t* buf, size_t bufSize)
+static void fillBuffer(uint8_t* buf, const size_t bufSize)
 {
     size_t i = 0;
     for (; i + MESSAGE_LENGTH <= bufSize; i += MESSAGE_LENGTH)
@@ -51,7 +51,7 @@ static void fillBuffer(uint8_t* buf, size_t bufSize)
     std::memset(&buf[i], ' ', bufSize - i);
 }
 
-static void report(const char* label, nanoseconds duration, size_t msgCount, size_t msgBytes)
+static void report(const char* label, const nanoseconds duration, const size_t msgCount, const size_t msgBytes)
 {
     const auto ms       = duration_cast<milliseconds>(duration).count();
     const auto seconds  = ::duration<double>(duration).count();
@@ -67,15 +67,13 @@ int main()
 
     std::printf("Message length = %zu bytes\n\n", MESSAGE_LENGTH);
 
-    // -------------------------------------------------------------------------
     // COLD: 1 GB buffer — data comes from DRAM for most of the run.
-    // -------------------------------------------------------------------------
     constexpr size_t COLD_SIZE = 1024ULL * 1024 * 1024;
     auto coldBuf = std::make_unique<uint8_t[]>(COLD_SIZE);
     fillBuffer(coldBuf.get(), COLD_SIZE);
 
     constexpr size_t coldMessages = COLD_SIZE / MESSAGE_LENGTH;
-    const auto coldDuration = timer([&]()
+    const auto coldDuration = timer([&]
     {
         for (size_t i = 0; i < coldMessages; ++i)
         {
@@ -85,9 +83,7 @@ int main()
     });
     report("COLD CACHE", coldDuration, coldMessages, MESSAGE_LENGTH);
 
-    // -------------------------------------------------------------------------
     // HOT: 256 KB buffer — fits in L2, measures pure compute throughput.
-    // -------------------------------------------------------------------------
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
     auto hotBuf = std::make_unique<uint8_t[]>(HOT_SIZE);
@@ -100,20 +96,20 @@ int main()
         for (size_t i = 0; i < msgsPerPass; ++i)
         {
             const std::span<const uint8_t> bytes(&hotBuf[i * MESSAGE_LENGTH], MESSAGE_LENGTH);
-            auto result = tokenizer.scan(bytes);
+            const auto result = tokenizer.scan(bytes);
             (void)result;
         }
     }
 
     constexpr size_t hotMsgs = msgsPerPass * HOT_COUNT;
-    const auto hotDuration = timer([&]()
+    const auto hotDuration = timer([&]
     {
         for (size_t iter = 0; iter < HOT_COUNT; ++iter)
         {
             for (size_t i = 0; i < msgsPerPass; ++i)
             {
                 const std::span<const uint8_t> bytes(&hotBuf[i * MESSAGE_LENGTH], MESSAGE_LENGTH);
-                auto result = tokenizer.scan(bytes);
+                const auto result = tokenizer.scan(bytes);
                 (void)result;
             }
         }

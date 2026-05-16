@@ -5,8 +5,6 @@
 #ifndef SIMD_FIX_LOGOUT_DECODER_HPP
 #define SIMD_FIX_LOGOUT_DECODER_HPP
 
-#include <expected>
-
 #include "org/limitless/fix/messages/Grammar.hpp"
 #include "org/limitless/fix/parser/MessageDecoder.hpp"
 

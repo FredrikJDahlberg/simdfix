@@ -99,7 +99,7 @@ public:
 
     [[nodiscard]] std::span<uint16_t> tags() noexcept
     {
-        return std::span(m_tags, m_count);
+        return {m_tags, m_count};
     }
 
     Result processCheckSum(const std::span<const data_t>::pointer data) const
@@ -227,7 +227,7 @@ public:
         }
         if (m_count < 7)
         {
-            auto last = &m_tokens[m_count - 1];
+            const auto last = &m_tokens[m_count - 1];
             return { last->position + last->length + 1, 0, ParserStatus::RequiredFieldMissing};
         }
         return processCheckSum(data);
@@ -262,7 +262,7 @@ private:
         }
         token->length = m_position;
 
-        uint64_t remainingDigitFlags = tagDigitFlags & (~0ull >> std::max(4, trailingCount));
+        uint64_t remainingDigitFlags = tagDigitFlags & ~0ull >> std::max(4, trailingCount);
         while (remainingDigitFlags > 0 && token->tag != CheckSumTag)
         {
             const int32_t nonTagCount = std::countr_zero(remainingDigitFlags);

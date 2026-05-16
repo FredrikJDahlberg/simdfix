@@ -25,12 +25,12 @@ struct Dictionary
                                      });
     if (it != grammar.end() && it->tag == tag)
     {
-        return &(*it);
+        return &*it;
     }
     return nullptr;
 }
 
-};
+}
 
 
 #endif //SIMD_FIX_DICTIONARY_HPP

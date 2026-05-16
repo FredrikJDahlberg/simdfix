@@ -38,7 +38,7 @@ public:
         return m_repeat < m_count;
     }
 
-    void wrap(Token* token)
+    void wrap(const Token* token)
     {
         m_offset = token - m_tokens.data();
         m_count = m_message->convertToUnsigned(&m_tokens[m_offset]);

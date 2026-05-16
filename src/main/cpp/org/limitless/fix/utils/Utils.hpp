@@ -14,7 +14,7 @@ inline void print(const uint32_t length, const uint8_t* buffer)
     for (uint32_t i = 0; i < length; ++i)
     {
         const auto ch = buffer[i];
-        std::printf("%2c ", std::isprint(ch) ? ch : (ch == 1 ? '|' : '?'));
+        std::printf("%2c ", std::isprint(ch) ? ch : ch == 1 ? '|' : '?');
     }
     std::printf("\n");
 }
@@ -102,7 +102,7 @@ template<size_t N>
 {
     const uint64_t mask = 0x01010101'01010101ULL * value;
     bytes ^= mask;
-    bytes = (bytes - 0x01010101'01010101ULL) & ~bytes & 0x80808080'80808080ULL;
+    bytes = bytes - 0x01010101'01010101ULL & ~bytes & 0x80808080'80808080ULL;
     return bytes;
 }
 
@@ -112,7 +112,7 @@ constexpr uint64_t littleEndianUint64(const std::string_view str)
     uint64_t result = 0;
     for (size_t i = 0; i < n; ++i)
     {
-        result |= (static_cast<uint64_t>(static_cast<uint8_t>(str[i])) << (i * 8));
+        result |= static_cast<uint64_t>(static_cast<uint8_t>(str[i])) << (i * 8);
     }
     return result;
 }

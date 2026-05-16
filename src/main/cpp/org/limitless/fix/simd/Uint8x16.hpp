@@ -202,9 +202,9 @@ struct Uint8x16
     static void dump(const uint8x16_t& vector)
     {
         const auto data = reinterpret_cast<const uint8_t*>(&vector);
-        for (int j = 0; j < 16; ++j)
+        for (int i = 0; i < 16; ++i)
         {
-            std::printf("%02x ", data[j]);
+            std::printf("%02x ", data[i]);
         }
         std::printf("\n");
     }

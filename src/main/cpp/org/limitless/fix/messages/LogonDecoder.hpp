@@ -53,7 +53,7 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
         return this->getUnsigned<34>(true);
     }
 
-    std::expected<String, parser::ParserStatus> onBehalfOfCompID()
+    [[nodiscard]] std::expected<String, parser::ParserStatus> onBehalfOfCompID() const
     {
         return this->getString<115>(false);
     }

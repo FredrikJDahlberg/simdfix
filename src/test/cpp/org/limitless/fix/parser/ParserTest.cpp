@@ -56,7 +56,7 @@ TEST(Parser, Logout)
 
         // skip logon
 
-        ParserStatus handle(generated::LogoutDecoder& logout)
+        ParserStatus handle(generated::LogoutDecoder&)
         {
             std::printf("Found Logout\n");
             found = true;
@@ -91,7 +91,7 @@ TEST(Parser, MessageFragment)
 
         // skip logon
 
-        ParserStatus handle(generated::LogoutDecoder& logout)
+        ParserStatus handle(generated::LogoutDecoder&)
         {
             std::printf("Found Logout\n");
             found = true;

@@ -38,20 +38,20 @@ namespace org::limitless::fix::simd {
         const int32_t k1 = carr[(base + quarter + 1) * gap - 1];
         const int32_t k2 = carr[(base + 2 * quarter + 1) * gap - 1];
         const int32_t k3 = carr[(base + 3 * quarter + 1) * gap - 1];
-        const int32_t c1 = (k1 < value);
-        const int32_t c2 = (k2 < value);
-        const int32_t c3 = (k3 < value);
+        const int32_t c1 = k1 < value;
+        const int32_t c2 = k2 < value;
+        const int32_t c3 = k3 < value;
         base += (c1 + c2 + c3) * quarter;
         n -= 3 * quarter;
     }
     while (n > 1)
     {
         const int32_t half = n >> 1;
-        base = (carr[(base + half + 1) * gap - 1] < value) ? base + half : base;
+        base = carr[(base + half + 1) * gap - 1] < value ? base + half : base;
         n -= half;
     }
 
-    int32_t lo = (carr[(base + 1) * gap - 1] < value) ? base + 1 : base;
+    int32_t lo = carr[(base + 1) * gap - 1] < value ? base + 1 : base;
     if (lo < num_blocks)
     {
         const uint16_t* blk = carr + lo * gap;

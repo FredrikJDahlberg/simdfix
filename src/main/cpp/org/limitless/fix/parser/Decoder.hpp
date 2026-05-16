@@ -89,12 +89,13 @@ private:
         {
             return ParserStatus::InvalidCheckSum;
         }
-
+#if !defined(NDEBUG)
         for (int i = 0; i < count; ++i)
         {
             auto [position, tag, length] = tokens[i];
             std::printf("%3d tag = %3d, pos = %3d, len = %3d\n", i, tag, position, length);
         }
+#endif
         // sender, target and message sequence number are validated in message decoder
         return ParserStatus::Success;
     }
