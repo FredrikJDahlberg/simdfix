@@ -17,7 +17,6 @@
 namespace org::limitless::fix::parser {
 
 // FIXME: do not clear token count and position on fragment
-//
 class Tokenizer
 {
 public:
@@ -25,13 +24,7 @@ public:
 
     struct Result
     {
-        Result(const uint32_t bytes, const uint32_t check, const ParserStatus error) :
-            processed(static_cast<uint16_t>(bytes)), checkSum(static_cast<uint8_t>(check)), status(error)
-        {
-        }
-
-        uint16_t processed;
-        uint8_t checkSum;
+        size_t processed;
         ParserStatus status;
     };
 
@@ -42,6 +35,8 @@ public:
 
     static constexpr data_t False = 0;
     static constexpr uint32_t CheckSumTag = 10;
+    static constexpr uint32_t BodyLengthTag = 9;
+    static constexpr uint32_t MessageTypeTag = 35;
 
     static constexpr uint8_t TagEnd = '=';
     static constexpr uint8_t FieldEnd = 0x01;
@@ -62,86 +57,29 @@ public:
     Tokenizer(Tokenizer&&) = delete;
     Tokenizer& operator=(Tokenizer&&) = delete;
 
-    [[nodiscard]] Token* begin() noexcept
-    {
-        return m_tokens;
-    }
-
-    [[nodiscard]] Token* end() noexcept
-    {
-        return m_tokens + m_count;
-    }
-
     [[nodiscard]] std::span<Token> tokens() noexcept
     {
         return { m_tokens, m_count };
     }
 
-    [[nodiscard]] const Token* begin() const noexcept
+    template <typename Handler>
+    Result parse(const std::span<const uint8_t> buffer, Handler& handler)
     {
-        return m_tokens;
-    }
-
-    [[nodiscard]] const Token* end() const noexcept
-    {
-        return m_tokens + m_count;
-    }
-
-    [[nodiscard]] std::span<const Token> tokens() const noexcept
-    {
-        return { m_tokens, m_count };
-    }
-
-    [[nodiscard]] size_t size() const noexcept
-    {
-        return m_count;
-    }
-
-    [[nodiscard]] std::span<uint16_t> tags() noexcept
-    {
-        return {m_tags, m_count};
-    }
-
-    Result processCheckSum(const std::span<const data_t>::pointer data) const
-    {
-        Result result{0, 0, ParserStatus::Success};
-        uint64_t checks = 0;
-        memcpy(&checks, data + m_tokens[m_count - 1].position - 4, sizeof(uint64_t));
-        const auto& checkSum = m_tokens[m_count - 1];
-        if ((checks & CheckSumMask) != CheckSumMask)
+        const auto result = parse(buffer);
+        if (result.status != ParserStatus::Success)
         {
-            result.status = ParserStatus::InvalidCheckSumTag;
-            result.processed = checkSum.position + checkSum.length + 1;
-            return result;
+            return { result.processed, result.status };
         }
-
-        uint64_t checkSumValue = 0;
-        const auto checkSumEnd = checkSum.position - 3;
-        position_t i = 0;
-        simd::Uint8x16 block;
-        for (; i + simd::Uint8x16::Size <= checkSumEnd; i += simd::Uint8x16::Size)
-        {
-            block.load(data + i);
-            checkSumValue += block.sum();
-        }
-        for (; i < checkSumEnd; ++i)
-        {
-            checkSumValue += data[i];
-        }
-        result.processed = checkSum.position + checkSum.length + 1;
-        result.checkSum = checkSumValue & 0xff;
-        result.status = ParserStatus::Success;
-        return result;
+        return { result.processed, handler.handle(buffer, std::span(m_tokens), m_count), m_tags };
     }
 
-    Result scan(const std::span<const data_t> buffer)
+    Result parse(const std::span<const data_t> buffer)
     {
+        using simd::Uint8x16;
         if (buffer.size() < 32)
         {
-            return { 0, 0, ParserStatus::MessageFragment };
+            return { 0, ParserStatus::MessageFragment };
         }
-
-        using simd::Uint8x16;
         m_count = 0;
         m_tag = 0;
 
@@ -149,7 +87,7 @@ public:
         const auto length = static_cast<length_t>(buffer.size());
         if (std::memcmp(data, BeginString, sizeof(BeginString) - 1) != 0)
         {
-            return { 8, 0, ParserStatus::InvalidBeginString };
+            return { 8, ParserStatus::InvalidBeginString };
         }
         m_tokens[0] = { 2, 8, 8 };
         m_count = 1;
@@ -207,30 +145,7 @@ public:
         {
             m_tags[i] = m_tokens[i].tag;
         }
-        if (m_tokens[1].tag == 9) // FIXME: constant
-        {
-            const auto token = &m_tokens[1];
-            const auto bodyLength = utils::asciiToDecimal(0, data + token->position, token->length);
-            const auto last = &m_tokens[m_count - 1];
-            const uint32_t count = last->position - token->position - token->length - 4;
-            if (count < bodyLength)
-            {
-                if (last->tag != CheckSumTag)
-                {
-                    return { 0, 0, ParserStatus::MessageFragment };
-                }
-            }
-            if (count > bodyLength)
-            {
-                return { count, 0, ParserStatus::InvalidBodyLength };
-            }
-        }
-        if (m_count < 7)
-        {
-            const auto last = &m_tokens[m_count - 1];
-            return { last->position + last->length + 1, 0, ParserStatus::RequiredFieldMissing};
-        }
-        return processCheckSum(data);
+        return checkRequiredFields(data);
     }
 
 private:
@@ -241,6 +156,49 @@ private:
     uint32_t m_tag{};
     int32_t m_position{};
     size_t m_count{};
+
+    Result checkRequiredFields(const data_t* data) const
+    {
+        const auto& token = m_tokens[1];
+        if (token.tag != BodyLengthTag)
+        {
+            // FIXME?
+            return {0, ParserStatus::InvalidBodyLengthTag };
+        }
+        const auto bodyLength = utils::asciiToDecimal(0, data + token.position, token.length);
+        const auto* last = &m_tokens[m_count - 1];
+        const uint32_t count = last->position - token.position - token.length - 4;
+        if (count < bodyLength && last->tag != CheckSumTag)
+        {
+            return {0, ParserStatus::MessageFragment };
+        }
+        const uint32_t processed = last->position + last->length + 1;
+        if (count != bodyLength)
+        {
+            return { processed, ParserStatus::InvalidBodyLength };
+        }
+        if (m_tokens[2].tag != MessageTypeTag)
+        {
+            return { processed, ParserStatus::InvalidMessageTypeTag };
+        }
+
+#if !defined(NDEBUG)
+        for (size_t i = 0; i < m_count; ++i)
+        {
+            std::printf("%3zu tag = %3d, pos = %3d, len = %3d\n", i, m_tokens[i].tag, m_tokens[i].position, m_tokens[i].length);
+        }
+#endif
+        const auto status = processCheckSum(data);
+        if (status != ParserStatus::Success)
+        {
+            return {processed, status };
+        }
+        if (m_count < 7)
+        {
+            return { processed , ParserStatus::RequiredFieldMissing };
+        }
+        return { processed, status };
+    }
 
     bool processBlock(const position_t offset,
                       const uint64_t tagDigitFlags,
@@ -298,6 +256,36 @@ private:
         return m_tokens[m_count - 1].tag == 10;
     }
 
+    ParserStatus processCheckSum(const std::span<const data_t>::pointer data) const
+    {
+        uint64_t checks = 0;
+        memcpy(&checks, data + m_tokens[m_count - 1].position - 4, sizeof(uint64_t));
+        const auto& checkSumToken = m_tokens[m_count - 1];
+        if ((checks & CheckSumMask) != CheckSumMask)
+        {
+            return ParserStatus::InvalidCheckSumTag;
+        }
+
+        uint64_t checkSumValue = 0;
+        const auto checkSumEnd = checkSumToken.position - 3;
+        position_t i = 0;
+        simd::Uint8x16 block;
+        for (; i + simd::Uint8x16::Size <= checkSumEnd; i += simd::Uint8x16::Size)
+        {
+            block.load(data + i);
+            checkSumValue += block.sum();
+        }
+        for (; i < checkSumEnd; ++i)
+        {
+            checkSumValue += data[i];
+        }
+        if (utils::asciiToDecimal(0, data + m_tokens[m_count - 1].position, 3) != (checkSumValue & 0xff))
+        {
+            return ParserStatus::InvalidCheckSum;
+        }
+        return ParserStatus::Success;
+    }
+
     void processTrailer(const position_t offset, const std::span<const uint8_t> buffer)
     {
 #if !defined(NDEBUG)
@@ -327,9 +315,9 @@ private:
         }
         else if (fieldEndPos < tagEndPos)
         { // handle split value
+            position = fieldEndPos + 1;
             fieldEndPos = fieldEnds.clear(fieldEndBit).zerosRight() / 8;
             last->length += fieldEndPos - tagEndPos - 1;
-            position = fieldEndPos + 1;
             last = &m_tokens[m_count++];
         }
         while (position + 7 < remaining)

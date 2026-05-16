@@ -78,7 +78,7 @@ int main()
         for (size_t i = 0; i < coldMessages; ++i)
         {
             const std::span<const uint8_t> bytes(&coldBuf[i * MESSAGE_LENGTH], MESSAGE_LENGTH);
-            (void) tokenizer.scan(bytes);
+            (void) tokenizer.parse(bytes);
         }
     });
     report("COLD CACHE", coldDuration, coldMessages, MESSAGE_LENGTH);
@@ -96,7 +96,7 @@ int main()
         for (size_t i = 0; i < msgsPerPass; ++i)
         {
             const std::span<const uint8_t> bytes(&hotBuf[i * MESSAGE_LENGTH], MESSAGE_LENGTH);
-            const auto result = tokenizer.scan(bytes);
+            const auto result = tokenizer.parse(bytes);
             (void)result;
         }
     }
@@ -109,7 +109,7 @@ int main()
             for (size_t i = 0; i < msgsPerPass; ++i)
             {
                 const std::span<const uint8_t> bytes(&hotBuf[i * MESSAGE_LENGTH], MESSAGE_LENGTH);
-                const auto result = tokenizer.scan(bytes);
+                const auto result = tokenizer.parse(bytes);
                 (void)result;
             }
         }
