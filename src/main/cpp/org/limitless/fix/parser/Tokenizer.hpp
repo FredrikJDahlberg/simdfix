@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-04-11.
 //
 
-#ifndef SIMD_FIX_TOKENIZER_H
-#define SIMD_FIX_TOKENIZER_H
+#ifndef SIMD_FIX_DECODER_HPP
+#define SIMD_FIX_DECODER_HPP
 
 #include <span>
 #include <ostream>
@@ -70,7 +70,8 @@ public:
         {
             return { result.processed, result.status };
         }
-        return { result.processed, handler.handle(buffer, std::span(m_tokens), m_count), m_tags };
+        result.status = handler.handle(buffer, std::span(m_tokens), m_count, m_tags);
+        return result;
     }
 
     Result parse(const std::span<const data_t> buffer)
@@ -345,4 +346,4 @@ private:
 };
 }
 
-#endif //SIMD_FIX_TOKENIZER_H
+#endif //SIMD_FIX_DECODER_H
