@@ -18,7 +18,6 @@ set(GENERATED_HEADERS
         ${GEN_PATH}/LogoutDecoder.hpp
         ${GEN_PATH}/MessageHandler.hpp)
 set(FIX_HEADERS
-        ${MAIN_PATH}/parser/Tokenizer.hpp
         ${MAIN_PATH}/utils/Utils.hpp
         ${MAIN_PATH}/utils/BitSet64.hpp
         ${MAIN_PATH}/parser/Decoder.hpp
@@ -28,7 +27,7 @@ set(FIX_HEADERS
         ${MAIN_PATH}/parser/GroupDecoder.hpp
         ${MAIN_PATH}/parser/Token.hpp
         ${MAIN_PATH}/simd/Uint8x16.hpp
-        ${MAIN_PATH}/simd/QuadSearch.hpp)
+        ${MAIN_PATH}/simd/LinearSearch.hpp)
 add_library(SimdFix INTERFACE)
 target_sources(SimdFix INTERFACE ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_include_directories(SimdFix INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")

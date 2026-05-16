@@ -5,7 +5,7 @@
 #ifndef SIMD_FIX_GROUP_DECODER_HPP
 #define SIMD_FIX_GROUP_DECODER_HPP
 
-#include "org/limitless/fix/simd/QuadSearch.hpp"
+#include "org/limitless/fix/simd/LinearSearch.hpp"
 
 namespace org::limitless::fix::parser {
 
@@ -63,7 +63,7 @@ public:
         {
             ++end;
         }
-        const int32_t position = simd::quadSearch(m_message->m_tags.data() + m_offset, end - m_offset, tag);
+        auto position = simd::find(m_message->m_tags.data() + m_offset, end - m_offset, tag);
         return position >= 0 ? &m_message->m_tokens[m_offset + position] : nullptr;
     }
 

@@ -11,7 +11,7 @@
 #include "org/limitless/fix/parser/Token.hpp"
 #include "org/limitless/fix/parser/ParserStatus.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
-#include "org/limitless/fix/simd/QuadSearch.hpp"
+#include "org/limitless/fix/simd/LinearSearch.hpp"
 
 namespace org::limitless::fix::parser {
 
@@ -67,14 +67,14 @@ struct MessageDecoder
     [[nodiscard]] uint16_t tokenType(const uint16_t tag) const
     {
         constexpr auto& tags = Protocol::Tags;
-        const auto position = simd::quadSearch(tags.data(), tags.size(), tag);
+        const auto position = simd::find(tags.data(), tags.size(), tag);
         return position >= 0 ? Protocol::Grammar[position].type : 0;
     }
 
     // FIXME: tags not sorted
     [[nodiscard]] Token* next(const uint32_t tag) const
     {
-        const auto index = simd::quadSearch(m_tags.data(), m_size, tag);
+        const auto index = simd::find(m_tags.data(), m_size, tag);
         return index >= 0 ? &m_tokens[index] : nullptr;
     }
 

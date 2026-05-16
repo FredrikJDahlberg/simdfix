@@ -62,8 +62,7 @@ static void report(const char* label, const nanoseconds duration, const size_t m
 
 int main()
 {
-    using namespace org::limitless::fix::parser;
-    Decoder tokenizer;
+    org::limitless::fix::parser::Decoder decoder;
 
     std::printf("Message length = %zu bytes\n\n", MESSAGE_LENGTH);
 
@@ -78,7 +77,7 @@ int main()
         for (size_t i = 0; i < coldMessages; ++i)
         {
             const std::span<const uint8_t> bytes(&coldBuf[i * MESSAGE_LENGTH], MESSAGE_LENGTH);
-            (void) tokenizer.parse(bytes);
+            (void) decoder.parse(bytes);
         }
     });
     report("COLD CACHE", coldDuration, coldMessages, MESSAGE_LENGTH);
@@ -96,7 +95,7 @@ int main()
         for (size_t i = 0; i < msgsPerPass; ++i)
         {
             const std::span<const uint8_t> bytes(&hotBuf[i * MESSAGE_LENGTH], MESSAGE_LENGTH);
-            const auto result = tokenizer.parse(bytes);
+            const auto result = decoder.parse(bytes);
             (void)result;
         }
     }
@@ -109,7 +108,7 @@ int main()
             for (size_t i = 0; i < msgsPerPass; ++i)
             {
                 const std::span<const uint8_t> bytes(&hotBuf[i * MESSAGE_LENGTH], MESSAGE_LENGTH);
-                const auto result = tokenizer.parse(bytes);
+                const auto result = decoder.parse(bytes);
                 (void)result;
             }
         }
