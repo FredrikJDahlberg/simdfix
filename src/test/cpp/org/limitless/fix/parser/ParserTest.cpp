@@ -5,7 +5,7 @@
 
 #include <string>
 
-#include "org/limitless/fix/parser/Tokenizer.hpp"
+#include "org/limitless/fix/parser/Decoder.hpp"
 #include "org/limitless/fix/messages/LogonDecoder.hpp"
 #include "org/limitless/fix/messages/LogoutDecoder.hpp"
 #include "org/limitless/fix/messages/MessageHandler.hpp"
@@ -40,8 +40,8 @@ TEST(Parser, Logon)
         }
     } app;
 
-    Tokenizer parser{};
-    auto [processed, status] = parser.parse(login, app);
+    Decoder decoder{};
+    auto [processed, status] = decoder.parse(login, app);
     ASSERT_EQ(ParserStatus::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -64,19 +64,19 @@ TEST(Parser, Logout)
         }
     } app;
 
-    Tokenizer parser{};
+    Decoder decoder{};
     {
         const auto logout = utils::makeSpan(
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
               "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
-        auto [processed, status] = parser.parse(logout, app);
+        auto [processed, status] = decoder.parse(logout, app);
         ASSERT_EQ(ParserStatus::Success, status);
         ASSERT_TRUE(app.found);
     }
     {
         const auto reject = utils::makeSpan("8=FIXT.1.1" SOH "9=41" SOH "35=3" SOH
             "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "45=666" SOH "10=247" SOH);
-        auto [processed, status] = parser.parse(reject, app);
+        auto [processed, status] = decoder.parse(reject, app);
         ASSERT_EQ(ParserStatus::InvalidMessageType, status);
     }
 }
@@ -99,11 +99,11 @@ TEST(Parser, MessageFragment)
         }
     } app;
 
-    Tokenizer parser{};
+    Decoder decoder{};
     {
         const auto logout1 = utils::makeSpan(
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH );
-        auto [processed, status] = parser.parse(logout1, app);
+        auto [processed, status] = decoder.parse(logout1, app);
         ASSERT_EQ(ParserStatus::MessageFragment, status);
         ASSERT_EQ(0, processed);
         ASSERT_FALSE(app.found);
@@ -113,7 +113,7 @@ TEST(Parser, MessageFragment)
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
               "34=100101" SOH "52=10:11:12.123" SOH "627=2" SOH "629=10" SOH
               "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
-        auto [processed, status] = parser.parse(logout2, app);
+        auto [processed, status] = decoder.parse(logout2, app);
         ASSERT_EQ(ParserStatus::Success, status);
         ASSERT_EQ(107, processed);
     }
@@ -145,11 +145,11 @@ TEST(Parser, HopGroup1)
             return ParserStatus::Success;
         }
     } app;
-    Tokenizer parser{};
+    Decoder decoder{};
     const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
-    auto[processed, status] = parser.parse(logout, app);
+    auto[processed, status] = decoder.parse(logout, app);
     ASSERT_EQ(ParserStatus::Success, status);
 }
 
@@ -179,10 +179,10 @@ TEST(Parser, HopGroup2)
             return ParserStatus::Success;
         }
     } app;
-    Decoder parser{};
+    Decoder decoder{};
     const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=77" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
         "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "628=20" SOH  "10=148" SOH);
-    auto[processed, status] = parser.parse(logout, app);
+    auto[processed, status] = decoder.parse(logout, app);
     ASSERT_EQ(ParserStatus::Success, status);
 }
 
@@ -212,10 +212,10 @@ TEST(Parser, HopGroup3)
             return ParserStatus::Success;
         }
     } app;
-    Tokenizer parser{};
+    Decoder decoder{};
     const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=70" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
         "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "10=077" SOH);
-    auto[processed, status] = parser.parse(logout, app);
+    auto[processed, status] = decoder.parse(logout, app);
     ASSERT_EQ(ParserStatus::Success, status);
 }
 
@@ -243,56 +243,56 @@ TEST(Parser, InvalidGroupCount)
             return ParserStatus::Success;
         }
     } app;
-    Tokenizer parser{};
+    Decoder decoder{};
     const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=70" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=12:12:12.123" SOH
         "627=2" SOH "629=10" SOH "628=20" SOH "10=071" SOH);
-    auto[processed, status] = parser.parse(logout, app);
+    auto[processed, status] = decoder.parse(logout, app);
     ASSERT_EQ(ParserStatus::Success, status);
 }
 
 TEST(Parser, InvalidMandatoryFields)
 {
-    Tokenizer parser{};
+    Decoder decoder{};
     struct AppHandler : generated::MessageHandler<AppHandler>{} app;
     {
         const auto message = utils::makeSpan("666=FIXT.1.1" SOH);
-        auto[processed, status] = parser.parse(message, app);
+        auto[processed, status] = decoder.parse(message, app);
         ASSERT_EQ(ParserStatus::MessageFragment, status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "666=66" SOH "666=66" SOH "666=66" SOH);
-        auto[processed, status] = parser.parse(message, app);
+        auto[processed, status] = decoder.parse(message, app);
         ASSERT_EQ(ParserStatus::RequiredFieldMissing, status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "666=66" SOH "52=101112.123" SOH
             "666=66" SOH "666=66" SOH "666=66" SOH "10=043" SOH);
-        auto[processed, status] = parser.parse(message, app);
+        auto[processed, status] = decoder.parse(message, app);
         ASSERT_EQ(ParserStatus::InvalidMessageTypeTag, status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "666=66" SOH "35=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "10=043" SOH);
-        auto[processed, status] = parser.parse(message, app);
+        auto[processed, status] = decoder.parse(message, app);
         ASSERT_EQ(ParserStatus::InvalidBodyLengthTag, status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=666" SOH "35=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "10=043" SOH);
-        auto[processed, status] = parser.parse(message, app);
+        auto[processed, status] = decoder.parse(message, app);
         ASSERT_EQ(ParserStatus::InvalidBodyLength, status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=34" SOH "666=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "10=063" SOH);
-        auto[processed, status] = parser.parse(message, app);
+        auto[processed, status] = decoder.parse(message, app);
         ASSERT_EQ(ParserStatus::InvalidMessageTypeTag, status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=66" SOH "35=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "11=043" SOH "                     ");
-        auto[processed, status] = parser.parse(message, app);
+        auto[processed, status] = decoder.parse(message, app);
         ASSERT_EQ(ParserStatus::InvalidCheckSumTag, status);
     }
 }

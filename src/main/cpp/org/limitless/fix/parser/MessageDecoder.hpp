@@ -23,6 +23,7 @@ struct MessageDecoder
     std::span<const uint8_t> m_data{};
     std::span<Token> m_tokens{};
     std::span<uint16_t> m_tags{};
+    uint32_t m_size{};
 
     // required fields access more than once will be cached
     // FIXME: cache all parsed fields?
@@ -33,21 +34,22 @@ struct MessageDecoder
 
     MessageDecoder() = default;
 
-    explicit MessageDecoder(const std::span<Token> tokens, const std::span<uint16_t> tags)
-        : m_tokens{tokens}, m_tags{tags}
+    explicit MessageDecoder(const std::span<Token> tokens, const std::span<uint16_t> tags, const uint32_t size)
+        : m_tokens{tokens}, m_tags{tags}, m_size(size)
     {
     }
 
-    MessageDecoder(const String data, const std::span<Token> tokens, const std::span<uint16_t> tags)
-        : m_data{data}, m_tokens{tokens}, m_tags{tags}
+    MessageDecoder(const String data, const std::span<Token> tokens, const std::span<uint16_t> tags, uint32_t size)
+        : m_data{data}, m_tokens{tokens}, m_tags{tags}, m_size(size)
     {
     }
 
-    void wrap(const String data, const std::span<Token> tokens, const std::span<uint16_t> tags)
+    void wrap(const String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const uint32_t size)
     {
         m_data = data;
         m_tokens = tokens;
         m_tags = tags;
+        m_size = size;
     }
 
     [[nodiscard]] uint16_t type() const noexcept
@@ -69,9 +71,10 @@ struct MessageDecoder
         return position >= 0 ? Protocol::Grammar[position].type : 0;
     }
 
+    // FIXME: tags not sorted
     [[nodiscard]] Token* next(const uint32_t tag) const
     {
-        const auto index = simd::quadSearch(m_tags.data(), m_tags.size(), tag);
+        const auto index = simd::quadSearch(m_tags.data(), m_size, tag);
         return index >= 0 ? &m_tokens[index] : nullptr;
     }
 

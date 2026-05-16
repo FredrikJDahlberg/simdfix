@@ -17,7 +17,7 @@
 namespace org::limitless::fix::parser {
 
 // FIXME: do not clear token count and position on fragment
-class Tokenizer
+class Decoder
 {
 public:
     static constexpr size_t MaxSize = 64;
@@ -49,13 +49,13 @@ public:
     static inline const simd::Uint8x16 ZerosBlock{'0'};
     static inline const simd::Uint8x16 NineMask{9};
 
-    Tokenizer() noexcept = default;
-    ~Tokenizer() = default;
+    Decoder() noexcept = default;
+    ~Decoder() = default;
 
-    Tokenizer(const Tokenizer&) = delete;
-    Tokenizer& operator=(const Tokenizer&) = delete;
-    Tokenizer(Tokenizer&&) = delete;
-    Tokenizer& operator=(Tokenizer&&) = delete;
+    Decoder(const Decoder&) = delete;
+    Decoder& operator=(const Decoder&) = delete;
+    Decoder(Decoder&&) = delete;
+    Decoder& operator=(Decoder&&) = delete;
 
     [[nodiscard]] std::span<Token> tokens() noexcept
     {
@@ -65,12 +65,12 @@ public:
     template <typename Handler>
     Result parse(const std::span<const uint8_t> buffer, Handler& handler)
     {
-        const auto result = parse(buffer);
+        auto result = parse(buffer);
         if (result.status != ParserStatus::Success)
         {
             return { result.processed, result.status };
         }
-        result.status = handler.handle(buffer, std::span(m_tokens), m_count, m_tags);
+        result.status = handler.handle(buffer, std::span(m_tokens, m_count), m_tags, m_count);
         return result;
     }
 

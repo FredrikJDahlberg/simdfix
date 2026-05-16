@@ -30,7 +30,7 @@ namespace org::limitless::fix::simd {
     }
 
     const int32_t num_blocks = cardinality / gap;
-     int32_t n = num_blocks;
+    int32_t n = num_blocks;
     int32_t base = 0;
     while (n > 3)
     {

@@ -7,7 +7,7 @@
 #include <cstddef>
 #include <chrono>
 
-#include "org/limitless/fix/parser/Tokenizer.hpp"
+#include "org/limitless/fix/parser/Decoder.hpp"
 
 #define SOH "\x01"
 
@@ -63,7 +63,7 @@ static void report(const char* label, const nanoseconds duration, const size_t m
 int main()
 {
     using namespace org::limitless::fix::parser;
-    Tokenizer tokenizer;
+    Decoder tokenizer;
 
     std::printf("Message length = %zu bytes\n\n", MESSAGE_LENGTH);
 

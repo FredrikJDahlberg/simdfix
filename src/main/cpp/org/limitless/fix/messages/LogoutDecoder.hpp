@@ -25,9 +25,12 @@ struct LogoutDecoder : MessageDecoder<protocols::Logout>
 
     LogoutDecoder() = default;
 
-    LogoutDecoder& wrap(const std::span<const uint8_t> data, const std::span<Token> tokens, const std::span<uint16_t> tags)
+    LogoutDecoder& wrap(const std::span<const uint8_t> data,
+                        const std::span<Token> tokens,
+                        const std::span<uint16_t> tags,
+                        const uint32_t count)
     {
-        Message::wrap(data, tokens, tags);
+        Message::wrap(data, tokens, tags, count);
         return *this;
     }
 
