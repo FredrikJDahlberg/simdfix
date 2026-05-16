@@ -171,10 +171,9 @@ struct Generator
             }
             else
             {
-                auto* ref = (refType != m_types.end()) ? &refType->second : &primitiveType->second;
-                auto length = ref->m_length;
-//                auto lengthAttr = type.attribute("length").as_int();
-                m_types.try_emplace(std::string{name}, std::string{name}, ref->m_size, ref->m_length);
+                auto* ref = refType != m_types.end() ? &refType->second : &primitiveType->second;
+                auto length = std::max(type.attribute("length").as_int(), ref->m_length);
+                m_types.try_emplace(std::string{name}, std::string{name}, ref->m_size, length);
             }
         }
     }
