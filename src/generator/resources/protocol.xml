@@ -15,10 +15,14 @@
         <field name="BodyLength" tag="9" primitiveType="int32"/>
         <field name="MsgType" tag="35" primitiveType="uint8"/>
         -->
+        <!--
         <field name="Sender" tag="49" type="String8"/>
         <field name="Target" tag="56" type="String8"/>
-        <field name="SequenceNumber" tag="34" primitypeType="uint32"/>
-        <field name="SendingTime" tag="52" primitiveType="uin32"/>
+        -->
+        <field name="Sender" tag="49" primitiveType="char" length="8"/>
+        <field name="Target" tag="56" primitiveType="char" length="8"/>
+        <field name="SequenceNumber" tag="34" primitiveType="uint32"/>
+        <field name="SendingTime" tag="52" primitiveType="uint32"/>
         <group name="Hops" tag="627" counter="NoHops" presence="optional">
             <field name="HopCompID" id="628" primitiveType="char" length="8" presence="optional"/>
             <field name="HopSendingTime" id="629" primitiveType="uint32" presence="optional"/>
@@ -36,7 +40,7 @@
 
     <message name="Logout" id="5">
         <field name="Header" type="StandardHeader"/>
-        <field name="Text" type="String8"/>
+        <field name="Text" tag="58" type="String8"/>
         <!-- <field name="CheckSum" tag="10" length="3" primitiveType="uint8"/> -->
     </message>
 

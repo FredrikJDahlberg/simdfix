@@ -11,18 +11,21 @@
 
 #include "pugixml.hpp"
 
-enum class PrimitiveType
+enum class TypeName
 {
     Null,
     Int32,
-    String
+    String,
+    Message,
+    Component,
+    Group
 };
 
-enum class CompositeType
+enum class Presence
 {
-    Message,
-    Record,
-    Group
+    Constant,
+    Required,
+    Optional
 };
 
 struct Type
@@ -30,9 +33,10 @@ struct Type
     std::string m_name;
     int32_t m_size;
     int32_t m_length;
+    TypeName m_type;
 
-    Type(const std::string& name, int32_t size, int32_t length)
-        : m_name(name), m_size(size), m_length(length)
+    Type(const std::string& name, const int32_t size, const int32_t length)
+        : m_name(name), m_size(size), m_length(length), m_type{TypeName::Null}
     {
     }
 };
@@ -41,29 +45,35 @@ struct Field
 {
     int32_t m_tag;
     std::string m_name;
-    int32_t m_alignment;
     int32_t m_length;
-    PrimitiveType m_type;
+    // TypeName m_type;
+    std::string m_type;
+    Presence m_presence;
+    // std::string m_value;  // constant
 
-    Field(const int32_t tag, const std::string& name, int32_t alignment, int32_t length, PrimitiveType type) :
-        m_tag(tag), m_name(name), m_alignment(alignment), m_length(length), m_type(type)
+    Field(const int32_t tag, const std::string& name, const std::string& type, const int32_t length, const Presence presence) :
+        m_tag(tag), m_name(name), m_length(length), m_type(type), m_presence{presence} // , m_value{"null"}
     {
     }
 
+    Field() = default;
     Field(const Field& other) = default;
     Field(Field&& other) noexcept = default;
     Field& operator=(const Field& other) = default;
     Field& operator=(Field&& other) noexcept = default;
 };
 
+// message or component
 struct Struct
 {
     std::string m_name;
-    Type m_type;
+    TypeName m_type;
     std::vector<Field> m_fields;
 
-    Struct(const std::string& name, Type type, std::vector<Field> fields)
-        : m_name(name), m_type(type), m_fields(std::move(fields))
+    Struct()= default;
+
+    Struct(const std::string& name, const TypeName type, const std::vector<Field>& fields)
+        : m_name(name), m_type(type), m_fields{fields}
     {
     }
 
@@ -76,106 +86,135 @@ struct Struct
 struct Generator
 {
     std::unordered_map<std::string, Type> m_types{};
-
     std::unordered_map<std::string, Struct> m_records;
     std::unordered_map<std::string, Struct> m_messages;
 
-    void process(pugi::xml_document& doc)
+    void process(const pugi::xml_document& doc)
     {
         const pugi::xml_node protocol = doc.child("protocol");
-
         processTypes(protocol.child("types").children());
-        for (pugi::xml_node node : protocol.children())
-        {
-#if 0
-            auto nodeName = node.name();
-            std::println("{}", nodeName);
-            auto type = PrimitiveType::Null;
-            if (std::strncmp(nodeName, "record", 6) == 0)
-            {
-                type = CompositeType::Record;
-            }
-            else if (std::strncmp(nodeName, "message", 7) == 0)
-            {
-                type = CompositeType::Message;
-            }
-            if (type != Type::Null)
-            {
-                const auto name = node.attribute("name").value();
-                std::vector<Field> fields{};
-                for (pugi::xml_node field : node.children())
-                {
-                    auto fieldName = std::string{field.attribute("name").value()};
-                    auto fieldType = field.name();
-                    auto fieldTag = field.attribute("tag").as_int();
-                    if (strncmp(fieldType, "string", 6) == 0)
-                    {
-                        auto length = field.attribute("length").as_int();
-                        fields.emplace_back(fieldTag, fieldName, 1, length, Type::String);
-                    }
-                    else if (strncmp(fieldType, "int32", 5) == 0)
-                    {
-                        fields.emplace_back(fieldTag, fieldName, 4, 1, Type::Int32);
-                    }
-                }
-                std::ranges::sort(fields, {}, &Field::m_tag);
-                if (type == Type::Message)
-                {
-                    m_messages.try_emplace(name, std::string{name}, type, std::move(fields));
-                }
-                else
-                {
-                    m_records.try_emplace(name, std::string{name}, type, std::move(fields));
-                }
-            }
-#endif
-        }
-#if 0
-        auto header = m_records.find("StandardHeader");
-        auto trailer = m_records.find("StandardTrailer");
-        for (auto message : m_messages)
-        {
-            message.second.m_fields.append_range(header->second.m_fields);
-            message.second.m_fields.append_range(trailer->second.m_fields);
-            std::ranges::sort(message.second.m_fields, {}, &Field::m_tag);
-        }
-#endif
+        processComponents(protocol.children("component"));
+        processMessages(protocol.children("message"));
     }
 
-    void processTypes(pugi::xml_object_range<pugi::xml_node_iterator> types)
+    void processTypes(const pugi::xml_object_range<pugi::xml_node_iterator>& types)
     {
         // FIXME: all supported primitive types
+        m_types.try_emplace("char", "char", 1, 1);
         m_types.try_emplace("uint8", "uint8", 1, 1);
         m_types.try_emplace("char", "char", 1, 1);
         m_types.try_emplace("int32", "int32", 4, 1);
         m_types.try_emplace("uint32", "uint32", 4, 1);
 
-        for (auto type : types)
+        for (auto typeNode : types)
         {
-            const std::string_view name = type.attribute("name").as_string();
-            const std::string_view primitiveAttr = type.attribute("primitiveType").as_string();
-            const std::string_view typeAttr = type.attribute("type").as_string();
-            auto primitiveType = m_types.find(std::string{primitiveAttr});
-            auto refType = m_types.find(std::string{typeAttr});
-            if (primitiveAttr.empty() == typeAttr.empty())
+            const std::string_view name = typeNode.attribute("name").as_string();
+            const std::string_view primitive = typeNode.attribute("primitiveType").as_string();
+            const std::string_view type = typeNode.attribute("type").as_string();
+            auto primitiveType = m_types.find(std::string{primitive});
+            auto refType = m_types.find(std::string{type});
+
+            // resolve types
+            // assume that document is checked by grammar
+            if (!primitive.empty() && primitiveType == m_types.end())
             {
-                std::println("Error: one primitiveType or derived type must be defined");
+                std::println("Error: type '{}' has an invalid primitive type '{}'", name, primitive);
             }
-            else if (!primitiveAttr.empty() && primitiveType == m_types.end())
+            else if (!type.empty() && refType == m_types.end())
             {
-                std::println("Error: type {} has an invalid primitive type {}", name, primitiveAttr);
-            }
-            else if (!typeAttr.empty() && refType == m_types.end())
-            {
-                std::println("Error: type {} has an invalid derived {}", name, typeAttr);
+                std::println("Error: type '{}' has an invalid derived '{}'", name, type);
             }
             else
             {
                 auto* ref = refType != m_types.end() ? &refType->second : &primitiveType->second;
-                auto length = std::max(type.attribute("length").as_int(), ref->m_length);
+                auto length = std::max(typeNode.attribute("length").as_int(), ref->m_length);
                 m_types.try_emplace(std::string{name}, std::string{name}, ref->m_size, length);
             }
         }
+    }
+
+    void processComponents(const pugi::xml_object_range<pugi::xml_named_node_iterator>& components)
+    {
+        for (const auto& component : components)
+        {
+            std::string_view name = component.attribute("name").as_string();
+            std::vector<Field> fields{};
+            processFields(component.children(), fields);
+            m_records.try_emplace(std::string{name}, std::string{name}, TypeName::Component, fields);
+        }
+    }
+
+    void processMessages(const pugi::xml_object_range<pugi::xml_named_node_iterator>& messages)
+    {
+        for (auto& message : messages)
+        {
+            std::string_view name = message.attribute("name").as_string();
+            std::vector<Field> fields{};
+            processFields(message.children(), fields);
+            m_messages.try_emplace(std::string{name}, std::string{name}, TypeName::Message, fields);
+        }
+    }
+
+    void processFields(const pugi::xml_object_range<pugi::xml_node_iterator>& nodes, std::vector<Field>& fields)
+    {
+        for (const auto& field : nodes)
+        {
+            const std::string_view nodeType = field.name();
+            const std::string_view name = field.attribute("name").as_string();
+            const int32_t tag = field.attribute("tag").as_int();
+            const std::string_view type = field.attribute("type").as_string();
+            const std::string_view primitive = field.attribute("primitiveType").as_string();
+            const std::string resolvedType = std::string{type.empty() ? primitive : type};
+            const int32_t length = field.attribute("length").as_int();
+            auto presence = Presence::Required;
+            const std::string_view presenceAttr = field.attribute("presence").as_string();
+            if (!presenceAttr.empty())
+            {
+                if (presenceAttr.compare("required") == 0)
+                {
+                    presence = Presence::Required;
+                }
+                else if (presenceAttr.compare("constant") == 0)
+                {
+                    presence = Presence::Constant;
+                }
+                else if (presenceAttr.compare("optional") == 0)
+                {
+                    presence = Presence::Optional;
+                }
+            }
+            auto typeName = std::string{name};
+            auto refType = m_types.find(resolvedType);
+            if (nodeType.compare("group") == 0)
+            {
+                std::println("Group found {}", name);
+            }
+            else
+            {
+                if (refType == m_types.end())
+                {
+                    auto compType = m_records.find(resolvedType);
+                    if (compType != m_records.end())
+                    {
+                        fields.append_range(compType->second.m_fields);
+                    }
+                    else
+                    {
+                        std::println("component not found {}", name);
+                    }
+                }
+                else
+                {
+                    std::println("Field '{}' type '{}' found", name, type);
+                    fields.emplace_back(tag, std::string{name}, resolvedType, length, presence);
+                }
+            }
+            std::println("field: {}, {}, {}, {}", name, tag, primitive, length);
+        }
+    }
+
+    void resolveType(const Field& field, Struct& record)
+    {
     }
 
     void print()
@@ -185,17 +224,14 @@ struct Generator
             auto& type = pair.second;
             std::println("Type{{name={}, align={}, length={}}}", type.m_name, type.m_size, type.m_length);
         }
-#if 0
-        for (auto& pair : m_records)
+        for (auto& message : m_messages)
         {
-            auto& record = pair.second;
-            std::println("{}", record.m_name);
-            for (auto& field : record.m_fields)
+            std::println("{}", message.second.m_name);
+            for (auto& field : message.second.m_fields)
             {
-                std::println("    {} = {}, {}/{} {}", field.m_tag, field.m_name, field.m_alignment, field.m_length, (int)field.m_type);
+                std::println("    {}, {}", field.m_tag, field.m_name);
             }
         }
-#endif
     }
 
     void generateGrammar()
@@ -223,10 +259,9 @@ int main(int argc, char** argv)
             result.description(), std::filesystem::current_path().c_str(), argv[1]);
         return 1;
     }
-    Generator generator;
+    Generator generator{};
     generator.process(doc);
     generator.print();
-    generator.generateGrammar();
     return 0;
 }
 
