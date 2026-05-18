@@ -8,12 +8,12 @@
 #include <span>
 #include <expected>
 
-#include "org/limitless/fix/parser/Token.hpp"
-#include "org/limitless/fix/parser/ParserStatus.hpp"
+#include "org/limitless/fix/decoder/Token.hpp"
+#include "org/limitless/fix/decoder/DecoderStatus.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
 
-namespace org::limitless::fix::parser {
+namespace org::limitless::fix::decoder {
 
 template <typename Protocol>
 struct MessageDecoder
@@ -79,23 +79,23 @@ struct MessageDecoder
     }
 
     template <int32_t Tag>
-    [[nodiscard]] std::expected<String, ParserStatus> getString(const bool required) const
+    [[nodiscard]] std::expected<String, DecoderStatus> getString(const bool required) const
     {
         const auto token = next(Tag);
         if (token == nullptr)
         {
-            return std::unexpected{required ? ParserStatus::RequiredFieldMissing : ParserStatus::NullValue};
+            return std::unexpected{required ? DecoderStatus::RequiredFieldMissing : DecoderStatus::NullValue};
         }
         return m_data.subspan(token->position, token->length);
     }
 
     template <int32_t Tag>
-    [[nodiscard]] std::expected<uint32_t, ParserStatus> getUnsigned(const bool required) const
+    [[nodiscard]] std::expected<uint32_t, DecoderStatus> getUnsigned(const bool required) const
     {
         const auto token = next(Tag);
         if (token == nullptr)
         {
-            return std::unexpected{required ? ParserStatus::RequiredFieldMissing : ParserStatus::NullValue};
+            return std::unexpected{required ? DecoderStatus::RequiredFieldMissing : DecoderStatus::NullValue};
         }
         return convertToUnsigned(token);
     }
@@ -110,7 +110,7 @@ struct MessageDecoder
         return m_data.subspan(token->position, token->length);
     }
 
-    [[nodiscard]] ParserStatus checkRequired()
+    [[nodiscard]] DecoderStatus checkRequired()
     {
         if (const auto sender = this->getString<49>(true))
         {
@@ -118,7 +118,7 @@ struct MessageDecoder
         }
         else
         {
-            return ParserStatus::InvalidSenderCompId;
+            return DecoderStatus::InvalidSenderCompId;
         }
         if (const auto target = this->getString<56>(true))
         {
@@ -126,7 +126,7 @@ struct MessageDecoder
         }
         else
         {
-            return ParserStatus::InvalidTargetCompId;
+            return DecoderStatus::InvalidTargetCompId;
         }
         if (const auto sequenceNumber = getUnsigned<34>(true))
         {
@@ -134,7 +134,7 @@ struct MessageDecoder
         }
         else
         {
-            return ParserStatus::InvalidSequenceNumber;
+            return DecoderStatus::InvalidSequenceNumber;
         }
         if (const auto sendingTime = getString<52>(true))
         {
@@ -142,9 +142,9 @@ struct MessageDecoder
         }
         else
         {
-            return ParserStatus::InvalidSendingTime;
+            return DecoderStatus::InvalidSendingTime;
         }
-        return ParserStatus::Success;
+        return DecoderStatus::Success;
     }
 };
 }

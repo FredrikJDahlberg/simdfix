@@ -5,7 +5,7 @@
 #ifndef SIMD_FIX_GRAMMAR_HPP
 #define SIMD_FIX_GRAMMAR_HPP
 
-#include "org/limitless/fix/parser/Dictionary.hpp"
+#include "org/limitless/fix/decoder/Dictionary.hpp"
 
 namespace org::limitless::fix::protocols {
 

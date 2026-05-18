@@ -5,8 +5,8 @@
 #ifndef SIMD_FIX_HOP_GROUP_DECODER_HPP
 #define SIMD_FIX_HOP_GROUP_DECODER_HPP
 
-#include "org/limitless/fix/parser/MessageDecoder.hpp"
-#include "org/limitless/fix/parser/GroupDecoder.hpp"
+#include "org/limitless/fix/decoder/MessageDecoder.hpp"
+#include "org/limitless/fix/decoder/GroupDecoder.hpp"
 
 namespace org::limitless::fix::messages {
 
@@ -33,7 +33,7 @@ struct HopGroupDecoder : parser::GroupDecoder<Message>
         return *this;
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> count() const
+    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> count() const
     {
         return Group::count();
     }
@@ -44,24 +44,24 @@ struct HopGroupDecoder : parser::GroupDecoder<Message>
         return *this;
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> hopCompID()
+    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> hopCompID()
     {
         const auto token = Group::member(628);
         if (token != nullptr)
         {
             return Group::m_message->convertToUnsigned(token);
         }
-        return std::unexpected{parser::ParserStatus::NullValue};
+        return std::unexpected{parser::DecoderStatus::NullValue};
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> hopRefID()
+    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> hopRefID()
     {
         const auto token = Group::member(629);
         if (token != nullptr)
         {
             return Group::m_message->convertToUnsigned(token);
         }
-        return std::unexpected{parser::ParserStatus::NullValue};
+        return std::unexpected{parser::DecoderStatus::NullValue};
     }
 };
 }

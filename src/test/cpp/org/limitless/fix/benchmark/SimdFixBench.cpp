@@ -7,7 +7,7 @@
 #include <cstddef>
 #include <chrono>
 
-#include "org/limitless/fix/parser/Decoder.hpp"
+#include "org/limitless/fix/decoder/Decoder.hpp"
 
 #define SOH "\x01"
 
@@ -62,7 +62,7 @@ static void report(const char* label, const nanoseconds duration, const size_t m
 
 int main()
 {
-    org::limitless::fix::parser::Decoder decoder;
+    org::limitless::fix::decoder::Decoder decoder;
 
     std::printf("Message length = %zu bytes\n\n", MESSAGE_LENGTH);
 

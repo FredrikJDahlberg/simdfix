@@ -22,7 +22,7 @@ set(FIX_HEADERS
         ${MAIN_PATH}/utils/BitSet64.hpp
         ${MAIN_PATH}/parser/Decoder.hpp
         ${MAIN_PATH}/parser/MessageDecoder.hpp
-        ${MAIN_PATH}/parser/ParserStatus.hpp
+        ${MAIN_PATH}/parser/DecoderStatus.hpp
         ${MAIN_PATH}/parser/Dictionary.hpp
         ${MAIN_PATH}/parser/GroupDecoder.hpp
         ${MAIN_PATH}/parser/Token.hpp
@@ -71,7 +71,7 @@ function(add_fix_test name source)
     target_link_options(${name} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address> -fprofile-instr-generate)
 endfunction()
 
-add_fix_test(TokenizerTest   "${TEST_PATH}/parser/TokenizerTest.cpp")
+add_fix_test(DecoderTest     "${TEST_PATH}/parser/DecoderTest.cpp")
 add_fix_test(ParserTest      "${TEST_PATH}/parser/ParserTest.cpp")
 add_fix_test(UtilsTest       "${TEST_PATH}/utils/UtilsTest.cpp")
 add_fix_test(BitSetTest      "${TEST_PATH}/utils/BitSetTest.cpp")

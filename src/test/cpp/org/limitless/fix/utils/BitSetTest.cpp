@@ -5,11 +5,11 @@
 
 #include "../../../../../../main/cpp/org/limitless/fix/utils/BitSet64.hpp"
 
-namespace org::limitless::fix::parser {
+namespace org::limitless::fix::decoder {
 
 TEST(BitSet, Basics)
 {
-    using namespace org::limitless::fix::parser;
+    using namespace org::limitless::fix::decoder;
 
     BitSet64 bits{};
     bits.set();

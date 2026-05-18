@@ -10,8 +10,8 @@
 #include <expected>
 
 #include "HeaderDecoder.hpp"
-#include "org/limitless/fix/parser/MessageDecoder.hpp"
-#include "org/limitless/fix/parser/ParserStatus.hpp"
+#include "org/limitless/fix/decoder/MessageDecoder.hpp"
+#include "org/limitless/fix/decoder/DecoderStatus.hpp"
 #include "org/limitless/fix/messages/Grammar.hpp"
 
 namespace org::limitless::fix::generated {
@@ -41,27 +41,27 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
         return *this;
     }
 
-    [[nodiscard]] std::expected<String, parser::ParserStatus> sender() const
+    [[nodiscard]] std::expected<String, parser::DecoderStatus> sender() const
     {
         return this->getString<56>(true);
     }
 
-    [[nodiscard]] std::expected<String, parser::ParserStatus> target() const
+    [[nodiscard]] std::expected<String, parser::DecoderStatus> target() const
     {
         return this->getString<49>(true);
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> expectedSeqNum() const
+    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> expectedSeqNum() const
     {
         return this->getUnsigned<34>(true);
     }
 
-    [[nodiscard]] std::expected<String, parser::ParserStatus> onBehalfOfCompID() const
+    [[nodiscard]] std::expected<String, parser::DecoderStatus> onBehalfOfCompID() const
     {
         return this->getString<115>(false);
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> nextExpectedSeqNum() const
+    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> nextExpectedSeqNum() const
     {
         return this->getUnsigned<789>(false);
     }

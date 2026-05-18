@@ -6,11 +6,11 @@
 #define SIMD_FIX_LOGOUT_DECODER_HPP
 
 #include "org/limitless/fix/messages/Grammar.hpp"
-#include "org/limitless/fix/parser/MessageDecoder.hpp"
+#include "org/limitless/fix/decoder/MessageDecoder.hpp"
 
 namespace org::limitless::fix::generated {
 
-using namespace org::limitless::fix::parser;
+using namespace org::limitless::fix::decoder;
 
 struct LogoutDecoder : MessageDecoder<protocols::Logout>
 {

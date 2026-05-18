@@ -7,6 +7,7 @@
 #include <print>
 #include <ranges>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "pugixml.hpp"
@@ -35,24 +36,24 @@ struct Type
     int32_t m_length;
     TypeName m_type;
 
-    Type(const std::string& name, const int32_t size, const int32_t length)
-        : m_name(name), m_size(size), m_length(length), m_type{TypeName::Null}
+    Type(std::string  name, const int32_t size, const int32_t length)
+        : m_name(std::move(name)), m_size(size), m_length(length), m_type{TypeName::Null}
     {
     }
 };
 
 struct Field
 {
-    int32_t m_tag;
+    int32_t m_tag{};
     std::string m_name;
-    int32_t m_length;
+    int32_t m_length{};
     // TypeName m_type;
     std::string m_type;
     Presence m_presence;
     // std::string m_value;  // constant
 
-    Field(const int32_t tag, const std::string& name, const std::string& type, const int32_t length, const Presence presence) :
-        m_tag(tag), m_name(name), m_length(length), m_type(type), m_presence{presence} // , m_value{"null"}
+    Field(const int32_t tag, std::string  name, std::string  type, const int32_t length, const Presence presence) :
+        m_tag(tag), m_name(std::move(name)), m_length(length), m_type(std::move(type)), m_presence{presence} // , m_value{"null"}
     {
     }
 
@@ -72,8 +73,8 @@ struct Struct
 
     Struct()= default;
 
-    Struct(const std::string& name, const TypeName type, const std::vector<Field>& fields)
-        : m_name(name), m_type(type), m_fields{fields}
+    Struct(std::string  name, const TypeName type, const std::vector<Field>& fields)
+        : m_name(std::move(name)), m_type(type), m_fields{fields}
     {
     }
 
@@ -170,24 +171,26 @@ struct Generator
             const std::string_view presenceAttr = field.attribute("presence").as_string();
             if (!presenceAttr.empty())
             {
-                if (presenceAttr.compare("required") == 0)
+                if (presenceAttr == "required")
                 {
                     presence = Presence::Required;
                 }
-                else if (presenceAttr.compare("constant") == 0)
+                else if (presenceAttr == "constant")
                 {
                     presence = Presence::Constant;
                 }
-                else if (presenceAttr.compare("optional") == 0)
+                else if (presenceAttr == "optional")
                 {
                     presence = Presence::Optional;
                 }
             }
             auto typeName = std::string{name};
             auto refType = m_types.find(resolvedType);
-            if (nodeType.compare("group") == 0)
+            if (nodeType == "group")
             {
                 std::println("Group found {}", name);
+                auto counter = m_types.find("int32");
+                fields.emplace_back(tag, std::string{name}, resolvedType, length, presence);
             }
             else
             {
@@ -219,9 +222,9 @@ struct Generator
 
     void print()
     {
-        for (auto& pair : m_types)
+        for (auto& val: m_types | std::views::values)
         {
-            auto& type = pair.second;
+            auto& type = val;
             std::println("Type{{name={}, align={}, length={}}}", type.m_name, type.m_size, type.m_length);
         }
         for (auto& message : m_messages)

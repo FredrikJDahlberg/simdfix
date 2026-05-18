@@ -23,7 +23,7 @@
         <field name="Target" tag="56" primitiveType="char" length="8"/>
         <field name="SequenceNumber" tag="34" primitiveType="uint32"/>
         <field name="SendingTime" tag="52" primitiveType="uint32"/>
-        <group name="Hops" tag="627" counter="NoHops" presence="optional">
+        <group name="Hops" tag="627" counter="NoHops" presence="optional" primitiveType="uint32">
             <field name="HopCompID" id="628" primitiveType="char" length="8" presence="optional"/>
             <field name="HopSendingTime" id="629" primitiveType="uint32" presence="optional"/>
             <field name="HopRefID" id="630" primitiveType="uint32" presence="optional"/>

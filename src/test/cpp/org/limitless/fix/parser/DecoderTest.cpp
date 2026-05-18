@@ -4,10 +4,10 @@
 
 #include <gtest/gtest.h>
 
-#include "../../../../../../main/cpp/org/limitless/fix/utils/Utils.hpp"
-#include "org/limitless/fix/parser/Decoder.hpp"
+#include "org/limitless/fix/utils/Utils.hpp"
+#include "org/limitless/fix/decoder/Decoder.hpp"
 
-namespace org::limitless::fix::parser {
+namespace org::limitless::fix::decoder {
 
 #define SOH "\x01"
 
@@ -26,17 +26,17 @@ void check(std::span<Token> result, const std::span<const Token> expected)
     ASSERT_EQ(expected.size(), result.size());
 }
 
-TEST(Tokenizer, Basics)
+TEST(Decoder, Basics)
 {
     const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH
         "56=SellerSide" SOH "34=1" SOH "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH
         "141=Y" SOH "553=Username" SOH "554=Password" SOH "1137=9" SOH "10=218" SOH
         // next message
         "8=FIXT.1.1" SOH "9=118" SOH);
-    Decoder tokenizer;
-    // auto [processed, checkSum, status] = tokenizer.scan(message);
-    auto [processed, status] = tokenizer.parse(message);
-    ASSERT_EQ(ParserStatus::Success, status);
+    Decoder decoder;
+    // auto [processed, checkSum, status] = decoder.scan(message);
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(DecoderStatus::Success, status);
     ASSERT_EQ(message.size() - 17, processed);
     // ASSERT_EQ(218, checkSum);
     constexpr Token expectedTokens[] =
@@ -57,18 +57,18 @@ TEST(Tokenizer, Basics)
         { 133, 1137, 1 },
         { 138, 10, 3 },
     };
-    check(tokenizer.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
+    check(decoder.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
 }
 
-TEST(Tokenizer, TrailerSplitCheckSum)
+TEST(Decoder, TrailerSplitCheckSum)
 {
     const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=52" SOH "35=A" SOH
         "49=Buyer" SOH "56=Seller" SOH "34=2000001" SOH "52=20190605" SOH "10=218" SOH);
-    Decoder tokenizer{};
-    auto [processed, status] = tokenizer.parse(message);
-//    ASSERT_EQ(ParserStatus::Success, status);
+    Decoder decoder{};
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(DecoderStatus::Success, status);
     ASSERT_EQ(message.size(), processed);
-//    ASSERT_EQ(48, checkSum);
+    // ASSERT_EQ(48, checkSum);
 
     constexpr Token expectedTokens[] =
     {
@@ -81,36 +81,36 @@ TEST(Tokenizer, TrailerSplitCheckSum)
         { 54, 52, 8 },
         { 66, 10, 3 }
     };
-    check(tokenizer.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
+    check(decoder.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
 }
 
-TEST(Tokenizer, TrailerFieldEnd)
+TEST(Decoder, TrailerFieldEnd)
 {
     const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=21" SOH "35=66" SOH
         "666=66" SOH "1=1" SOH "2=2" SOH "10=233" SOH);
-    Decoder tokenizer{};
-    auto [processed, status] = tokenizer.parse(message);
-    ASSERT_EQ(ParserStatus::Success, status);
+    Decoder decoder{};
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(DecoderStatus::Success, status);
     // ASSERT_EQ(239, checkSum);
 }
 
-TEST(Tokenizer, Fragment)
+TEST(Decoder, Fragment)
 {
     const auto message = utils::makeSpan("8=FIXT.");
-    Decoder tokenizer{};
-    auto [processed, status] = tokenizer.parse(message);
-    ASSERT_EQ(ParserStatus::MessageFragment, status);
+    Decoder decoder{};
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(DecoderStatus::MessageFragment, status);
     ASSERT_EQ(0, processed);
 }
 
-TEST(Tokenizer, HopGroup)
+TEST(Decoder, HopGroup)
 {
     const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
-    Decoder tokenizer{};
-    auto [processed, status] = tokenizer.parse(logout);
-    ASSERT_EQ(ParserStatus::Success, status);
+    Decoder decoder{};
+    auto [processed, status] = decoder.parse(logout);
+    ASSERT_EQ(DecoderStatus::Success, status);
     constexpr Token expectedTokens[] =
     {
         { 2, 8, 8 },
@@ -127,6 +127,6 @@ TEST(Tokenizer, HopGroup)
         { 97, 628, 2, },
         { 103, 10, 3 }
     };
-    check(tokenizer.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
+    check(decoder.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
 }
 }

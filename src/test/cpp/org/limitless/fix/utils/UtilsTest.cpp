@@ -8,7 +8,7 @@
 #include "org/limitless/fix/simd/QuadSearch.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
 
-namespace org::limitless::fix::parser {
+namespace org::limitless::fix::decoder {
 
 TEST(QuadSearch, Sorted)
 {

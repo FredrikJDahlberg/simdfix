@@ -7,7 +7,7 @@
 
 #include <algorithm>
 
-namespace org::limitless::fix::parser {
+namespace org::limitless::fix::decoder {
 
 struct Dictionary
 {

@@ -8,7 +8,7 @@
 #include <expected>
 
 #include "org/limitless/fix/messages/HopGroupDecoder.hpp"
-#include "org/limitless/fix/parser/ParserStatus.hpp"
+#include "org/limitless/fix/decoder/DecoderStatus.hpp"
 
 namespace org::limitless::fix::messages {
 
@@ -37,32 +37,32 @@ struct HeaderDecoder
         return *this;
     }
 
-    [[nodiscard]] std::expected<String, parser::ParserStatus> sender()
+    [[nodiscard]] std::expected<String, parser::DecoderStatus> sender()
     {
         return m_message->m_sender;
     }
 
-    [[nodiscard]] std::expected<String, parser::ParserStatus> target()
+    [[nodiscard]] std::expected<String, parser::DecoderStatus> target()
     {
         return m_message->m_target;
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> sequenceNumber()
+    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> sequenceNumber()
     {
         return m_message->m_sequenceNumber;
     }
 
-    [[nodiscard]] std::expected<String, parser::ParserStatus> sendingTime()
+    [[nodiscard]] std::expected<String, parser::DecoderStatus> sendingTime()
     {
         return m_message->m_sendingTime;
     }
 
-    [[nodiscard]] std::expected<String, parser::ParserStatus> onBehalfOfCompID()
+    [[nodiscard]] std::expected<String, parser::DecoderStatus> onBehalfOfCompID()
     {
         return m_message->template getString<115>(false);
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::ParserStatus> nextExpectedSeqNum() const
+    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> nextExpectedSeqNum() const
     {
         return m_message->template getUnsigned<789>(false);
     }

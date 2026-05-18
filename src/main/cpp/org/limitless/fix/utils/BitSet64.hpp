@@ -7,7 +7,7 @@
 
 #include <bit>
 
-namespace org::limitless::fix::parser {
+namespace org::limitless::fix::decoder {
 
 class BitSet64
 {

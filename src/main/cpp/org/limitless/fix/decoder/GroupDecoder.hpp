@@ -7,7 +7,7 @@
 
 #include "org/limitless/fix/simd/LinearSearch.hpp"
 
-namespace org::limitless::fix::parser {
+namespace org::limitless::fix::decoder {
 
 template <typename Message>
 struct GroupDecoder

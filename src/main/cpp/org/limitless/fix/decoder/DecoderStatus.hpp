@@ -7,9 +7,9 @@
 
 #include <cstdint>
 
-namespace org::limitless::fix::parser {
+namespace org::limitless::fix::decoder {
 
-enum class ParserStatus : uint8_t
+enum class DecoderStatus : uint8_t
 {
     Success,
     MessageFragment,
