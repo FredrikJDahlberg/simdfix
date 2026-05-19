@@ -34,7 +34,6 @@ TEST(Decoder, Basics)
         // next message
         "8=FIXT.1.1" SOH "9=118" SOH);
     Decoder decoder;
-    // auto [processed, checkSum, status] = decoder.scan(message);
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(DecoderStatus::Success, status);
     ASSERT_EQ(message.size() - 17, processed);
@@ -62,8 +61,8 @@ TEST(Decoder, Basics)
 
 TEST(Decoder, TrailerSplitCheckSum)
 {
-    const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=52" SOH "35=A" SOH
-        "49=Buyer" SOH "56=Seller" SOH "34=2000001" SOH "52=20190605" SOH "10=218" SOH);
+    const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=47" SOH "35=A" SOH
+        "49=Buyer" SOH "56=Seller" SOH "34=2000001" SOH "52=20190605" SOH "10=046" SOH);
     Decoder decoder{};
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(DecoderStatus::Success, status);
@@ -91,7 +90,6 @@ TEST(Decoder, TrailerFieldEnd)
     Decoder decoder{};
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(DecoderStatus::Success, status);
-    // ASSERT_EQ(239, checkSum);
 }
 
 TEST(Decoder, Fragment)

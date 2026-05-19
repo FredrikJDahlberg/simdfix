@@ -22,11 +22,39 @@ enum class TypeName
     Group
 };
 
-enum class Presence
+struct Presence
 {
-    Constant,
-    Required,
-    Optional
+    enum Values { Null, Constant, Optional, Required };
+
+    static constexpr std::string_view Names[] = { "??", "Constant", "Optional", "Required" };
+
+    Presence() : m_value{Null} {}
+
+    Presence(const Values value) : m_value{value} {}
+
+    Presence(const std::string_view name) : m_value{Null}
+    {
+        m_value = Required;
+        if (name.empty())
+        {
+            return;
+        }
+        for (int i = 1; i < 4; ++i)
+        {
+            if (Names[i] == name)
+            {
+                m_value = static_cast<Values>(i);
+                return;
+            }
+        }
+    }
+
+    [[nodiscard]] std::string_view name() const
+    {
+        return Names[m_value];
+    }
+
+    Values m_value;
 };
 
 struct Type
@@ -47,13 +75,11 @@ struct Field
     int32_t m_tag{};
     std::string m_name;
     int32_t m_length{};
-    // TypeName m_type;
-    std::string m_type;
+    TypeName m_type;
     Presence m_presence;
-    // std::string m_value;  // constant
 
-    Field(const int32_t tag, std::string  name, std::string  type, const int32_t length, const Presence presence) :
-        m_tag(tag), m_name(std::move(name)), m_length(length), m_type(std::move(type)), m_presence{presence} // , m_value{"null"}
+    Field(const int32_t tag, std::string  name, /*std::string type*/TypeName type, const int32_t length, const Presence presence) :
+        m_tag(tag), m_name(std::move(name)), m_length(length), m_type(/*std::move(type)*/type), m_presence{presence} // , m_value{"null"}
     {
     }
 
@@ -71,7 +97,7 @@ struct Struct
     TypeName m_type;
     std::vector<Field> m_fields;
 
-    Struct()= default;
+    Struct() = default;
 
     Struct(std::string  name, const TypeName type, const std::vector<Field>& fields)
         : m_name(std::move(name)), m_type(type), m_fields{fields}
@@ -167,30 +193,21 @@ struct Generator
             const std::string_view primitive = field.attribute("primitiveType").as_string();
             const std::string resolvedType = std::string{type.empty() ? primitive : type};
             const int32_t length = field.attribute("length").as_int();
-            auto presence = Presence::Required;
             const std::string_view presenceAttr = field.attribute("presence").as_string();
             if (!presenceAttr.empty())
             {
-                if (presenceAttr == "required")
-                {
-                    presence = Presence::Required;
-                }
-                else if (presenceAttr == "constant")
-                {
-                    presence = Presence::Constant;
-                }
-                else if (presenceAttr == "optional")
-                {
-                    presence = Presence::Optional;
-                }
             }
+            Presence presence{presenceAttr};
             auto typeName = std::string{name};
             auto refType = m_types.find(resolvedType);
             if (nodeType == "group")
             {
                 std::println("Group found {}", name);
-                auto counter = m_types.find("int32");
-                fields.emplace_back(tag, std::string{name}, resolvedType, length, presence);
+                // auto counter = m_types.find("int32");
+                const auto counterName = field.attribute("counter").as_string();
+                Field counter{tag, std::string{counterName}, TypeName::Group, length, presence};
+                fields.emplace_back(std::move(counter));
+                processFields(field.children(), fields);
             }
             else
             {
@@ -209,7 +226,8 @@ struct Generator
                 else
                 {
                     std::println("Field '{}' type '{}' found", name, type);
-                    fields.emplace_back(tag, std::string{name}, resolvedType, length, presence);
+
+                    fields.emplace_back(tag, std::string{name}, refType->second.m_type, length, presence);
                 }
             }
             std::println("field: {}, {}, {}, {}", name, tag, primitive, length);
@@ -227,7 +245,7 @@ struct Generator
             auto& type = val;
             std::println("Type{{name={}, align={}, length={}}}", type.m_name, type.m_size, type.m_length);
         }
-        for (auto& message : m_messages)
+        for (const auto& message : m_messages)
         {
             std::println("{}", message.second.m_name);
             for (auto& field : message.second.m_fields)
@@ -239,18 +257,34 @@ struct Generator
 
     void generateGrammar()
     {
+        std::println("#ifndef SIMD_FIX_GRAMMAR_HPP");
+        std::println("#define SIMD_FIX_GRAMMAR_HPP\n");
+        std::println("#include \"org/limitless/fix/decoder/Dictionary.hpp\"\n");
+        std::println("namespace org::limitless::fix::protocols {{");
+
         for (auto& message: m_messages | std::views::values)
         {
+            auto sorted = message.m_fields;
+            std::ranges::sort(sorted, {}, &Field::m_tag);
             std::println("struct {} {{", message.m_name);
-            for (auto& field : message.m_fields)
+            std::println("    static constexpr uint16_t Tags[] = {{", message.m_name);
+            for (auto& field : sorted)
             {
-                std::println("    {},", field.m_tag);
+                std::println("        {},", field.m_tag);
             }
+            std::println("    }};\n");
+            std::println("    static constexpr Dictionary Grammar[] = {{", message.m_name);
+            for (auto& field : sorted)
+            {
+                std::println("        {{ {}, Presence::{}, {} }}, ", field.m_tag, field.m_presence.name(), field.m_name);
+            }
+            std::println("    }};");
             std::println("}};\n");
         }
+        std::println("}}\n");
+        std::println("#endif //SIMD_FIX_GRAMMAR_HPP");
     }
 };
-
 
 int main(int argc, char** argv)
 {
@@ -262,9 +296,13 @@ int main(int argc, char** argv)
             result.description(), std::filesystem::current_path().c_str(), argv[1]);
         return 1;
     }
+
+    Presence pre = Presence::Constant;
+
     Generator generator{};
     generator.process(doc);
     generator.print();
+    generator.generateGrammar();
     return 0;
 }
 

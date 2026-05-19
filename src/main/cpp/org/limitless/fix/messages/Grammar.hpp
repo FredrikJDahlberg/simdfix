@@ -13,7 +13,7 @@ struct Logon
 {
     static constexpr std::array<uint16_t, 14> Tags = {1, 8, 9, 10, 34, 35, 49, 52, 56, 102, 627, 628, 629, 630 };
 
-    static constexpr std::array<parser::Dictionary, 14> Grammar
+    static constexpr std::array<decoder::Dictionary, 14> Grammar
     {
         {
             {1, 0, false},
@@ -38,7 +38,7 @@ struct Logout
 {
     static constexpr std::array<uint16_t, 14> Tags = { 8, 9, 10, 34, 35, 49, 52, 56, 102, 627, 628, 629, 630 };
 
-    static constexpr std::array<parser::Dictionary, 14> Grammar
+    static constexpr std::array<decoder::Dictionary, 14> Grammar
     {
             {  // 0 0 0 0 0 0 10 10 10 1
                 {8, 0, true},
@@ -62,7 +62,7 @@ struct HopGroup
 {
     static constexpr std::array<uint16_t, 4> Tags = { 627, 628, 629, 630 };
 
-    static constexpr std::array<parser::Dictionary, 4> Grammar
+    static constexpr std::array<decoder::Dictionary, 4> Grammar
     {
         {
             {627, 10, false},
