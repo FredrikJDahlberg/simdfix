@@ -18,7 +18,7 @@ namespace org::limitless::fix::generated {
 
 using namespace org::limitless::fix;
 
-struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
+struct LogonDecoder : decoder::MessageDecoder<protocols::Logon>
 {
     using Message = MessageDecoder;
     using Header = messages::HeaderDecoder<MessageDecoder>;
@@ -41,27 +41,27 @@ struct LogonDecoder : parser::MessageDecoder<protocols::Logon>
         return *this;
     }
 
-    [[nodiscard]] std::expected<String, parser::DecoderStatus> sender() const
+    [[nodiscard]] std::expected<String, decoder::DecoderStatus> sender() const
     {
         return this->getString<56>(true);
     }
 
-    [[nodiscard]] std::expected<String, parser::DecoderStatus> target() const
+    [[nodiscard]] std::expected<String, decoder::DecoderStatus> target() const
     {
         return this->getString<49>(true);
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> expectedSeqNum() const
+    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> expectedSeqNum() const
     {
         return this->getUnsigned<34>(true);
     }
 
-    [[nodiscard]] std::expected<String, parser::DecoderStatus> onBehalfOfCompID() const
+    [[nodiscard]] std::expected<String, decoder::DecoderStatus> onBehalfOfCompID() const
     {
         return this->getString<115>(false);
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> nextExpectedSeqNum() const
+    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> nextExpectedSeqNum() const
     {
         return this->getUnsigned<789>(false);
     }

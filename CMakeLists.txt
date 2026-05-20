@@ -20,12 +20,12 @@ set(GENERATED_HEADERS
 set(FIX_HEADERS
         ${MAIN_PATH}/utils/Utils.hpp
         ${MAIN_PATH}/utils/BitSet64.hpp
-        ${MAIN_PATH}/parser/Decoder.hpp
-        ${MAIN_PATH}/parser/MessageDecoder.hpp
-        ${MAIN_PATH}/parser/DecoderStatus.hpp
-        ${MAIN_PATH}/parser/Dictionary.hpp
-        ${MAIN_PATH}/parser/GroupDecoder.hpp
-        ${MAIN_PATH}/parser/Token.hpp
+        ${MAIN_PATH}/decoder/Decoder.hpp
+        ${MAIN_PATH}/decoder/MessageDecoder.hpp
+        ${MAIN_PATH}/decoder/DecoderStatus.hpp
+        ${MAIN_PATH}/decoder/Dictionary.hpp
+        ${MAIN_PATH}/decoder/GroupDecoder.hpp
+        ${MAIN_PATH}/decoder/Token.hpp
         ${MAIN_PATH}/simd/Uint8x16.hpp
         ${MAIN_PATH}/simd/LinearSearch.hpp)
 add_library(SimdFix INTERFACE)

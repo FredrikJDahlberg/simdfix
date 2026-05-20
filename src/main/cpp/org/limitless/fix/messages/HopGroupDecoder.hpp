@@ -11,9 +11,9 @@
 namespace org::limitless::fix::messages {
 
 template <typename Message>
-struct HopGroupDecoder : parser::GroupDecoder<Message>
+struct HopGroupDecoder : decoder::GroupDecoder<Message>
 {
-    using Group = parser::GroupDecoder<Message>;
+    using Group = decoder::GroupDecoder<Message>;
 
     static constexpr uint32_t Type = 10;
 
@@ -33,7 +33,7 @@ struct HopGroupDecoder : parser::GroupDecoder<Message>
         return *this;
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> count() const
+    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> count() const
     {
         return Group::count();
     }
@@ -44,24 +44,24 @@ struct HopGroupDecoder : parser::GroupDecoder<Message>
         return *this;
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> hopCompID()
+    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> hopCompID()
     {
         const auto token = Group::member(628);
         if (token != nullptr)
         {
             return Group::m_message->convertToUnsigned(token);
         }
-        return std::unexpected{parser::DecoderStatus::NullValue};
+        return std::unexpected{decoder::DecoderStatus::NullValue};
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> hopRefID()
+    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> hopRefID()
     {
         const auto token = Group::member(629);
         if (token != nullptr)
         {
             return Group::m_message->convertToUnsigned(token);
         }
-        return std::unexpected{parser::DecoderStatus::NullValue};
+        return std::unexpected{decoder::DecoderStatus::NullValue};
     }
 };
 }

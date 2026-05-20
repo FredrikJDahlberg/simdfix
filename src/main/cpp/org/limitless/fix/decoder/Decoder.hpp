@@ -160,27 +160,37 @@ private:
 
     Result checkRequiredFields(const data_t* data) const
     {
-        const auto& token = m_tokens[1];
-        if (token.tag != BodyLengthTag)
-        {
-            // FIXME?
-            return {0, DecoderStatus::InvalidBodyLengthTag };
-        }
-        const auto bodyLength = utils::asciiToDecimal(0, data + token.position, token.length);
         const auto* last = &m_tokens[m_count - 1];
-        const uint32_t count = last->position - token.position - token.length - 4;
-        if (count < bodyLength && last->tag != CheckSumTag)
+        const bool hasCheckSum = last->tag == CheckSumTag;
+        const uint32_t processed = hasCheckSum ? last->position + last->length + 1 : 0;
+
+        // incomplete message with no checksum
+        if (!hasCheckSum && m_count < 7)
         {
-            return {0, DecoderStatus::MessageFragment };
+            return {0, DecoderStatus::RequiredFieldMissing};
         }
-        const uint32_t processed = last->position + last->length + 1;
-        if (count != bodyLength)
-        {
-            return { processed, DecoderStatus::InvalidBodyLength };
-        }
+
+        // fixed-position header tags
         if (m_tokens[2].tag != MessageTypeTag)
         {
-            return { processed, DecoderStatus::InvalidMessageTypeTag };
+            return {processed, DecoderStatus::InvalidMessageTypeTag};
+        }
+        const auto& bodyLenToken = m_tokens[1];
+        if (bodyLenToken.tag != BodyLengthTag)
+        {
+            return {processed, DecoderStatus::InvalidBodyLengthTag};
+        }
+
+        // body length
+        const auto bodyLength = utils::asciiToDecimal(0, data + bodyLenToken.position, bodyLenToken.length);
+        const uint32_t count = last->position - bodyLenToken.position - bodyLenToken.length - 4;
+        if (!hasCheckSum && count < bodyLength)
+        {
+            return {0, DecoderStatus::MessageFragment};
+        }
+        if (count != bodyLength)
+        {
+            return {processed, DecoderStatus::InvalidBodyLength};
         }
 
 #if !defined(NDEBUG)
@@ -189,16 +199,14 @@ private:
             std::printf("%3zu tag = %3d, pos = %3d, len = %3d\n", i, m_tokens[i].tag, m_tokens[i].position, m_tokens[i].length);
         }
 #endif
+
+        // checksum and field count
         const auto status = processCheckSum(data);
         if (status != DecoderStatus::Success)
         {
-            return {processed, status };
+            return {processed, status};
         }
-        if (m_count < 7)
-        {
-            return { processed , DecoderStatus::RequiredFieldMissing };
-        }
-        return { processed, status };
+        return {processed, m_count < 7 ? DecoderStatus::RequiredFieldMissing : status};
     }
 
     bool processBlock(const position_t offset,

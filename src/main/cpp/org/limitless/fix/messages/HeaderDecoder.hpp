@@ -37,32 +37,32 @@ struct HeaderDecoder
         return *this;
     }
 
-    [[nodiscard]] std::expected<String, parser::DecoderStatus> sender()
+    [[nodiscard]] std::expected<String, decoder::DecoderStatus> sender()
     {
         return m_message->m_sender;
     }
 
-    [[nodiscard]] std::expected<String, parser::DecoderStatus> target()
+    [[nodiscard]] std::expected<String, decoder::DecoderStatus> target()
     {
         return m_message->m_target;
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> sequenceNumber()
+    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> sequenceNumber()
     {
         return m_message->m_sequenceNumber;
     }
 
-    [[nodiscard]] std::expected<String, parser::DecoderStatus> sendingTime()
+    [[nodiscard]] std::expected<String, decoder::DecoderStatus> sendingTime()
     {
         return m_message->m_sendingTime;
     }
 
-    [[nodiscard]] std::expected<String, parser::DecoderStatus> onBehalfOfCompID()
+    [[nodiscard]] std::expected<String, decoder::DecoderStatus> onBehalfOfCompID()
     {
         return m_message->template getString<115>(false);
     }
 
-    [[nodiscard]] std::expected<uint32_t, parser::DecoderStatus> nextExpectedSeqNum() const
+    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> nextExpectedSeqNum() const
     {
         return m_message->template getUnsigned<789>(false);
     }

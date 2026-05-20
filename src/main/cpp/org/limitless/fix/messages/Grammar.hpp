@@ -16,20 +16,20 @@ struct Logon
     static constexpr std::array<decoder::Dictionary, 14> Grammar
     {
         {
-            {1, 0, false},
-            {8, 0, true},
-            {9, 0, true},
-            {10, 0, true},
-            {34, 0, true},
-            {35, 0, true},
-            {49, 12, true},
-            {52, 0, true},
-            {56, 0, true},
-            {102, 24, true},
-            {627, 10, false},
-            {628, 10, false},
-            {629, 10, false},
-            {630, 10, false}
+            {1,   0,  decoder::Presence::Optional},
+            {8,   0,  decoder::Presence::Required},
+            {9,   0,  decoder::Presence::Required},
+            {10,  0,  decoder::Presence::Required},
+            {34,  0,  decoder::Presence::Required},
+            {35,  0,  decoder::Presence::Required},
+            {49,  12, decoder::Presence::Required},
+            {52,  0,  decoder::Presence::Required},
+            {56,  0,  decoder::Presence::Required},
+            {102, 24, decoder::Presence::Required},
+            {627, 10, decoder::Presence::Optional},
+            {628, 10, decoder::Presence::Optional},
+            {629, 10, decoder::Presence::Optional},
+            {630, 10, decoder::Presence::Optional}
         }
     };
 };
@@ -40,21 +40,21 @@ struct Logout
 
     static constexpr std::array<decoder::Dictionary, 14> Grammar
     {
-            {  // 0 0 0 0 0 0 10 10 10 1
-                {8, 0, true},
-                {9, 0, true},
-                {10, 1, true},
-                {34, 0, true},
-                {35, 0, true},
-                {49, 0, true},
-                {52, 0, true},
-                {56, 0, true},
-                {102, 0, true},
-                {627, 10, false},
-                {628, 10, false},
-                {629, 10, false},
-                {630, 10, false}
-            }
+        {
+            {8,   0,  decoder::Presence::Required},
+            {9,   0,  decoder::Presence::Required},
+            {10,  1,  decoder::Presence::Required},
+            {34,  0,  decoder::Presence::Required},
+            {35,  0,  decoder::Presence::Required},
+            {49,  0,  decoder::Presence::Required},
+            {52,  0,  decoder::Presence::Required},
+            {56,  0,  decoder::Presence::Required},
+            {102, 0,  decoder::Presence::Required},
+            {627, 10, decoder::Presence::Optional},
+            {628, 10, decoder::Presence::Optional},
+            {629, 10, decoder::Presence::Optional},
+            {630, 10, decoder::Presence::Optional}
+        }
     };
 };
 
@@ -65,10 +65,10 @@ struct HopGroup
     static constexpr std::array<decoder::Dictionary, 4> Grammar
     {
         {
-            {627, 10, false},
-            {628, 10, false},
-            {629, 10, false},
-            {630, 10, false}
+            {627, 10, decoder::Presence::Optional},
+            {628, 10, decoder::Presence::Optional},
+            {629, 10, decoder::Presence::Optional},
+            {630, 10, decoder::Presence::Optional}
         }
     };
 };
