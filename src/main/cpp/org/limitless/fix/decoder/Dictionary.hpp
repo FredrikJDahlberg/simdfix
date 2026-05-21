@@ -46,7 +46,7 @@ struct Presence
 {
     enum Values { Null, Constant, Optional, Required };
 
-    static constexpr std::string_view Names[] = { "??", "Constant", "Optional", "Required" };
+    static constexpr std::string_view Names[] = { "??", "constant", "optional", "required" };
 
     constexpr Presence() : m_value{Null} {}
 
@@ -54,8 +54,6 @@ struct Presence
 
     constexpr Presence(const std::string_view name) : m_value{Required}
     {
-        if (name.empty())
-            return;
         for (int i = 1; i < 4; ++i)
         {
             if (Names[i] == name)

@@ -27,9 +27,9 @@ struct Logon
             {56,  0,  decoder::Presence::Required},
             {102, 24, decoder::Presence::Required},
             {627, 10, decoder::Presence::Optional},
-            {628, 10, decoder::Presence::Optional},
-            {629, 10, decoder::Presence::Optional},
-            {630, 10, decoder::Presence::Optional}
+//            {628, 10, decoder::Presence::Optional},
+//            {629, 10, decoder::Presence::Optional},
+//            {630, 10, decoder::Presence::Optional}
         }
     };
 };

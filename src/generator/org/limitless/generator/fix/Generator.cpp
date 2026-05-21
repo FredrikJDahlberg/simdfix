@@ -85,7 +85,7 @@ struct Generator
     {
         const pugi::xml_node protocol = doc.child("protocol");
         processTypes(protocol.child("types").children());
-        processComponents(protocol.children("component"));
+        processComponents(protocol.select_nodes(".//component|.//group"));
         processMessages(protocol.children("message"));
     }
 
@@ -121,13 +121,14 @@ struct Generator
         }
     }
 
-    void processComponents(const pugi::xml_object_range<pugi::xml_named_node_iterator>& components)
+    void processComponents(const pugi::xpath_node_set& components)
     {
-        for (const auto& component : components)
+        for (const auto& xpathNode : components)
         {
-            std::string_view name = component.attribute("name").as_string();
+            const auto node = xpathNode.node();
+            std::string_view name = node.attribute("name").as_string();
             std::vector<Field> fields{};
-            processFields(component.children(), fields);
+            processFields(node.children(), fields);
             m_records.try_emplace(std::string{name}, std::string{name}, std::string{}, TypeName::Component, fields);
         }
     }
@@ -164,7 +165,7 @@ struct Generator
                 const auto counterName = field.attribute("counter").as_string();
                 Field counter{tag, std::string{counterName}, TypeName::Group, 0, presence};
                 fields.emplace_back(std::move(counter));
-                processFields(field.children(), fields, true);
+                // processFields(field.children(), fields, true);
             }
             else
             {
@@ -207,33 +208,42 @@ struct Generator
         }
     }
 
+    void generateStruct(std::ostream& out, const Struct& component)
+    {
+        auto sorted = component.m_fields;
+        std::ranges::sort(sorted, {}, &Field::m_tag);
+        out << std::vformat("struct {} {{\n", std::make_format_args(component.m_name));
+        out << "    static constexpr uint16_t Tags[] = {\n";
+        for (auto& field : sorted)
+        {
+            out << std::vformat("        {},\n", std::make_format_args(field.m_tag));
+        }
+        out << "    };\n\n";
+        out << "    static constexpr Dictionary Grammar[] = {\n";
+        for (auto& field : sorted)
+        {
+            auto presence = field.m_presence.name();
+            out << std::vformat("        {{ {}, {}, Presence::{} }},\n", std::make_format_args(field.m_tag, field.m_length, presence));
+        }
+        out << "    };\n";
+        out << "};\n\n";
+    }
+
     void generateGrammar(std::ostream& out)
     {
-
         out << "#ifndef SIMD_FIX_GRAMMAR_HPP\n";
         out << "#define SIMD_FIX_GRAMMAR_HPP\n\n";
         out << "#include \"org/limitless/fix/decoder/Dictionary.hpp\"\n\n";
         out << "namespace org::limitless::fix::protocols {\n";
 
-        for (auto& message: m_messages | std::views::values)
+        for (auto& record : m_records)
         {
-            auto sorted = message.m_fields;
-            std::ranges::sort(sorted, {}, &Field::m_tag);
-            out << std::vformat("struct {} {{\n", std::make_format_args(message.m_name));
-            out << "    static constexpr uint16_t Tags[] = {\n";
-            for (auto& field : sorted)
-            {
-                out << std::vformat("        {},\n", std::make_format_args(field.m_tag));
-            }
-            out << "    };\n\n";
-            out << "    static constexpr Dictionary Grammar[] = {\n";
-            for (auto& field : sorted)
-            {
-                auto presence = field.m_presence.name();
-                out << std::vformat("        {{ {}, {}, Presence::{} }},\n", std::make_format_args(field.m_tag, field.m_length, presence));
-            }
-            out << "    };\n";
-            out << "};\n\n";
+            generateStruct(out, record.second);
+        }
+
+        for (auto& message: m_messages)
+        {
+            generateStruct(out, message.second);
         }
         out << "}\n\n";
         out << "#endif //SIMD_FIX_GRAMMAR_HPP\n";
@@ -339,15 +349,15 @@ int main(int argc, char** argv)
     const auto result = doc.load_file(argv[1]);
     if (!result)
     {
-        std::println("XML error: {}, dir = {}, file = {}",
-            result.description(), std::filesystem::current_path().c_str(), argv[1]);
+        std::println("XML error: {}, dir = {}, file = {}", result.description(),
+                     std::filesystem::current_path().c_str(), argv[1]);
         return 1;
     }
 
     Generator generator{};
     generator.process(doc);
-    generator.print();
+    //generator.print();
     generator.generateGrammar(std::cout);
-    generator.generateMessages(std::cout);
+    //generator.generateMessages(std::cout);
     return 0;
 }
