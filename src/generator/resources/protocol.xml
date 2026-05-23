@@ -32,15 +32,15 @@
 
     <message name="Logon" id="A">
         <field name="Header" type="StandardHeader"/>
-        <!-- <field name="EncryptMethod" tag="98" type="Encryption"/> -->
-        <field name="EncryptMethod" tag="98" primitiveType="uint8" presence="constant">0</field>
+        <!-- <field name="EncryptMethod" tag="98" primitiveType="uint8" presence="constant">0</field> -->
+        <field name="EncryptMethod" tag="98" primitiveType="uint8" presence="optional"/>
         <field name="HeartbeatInterval" tag="108" primitiveType="uint32"/>
         <!-- <field name="CheckSum" tag="10" length="3" primitiveType="uint8"/> -->
     </message>
 
     <message name="Logout" id="5">
         <field name="Header" type="StandardHeader"/>
-        <field name="Text" tag="58" type="String8"/>
+        <field name="Text" tag="58" primitiveType="char" length="8"/>
         <!-- <field name="CheckSum" tag="10" length="3" primitiveType="uint8"/> -->
     </message>
 

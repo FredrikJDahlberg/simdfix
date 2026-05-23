@@ -6,8 +6,7 @@
 #include <string>
 
 #include "org/limitless/fix/decoder/Decoder.hpp"
-#include "org/limitless/fix/messages/LogonDecoder.hpp"
-#include "org/limitless/fix/messages/LogoutDecoder.hpp"
+#include "org/limitless/fix/messages/Messages.hpp"
 #include "org/limitless/fix/messages/MessageHandler.hpp"
 
 #define SOH "\x01"
@@ -15,6 +14,7 @@
 namespace org::limitless::fix::decoder {
 
 using namespace org::limitless::fix::decoder;
+using namespace org::limitless::fix::generated;
 
 TEST(Parser, Logon)
 {
@@ -130,7 +130,7 @@ TEST(Parser, HopGroup1)
         DecoderStatus handle(generated::LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
-            auto group = logout.header().hopGroup();
+            auto group = logout.header().hops();
             const auto count = group.count().value_or(0);
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
@@ -164,7 +164,7 @@ TEST(Parser, HopGroup2)
         DecoderStatus handle(generated::LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
-            auto group = logout.header().hopGroup();
+            auto group = logout.header().hops();
             const auto count = group.count().value_or(0);
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
@@ -197,7 +197,7 @@ TEST(Parser, HopGroup3)
         DecoderStatus handle(generated::LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
-            auto group = logout.header().hopGroup();
+            auto group = logout.header().hops();
             const auto count = group.count().value_or(0);
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);

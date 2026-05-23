@@ -14,7 +14,7 @@ struct GroupDecoder
 {
 protected:
     const Message* m_message;
-    const uint32_t m_groupType;
+    // const uint32_t m_groupType;
 
     std::span<Token> m_tokens{};
 
@@ -24,7 +24,8 @@ protected:
     uint32_t m_offset{};
 
 public:
-    explicit GroupDecoder(const uint32_t groupType, const Message* grammar) : m_message(grammar), m_groupType(groupType)
+    // const uint32_t groupType,
+    explicit GroupDecoder(const Message* grammar) : m_message(grammar)// , m_groupType(groupType)
     {
     }
 

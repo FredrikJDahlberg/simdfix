@@ -10,7 +10,7 @@
 
 namespace org::limitless::fix::decoder {
 
-struct TypeName
+struct Category
 {
     enum Values { Null, Int32, String, Message, Component, Group, GroupMember };
 
@@ -18,11 +18,11 @@ struct TypeName
         "Null", "Int32", "String", "Message", "Component", "Group", "GroupMember"
     };
 
-    constexpr TypeName() : m_value{Null} {}
+    constexpr Category() : m_value{Null} {}
 
-    constexpr TypeName(const Values value) : m_value{value} {}
+    constexpr Category(const Values value) : m_value{value} {}
 
-    constexpr TypeName(const std::string_view name) : m_value{Null}
+    constexpr Category(const std::string_view name) : m_value{Null}
     {
         for (int i = 0; i < 7; ++i)
         {
@@ -46,7 +46,8 @@ struct Presence
 {
     enum Values { Null, Constant, Optional, Required };
 
-    static constexpr std::string_view Names[] = { "??", "constant", "optional", "required" };
+    static constexpr std::string_view Strings[] = { "??", "constant", "optional", "required" };
+    static constexpr std::string_view Names[] = { "??", "Constant", "Optional", "Required" };
 
     constexpr Presence() : m_value{Null} {}
 
@@ -56,7 +57,7 @@ struct Presence
     {
         for (int i = 1; i < 4; ++i)
         {
-            if (Names[i] == name)
+            if (Strings[i] == name)
             {
                 m_value = static_cast<Values>(i);
                 return;

@@ -17,17 +17,17 @@
 
 namespace org::limitless::generator::fix {
 
-namespace decoder = org::limitless::fix::decoder;
-using decoder::TypeName;
+namespace decoder = limitless::fix::decoder;
+using decoder::Category;
 
 struct Type
 {
     std::string m_name;
     int32_t m_size;
     int32_t m_length;
-    TypeName m_type;
+    Category m_type;
 
-    Type(std::string name, const int32_t size, const int32_t length, const TypeName type = TypeName::Null)
+    Type(std::string name, const int32_t size, const int32_t length, const Category type = Category::Null)
         : m_name(std::move(name)), m_size(size), m_length(length), m_type{type}
     {
     }
@@ -37,14 +37,17 @@ struct Field
 {
     int32_t m_tag{};
     std::string m_name;
+    std::string m_type;
     int32_t m_length{};
-    TypeName m_type{};
+    Category m_category{};
     decoder::Presence m_presence{decoder::Presence::Required};
 
     Field() = default;
 
-    Field(const int32_t tag, std::string  name, TypeName type, const int32_t length, const decoder::Presence presence) :
-        m_tag(tag), m_name(std::move(name)), m_length(length), m_type(type), m_presence{presence}
+    Field(const int32_t tag, std::string  name, std::string type, Category category,
+          const int32_t length, const decoder::Presence presence) :
+        m_tag(tag), m_name(std::move(name)), m_type(std::move(type)), m_length(length),
+        m_category(category), m_presence{presence}
     {
     }
 
@@ -59,13 +62,13 @@ struct Struct
 {
     std::string m_name{};
     std::string m_id{};
-    TypeName m_type{};
+    Category m_category{};
     std::vector<Field> m_fields{};
 
     Struct() = default;
 
-    Struct(std::string name, std::string id, const TypeName type, const std::vector<Field>& fields)
-        : m_name(std::move(name)), m_id(std::move(id)), m_type(type), m_fields{fields}
+    Struct(std::string name, std::string id, const Category type, const std::vector<Field>& fields)
+        : m_name(std::move(name)), m_id(std::move(id)), m_category(type), m_fields{fields}
     {
     }
 
@@ -91,10 +94,10 @@ struct Generator
 
     void processTypes(const pugi::xml_object_range<pugi::xml_node_iterator>& types)
     {
-        m_types.try_emplace("char",   "char",   1, 1, TypeName::String);
-        m_types.try_emplace("uint8",  "uint8",  1, 1, TypeName::Int32);
-        m_types.try_emplace("int32",  "int32",  4, 1, TypeName::Int32);
-        m_types.try_emplace("uint32", "uint32", 4, 1, TypeName::Int32);
+        m_types.try_emplace("char",   "char",   1, 1, Category::String);
+        m_types.try_emplace("uint8",  "uint8",  1, 1, Category::Int32);
+        m_types.try_emplace("int32",  "int32",  4, 1, Category::Int32);
+        m_types.try_emplace("uint32", "uint32", 4, 1, Category::Int32);
 
         for (auto typeNode : types)
         {
@@ -129,7 +132,8 @@ struct Generator
             std::string_view name = node.attribute("name").as_string();
             std::vector<Field> fields{};
             processFields(node.children(), fields);
-            m_records.try_emplace(std::string{name}, std::string{name}, std::string{}, TypeName::Component, fields);
+            auto category = std::strcmp(node.name(), "component") == 0 ? Category::Component : Category::Group;
+            m_records.try_emplace(std::string{name}, std::string{name}, std::string{}, category, fields);
         }
     }
 
@@ -141,7 +145,7 @@ struct Generator
             std::string_view id = message.attribute("id").as_string();
             std::vector<Field> fields{};
             processFields(message.children(), fields);
-            m_messages.try_emplace(std::string{name}, std::string{name}, std::string{id}, TypeName::Message, fields);
+            m_messages.try_emplace(std::string{name}, std::string{name}, std::string{id}, Category::Message, fields);
         }
     }
 
@@ -163,9 +167,9 @@ struct Generator
             if (nodeType == "group")
             {
                 const auto counterName = field.attribute("counter").as_string();
-                Field counter{tag, std::string{counterName}, TypeName::Group, 0, presence};
+                const auto groupName = field.attribute("name").as_string();
+                Field counter{tag, std::string{counterName}, std::string{groupName}, Category::Group, 0, presence};
                 fields.emplace_back(std::move(counter));
-                // processFields(field.children(), fields, true);
             }
             else
             {
@@ -184,112 +188,96 @@ struct Generator
                 else
                 {
                     const int32_t length = std::max(field.attribute("length").as_int(), refType->second.m_length);
-                    const TypeName typeName = inGroup ? TypeName::GroupMember : refType->second.m_type;
-                    fields.emplace_back(tag, std::string{name}, typeName, length, presence);
+                    const Category typeName = inGroup ? Category::GroupMember : refType->second.m_type;
+                    fields.emplace_back(tag, std::string{name}, std::string{type}, typeName, length, presence);
                 }
             }
         }
     }
 
-    void print()
-    {
-        for (auto& val: m_types | std::views::values)
-        {
-            auto& type = val;
-            std::println("Type{{name={}, align={}, length={}}}", type.m_name, type.m_size, type.m_length);
-        }
-        for (const auto& message : m_messages)
-        {
-            std::println("{}", message.second.m_name);
-            for (auto& field : message.second.m_fields)
-            {
-                std::println("    {}, {}", field.m_tag, field.m_name);
-            }
-        }
-    }
-
-    void generateStruct(std::ostream& out, const Struct& component)
+    static void generateGrammarStruct(std::ostream& out, const Struct& component)
     {
         auto sorted = component.m_fields;
         std::ranges::sort(sorted, {}, &Field::m_tag);
-        out << std::vformat("struct {} {{\n", std::make_format_args(component.m_name));
+        out << std::format("struct {} {{\n", component.m_name);
         out << "    static constexpr uint16_t Tags[] = {\n";
         for (auto& field : sorted)
         {
-            out << std::vformat("        {},\n", std::make_format_args(field.m_tag));
+            out << std::format("        {},\n", field.m_tag);
         }
         out << "    };\n\n";
-        out << "    static constexpr Dictionary Grammar[] = {\n";
+        out << "    static constexpr decoder::Dictionary Grammar[] = {\n";
         for (auto& field : sorted)
         {
-            auto presence = field.m_presence.name();
-            out << std::vformat("        {{ {}, {}, Presence::{} }},\n", std::make_format_args(field.m_tag, field.m_length, presence));
+            out << std::format("        {{ {}, {}, decoder::Presence::{} }},\n",
+                               field.m_tag, field.m_length, field.m_presence.name());
         }
         out << "    };\n";
         out << "};\n\n";
     }
 
-    void generateGrammar(std::ostream& out)
+    void generateGrammar(std::ostream& out) const
     {
         out << "#ifndef SIMD_FIX_GRAMMAR_HPP\n";
         out << "#define SIMD_FIX_GRAMMAR_HPP\n\n";
         out << "#include \"org/limitless/fix/decoder/Dictionary.hpp\"\n\n";
         out << "namespace org::limitless::fix::protocols {\n";
 
-        for (auto& record : m_records)
+        for (const auto& record: m_records | std::views::values)
         {
-            generateStruct(out, record.second);
+            generateGrammarStruct(out, record);
         }
 
-        for (auto& message: m_messages)
+        for (const auto& message: m_messages | std::views::values)
         {
-            generateStruct(out, message.second);
+            generateGrammarStruct(out, message);
         }
         out << "}\n\n";
         out << "#endif //SIMD_FIX_GRAMMAR_HPP\n";
     }
 
-    // FIXME: does not support groups
-    void generateMessages(std::ostream& out)
+    static void generateStruct(std::ostream& out, const Struct& component)
     {
-        out << "#ifndef SIMD_FIX_MESSAGES_HPP\n";
-        out << "#define SIMD_FIX_MESSAGES_HPP\n\n";
-        out << "#include <expected>\n\n";
-        out << "#include \"HeaderDecoder.hpp\"\n";
-        out << "#include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n";
-        out << "#include \"org/limitless/fix/decoder/DecoderStatus.hpp\"\n";
-        out << "#include \"org/limitless/fix/messages/Grammar.hpp\"\n\n";
-        out << "namespace org::limitless::fix::generated {\n\n";
-        out << "using namespace org::limitless::fix;\n\n";
+        auto& name = component.m_name;
+        auto& id   = component.m_id;
 
-        for (auto& message : m_messages | std::views::values)
+        std::vector<const Field*> groups;
+        for (auto& field : component.m_fields)
         {
-            auto& name = message.m_name;
-            auto& id   = message.m_id;
-
-            // collect groups present in this message
-            std::vector<const Field*> groups;
-            for (auto& field : message.m_fields)
-                if (field.m_type == TypeName::Group)
-                    groups.push_back(&field);
-
-            out << std::vformat("struct {}Decoder : decoder::MessageDecoder<protocols::{}>\n{{\n", std::make_format_args(name, name));
-            out << "    using Message = MessageDecoder;\n";
-            out << "    using Header  = messages::HeaderDecoder<MessageDecoder>;\n";
-            for (auto* g : groups)
-                out << std::vformat("    using {}Decoder = messages::GroupDecoder<MessageDecoder>;\n", std::make_format_args(g->m_name));
-            out << "    using String  = std::span<const uint8_t>;\n\n";
-            out << std::vformat("    static constexpr uint16_t MessageId = '{}';\n\n", std::make_format_args(id));
-            out << "    Header m_header{this};\n";
-            for (auto* g : groups)
+            if (field.m_category == Category::Group)
             {
-                auto memberName = g->m_name;
-                memberName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(memberName[0])));
-                out << std::vformat("    {}Decoder m_{}{{this}};\n", std::make_format_args(g->m_name, memberName));
+                groups.push_back(&field);
             }
-            out << "\n";
-            out << std::vformat("    {}Decoder() = default;\n\n", std::make_format_args(name));
-            out << std::vformat("    {}Decoder& wrap(const std::span<const uint8_t> data,\n", std::make_format_args(name));
+        }
+        if (component.m_category != Category::Message)
+        {
+            out << "template <typename Message>\n";
+        }
+        if (component.m_category == Category::Message)
+        {
+            std::string decoder = std::format("decoder::MessageDecoder<protocols::{}>", name);
+            out << std::format("struct {}Decoder : {}\n{{\n", name, decoder);
+            out << "    using Message = " << decoder << ";\n";
+            out << std::format("    using Header = StandardHeaderDecoder<Message>;\n");
+            out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", id);
+            out << "    Header m_header{this};\n";
+        }
+        else
+        {
+            std::string decoder = "decoder::GroupDecoder<Message>";
+            out << std::format("struct {}Decoder : {}\n{{\n", name, decoder);
+        }
+        for (auto* group : groups)
+        {
+            auto fieldName = group->m_type;
+            fieldName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(fieldName[0])));
+            out << std::format("    {}Decoder<Message> m_{};\n", group->m_type, fieldName);
+        }
+
+        out << std::format("    {}Decoder() = default;\n\n", name);
+        if (component.m_category != Category::Group)
+        {
+            out << std::format("    {}Decoder& wrap(const std::span<const uint8_t> data,\n", name);
             out << "                        const std::span<Token> tokens,\n";
             out << "                        const std::span<uint16_t> tags,\n";
             out << "                        const uint32_t count)\n";
@@ -297,44 +285,177 @@ struct Generator
             out << "        Message::wrap(data, tokens, tags, count);\n";
             out << "        return *this;\n";
             out << "    }\n\n";
+        }
+        else
+        {
+            out << std::format("    {}Decoder& wrap()\n    {{\n", component.m_name);
+            auto memberName = component.m_name;
+            memberName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(memberName[0])));
+            out << std::format("        decoder::GroupDecoder<Message>::wrap(decoder::GroupDecoder<Message>::next(627));\n");
+            out << "        return *this;\n";
+            out << "    }\n\n";
+        }
+        if (component.m_category != Category::Message)
+        {
+            out << std::format("    explicit {}Decoder(const Message* grammar) : decoder::GroupDecoder<Message>(100, grammar)\n", component.m_name);
+            out << "    {\n    }\n";
+        }
 
-            for (auto& field : message.m_fields)
+        /*
+        for (auto* group : groups)
+        {
+        out << std::format("    {}Decoder<Message>& wrap()\n", group->m_type);
+            out << "    {\n";
+            out << std::format("        return decoder::GroupDecoder<Message>::wrap(decoder::GroupDecoder<Message>::next({}));\n",
+                               group->m_tag);
+            out << "    }\n\n";
+        }
+*/
+        for (auto& field : component.m_fields)
+        {
+            if (field.m_category == Category::GroupMember)
             {
-                if (field.m_type == TypeName::Group || field.m_type == TypeName::GroupMember || field.m_tag == 0)
-                    continue;
-
-                auto methodName = field.m_name;
-                methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
-                std::string_view mandatory = (field.m_presence.m_value == decoder::Presence::Required) ? "true" : "false";
-
-                if (field.m_type == TypeName::String)
-                {
-                    out << std::vformat("    [[nodiscard]] std::expected<String, decoder::DecoderStatus> {}() const\n", std::make_format_args(methodName));
-                    out << "    {\n";
-                    out << std::vformat("        return this->getString<{}>({});\n", std::make_format_args(field.m_tag, mandatory));
-                    out << "    }\n\n";
-                }
-                else
-                {
-                    out << std::vformat("    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> {}() const\n", std::make_format_args(methodName));
-                    out << "    {\n";
-                    out << std::vformat("        return this->getUnsigned<{}>({});\n", std::make_format_args(field.m_tag, mandatory));
-                    out << "    }\n\n";
-                }
+                continue;
             }
+            auto methodName = field.m_name;
+            methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
+            std::string_view mandatory = field.m_presence.m_value == decoder::Presence::Required ? "true" : "false";
+            if (field.m_category == Category::String)
+            {
+                out << std::format("    [[nodiscard]] std::expected<std::span<const uint8_t>, decoder::DecoderStatus> {}() const\n", methodName);
+                out << "    {\n";
+                out << std::format("        return this->getString<{}>({});\n", field.m_tag, mandatory);
+                out << "    }\n\n";
+            }
+            else
+            {
+                out << std::format("    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> {}() const\n", methodName);
+                out << "    {\n";
+                out << std::format("        return this->getUnsigned<{}>({});\n", field.m_tag, mandatory);
+                out << "    }\n\n";
+            }
+        }
 
+        if (component.m_category == Category::Message)
+        {
             out << "    Header& header() { return m_header; }\n";
-            for (auto* g : groups)
-            {
-                auto memberName = g->m_name;
-                memberName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(memberName[0])));
-                out << std::vformat("    {}Decoder& {}() {{ return m_{}; }}\n", std::make_format_args(g->m_name, memberName, memberName));
-            }
-            out << "};\n\n";
+        }
+        for (auto* group : groups)
+        {
+            auto groupName = group->m_type;
+            groupName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(groupName[0])));
+            out << std::format("    {}Decoder<Message>& {}() {{\n", group->m_type, groupName);
+            out << std::format("        return m_{}.wrap();\n",groupName);
+            out << "    }\n";
+        }
+        out << "};\n\n";
+    }
+
+    void generateStructs(std::ostream& out)
+    {
+        out << "#ifndef SIMD_FIX_MESSAGES_HPP\n";
+        out << "#define SIMD_FIX_MESSAGES_HPP\n\n";
+        out << "#include <expected>\n\n";
+        out << "#include \"org/limitless/fix/decoder/DecoderStatus.hpp\"\n";
+        out << "#include \"org/limitless/fix/decoder/GroupDecoder.hpp\"\n";
+        out << "#include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n";
+        out << "#include \"org/limitless/fix/messages/Grammar.hpp\"\n\n";
+        out << "namespace org::limitless::fix::generated {\n\n";
+        out << "using namespace org::limitless::fix;\n\n";
+
+        for (auto& record : m_records | std::views::values)
+        {
+            generateStruct(out, record);
+        }
+
+        for (auto& message : m_messages | std::views::values)
+        {
+            generateStruct(out, message);
         }
 
         out << "} // namespace org::limitless::fix::generated\n\n";
         out << "#endif //SIMD_FIX_MESSAGES_HPP\n";
+    }
+
+    void generateMessageHandler(std::ostream& out)
+    {
+        out << "#ifndef SIMD_FIX_MESSAGE_HANDLER_HPP\n";
+        out << "#define SIMD_FIX_MESSAGE_HANDLER_HPP\n\n";
+        out << "#include \"org/limitless/fix/decoder/DecoderStatus.hpp\"\n";
+        out << "#include \"org/limitless/fix/messages/Messages.hpp\"\n\n";
+        out << "namespace org::limitless::fix::generated {\n\n";
+        out << "using decoder::DecoderStatus;\n\n";
+        out << "template <typename Handler>\n";
+        out << "class MessageHandler\n{\n";
+
+        for (auto& message : m_messages | std::views::values)
+        {
+            auto memberName = message.m_name;
+            memberName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(memberName[0])));
+            out << std::format("    {}Decoder m_{}{{}};\n", message.m_name, memberName);
+        }
+
+        out << "\npublic:\n";
+        out << "    template <typename Event>\n";
+        out << "    DecoderStatus receive(Event&& event)\n";
+        out << "    {\n";
+        out << "        return static_cast<Handler*>(this)->handle(std::forward<Event>(event));\n";
+        out << "    }\n\n";
+        out << "    DecoderStatus handle(const std::span<const uint8_t> data,\n";
+        out << "                        const std::span<Token> tokens,\n";
+        out << "                        const std::span<uint16_t> tags,\n";
+        out << "                        const uint32_t count)\n";
+        out << "    {\n";
+        out << "        const auto messageType = data[tokens[2].position];\n";
+        out << "        auto status = DecoderStatus::InvalidMessageType;\n";
+        out << "        switch (messageType)\n";
+        out << "        {\n";
+
+        for (auto& message : m_messages | std::views::values)
+        {
+            auto memberName = message.m_name;
+            memberName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(memberName[0])));
+            out << std::format("            case {}Decoder::MessageId:\n", message.m_name);
+            out << std::format("                m_{}.wrap(data, tokens, tags, count);\n", memberName);
+            out << std::format("                status = m_{}.checkRequired();\n", memberName);
+            out << "                if (status == DecoderStatus::Success)\n";
+            out << "                {\n";
+            out << std::format("                    status = receive(m_{});\n", memberName);
+            out << "                }\n";
+            out << "                break;\n";
+        }
+
+        out << "            default:\n";
+        out << "                break;\n";
+        out << "        }\n";
+        out << "        return status;\n";
+        out << "    }\n\n";
+        out << "protected:\n";
+
+        for (auto& message : m_messages | std::views::values)
+        {
+            out << std::format("    DecoderStatus handle({}Decoder&) {{ return DecoderStatus::Success; }}\n", message.m_name);
+        }
+
+        out << "};\n\n";
+        out << "} // namespace org::limitless::fix::generated\n\n";
+        out << "#endif // SIMD_FIX_MESSAGE_HANDLER_HPP\n";
+    }
+
+    void generateDecoders(const char* directory)
+    {
+        std::string messageFile{directory};
+        messageFile.append("/Messages.hpp");
+        std::ofstream messagesOut(messageFile);
+        if (messagesOut)
+        {
+            generateStructs(messagesOut);
+        }
+        else
+        {
+            std::println("Error: could not open '{}' for writing", directory);
+        }
+        messagesOut.close();
     }
 };
 
@@ -356,8 +477,30 @@ int main(int argc, char** argv)
 
     Generator generator{};
     generator.process(doc);
-    //generator.print();
-    generator.generateGrammar(std::cout);
-    //generator.generateMessages(std::cout);
+
+    std::string grammarFile{argv[2]};
+    grammarFile.append("/Grammar.hpp");
+    std::ofstream grammarOut(grammarFile);
+    if (!grammarOut)
+    {
+        std::println("Error: could not open '{}' for writing", argv[2]);
+        return 1;
+    }
+    generator.generateGrammar(grammarOut);
+    grammarOut.close();
+
+    generator.generateDecoders(argv[2]);
+
+    std::string handlerFile{argv[2]};
+    handlerFile.append("/MessageHandler.hpp");
+    std::ofstream handlerOut(handlerFile);
+    if (handlerOut)
+    {
+        generator.generateMessageHandler(handlerOut);
+    }
+    else
+    {
+        std::println("Error: could not open '{}' for writing", handlerFile);
+    }
     return 0;
 }
