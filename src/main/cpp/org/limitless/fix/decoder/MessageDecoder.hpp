@@ -25,7 +25,6 @@ struct MessageDecoder
     std::span<uint16_t> m_tags{};
     uint32_t m_size{};
 
-    // required fields access more than once will be cached
     // FIXME: cache all parsed fields?
     String m_sender{};           // FIXME: configuration and verification
     String m_target{};           // FIXME: configuration and verification
@@ -34,7 +33,7 @@ struct MessageDecoder
 
     MessageDecoder() = default;
 
-    explicit MessageDecoder(const std::span<Token> tokens, const std::span<uint16_t> tags, const uint32_t size)
+    MessageDecoder(const std::span<Token> tokens, const std::span<uint16_t> tags, const uint32_t size)
         : m_tokens{tokens}, m_tags{tags}, m_size(size)
     {
     }

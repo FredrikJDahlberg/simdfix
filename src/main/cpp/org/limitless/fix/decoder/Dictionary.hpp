@@ -12,17 +12,45 @@ namespace org::limitless::fix::decoder {
 
 struct Category
 {
-    enum Values { Null, Int32, String, Message, Component, Group, GroupMember };
+    enum Values { Null, Int32, String, Counter, Struct };
 
     static constexpr std::string_view Names[] = {
-        "Null", "Int32", "String", "Message", "Component", "Group", "GroupMember"
+        "Null", "Int32", "String", "Counter", "Struct"
     };
 
     constexpr Category() : m_value{Null} {}
-
     constexpr Category(const Values value) : m_value{value} {}
-
     constexpr Category(const std::string_view name) : m_value{Null}
+    {
+        for (int i = 0; i < 7; ++i)
+        {
+            if (Names[i] == name)
+            {
+                m_value = static_cast<Values>(i);
+                return;
+            }
+        }
+    }
+
+    [[nodiscard]] constexpr std::string_view name() const { return Names[m_value]; }
+
+    constexpr bool operator==(const Values v) const { return m_value == v; }
+    constexpr bool operator!=(const Values v) const { return m_value != v; }
+
+    Values m_value;
+};
+
+struct Parent
+{
+    enum Values { Null, Message, Component, Group };
+
+    static constexpr std::string_view Names[] = {
+        "Null", "Message", "Component", "Group"
+    };
+
+    constexpr Parent() : m_value{Null} {}
+    constexpr Parent(const Values value) : m_value{value} {}
+    constexpr Parent(const std::string_view name) : m_value{Null}
     {
         for (int i = 0; i < 7; ++i)
         {

@@ -18,7 +18,9 @@
 namespace org::limitless::generator::fix {
 
 namespace decoder = limitless::fix::decoder;
+
 using decoder::Category;
+using decoder::Parent;
 
 struct Type
 {
@@ -39,15 +41,15 @@ struct Field
     std::string m_name;
     std::string m_type;
     int32_t m_length{};
-    Category m_category{};
+    Category m_category{decoder::Category::Null};
+    Parent m_parentCategory{};
     decoder::Presence m_presence{decoder::Presence::Required};
 
     Field() = default;
-
-    Field(const int32_t tag, std::string  name, std::string type, Category category,
-          const int32_t length, const decoder::Presence presence) :
+    Field(const int32_t tag, std::string  name, std::string type,
+          const int32_t length, const decoder::Presence presence, Category category, Parent parent) :
         m_tag(tag), m_name(std::move(name)), m_type(std::move(type)), m_length(length),
-        m_category(category), m_presence{presence}
+        m_category(category), m_parentCategory(parent), m_presence{presence}
     {
     }
 
@@ -57,39 +59,42 @@ struct Field
     Field& operator=(Field&& other) noexcept = default;
 };
 
-// message or component
-struct Struct
+struct Record
 {
     std::string m_name{};
     std::string m_id{};
-    Category m_category{};
+    Parent m_category{};
     std::vector<Field> m_fields{};
+    std::vector<Field> m_structs{};
 
-    Struct() = default;
+    Record() = default;
 
-    Struct(std::string name, std::string id, const Category type, const std::vector<Field>& fields)
+    Record(std::string name, std::string id, const Parent type, const std::vector<Field>& fields)
         : m_name(std::move(name)), m_id(std::move(id)), m_category(type), m_fields{fields}
     {
     }
 
-    Struct(const Struct& other) = default;
-    Struct(Struct&& other) noexcept = default;
-    Struct& operator=(const Struct& other) = default;
-    Struct& operator=(Struct&& other) noexcept = default;
+    Record(const Record& other) = default;
+    Record(Record&& other) noexcept = default;
+    Record& operator=(const Record& other) = default;
+    Record& operator=(Record&& other) noexcept = default;
 };
 
 struct Generator
 {
     std::unordered_map<std::string, Type> m_types{};
-    std::unordered_map<std::string, Struct> m_records;
-    std::unordered_map<std::string, Struct> m_messages;
+    std::unordered_map<std::string, Record> m_recordsByName{};
+    std::vector<Record> m_records{};
+    std::vector<Record> m_grammar{};
 
-    void process(const pugi::xml_document& doc)
+    static std::string camelCase(const std::string& value)
     {
-        const pugi::xml_node protocol = doc.child("protocol");
-        processTypes(protocol.child("types").children());
-        processComponents(protocol.select_nodes(".//component|.//group"));
-        processMessages(protocol.children("message"));
+        std::string result{value};
+        if (!value.empty())
+        {
+            result[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(result[0])));
+        }
+        return result;
     }
 
     void processTypes(const pugi::xml_object_range<pugi::xml_node_iterator>& types)
@@ -124,34 +129,8 @@ struct Generator
         }
     }
 
-    void processComponents(const pugi::xpath_node_set& components)
-    {
-        for (const auto& xpathNode : components)
-        {
-            const auto node = xpathNode.node();
-            std::string_view name = node.attribute("name").as_string();
-            std::vector<Field> fields{};
-            processFields(node.children(), fields);
-            auto category = std::strcmp(node.name(), "component") == 0 ? Category::Component : Category::Group;
-            m_records.try_emplace(std::string{name}, std::string{name}, std::string{}, category, fields);
-        }
-    }
-
-    void processMessages(const pugi::xml_object_range<pugi::xml_named_node_iterator>& messages)
-    {
-        for (auto& message : messages)
-        {
-            std::string_view name = message.attribute("name").as_string();
-            std::string_view id = message.attribute("id").as_string();
-            std::vector<Field> fields{};
-            processFields(message.children(), fields);
-            m_messages.try_emplace(std::string{name}, std::string{name}, std::string{id}, Category::Message, fields);
-        }
-    }
-
     void processFields(const pugi::xml_object_range<pugi::xml_node_iterator>& nodes,
-                       std::vector<Field>& fields,
-                       const bool inGroup = false)
+                       const Parent parent, std::vector<Field>& fields)
     {
         for (const auto& field : nodes)
         {
@@ -160,25 +139,27 @@ struct Generator
             const int32_t tag = field.attribute("tag").as_int();
             const std::string_view type = field.attribute("type").as_string();
             const std::string_view primitive = field.attribute("primitiveType").as_string();
-            const std::string resolvedType = std::string{type.empty() ? primitive : type};
+            const auto resolvedType = std::string{type.empty() ? primitive : type};
             const std::string_view presenceAttr = field.attribute("presence").as_string();
             decoder::Presence presence{presenceAttr};
             auto refType = m_types.find(resolvedType);
             if (nodeType == "group")
             {
-                const auto counterName = field.attribute("counter").as_string();
+                // const auto counterName = field.attribute("counter").as_string();
                 const auto groupName = field.attribute("name").as_string();
-                Field counter{tag, std::string{counterName}, std::string{groupName}, Category::Group, 0, presence};
-                fields.emplace_back(std::move(counter));
+                fields.emplace_back(0, std::string{groupName}, std::string{groupName}, 0, presence,
+                                    Category::Struct, parent);
+                // fields.emplace_back(tag, std::string{counterName}, std::string{groupName}, 0, presence,
+                //                    Category::Counter, parent);
             }
             else
             {
                 if (refType == m_types.end())
                 {
-                    auto compType = m_records.find(resolvedType);
-                    if (compType != m_records.end())
+                    auto record = m_recordsByName.find(resolvedType);
+                    if (record != m_recordsByName.end())
                     {
-                        fields.append_range(compType->second.m_fields);
+                        fields.emplace_back(0, std::string{name}, std::string{type}, 0, presence, Category::Struct, parent);
                     }
                     else
                     {
@@ -187,33 +168,51 @@ struct Generator
                 }
                 else
                 {
-                    const int32_t length = std::max(field.attribute("length").as_int(), refType->second.m_length);
-                    const Category typeName = inGroup ? Category::GroupMember : refType->second.m_type;
-                    fields.emplace_back(tag, std::string{name}, std::string{type}, typeName, length, presence);
+                    const auto& ref = refType->second;
+                    const int32_t length = std::max(field.attribute("length").as_int(), ref.m_length);
+                    fields.emplace_back(tag, std::string{name}, std::string{type}, length, presence, ref.m_type, parent);
                 }
             }
         }
     }
 
-    static void generateGrammarStruct(std::ostream& out, const Struct& component)
+    void processRecords(const pugi::xpath_node_set& components, const Parent parent)
     {
-        auto sorted = component.m_fields;
-        std::ranges::sort(sorted, {}, &Field::m_tag);
-        out << std::format("struct {} {{\n", component.m_name);
-        out << "    static constexpr uint16_t Tags[] = {\n";
-        for (auto& field : sorted)
+        for (const auto& xpathNode : components)
         {
-            out << std::format("        {},\n", field.m_tag);
+            const auto node = xpathNode.node();
+            std::string_view name = node.attribute("name").as_string();
+            std::vector<Field> fields{};
+            processFields(node.children(), parent, fields);
+
+            Record record{std::string{name}, std::string{}, parent, fields};
+            if (parent == Parent::Message)
+            {
+                record.m_id = node.attribute("id").as_string();
+            }
+
+            //std::vector<const Field*> structs{};
+            for (const auto& field : fields)
+            {
+                if (field.m_category == Category::Struct)
+                {
+                    record.m_structs.push_back(field);
+                }
+            }
+
+            m_recordsByName.emplace(std::string{name}, record);
+            m_records.emplace_back(record);
+            m_grammar.emplace_back(record);
         }
-        out << "    };\n\n";
-        out << "    static constexpr decoder::Dictionary Grammar[] = {\n";
-        for (auto& field : sorted)
-        {
-            out << std::format("        {{ {}, {}, decoder::Presence::{} }},\n",
-                               field.m_tag, field.m_length, field.m_presence.name());
-        }
-        out << "    };\n";
-        out << "};\n\n";
+    }
+
+    void process(const pugi::xml_document& doc)
+    {
+        const pugi::xml_node protocol = doc.child("protocol");
+        processTypes(protocol.child("types").children());
+        processRecords(protocol.select_nodes(".//group"), Parent::Group);
+        processRecords(protocol.select_nodes(".//component"), Parent::Component);
+        processRecords(protocol.select_nodes(".//message"), Parent::Message);
     }
 
     void generateGrammar(std::ostream& out) const
@@ -223,100 +222,98 @@ struct Generator
         out << "#include \"org/limitless/fix/decoder/Dictionary.hpp\"\n\n";
         out << "namespace org::limitless::fix::protocols {\n";
 
-        for (const auto& record: m_records | std::views::values)
+        for (const auto& record: m_grammar)
         {
-            generateGrammarStruct(out, record);
-        }
+            auto sorted = record.m_fields;
 
-        for (const auto& message: m_messages | std::views::values)
-        {
-            generateGrammarStruct(out, message);
+            std::ranges::sort(sorted, {}, &Field::m_tag);
+            out << std::format("struct {} {{\n", record.m_name);
+            out << "    static constexpr uint16_t Tags[] = {\n";
+            for (auto& field : sorted)
+            {
+                out << std::format("        {},\n", field.m_tag);
+            }
+            out << "    };\n\n";
+            out << "    static constexpr decoder::Dictionary Grammar[] = {\n";
+            for (auto& field : sorted)
+            {
+                out << std::format("        {{ {}, {}, decoder::Presence::{} }},\n",
+                                   field.m_tag, field.m_length, field.m_presence.name());
+            }
+            out << "    };\n";
+            out << "};\n\n";
         }
         out << "}\n\n";
         out << "#endif //SIMD_FIX_GRAMMAR_HPP\n";
     }
 
-    static void generateStruct(std::ostream& out, const Struct& component)
+    static void generateStruct(std::ostream& out, const Record& record)
     {
-        auto& name = component.m_name;
-        auto& id   = component.m_id;
-
-        std::vector<const Field*> groups;
-        for (auto& field : component.m_fields)
-        {
-            if (field.m_category == Category::Group)
-            {
-                groups.push_back(&field);
-            }
-        }
-        if (component.m_category != Category::Message)
+        auto& name = record.m_name;
+        auto& id   = record.m_id;
+        if (record.m_category != Parent::Message)
         {
             out << "template <typename Message>\n";
         }
-        if (component.m_category == Category::Message)
+
+        std::string decoder;
+        if (record.m_category == Parent::Group)
         {
-            std::string decoder = std::format("decoder::MessageDecoder<protocols::{}>", name);
+            decoder = "decoder::GroupDecoder<Message>";
             out << std::format("struct {}Decoder : {}\n{{\n", name, decoder);
-            out << "    using Message = " << decoder << ";\n";
-            out << std::format("    using Header = StandardHeaderDecoder<Message>;\n");
-            out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", id);
-            out << "    Header m_header{this};\n";
         }
         else
         {
-            std::string decoder = "decoder::GroupDecoder<Message>";
+            decoder = std::format("decoder::MessageDecoder<protocols::{}>", name);
             out << std::format("struct {}Decoder : {}\n{{\n", name, decoder);
         }
-        for (auto* group : groups)
+        if (record.m_category == Parent::Message)
         {
-            auto fieldName = group->m_type;
-            fieldName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(fieldName[0])));
-            out << std::format("    {}Decoder<Message> m_{};\n", group->m_type, fieldName);
+            out << "    using Message = " << decoder << ";\n";
         }
-
-        out << std::format("    {}Decoder() = default;\n\n", name);
-        if (component.m_category != Category::Group)
+        if (!record.m_structs.empty())
+        {
+            out << "private:\n";
+            for (auto& ref : record.m_structs)
+            {
+                out << std::format("    {}Decoder<Message> m_{};\n\n", ref.m_type, camelCase(ref.m_type));
+            }
+        }
+        out << "public:\n";
+        if (record.m_category == Parent::Message)
+        {
+            out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", id);
+            out << std::format("    {}Decoder() {{}}\n\n", name);
+        }
+        if (record.m_category != Parent::Group)
         {
             out << std::format("    {}Decoder& wrap(const std::span<const uint8_t> data,\n", name);
             out << "                        const std::span<Token> tokens,\n";
             out << "                        const std::span<uint16_t> tags,\n";
             out << "                        const uint32_t count)\n";
             out << "    {\n";
-            out << "        Message::wrap(data, tokens, tags, count);\n";
+            out << "        MessageDecoder::wrap(data, tokens, tags, count);\n";
             out << "        return *this;\n";
             out << "    }\n\n";
         }
         else
         {
-            out << std::format("    {}Decoder& wrap()\n    {{\n", component.m_name);
-            auto memberName = component.m_name;
-            memberName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(memberName[0])));
+            out << std::format("    {}Decoder& wrap()\n    {{\n", record.m_name);
             out << std::format("        decoder::GroupDecoder<Message>::wrap(decoder::GroupDecoder<Message>::next(627));\n");
             out << "        return *this;\n";
             out << "    }\n\n";
         }
-        if (component.m_category != Category::Message)
+        for (const auto& ref : record.m_structs)
         {
-            out << std::format("    explicit {}Decoder(const Message* grammar) : decoder::GroupDecoder<Message>(100, grammar)\n", component.m_name);
-            out << "    {\n    }\n";
+            auto fieldName = ref.m_type;
+            fieldName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(fieldName[0])));
+            out << std::format("    {}Decoder<Message> {}() {{\n", ref.m_type, fieldName);
+            out << std::format("        return m_{};\n", fieldName);
+            out << std::format("    }}\n\n");
         }
 
-        /*
-        for (auto* group : groups)
+        for (auto& field : record.m_fields)
         {
-        out << std::format("    {}Decoder<Message>& wrap()\n", group->m_type);
-            out << "    {\n";
-            out << std::format("        return decoder::GroupDecoder<Message>::wrap(decoder::GroupDecoder<Message>::next({}));\n",
-                               group->m_tag);
-            out << "    }\n\n";
-        }
-*/
-        for (auto& field : component.m_fields)
-        {
-            if (field.m_category == Category::GroupMember)
-            {
-                continue;
-            }
             auto methodName = field.m_name;
             methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
             std::string_view mandatory = field.m_presence.m_value == decoder::Presence::Required ? "true" : "false";
@@ -327,7 +324,7 @@ struct Generator
                 out << std::format("        return this->getString<{}>({});\n", field.m_tag, mandatory);
                 out << "    }\n\n";
             }
-            else
+            else if (field.m_category != Category::Struct)
             {
                 out << std::format("    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> {}() const\n", methodName);
                 out << "    {\n";
@@ -335,23 +332,10 @@ struct Generator
                 out << "    }\n\n";
             }
         }
-
-        if (component.m_category == Category::Message)
-        {
-            out << "    Header& header() { return m_header; }\n";
-        }
-        for (auto* group : groups)
-        {
-            auto groupName = group->m_type;
-            groupName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(groupName[0])));
-            out << std::format("    {}Decoder<Message>& {}() {{\n", group->m_type, groupName);
-            out << std::format("        return m_{}.wrap();\n",groupName);
-            out << "    }\n";
-        }
         out << "};\n\n";
     }
 
-    void generateStructs(std::ostream& out)
+    void generateMessages(std::ostream& out) const
     {
         out << "#ifndef SIMD_FIX_MESSAGES_HPP\n";
         out << "#define SIMD_FIX_MESSAGES_HPP\n\n";
@@ -363,14 +347,9 @@ struct Generator
         out << "namespace org::limitless::fix::generated {\n\n";
         out << "using namespace org::limitless::fix;\n\n";
 
-        for (auto& record : m_records | std::views::values)
+        for (auto& record : m_records)
         {
             generateStruct(out, record);
-        }
-
-        for (auto& message : m_messages | std::views::values)
-        {
-            generateStruct(out, message);
         }
 
         out << "} // namespace org::limitless::fix::generated\n\n";
@@ -388,7 +367,15 @@ struct Generator
         out << "template <typename Handler>\n";
         out << "class MessageHandler\n{\n";
 
-        for (auto& message : m_messages | std::views::values)
+        std::vector<Record> messages{};
+        for (const auto& record : m_records)
+        {
+            if (!record.m_id.empty())
+            {
+                messages.push_back(record);
+            }
+        }
+        for (auto& message : messages)
         {
             auto memberName = message.m_name;
             memberName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(memberName[0])));
@@ -410,33 +397,31 @@ struct Generator
         out << "        auto status = DecoderStatus::InvalidMessageType;\n";
         out << "        switch (messageType)\n";
         out << "        {\n";
-
-        for (auto& message : m_messages | std::views::values)
+        for (auto& message : messages)
         {
-            auto memberName = message.m_name;
-            memberName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(memberName[0])));
-            out << std::format("            case {}Decoder::MessageId:\n", message.m_name);
-            out << std::format("                m_{}.wrap(data, tokens, tags, count);\n", memberName);
-            out << std::format("                status = m_{}.checkRequired();\n", memberName);
-            out << "                if (status == DecoderStatus::Success)\n";
-            out << "                {\n";
-            out << std::format("                    status = receive(m_{});\n", memberName);
-            out << "                }\n";
-            out << "                break;\n";
+            if (!message.m_id.empty())
+            {
+                auto memberName = camelCase(message.m_name);
+                out << std::format("            case {}Decoder::MessageId:\n", message.m_name);
+                out << std::format("                m_{}.wrap(data, tokens, tags, count);\n", memberName);
+                out << std::format("                status = m_{}.checkRequired();\n", memberName);
+                out << "                if (status == DecoderStatus::Success)\n";
+                out << "                {\n";
+                out << std::format("                    status = receive(m_{});\n", memberName);
+                out << "                }\n";
+                out << "                break;\n";
+            }
         }
-
         out << "            default:\n";
         out << "                break;\n";
         out << "        }\n";
         out << "        return status;\n";
         out << "    }\n\n";
         out << "protected:\n";
-
-        for (auto& message : m_messages | std::views::values)
+        for (auto& message : messages)
         {
             out << std::format("    DecoderStatus handle({}Decoder&) {{ return DecoderStatus::Success; }}\n", message.m_name);
         }
-
         out << "};\n\n";
         out << "} // namespace org::limitless::fix::generated\n\n";
         out << "#endif // SIMD_FIX_MESSAGE_HANDLER_HPP\n";
@@ -449,7 +434,7 @@ struct Generator
         std::ofstream messagesOut(messageFile);
         if (messagesOut)
         {
-            generateStructs(messagesOut);
+            generateMessages(messagesOut);
         }
         else
         {

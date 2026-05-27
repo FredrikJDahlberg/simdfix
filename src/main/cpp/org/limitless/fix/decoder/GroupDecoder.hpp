@@ -24,6 +24,10 @@ protected:
     uint32_t m_offset{};
 
 public:
+    GroupDecoder() : m_message(nullptr)
+    {
+    }
+
     // const uint32_t groupType,
     explicit GroupDecoder(const Message* grammar) : m_message(grammar)// , m_groupType(groupType)
     {
