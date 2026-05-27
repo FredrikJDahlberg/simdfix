@@ -65,7 +65,7 @@ struct Record
     std::string m_id{};
     Parent m_category{};
     std::vector<Field> m_fields{};
-    std::vector<Field> m_structs{};
+    std::vector<Field> m_records{};
 
     Record() = default;
 
@@ -145,12 +145,12 @@ struct Generator
             auto refType = m_types.find(resolvedType);
             if (nodeType == "group")
             {
-                // const auto counterName = field.attribute("counter").as_string();
                 const auto groupName = field.attribute("name").as_string();
                 fields.emplace_back(0, std::string{groupName}, std::string{groupName}, 0, presence,
                                     Category::Struct, parent);
-                // fields.emplace_back(tag, std::string{counterName}, std::string{groupName}, 0, presence,
-                //                    Category::Counter, parent);
+                const auto counterName = field.attribute("counter").as_string();
+                fields.emplace_back(tag, std::string{counterName}, std::string{groupName}, 0, presence,
+                                    Category::Counter, parent);
             }
             else
             {
@@ -190,13 +190,11 @@ struct Generator
             {
                 record.m_id = node.attribute("id").as_string();
             }
-
-            //std::vector<const Field*> structs{};
             for (const auto& field : fields)
             {
                 if (field.m_category == Category::Struct)
                 {
-                    record.m_structs.push_back(field);
+                    record.m_records.push_back(field);
                 }
             }
 
@@ -215,8 +213,14 @@ struct Generator
         processRecords(protocol.select_nodes(".//message"), Parent::Message);
     }
 
-    void generateGrammar(std::ostream& out) const
+    void generateGrammar(const std::string& grammarFile) const
     {
+        std::ofstream out(grammarFile);
+        if (!out)
+        {
+            std::println("Error: could not open '{}' for writing", grammarFile);
+            return;
+        }
         out << "#ifndef SIMD_FIX_GRAMMAR_HPP\n";
         out << "#define SIMD_FIX_GRAMMAR_HPP\n\n";
         out << "#include \"org/limitless/fix/decoder/Dictionary.hpp\"\n\n";
@@ -245,6 +249,7 @@ struct Generator
         }
         out << "}\n\n";
         out << "#endif //SIMD_FIX_GRAMMAR_HPP\n";
+        out.close();
     }
 
     static void generateStruct(std::ostream& out, const Record& record)
@@ -271,12 +276,12 @@ struct Generator
         {
             out << "    using Message = " << decoder << ";\n";
         }
-        if (!record.m_structs.empty())
+        if (!record.m_records.empty())
         {
             out << "private:\n";
-            for (auto& ref : record.m_structs)
+            for (auto& comp : record.m_records)
             {
-                out << std::format("    {}Decoder<Message> m_{};\n\n", ref.m_type, camelCase(ref.m_type));
+                out << std::format("    {}Decoder<Message> m_{}{{}};\n\n", comp.m_type, camelCase(comp.m_name));
             }
         }
         out << "public:\n";
@@ -303,15 +308,13 @@ struct Generator
             out << "        return *this;\n";
             out << "    }\n\n";
         }
-        for (const auto& ref : record.m_structs)
+        for (const auto& comp : record.m_records)
         {
-            auto fieldName = ref.m_type;
-            fieldName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(fieldName[0])));
-            out << std::format("    {}Decoder<Message> {}() {{\n", ref.m_type, fieldName);
-            out << std::format("        return m_{};\n", fieldName);
+            auto name = camelCase(comp.m_name);
+            out << std::format("    {}Decoder<Message> {}()\n    {{\n", comp.m_type, name);
+            out << std::format("        return m_{};\n", name);
             out << std::format("    }}\n\n");
         }
-
         for (auto& field : record.m_fields)
         {
             auto methodName = field.m_name;
@@ -324,7 +327,7 @@ struct Generator
                 out << std::format("        return this->getString<{}>({});\n", field.m_tag, mandatory);
                 out << "    }\n\n";
             }
-            else if (field.m_category != Category::Struct)
+            else if (field.m_category != Category::Struct && field.m_category != Category::Counter)
             {
                 out << std::format("    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> {}() const\n", methodName);
                 out << "    {\n";
@@ -335,8 +338,15 @@ struct Generator
         out << "};\n\n";
     }
 
-    void generateMessages(std::ostream& out) const
+    void generateMessageDecoders(const std::string& fileName) const
     {
+        std::ofstream out(fileName);
+        if (!out)
+        {
+            std::println("Error: could not open '{}' for writing", fileName);
+            return;
+        }
+
         out << "#ifndef SIMD_FIX_MESSAGES_HPP\n";
         out << "#define SIMD_FIX_MESSAGES_HPP\n\n";
         out << "#include <expected>\n\n";
@@ -346,26 +356,23 @@ struct Generator
         out << "#include \"org/limitless/fix/messages/Grammar.hpp\"\n\n";
         out << "namespace org::limitless::fix::generated {\n\n";
         out << "using namespace org::limitless::fix;\n\n";
-
         for (auto& record : m_records)
         {
             generateStruct(out, record);
         }
-
         out << "} // namespace org::limitless::fix::generated\n\n";
         out << "#endif //SIMD_FIX_MESSAGES_HPP\n";
+        out.close();
     }
 
-    void generateMessageHandler(std::ostream& out)
+    void generateMessageHandler(const std::string& fileName) const
     {
-        out << "#ifndef SIMD_FIX_MESSAGE_HANDLER_HPP\n";
-        out << "#define SIMD_FIX_MESSAGE_HANDLER_HPP\n\n";
-        out << "#include \"org/limitless/fix/decoder/DecoderStatus.hpp\"\n";
-        out << "#include \"org/limitless/fix/messages/Messages.hpp\"\n\n";
-        out << "namespace org::limitless::fix::generated {\n\n";
-        out << "using decoder::DecoderStatus;\n\n";
-        out << "template <typename Handler>\n";
-        out << "class MessageHandler\n{\n";
+        std::ofstream out(fileName);
+        if (!out)
+        {
+            std::println("Error: could not open '{}' for writing", fileName);
+            return;
+        }
 
         std::vector<Record> messages{};
         for (const auto& record : m_records)
@@ -375,13 +382,21 @@ struct Generator
                 messages.push_back(record);
             }
         }
+
+        out << "#ifndef SIMD_FIX_MESSAGE_HANDLER_HPP\n";
+        out << "#define SIMD_FIX_MESSAGE_HANDLER_HPP\n\n";
+        out << "#include \"org/limitless/fix/decoder/DecoderStatus.hpp\"\n";
+        out << "#include \"org/limitless/fix/messages/Messages.hpp\"\n\n";
+        out << "namespace org::limitless::fix::generated {\n\n";
+        out << "using decoder::DecoderStatus;\n\n";
+        out << "template <typename Handler>\n";
+        out << "class MessageHandler\n{\n";
         for (auto& message : messages)
         {
             auto memberName = message.m_name;
             memberName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(memberName[0])));
             out << std::format("    {}Decoder m_{}{{}};\n", message.m_name, memberName);
         }
-
         out << "\npublic:\n";
         out << "    template <typename Event>\n";
         out << "    DecoderStatus receive(Event&& event)\n";
@@ -399,18 +414,15 @@ struct Generator
         out << "        {\n";
         for (auto& message : messages)
         {
-            if (!message.m_id.empty())
-            {
-                auto memberName = camelCase(message.m_name);
-                out << std::format("            case {}Decoder::MessageId:\n", message.m_name);
-                out << std::format("                m_{}.wrap(data, tokens, tags, count);\n", memberName);
-                out << std::format("                status = m_{}.checkRequired();\n", memberName);
-                out << "                if (status == DecoderStatus::Success)\n";
-                out << "                {\n";
-                out << std::format("                    status = receive(m_{});\n", memberName);
-                out << "                }\n";
-                out << "                break;\n";
-            }
+            auto memberName = camelCase(message.m_name);
+            out << std::format("            case {}Decoder::MessageId:\n", message.m_name);
+            out << std::format("                m_{}.wrap(data, tokens, tags, count);\n", memberName);
+            out << std::format("                status = m_{}.checkRequired();\n", memberName);
+            out << "                if (status == DecoderStatus::Success)\n";
+            out << "                {\n";
+            out << std::format("                    status = receive(m_{});\n", memberName);
+            out << "                }\n";
+            out << "                break;\n";
         }
         out << "            default:\n";
         out << "                break;\n";
@@ -425,22 +437,6 @@ struct Generator
         out << "};\n\n";
         out << "} // namespace org::limitless::fix::generated\n\n";
         out << "#endif // SIMD_FIX_MESSAGE_HANDLER_HPP\n";
-    }
-
-    void generateDecoders(const char* directory)
-    {
-        std::string messageFile{directory};
-        messageFile.append("/Messages.hpp");
-        std::ofstream messagesOut(messageFile);
-        if (messagesOut)
-        {
-            generateMessages(messagesOut);
-        }
-        else
-        {
-            std::println("Error: could not open '{}' for writing", directory);
-        }
-        messagesOut.close();
     }
 };
 
@@ -465,27 +461,14 @@ int main(int argc, char** argv)
 
     std::string grammarFile{argv[2]};
     grammarFile.append("/Grammar.hpp");
-    std::ofstream grammarOut(grammarFile);
-    if (!grammarOut)
-    {
-        std::println("Error: could not open '{}' for writing", argv[2]);
-        return 1;
-    }
-    generator.generateGrammar(grammarOut);
-    grammarOut.close();
+    generator.generateGrammar(grammarFile);
 
-    generator.generateDecoders(argv[2]);
+    std::string decodersFile{argv[2]};
+    decodersFile.append("/Messages.hpp"); // FIXME naming
+    generator.generateMessageDecoders(decodersFile);
 
     std::string handlerFile{argv[2]};
     handlerFile.append("/MessageHandler.hpp");
-    std::ofstream handlerOut(handlerFile);
-    if (handlerOut)
-    {
-        generator.generateMessageHandler(handlerOut);
-    }
-    else
-    {
-        std::println("Error: could not open '{}' for writing", handlerFile);
-    }
+    generator.generateMessageHandler(handlerFile);
     return 0;
 }
