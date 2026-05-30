@@ -199,20 +199,16 @@ struct Generator
 
             m_recordsByType.emplace(std::string{name}, record);
             m_records.emplace_back(record);
-            // m_grammar.emplace_back(record);
         }
     }
 
     void resolveGrammar(Record& oldRrecord)
     {
-        auto record = oldRrecord;
-        std::println("process = {}", record.m_name);
+        auto record = oldRrecord; // copy
         while (!record.m_records.empty())
         {
             const auto& ref = record.m_records.back();
-            std::println("process: {} = {}, {}", record.m_name, ref.m_name, ref.m_type);
-            const auto found = m_recordsByType.find(ref.m_type);
-            if (found != m_recordsByType.end())
+            if (const auto found = m_recordsByType.find(ref.m_type); found != m_recordsByType.end())
             {
                 const auto& component = found->second;
                 record.m_fields.append_range(component.m_fields);
@@ -221,7 +217,7 @@ struct Generator
             }
             else
             {
-                std::println("Key not found = {}, {}", ref.m_name, ref.m_type);
+                std::println("Record not found = {}, {}", ref.m_name, ref.m_type);
             }
         }
         m_grammar.push_back(record);
@@ -497,7 +493,7 @@ int main(int argc, char** argv)
     generator.generateGrammar(grammarFile);
 
     std::string decodersFile{argv[2]};
-    decodersFile.append("/Messages.hpp"); // FIXME naming
+    decodersFile.append("/Messages.hpp"); // FIXME: MessageDecoders
     generator.generateMessageDecoders(decodersFile);
 
     std::string handlerFile{argv[2]};
