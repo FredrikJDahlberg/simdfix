@@ -14,8 +14,6 @@ struct GroupDecoder
 {
 protected:
     const Message* m_message;
-    // const uint32_t m_groupType;
-
     std::span<Token> m_tokens{};
 
     uint32_t m_count{};
@@ -28,8 +26,7 @@ public:
     {
     }
 
-    // const uint32_t groupType,
-    explicit GroupDecoder(const Message* grammar) : m_message(grammar)// , m_groupType(groupType)
+    explicit GroupDecoder(const Message* grammar) : m_message(grammar)
     {
     }
 
@@ -88,7 +85,7 @@ public:
         ++m_repeat;
     }
 
-    [[nodiscard]] size_t count() const
+    [[nodiscard]] uint32_t count() const
     {
         return m_count;
     }

@@ -83,7 +83,7 @@ struct Record
 struct Generator
 {
     std::unordered_map<std::string, Type> m_types{};
-    std::unordered_map<std::string, Record> m_recordsByName{};
+    std::unordered_map<std::string, Record> m_recordsByType{};
     std::vector<Record> m_records{};
     std::vector<Record> m_grammar{};
 
@@ -111,7 +111,6 @@ struct Generator
             const std::string_view type = typeNode.attribute("type").as_string();
             auto primitiveType = m_types.find(std::string{primitive});
             auto refType = m_types.find(std::string{type});
-
             if (!primitive.empty() && primitiveType == m_types.end())
             {
                 std::println("Error: type '{}' has an invalid primitive type '{}'", name, primitive);
@@ -156,8 +155,8 @@ struct Generator
             {
                 if (refType == m_types.end())
                 {
-                    auto record = m_recordsByName.find(resolvedType);
-                    if (record != m_recordsByName.end())
+                    auto record = m_recordsByType.find(resolvedType);
+                    if (record != m_recordsByType.end())
                     {
                         fields.emplace_back(0, std::string{name}, std::string{type}, 0, presence, Category::Struct, parent);
                     }
@@ -198,10 +197,34 @@ struct Generator
                 }
             }
 
-            m_recordsByName.emplace(std::string{name}, record);
+            m_recordsByType.emplace(std::string{name}, record);
             m_records.emplace_back(record);
-            m_grammar.emplace_back(record);
+            // m_grammar.emplace_back(record);
         }
+    }
+
+    void resolveGrammar(Record& oldRrecord)
+    {
+        auto record = oldRrecord;
+        std::println("process = {}", record.m_name);
+        while (!record.m_records.empty())
+        {
+            const auto& ref = record.m_records.back();
+            std::println("process: {} = {}, {}", record.m_name, ref.m_name, ref.m_type);
+            const auto found = m_recordsByType.find(ref.m_type);
+            if (found != m_recordsByType.end())
+            {
+                const auto& component = found->second;
+                record.m_fields.append_range(component.m_fields);
+                record.m_records.pop_back();
+                record.m_records.append_range(component.m_records);
+            }
+            else
+            {
+                std::println("Key not found = {}, {}", ref.m_name, ref.m_type);
+            }
+        }
+        m_grammar.push_back(record);
     }
 
     void process(const pugi::xml_document& doc)
@@ -211,6 +234,13 @@ struct Generator
         processRecords(protocol.select_nodes(".//group"), Parent::Group);
         processRecords(protocol.select_nodes(".//component"), Parent::Component);
         processRecords(protocol.select_nodes(".//message"), Parent::Message);
+
+        for (auto& record : m_records)
+        {
+            resolveGrammar(record);
+        }
+        std::println("Records = {}", m_records.size());
+        std::println("Grammar = {}", m_grammar.size());
     }
 
     void generateGrammar(const std::string& grammarFile) const
@@ -229,7 +259,6 @@ struct Generator
         for (const auto& record: m_grammar)
         {
             auto sorted = record.m_fields;
-
             std::ranges::sort(sorted, {}, &Field::m_tag);
             out << std::format("struct {} {{\n", record.m_name);
             out << "    static constexpr uint16_t Tags[] = {\n";
@@ -290,6 +319,10 @@ struct Generator
             out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", id);
             out << std::format("    {}Decoder() {{}}\n\n", name);
         }
+        out << "// FIXME: constructor with this\n";
+        out << std::format("    {}Decoder(const Message* grammar) : MessageDecoder<protocols::{}>(grammar) {{}}\n",
+                           record.m_name, record.m_name);
+
         if (record.m_category != Parent::Group)
         {
             out << std::format("    {}Decoder& wrap(const std::span<const uint8_t> data,\n", name);
@@ -310,9 +343,9 @@ struct Generator
         }
         for (const auto& comp : record.m_records)
         {
-            auto name = camelCase(comp.m_name);
-            out << std::format("    {}Decoder<Message> {}()\n    {{\n", comp.m_type, name);
-            out << std::format("        return m_{};\n", name);
+            auto fieldName = camelCase(comp.m_name);
+            out << std::format("    {}Decoder<Message> {}()\n    {{\n", comp.m_type, fieldName);
+            out << std::format("        return m_{};\n", fieldName);
             out << std::format("    }}\n\n");
         }
         for (auto& field : record.m_fields)
@@ -327,7 +360,7 @@ struct Generator
                 out << std::format("        return this->getString<{}>({});\n", field.m_tag, mandatory);
                 out << "    }\n\n";
             }
-            else if (field.m_category != Category::Struct && field.m_category != Category::Counter)
+            else if (field.m_category == Category::Int32)
             {
                 out << std::format("    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> {}() const\n", methodName);
                 out << "    {\n";
