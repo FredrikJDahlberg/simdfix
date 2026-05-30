@@ -9,6 +9,9 @@
 
 namespace org::limitless::fix::utils {
 
+// FIXME: restructure
+using String = std::span<const uint8_t>;
+
 inline void print(const uint32_t length, const uint8_t* buffer)
 {
     for (uint32_t i = 0; i < length; ++i)

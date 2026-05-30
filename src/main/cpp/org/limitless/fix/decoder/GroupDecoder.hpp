@@ -5,6 +5,7 @@
 #ifndef SIMD_FIX_GROUP_DECODER_HPP
 #define SIMD_FIX_GROUP_DECODER_HPP
 
+#include "org/limitless/fix/utils/Utils.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
 
 namespace org::limitless::fix::decoder {
@@ -88,6 +89,19 @@ public:
     [[nodiscard]] uint32_t count() const
     {
         return m_count;
+    }
+
+    // FIXME: restructure
+    template <int32_t Tag>
+    [[nodiscard]] std::expected<utils::String, DecoderStatus> getString(const bool required) const
+    {
+        return m_message->template getString<Tag>(required);
+    }
+
+    template <int32_t Tag>
+    [[nodiscard]] std::expected<uint32_t, DecoderStatus> getUnsigned(const bool required) const
+    {
+        return m_message->template getUnsigned<Tag>(required);
     }
 };
 

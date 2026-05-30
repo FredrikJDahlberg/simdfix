@@ -70,7 +70,7 @@ public:
         {
             return { result.processed, result.status };
         }
-        result.status = handler.handle(buffer, std::span(m_tokens, m_count), m_tags, m_count);
+        result.status = handler.handle(buffer, std::span(m_tokens, m_count), std::span(m_tags, m_count), m_count);
         return result;
     }
 

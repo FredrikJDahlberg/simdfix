@@ -18,17 +18,15 @@ namespace org::limitless::fix::decoder {
 template <typename Protocol>
 struct MessageDecoder
 {
-    using String = std::span<const uint8_t>;
-
     std::span<const uint8_t> m_data{};
     std::span<Token> m_tokens{};
     std::span<uint16_t> m_tags{};
     uint32_t m_size{};
 
     // FIXME: cache all parsed fields?
-    String m_sender{};           // FIXME: configuration and verification
-    String m_target{};           // FIXME: configuration and verification
-    String m_sendingTime{};
+    utils::String m_sender{};           // FIXME: configuration and verification
+    utils::String m_target{};           // FIXME: configuration and verification
+    utils::String m_sendingTime{};
     uint32_t m_sequenceNumber{};
 
     MessageDecoder() = default;
@@ -38,12 +36,12 @@ struct MessageDecoder
     {
     }
 
-    MessageDecoder(const String data, const std::span<Token> tokens, const std::span<uint16_t> tags, uint32_t size)
+    MessageDecoder(const utils::String data, const std::span<Token> tokens, const std::span<uint16_t> tags, uint32_t size)
         : m_data{data}, m_tokens{tokens}, m_tags{tags}, m_size(size)
     {
     }
 
-    void wrap(const String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const uint32_t size)
+    void wrap(const utils::String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const uint32_t size)
     {
         m_data = data;
         m_tokens = tokens;
@@ -70,7 +68,7 @@ struct MessageDecoder
         return position >= 0 ? Protocol::Grammar[position].type : 0;
     }
 
-    // FIXME: tags not sorted
+    // FIXME: restructure
     [[nodiscard]] Token* next(const uint32_t tag) const
     {
         const auto index = simd::find(m_tags.data(), m_size, tag);
@@ -78,7 +76,7 @@ struct MessageDecoder
     }
 
     template <int32_t Tag>
-    [[nodiscard]] std::expected<String, DecoderStatus> getString(const bool required) const
+    [[nodiscard]] std::expected<utils::String, DecoderStatus> getString(const bool required) const
     {
         const auto token = next(Tag);
         if (token == nullptr)

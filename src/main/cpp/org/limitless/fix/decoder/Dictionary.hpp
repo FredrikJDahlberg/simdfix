@@ -12,7 +12,7 @@ namespace org::limitless::fix::decoder {
 
 struct Category
 {
-    enum Values { Null, Int32, String, Counter, Struct };
+    enum Values { Null, Int32, String, Counter, Struct, Group };
 
     static constexpr std::string_view Names[] = {
         "Null", "Int32", "String", "Counter", "Struct"
