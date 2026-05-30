@@ -12,11 +12,12 @@ include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp ${CMAKE_SOURCE_DIR}/src/tes
 set(MAIN_PATH "src/main/cpp/org/limitless/fix")
 set(GEN_PATH "src/main/cpp/org/limitless/fix/messages")
 set(TEST_PATH "src/test/cpp/org/limitless/fix")
+set(PROTOCOL_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/protocol.xml")
+set(GENERATED_DIR "${CMAKE_SOURCE_DIR}/${GEN_PATH}")
 set(GENERATED_HEADERS
-        ${GEN_PATH}/Grammar.hpp
-        ${GEN_PATH}/LogonDecoder.hpp
-        ${GEN_PATH}/LogoutDecoder.hpp
-        ${GEN_PATH}/MessageHandler.hpp)
+        ${GENERATED_DIR}/Grammar.hpp
+        ${GENERATED_DIR}/MessageDecoders.hpp
+        ${GENERATED_DIR}/MessageHandler.hpp)
 set(FIX_HEADERS
         ${MAIN_PATH}/utils/Utils.hpp
         ${MAIN_PATH}/utils/BitSet64.hpp
@@ -49,6 +50,7 @@ target_include_directories(SimdFixBench PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/test/cpp")
 target_link_libraries(SimdFixBench PRIVATE SimdFix)
+add_dependencies(SimdFixBench GenerateMessages)
 target_compile_definitions(SimdFixBench PRIVATE $<$<CONFIG:Release>:NDEBUG>)
 target_compile_options(SimdFixBench PRIVATE -Wall
         $<$<CONFIG:Debug>:-g -O0 -fsanitize=address -fno-omit-frame-pointer>
@@ -61,14 +63,29 @@ list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/include")
 find_package(pugixml REQUIRED)
 add_executable(Generator src/generator/org/limitless/generator/fix/Generator.cpp)
 target_compile_options(Generator PRIVATE -O0 -Wall)
-target_include_directories(Generator PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/cpp")
+target_include_directories(Generator PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/cpp")
 target_link_libraries(Generator PRIVATE pugixml::pugixml)
+
+add_custom_command(
+        OUTPUT ${GENERATED_HEADERS}
+        COMMAND $<TARGET_FILE:Generator> ${PROTOCOL_XML} ${GENERATED_DIR}
+        DEPENDS Generator
+                ${PROTOCOL_XML}
+                ${CMAKE_SOURCE_DIR}/src/generator/org/limitless/generator/fix/Generator.cpp
+        COMMENT "Generating FIX message headers from protocol.xml"
+        VERBATIM
+)
+add_custom_target(GenerateMessages DEPENDS ${GENERATED_HEADERS})
+add_dependencies(SimdFix GenerateMessages)
 
 function(add_fix_test name source)
     add_executable(${name} ${source})
     target_compile_options(${name} PRIVATE -O0 -Wall -fprofile-instr-generate -fcoverage-mapping)
     target_link_libraries(${name} PRIVATE SimdFix GTest::gtest GTest::gtest_main)
     target_link_options(${name} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address> -fprofile-instr-generate)
+    add_dependencies(${name} GenerateMessages)
 endfunction()
 
 add_fix_test(DecoderTest     "${TEST_PATH}/parser/DecoderTest.cpp")

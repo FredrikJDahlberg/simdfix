@@ -257,7 +257,6 @@ struct Generator
         out << "#include \"org/limitless/fix/decoder/Dictionary.hpp\"\n\n";
         out << "namespace org::limitless::fix::protocols {\n\n";
         out << "using namespace org::limitless::fix::decoder;\n\n";
-
         for (const auto& record: m_grammar)
         {
             auto sorted = record.m_fields;
@@ -291,10 +290,10 @@ struct Generator
         }
         else
         {
-            out << std::format("    {}Decoder({}{}) :\n", record.m_name, arg.empty() ? "" : "const Message* ", arg);
+            out << std::format("    {}Decoder({}{}) :\n", record.m_name, arg.empty() ? "" : "const Meta* ", arg);
             if (record.m_parent == Parent::Group)
             {
-                out << std::format("        decoder::GroupDecoder<Message>({})\n", arg);
+                out << std::format("        decoder::GroupDecoder<Meta>({})\n", arg);
             }
             if (!record.m_records.empty())
             {
@@ -321,8 +320,9 @@ struct Generator
         }
         else
         {
+            out << "    // FIXME: this is null";
             out << std::format("    {}Decoder& wrap()\n    {{\n", record.m_name);
-            out << std::format("        decoder::GroupDecoder<Message>::wrap(decoder::GroupDecoder<Message>::next(627));\n");
+            out << std::format("        decoder::GroupDecoder<Meta>::wrap(decoder::GroupDecoder<Meta>::next(627));\n");
         }
         for (auto& comp : record.m_records)
         {
@@ -349,14 +349,14 @@ struct Generator
             {
                 out << std::format("    [[nodiscard]] std::expected<std::span<const uint8_t>, decoder::DecoderStatus> {}() const\n", methodName);
                 out << "    {\n";
-                out << std::format("        return this->getString<{}>({});\n", field.m_tag, mandatory);
+                out << std::format("        return this->template getString<{}>({});\n", field.m_tag, mandatory);
                 out << "    }\n\n";
             }
             else if (field.m_category == Category::Int32)
             {
                 out << std::format("    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> {}() const\n", methodName);
                 out << "    {\n";
-                out << std::format("        return this->getUnsigned<{}>({});\n", field.m_tag, mandatory);
+                out << std::format("        return this->template getUnsigned<{}>({});\n", field.m_tag, mandatory);
                 out << "    }\n\n";
             }
         }
@@ -369,7 +369,7 @@ struct Generator
             out << "private:\n";
             for (auto& comp : record.m_records)
             {
-                out << std::format("    {}Decoder<Message> m_{};\n\n", comp.m_type, uncap(comp.m_name));
+                out << std::format("    {}Decoder<Meta> m_{};\n\n", comp.m_type, uncap(comp.m_name));
             }
         }
     }
@@ -379,7 +379,7 @@ struct Generator
         for (const auto& comp : record.m_records)
         {
             auto fieldName = uncap(comp.m_name);
-            out << std::format("    {}Decoder<Message> {}()\n    {{\n", comp.m_type, fieldName);
+            out << std::format("    {}Decoder<Meta> {}()\n    {{\n", comp.m_type, fieldName);
             out << std::format("        return m_{};\n", fieldName);
             out << std::format("    }}\n\n");
         }
@@ -389,13 +389,13 @@ struct Generator
     {
         if (record.m_parent != Parent::Message)
         {
-            out << "template <typename Message>\n";
+            out << "template <typename Meta>\n";
         }
 
         std::string decoder;
         if (record.m_parent == Parent::Group)
         {
-            decoder = "decoder::GroupDecoder<Message>";
+            decoder = "decoder::GroupDecoder<Meta>";
             out << std::format("struct {}Decoder : {}\n{{\n", record.m_name, decoder);
         }
         else
@@ -405,23 +405,19 @@ struct Generator
         }
         if (record.m_parent == Parent::Message)
         {
-            out << "    using Message = " << decoder << ";\n";
+            out << "    using Meta = " << decoder << ";\n";
         }
     }
 
     static void generateRecord(std::ostream& out, const Record& record)
     {
-        auto& name = record.m_name;
-
         generateDefinition(out, record);
         generateMembers(out, record);
-
         out << "public:\n";
         if (record.m_parent == Parent::Message)
         {
             out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
         }
-
         generateConstructor(out, record, "");
         generateConstructor(out, record, "message");
         generateWrap(out, record);
@@ -439,8 +435,8 @@ struct Generator
             return;
         }
 
-        out << "#ifndef SIMD_FIX_MESSAGES_HPP\n";
-        out << "#define SIMD_FIX_MESSAGES_HPP\n\n";
+        out << "#ifndef SIMD_FIX_MESSAGE_DECODERS_HPP\n";
+        out << "#define SIMD_FIX_MESSAGE_DECODERS_HPP\n\n";
         out << "#include <expected>\n\n";
         out << "#include \"org/limitless/fix/decoder/DecoderStatus.hpp\"\n";
         out << "#include \"org/limitless/fix/decoder/GroupDecoder.hpp\"\n";
@@ -453,7 +449,8 @@ struct Generator
             generateRecord(out, record);
         }
         out << "} // namespace org::limitless::fix::generated\n\n";
-        out << "#endif //SIMD_FIX_MESSAGES_HPP\n";
+        out << "#endif //SIMD_FIX_MESSAGE_DECODERS_HPP\n";
+
         out.close();
     }
 
@@ -474,20 +471,17 @@ struct Generator
                 messages.push_back(record);
             }
         }
-
         out << "#ifndef SIMD_FIX_MESSAGE_HANDLER_HPP\n";
         out << "#define SIMD_FIX_MESSAGE_HANDLER_HPP\n\n";
         out << "#include \"org/limitless/fix/decoder/DecoderStatus.hpp\"\n";
-        out << "#include \"org/limitless/fix/messages/Messages.hpp\"\n\n";
+        out << "#include \"org/limitless/fix/messages/MessageDecoders.hpp\"\n\n";
         out << "namespace org::limitless::fix::generated {\n\n";
         out << "using decoder::DecoderStatus;\n\n";
         out << "template <typename Handler>\n";
         out << "class MessageHandler\n{\n";
         for (auto& message : messages)
         {
-            auto memberName = message.m_name;
-            memberName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(memberName[0])));
-            out << std::format("    {}Decoder m_{};\n", message.m_name, memberName);
+            out << std::format("    {}Decoder m_{};\n", message.m_name, uncap(message.m_name));
         }
         out << "\npublic:\n";
         out << "    template <typename Event>\n";
@@ -556,7 +550,7 @@ int main(int argc, char** argv)
     generator.generateGrammar(grammarFile);
 
     std::string decodersFile{argv[2]};
-    decodersFile.append("/Messages.hpp"); // FIXME: MessageDecoders
+    decodersFile.append("/MessageDecoders.hpp"); // FIXME: MessageDecoders
     generator.generateMessageDecoders(decodersFile);
 
     std::string handlerFile{argv[2]};
