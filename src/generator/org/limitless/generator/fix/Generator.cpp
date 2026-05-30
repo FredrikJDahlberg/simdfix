@@ -87,7 +87,7 @@ struct Generator
     std::vector<Record> m_records{};
     std::vector<Record> m_grammar{};
 
-    static std::string camelCase(const std::string& value)
+    static std::string uncap(const std::string& value)
     {
         std::string result{value};
         if (!value.empty())
@@ -220,6 +220,7 @@ struct Generator
                 std::println("Record not found = {}, {}", ref.m_name, ref.m_type);
             }
         }
+        std::erase_if(record.m_fields, [](const Field& f) { return f.m_tag == 0; });
         m_grammar.push_back(record);
     }
 
@@ -235,8 +236,6 @@ struct Generator
         {
             resolveGrammar(record);
         }
-        std::println("Records = {}", m_records.size());
-        std::println("Grammar = {}", m_grammar.size());
     }
 
     void generateGrammar(const std::string& grammarFile) const
@@ -250,7 +249,8 @@ struct Generator
         out << "#ifndef SIMD_FIX_GRAMMAR_HPP\n";
         out << "#define SIMD_FIX_GRAMMAR_HPP\n\n";
         out << "#include \"org/limitless/fix/decoder/Dictionary.hpp\"\n\n";
-        out << "namespace org::limitless::fix::protocols {\n";
+        out << "namespace org::limitless::fix::protocols {\n\n";
+        out << "using namespace org::limitless::fix::decoder;\n\n";
 
         for (const auto& record: m_grammar)
         {
@@ -263,10 +263,10 @@ struct Generator
                 out << std::format("        {},\n", field.m_tag);
             }
             out << "    };\n\n";
-            out << "    static constexpr decoder::Dictionary Grammar[] = {\n";
+            out << "    static constexpr Dictionary Grammar[] = {\n";
             for (auto& field : sorted)
             {
-                out << std::format("        {{ {}, {}, decoder::Presence::{} }},\n",
+                out << std::format("        {{ {}, {}, Presence::{} }},\n",
                                    field.m_tag, field.m_length, field.m_presence.name());
             }
             out << "    };\n";
@@ -275,6 +275,25 @@ struct Generator
         out << "}\n\n";
         out << "#endif //SIMD_FIX_GRAMMAR_HPP\n";
         out.close();
+    }
+
+    static void generateConstructor(std::ostream& out, const Record& record, std::string arg = "message")
+    {
+
+        out << std::format("    {}Decoder({}{}) :\n", record.m_name, arg.empty() ? "" : "const Message* ", arg);
+        if (record.m_records.empty())
+        {
+            out << std::format("        decoder::GroupDecoder<Message>({})\n", arg);
+        }
+        else
+        {
+            const auto last = record.m_records.back().m_name;
+            for (auto& comp : record.m_records)
+            {
+                out << std::format("        m_{}({}){}\n", uncap(comp.m_name), arg, comp.m_name != last ? "," : "");
+            }
+        }
+        out << "        {}\n\n";
     }
 
     static void generateStruct(std::ostream& out, const Record& record)
@@ -301,23 +320,23 @@ struct Generator
         {
             out << "    using Message = " << decoder << ";\n";
         }
+
         if (!record.m_records.empty())
         {
             out << "private:\n";
             for (auto& comp : record.m_records)
             {
-                out << std::format("    {}Decoder<Message> m_{}{{}};\n\n", comp.m_type, camelCase(comp.m_name));
+                out << std::format("    {}Decoder<Message> m_{};\n\n", comp.m_type, uncap(comp.m_name));
             }
         }
         out << "public:\n";
         if (record.m_category == Parent::Message)
         {
             out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", id);
-            out << std::format("    {}Decoder() {{}}\n\n", name);
         }
-        out << "// FIXME: constructor with this\n";
-        out << std::format("    {}Decoder(const Message* grammar) : MessageDecoder<protocols::{}>(grammar) {{}}\n",
-                           record.m_name, record.m_name);
+
+        generateConstructor(out, record, "");
+        generateConstructor(out, record);
 
         if (record.m_category != Parent::Group)
         {
@@ -339,7 +358,7 @@ struct Generator
         }
         for (const auto& comp : record.m_records)
         {
-            auto fieldName = camelCase(comp.m_name);
+            auto fieldName = uncap(comp.m_name);
             out << std::format("    {}Decoder<Message> {}()\n    {{\n", comp.m_type, fieldName);
             out << std::format("        return m_{};\n", fieldName);
             out << std::format("    }}\n\n");
@@ -424,7 +443,7 @@ struct Generator
         {
             auto memberName = message.m_name;
             memberName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(memberName[0])));
-            out << std::format("    {}Decoder m_{}{{}};\n", message.m_name, memberName);
+            out << std::format("    {}Decoder m_{};\n", message.m_name, memberName);
         }
         out << "\npublic:\n";
         out << "    template <typename Event>\n";
@@ -443,7 +462,7 @@ struct Generator
         out << "        {\n";
         for (auto& message : messages)
         {
-            auto memberName = camelCase(message.m_name);
+            auto memberName = uncap(message.m_name);
             out << std::format("            case {}Decoder::MessageId:\n", message.m_name);
             out << std::format("                m_{}.wrap(data, tokens, tags, count);\n", memberName);
             out << std::format("                status = m_{}.checkRequired();\n", memberName);
