@@ -5,16 +5,17 @@
 #ifndef SIMD_FIX_GROUP_DECODER_HPP
 #define SIMD_FIX_GROUP_DECODER_HPP
 
+#include "org/limitless/fix/decoder/Dictionary.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
 
 namespace org::limitless::fix::decoder {
 
-template <typename Message>
+template <typename Decoder>
 struct GroupDecoder
 {
 protected:
-    const Message* m_message;
+    const Decoder* m_message;
     std::span<Token> m_tokens{};
 
     uint32_t m_count{};
@@ -27,12 +28,13 @@ public:
     {
     }
 
-    explicit GroupDecoder(const Message* grammar) : m_message(grammar)
+    explicit GroupDecoder(const Decoder* grammar) : m_message(grammar)
     {
     }
 
-    GroupDecoder& wrap()
+    GroupDecoder& wrap(const Decoder* message)
     {
+        m_message = message;
         return *this;
     }
 

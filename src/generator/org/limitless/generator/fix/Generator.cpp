@@ -282,64 +282,42 @@ struct Generator
         out.close();
     }
 
-    static void generateConstructor(std::ostream& out, const Record& record, std::string arg)
+    static void generateConstructor(std::ostream& out, const Record& record)
     {
-        if (arg.empty())
-        {
-            out << std::format("    {}Decoder() = default;\n\n", record.m_name);
-        }
-        else
-        {
-            out << std::format("    {}Decoder({}{}) :\n", record.m_name, arg.empty() ? "" : "const Meta* ", arg);
-            if (record.m_parent == Parent::Group)
-            {
-                out << std::format("        decoder::GroupDecoder<Meta>({})\n", arg);
-            }
-            if (!record.m_records.empty())
-            {
-                const auto last = record.m_records.back().m_name;
-                for (auto& comp : record.m_records)
-                {
-                    out << std::format("        m_{}{{{}}}{}\n", uncap(comp.m_name), arg, comp.m_name != last ? "," : "");
-                }
-            }
-            out << "        {}\n\n";
-        }
+        out << std::format("    {}Decoder() = default;\n\n", record.m_name);
     }
 
     static void generateWrap(std::ostream& out, const Record& record)
     {
-        if (record.m_parent != Parent::Group)
+        if (record.m_parent == Parent::Message)
         {
             out << std::format("    {}Decoder& wrap(const std::span<const uint8_t> data,\n", record.m_name);
             out << "                        const std::span<Token> tokens,\n";
             out << "                        const std::span<uint16_t> tags,\n";
             out << "                        const uint32_t count)\n";
             out << "    {\n";
-            out << "        MessageDecoder::wrap(data, tokens, tags, count);\n";
+            out << "        Decoder::wrap(data, tokens, tags, count);\n";
         }
         else
         {
-            out << "    // FIXME: this is null";
-            out << std::format("    {}Decoder& wrap()\n    {{\n", record.m_name);
-            out << std::format("        decoder::GroupDecoder<Meta>::wrap(decoder::GroupDecoder<Meta>::next(627));\n");
+            out << std::format("    {}Decoder& wrap(const Decoder* decoder)\n    {{\n", record.m_name);
         }
+        if (record.m_parent == Parent::Group)
+        {
+            out << "        decoder::GroupDecoder<Decoder>::wrap(decoder);\n";
+        }
+        auto arg = record.m_parent == Parent::Message ? "this" : "decoder";
         for (auto& comp : record.m_records)
         {
-            auto name = uncap(comp.m_name);
-            out << std::format("        m_{}.wrap(", name);
-            if (comp.m_category != Category::Group)
-            {
-                out << "data, tokens, tags, count";
-            }
-            out << ");\n";
+            out << std::format("        m_{}.wrap({});\n", uncap(comp.m_name), arg);
         }
         out << "        return *this;\n";
         out << "    }\n\n";
     }
 
-    static void generateFields(std::ostream& out, const Record& record)
+    static void generateGetters(std::ostream& out, const Record& record)
     {
+        auto arg = record.m_parent == Parent::Group ? "template " : "";
         for (auto& field : record.m_fields)
         {
             auto methodName = field.m_name;
@@ -349,27 +327,28 @@ struct Generator
             {
                 out << std::format("    [[nodiscard]] std::expected<std::span<const uint8_t>, decoder::DecoderStatus> {}() const\n", methodName);
                 out << "    {\n";
-                out << std::format("        return this->template getString<{}>({});\n", field.m_tag, mandatory);
+                out << std::format("        return this->{}getString<{}>({});\n", arg, field.m_tag, mandatory);
                 out << "    }\n\n";
             }
             else if (field.m_category == Category::Int32)
             {
                 out << std::format("    [[nodiscard]] std::expected<uint32_t, decoder::DecoderStatus> {}() const\n", methodName);
                 out << "    {\n";
-                out << std::format("        return this->template getUnsigned<{}>({});\n", field.m_tag, mandatory);
+                out << std::format("        return this->{}getUnsigned<{}>({});\n", arg, field.m_tag, mandatory);
                 out << "    }\n\n";
             }
         }
     }
 
-    static void generateMembers(std::ostream& out, const Record& record)
+    static void generateFields(std::ostream& out, const Record& record)
     {
-        if (!record.m_records.empty())
+        if (record.m_records.size() >= 1)
         {
             out << "private:\n";
             for (auto& comp : record.m_records)
             {
-                out << std::format("    {}Decoder<Meta> m_{};\n\n", comp.m_type, uncap(comp.m_name));
+                out << std::format("    {}Decoder<Decoder> m_{}{{}};\n\n",
+                                   comp.m_type, uncap(comp.m_name));
             }
         }
     }
@@ -379,7 +358,8 @@ struct Generator
         for (const auto& comp : record.m_records)
         {
             auto fieldName = uncap(comp.m_name);
-            out << std::format("    {}Decoder<Meta> {}()\n    {{\n", comp.m_type, fieldName);
+            out << std::format("    {}Decoder<Decoder> {}() const\n    {{\n",
+                               comp.m_type, fieldName);
             out << std::format("        return m_{};\n", fieldName);
             out << std::format("    }}\n\n");
         }
@@ -389,40 +369,38 @@ struct Generator
     {
         if (record.m_parent != Parent::Message)
         {
-            out << "template <typename Meta>\n";
+            out << "template <typename Decoder>\n";
         }
 
-        std::string decoder;
-        if (record.m_parent == Parent::Group)
+        out << std::format("struct {}Decoder : ", record.m_name);
+         if (record.m_parent == Parent::Group)
         {
-            decoder = "decoder::GroupDecoder<Meta>";
-            out << std::format("struct {}Decoder : {}\n{{\n", record.m_name, decoder);
+            out << "decoder::GroupDecoder<Decoder>\n";
         }
         else
         {
-            decoder = std::format("decoder::MessageDecoder<protocols::{}>", record.m_name);
-            out << std::format("struct {}Decoder : {}\n{{\n", record.m_name, decoder);
+            out << std::format("decoder::MessageDecoder<protocols::{}>\n", record.m_name);
         }
+        out << "{\n";
         if (record.m_parent == Parent::Message)
         {
-            out << "    using Meta = " << decoder << ";\n";
+            out << "    using Decoder = MessageDecoder;\n\n";
         }
     }
 
     static void generateRecord(std::ostream& out, const Record& record)
     {
         generateDefinition(out, record);
-        generateMembers(out, record);
+        generateFields(out, record);
         out << "public:\n";
         if (record.m_parent == Parent::Message)
         {
             out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
         }
-        generateConstructor(out, record, "");
-        generateConstructor(out, record, "message");
+        generateConstructor(out, record);
         generateWrap(out, record);
         generateStructGetters(out, record);
-        generateFields(out, record);
+        generateGetters(out, record);
         out << "};\n\n";
     }
 
