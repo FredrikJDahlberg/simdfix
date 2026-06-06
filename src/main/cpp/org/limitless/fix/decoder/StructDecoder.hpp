@@ -12,22 +12,12 @@ namespace org::limitless::fix::decoder {
 struct StructDecoder
 {
 protected:
-    const FieldDecoder* m_decoder;
+    FieldDecoder& m_decoder;
 
 public:
 
-    StructDecoder() : m_decoder(nullptr)
+    explicit StructDecoder(FieldDecoder& decoder) : m_decoder{decoder}
     {
-    }
-
-    explicit StructDecoder(const FieldDecoder* decoder) : m_decoder(decoder)
-    {
-    }
-
-    StructDecoder& wrap(const FieldDecoder* decoder)
-    {
-        m_decoder = decoder;
-        return *this;
     }
 };
 

@@ -14,83 +14,85 @@ using namespace org::limitless::fix::decoder;
 
 struct HopsDecoder : GroupDecoder
 {
-    HopsDecoder() = default;
-
-    HopsDecoder& wrap(FieldDecoder* decoder, uint32_t tag)
+    explicit HopsDecoder(FieldDecoder& decoder) : 
+        GroupDecoder{decoder}
     {
-        GroupDecoder::wrap(decoder, tag);
+    }
+
+    HopsDecoder& wrap(uint32_t tag)
+    {
+        GroupDecoder::wrap(tag);
         return *this;
     }
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> hopCompID() const
     {
-        return m_decoder->getString<628, false>();
+        return m_decoder.getString<628, false>();
     }
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> hopSendingTime() const
     {
-        return m_decoder->getUint32<629, false>();
+        return m_decoder.getUint32<629, false>();
     }
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> hopRefID() const
     {
-        return m_decoder->getUint32<630, false>();
+        return m_decoder.getUint32<630, false>();
     }
 
 };
 
 struct StandardHeaderDecoder : StructDecoder
 {
-    StandardHeaderDecoder() = default;
-
 private:
-    HopsDecoder m_hops{};
+    HopsDecoder m_hops;
 
 public:
-    StandardHeaderDecoder& wrap(FieldDecoder* decoder)
+    explicit StandardHeaderDecoder(FieldDecoder& decoder) : 
+        StructDecoder{decoder},
+        m_hops{decoder}
     {
-        StructDecoder::wrap(decoder);
-        m_hops.wrap(decoder, 627);
-        return *this;
     }
 
     HopsDecoder& hops()
     {
+        m_hops.wrap(627);
         return m_hops;
     }
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
     {
-        return m_decoder->getString<49, true>();
+        return m_decoder.getString<49, true>();
     }
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> target() const
     {
-        return m_decoder->getString<56, true>();
+        return m_decoder.getString<56, true>();
     }
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder->getUint32<34, true>();
+        return m_decoder.getUint32<34, true>();
     }
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> sendingTime() const
     {
-        return m_decoder->getUint32<52, true>();
+        return m_decoder.getUint32<52, true>();
     }
 
 };
 
 struct LogonDecoder : MessageDecoder<protocols::Logon>
 {
-    using Decoder = MessageDecoder;
-
-    LogonDecoder() = default;
-
 private:
-    StandardHeaderDecoder m_standardHeader{};
+    StandardHeaderDecoder m_standardHeader;
 
 public:
+    LogonDecoder() : 
+        m_standardHeader{m_decoder}
+    {
+    }
+
     static constexpr uint16_t MessageId = 'A';
 
     LogonDecoder& wrap(const std::span<const uint8_t> data,
@@ -98,8 +100,7 @@ public:
                         const std::span<uint16_t> tags,
                         const uint32_t count)
     {
-        Decoder::wrap(data, tokens, tags, count);
-        m_standardHeader.wrap(m_decoder);
+        MessageDecoder::wrap(data, tokens, tags, count);
         return *this;
     }
 
@@ -110,26 +111,27 @@ public:
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> encryptMethod() const
     {
-        return m_decoder->getUint32<98, false>();
+        return m_decoder.getUint32<98, false>();
     }
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> heartbeatInterval() const
     {
-        return m_decoder->getUint32<108, true>();
+        return m_decoder.getUint32<108, true>();
     }
 
 };
 
 struct LogoutDecoder : MessageDecoder<protocols::Logout>
 {
-    using Decoder = MessageDecoder;
-
-    LogoutDecoder() = default;
-
 private:
-    StandardHeaderDecoder m_standardHeader{};
+    StandardHeaderDecoder m_standardHeader;
 
 public:
+    LogoutDecoder() : 
+        m_standardHeader{m_decoder}
+    {
+    }
+
     static constexpr uint16_t MessageId = '5';
 
     LogoutDecoder& wrap(const std::span<const uint8_t> data,
@@ -137,8 +139,7 @@ public:
                         const std::span<uint16_t> tags,
                         const uint32_t count)
     {
-        Decoder::wrap(data, tokens, tags, count);
-        m_standardHeader.wrap(m_decoder);
+        MessageDecoder::wrap(data, tokens, tags, count);
         return *this;
     }
 
@@ -149,21 +150,22 @@ public:
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> text() const
     {
-        return m_decoder->getString<58, true>();
+        return m_decoder.getString<58, true>();
     }
 
 };
 
 struct HeartbeatDecoder : MessageDecoder<protocols::Heartbeat>
 {
-    using Decoder = MessageDecoder;
-
-    HeartbeatDecoder() = default;
-
 private:
-    StandardHeaderDecoder m_standardHeader{};
+    StandardHeaderDecoder m_standardHeader;
 
 public:
+    HeartbeatDecoder() : 
+        m_standardHeader{m_decoder}
+    {
+    }
+
     static constexpr uint16_t MessageId = '0';
 
     HeartbeatDecoder& wrap(const std::span<const uint8_t> data,
@@ -171,8 +173,7 @@ public:
                         const std::span<uint16_t> tags,
                         const uint32_t count)
     {
-        Decoder::wrap(data, tokens, tags, count);
-        m_standardHeader.wrap(m_decoder);
+        MessageDecoder::wrap(data, tokens, tags, count);
         return *this;
     }
 
@@ -183,7 +184,7 @@ public:
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> testReqID() const
     {
-        return m_decoder->getString<112, true>();
+        return m_decoder.getString<112, true>();
     }
 
 };

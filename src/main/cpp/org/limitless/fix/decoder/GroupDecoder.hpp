@@ -5,7 +5,6 @@
 #ifndef SIMD_FIX_GROUP_DECODER_HPP
 #define SIMD_FIX_GROUP_DECODER_HPP
 
-#include "org/limitless/fix/decoder/Dictionary.hpp"
 #include "org/limitless/fix/decoder/FieldDecoder.hpp"
 
 namespace org::limitless::fix::decoder {
@@ -13,7 +12,7 @@ namespace org::limitless::fix::decoder {
 struct GroupDecoder
 {
 protected:
-    FieldDecoder* m_decoder;
+    FieldDecoder& m_decoder;
 
     std::span<Token> m_group{};
 
@@ -24,7 +23,7 @@ protected:
 
 public:
 
-    GroupDecoder() : m_decoder(nullptr)
+    explicit GroupDecoder(FieldDecoder& decoder) : m_decoder(decoder)
     {
     }
 
@@ -33,15 +32,14 @@ public:
         return m_repeat < m_count;
     }
 
-    GroupDecoder& wrap(FieldDecoder* decoder, const uint32_t tag)
+    GroupDecoder& wrap(const uint32_t tag)
     {
-        m_decoder = decoder;
-        m_group = decoder->m_tokens;
+        m_group = m_decoder.m_tokens;
         const Token* token = next(tag);
         if (token != nullptr)
         {
             m_offset = token - &m_group[0];
-            std::cout << "1 offset = " << m_offset << " tag = " << m_decoder->m_tokens[m_offset].tag << std::endl;            m_count = m_decoder->convertToUint32(token);
+            m_count = m_decoder.convertToUint32(token);
             m_delim = m_group[m_offset + 1].tag;
             m_repeat = 0;
         }
@@ -59,36 +57,19 @@ public:
         m_offset = 0;
     }
 
-    /*
-    [[nodiscard]] Token* member(const int32_t tag) const
-    {
-        const auto tokens = m_decoder->m_tokens;
-        const size_t  size = tokens.size();
-        uint32_t end = m_offset + 1;
-        while (end < size && tokens[end].tag != m_delim)
-        {
-            ++end;
-        }
-
-        const auto position = simd::find(m_decoder->m_tags.data() + m_offset, end - m_offset, tag);
-        return position >= 0 ? &m_group[m_offset + position] : nullptr;
-    }
-    */
-
     [[nodiscard]] Token* next(const uint32_t tag)
     {
-        return m_decoder->next(tag);
+        return m_decoder.next(tag);
     }
 
     [[nodiscard]] const Token* next(const uint32_t tag) const
     {
-        return m_decoder->next(tag);
+        return m_decoder.next(tag);
     }
 
     void next()
     {
-        m_offset = m_decoder->nextDelim(m_offset + 1, m_delim);
-        std::cout << "2 offset = " << m_offset << " tag = " << m_decoder->m_tokens[m_offset].tag << std::endl;
+        m_offset = m_decoder.nextDelim(m_offset + 1, m_delim);
         ++m_repeat;
     }
 
@@ -96,7 +77,6 @@ public:
     {
         return m_count;
     }
-
 };
 
 }

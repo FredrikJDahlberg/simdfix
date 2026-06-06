@@ -162,10 +162,12 @@ struct Processor
         processRecords(protocol.select_nodes(".//group"), Parent::Group);
         processRecords(protocol.select_nodes(".//component"), Parent::Component);
         processRecords(protocol.select_nodes(".//message"), Parent::Message);
-
         for (auto& record : m_records)
         {
-            resolveGrammar(record);
+            if (record.m_parent == Parent::Message)
+            {
+                resolveGrammar(record);
+            }
         }
     }
 
