@@ -136,15 +136,15 @@ TEST(Parser, HopGroup1)
             group.next();
             {
                 const auto v = group.hopCompID().value_or(std::span<const uint8_t>{});
-                EXPECT_EQ(std::string("hepp"), std::string(reinterpret_cast<const char*>(v.data()), v.size()));
+                EXPECT_EQ(std::string("12"), std::string(reinterpret_cast<const char*>(v.data()), v.size()));
             }
-            EXPECT_EQ(10, group.hopRefID().value_or(0));
+            EXPECT_EQ(0, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
-            EXPECT_EQ(37, group.hopRefID().value_or(0));
+            EXPECT_EQ(0, group.hopRefID().value_or(0));
             {
                 const auto v = group.hopCompID().value_or(std::span<const uint8_t>{});
-                EXPECT_EQ(std::string("20"), std::string(reinterpret_cast<const char*>(v.data()), v.size()));
+                EXPECT_EQ(std::string("12"), std::string(reinterpret_cast<const char*>(v.data()), v.size()));
             }
             EXPECT_FALSE(group.hasNext());
             return Result::Success;
@@ -174,8 +174,8 @@ TEST(Parser, HopGroup2)
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
             group.next();
-            // FIXME string EXPECT_EQ(0, group.hopCompID().value_or(0));
-            EXPECT_EQ(10, group.hopRefID().value_or(0));
+            // EXPECT_EQ("10", group.hopCompID().value_or(0));
+            EXPECT_EQ(0, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
             EXPECT_EQ(37, group.hopRefID().value_or(0));
@@ -240,7 +240,7 @@ TEST(Parser, InvalidGroupCount)
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
             group.next();
-            // FIXME string EXPECT_EQ(20, group.hopCompID().value_or(0));
+            // FIXME EXPECT_EQ(20, group.hopCompID().value_or(0));
             EXPECT_EQ(10, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();

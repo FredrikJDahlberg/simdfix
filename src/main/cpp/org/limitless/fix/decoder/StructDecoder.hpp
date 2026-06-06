@@ -5,14 +5,14 @@
 #ifndef SIMD_FIX_STRUCT_DECODER_HPP
 #define SIMD_FIX_STRUCT_DECODER_HPP
 
-#include "org/limitless/fix/decoder/Tokens.hpp"
+#include "org/limitless/fix/decoder/FieldDecoder.hpp"
 
 namespace org::limitless::fix::decoder {
 
 struct StructDecoder
 {
 protected:
-    const Tokens* m_decoder;
+    const FieldDecoder* m_decoder;
 
 public:
 
@@ -20,11 +20,11 @@ public:
     {
     }
 
-    explicit StructDecoder(const Tokens* decoder) : m_decoder(decoder)
+    explicit StructDecoder(const FieldDecoder* decoder) : m_decoder(decoder)
     {
     }
 
-    StructDecoder& wrap(const Tokens* decoder)
+    StructDecoder& wrap(const FieldDecoder* decoder)
     {
         m_decoder = decoder;
         return *this;

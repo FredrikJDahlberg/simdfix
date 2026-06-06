@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-06-05.
 //
 
-#ifndef SIMD_FIX_DECODER_UTILS_HPP
-#define SIMD_FIX_DECODER_UTILS_HPP
+#ifndef SIMD_FIX_FIELD_DECODER_HPP
+#define SIMD_FIX_FIELD_DECODER_HPP
 
 #include <span>
 
@@ -13,7 +13,7 @@
 
 namespace org::limitless::fix::decoder {
 
-struct Tokens
+struct FieldDecoder
 {
     using Buffer = std::span<const uint8_t>;
     using TokenSpan = std::span<Token>;
@@ -24,16 +24,16 @@ struct Tokens
     Buffer m_data{};
     TokenSpan m_tokens{};
     TagSpan m_tags{};
-    uint32_t m_size;
+    int32_t m_size;
 
-    Tokens() = default;
+    FieldDecoder() = default;
 
-    Tokens(const Buffer data, TokenSpan const tokens, TagSpan const tags, const uint32_t size) :
+    FieldDecoder(const Buffer data, TokenSpan const tokens, TagSpan const tags, const int32_t size) :
         m_data{data}, m_tokens{tokens}, m_tags{tags}, m_size{size}
     {
     }
 
-    void wrap(const utils::String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const uint32_t size)
+    void wrap(const utils::String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
     {
         m_data = data;
         m_tokens = tokens;
@@ -44,10 +44,9 @@ struct Tokens
     [[nodiscard]] Token* next(const uint32_t tag)
     {
         const auto index = simd::find(m_tags.data(), m_size, tag);
-        return index < m_size ? &m_tokens[index] : nullptr;
+        return index >= 0 ? &m_tokens[index] : nullptr;
     }
 
-    // Const version: for read-only access
     [[nodiscard]] const Token* next(const uint32_t tag) const
     {
         const auto index = simd::find(m_tags.data(), m_size, tag);
@@ -83,4 +82,4 @@ struct Tokens
     }
 };
 }
-#endif //SIMD_FIX_BUFFER_DECODER_HPP
+#endif //SIMD_FIX_FIELD_DECODER_HPP

@@ -14,8 +14,6 @@
         <field name="BeginString" tag="8" primitiveType="char" length="7" presence="constant">FIX.4.3</field>
         <field name="BodyLength" tag="9" primitiveType="int32"/>
         <field name="MsgType" tag="35" primitiveType="uint8"/>
-        -->
-        <!--
         <field name="Sender" tag="49" type="String8"/>
         <field name="Target" tag="56" type="String8"/>
         -->

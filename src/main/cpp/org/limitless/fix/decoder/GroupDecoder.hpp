@@ -6,7 +6,7 @@
 #define SIMD_FIX_GROUP_DECODER_HPP
 
 #include "org/limitless/fix/decoder/Dictionary.hpp"
-#include "org/limitless/fix/decoder/Tokens.hpp"
+#include "org/limitless/fix/decoder/FieldDecoder.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 //#include "org/limitless/fix/simd/LinearSearch.hpp"
 
@@ -15,7 +15,7 @@ namespace org::limitless::fix::decoder {
 struct GroupDecoder
 {
 protected:
-    Tokens* m_decoder;
+    FieldDecoder* m_decoder;
 
     std::span<Token> m_group{};
 
@@ -35,13 +35,14 @@ public:
         return m_repeat < m_count;
     }
 
-    GroupDecoder& wrap(Tokens* decoder, const uint32_t tag)
+    GroupDecoder& wrap(FieldDecoder* decoder, const uint32_t tag)
     {
         m_decoder = decoder;
+        m_group = decoder->m_tokens;
         const Token* token = next(tag);
         if (token != nullptr)
         {
-            m_offset = token - m_group.data();
+            m_offset = token - &m_group[0];
             m_count = m_decoder->convertToUint32(token);
             m_delim = m_group[m_offset + 1].tag;
             m_repeat = 0;
@@ -100,20 +101,6 @@ public:
         return m_count;
     }
 
-    // FIXME: restructure
-#if 0
-    template <int32_t Tag>
-    [[nodiscard]] std::expected<utils::String, Result::Values> getString(const bool required) const
-    {
-        return m_decoder->template getString<Tag>(required);
-    }
-
-    template <int32_t Tag>
-    [[nodiscard]] std::expected<uint32_t, Result::Values> getUnsigned(const bool required) const
-    {
-        return m_decoder->template getUnsigned<Tag>(required);
-    }
-#endif
 };
 
 }

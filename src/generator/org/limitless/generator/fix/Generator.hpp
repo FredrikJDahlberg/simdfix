@@ -109,7 +109,7 @@ struct Generator
         }
         else
         {
-            out << "Tokens* decoder";
+            out << "FieldDecoder* decoder";
             switch (record.m_parent.m_value)
             {
                 case Parent::Group:

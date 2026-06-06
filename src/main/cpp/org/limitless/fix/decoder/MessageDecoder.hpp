@@ -9,7 +9,7 @@
 #include <expected>
 
 #include "org/limitless/fix/decoder/Token.hpp"
-#include "org/limitless/fix/decoder/Tokens.hpp"
+#include "org/limitless/fix/decoder/FieldDecoder.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
@@ -18,7 +18,7 @@ namespace org::limitless::fix::decoder {
 template <typename Protocol>
 struct MessageDecoder
 {
-    Tokens m_tokens;
+    FieldDecoder m_tokens;
 
     // FIXME: cache all parsed fields?
     utils::String m_sender{};           // FIXME: configuration and verification
