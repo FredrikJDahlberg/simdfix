@@ -1,9 +1,10 @@
 //
 // Created by Fredrik Dahlberg on 2026-04-24.
 //
-#include <gtest/gtest.h>
-
+#include <span>
 #include <string>
+
+#include <gtest/gtest.h>
 
 #include "org/limitless/fix/decoder/Decoder.hpp"
 #include "org/limitless/fix/messages/MessageDecoders.hpp"
@@ -158,6 +159,13 @@ TEST(Parser, HopGroup1)
     ASSERT_EQ(Result::Success, status);
 }
 
+
+template <typename Span>
+std::string toString(Span span)
+{
+    return std::string(reinterpret_cast<const char*>(span.data()), span.size());
+}
+
 TEST(Parser, HopGroup2)
 {
     struct AppHandler : generated::MessageHandler<AppHandler>
@@ -174,12 +182,12 @@ TEST(Parser, HopGroup2)
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
             group.next();
-            // EXPECT_EQ("10", group.hopCompID().value_or(0));
+            EXPECT_EQ("20", toString(group.hopCompID().value()));
             EXPECT_EQ(0, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
             EXPECT_EQ(37, group.hopRefID().value_or(0));
-            // FIXME: string EXPECT_EQ(20, group.hopCompID().value_or(0));
+            EXPECT_EQ("20", toString(group.hopCompID().value()));
             EXPECT_FALSE(group.hasNext());
             return Result::Success;
         }
@@ -240,8 +248,8 @@ TEST(Parser, InvalidGroupCount)
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
             group.next();
-            // FIXME EXPECT_EQ(20, group.hopCompID().value_or(0));
-            EXPECT_EQ(10, group.hopRefID().value_or(0));
+            EXPECT_EQ("20", toString(group.hopCompID().value()));
+            //EXPECT_EQ(10, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
             EXPECT_FALSE(group.hasNext());

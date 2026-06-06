@@ -24,17 +24,17 @@ struct HopsDecoder : GroupDecoder
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> hopCompID() const
     {
-        return this->m_decoder->getString<628, false>();
+        return m_decoder->getString<628, false>();
     }
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> hopSendingTime() const
     {
-        return this->m_decoder->getUint32<629, false>();
+        return m_decoder->getUint32<629, false>();
     }
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> hopRefID() const
     {
-        return this->m_decoder->getUint32<630, false>();
+        return m_decoder->getUint32<630, false>();
     }
 
 };
@@ -61,22 +61,22 @@ public:
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
     {
-        return this->m_decoder->getString<49, true>();
+        return m_decoder->getString<49, true>();
     }
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> target() const
     {
-        return this->m_decoder->getString<56, true>();
+        return m_decoder->getString<56, true>();
     }
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> sequenceNumber() const
     {
-        return this->m_decoder->getUint32<34, true>();
+        return m_decoder->getUint32<34, true>();
     }
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> sendingTime() const
     {
-        return this->m_decoder->getUint32<52, true>();
+        return m_decoder->getUint32<52, true>();
     }
 
 };
@@ -99,7 +99,7 @@ public:
                         const uint32_t count)
     {
         Decoder::wrap(data, tokens, tags, count);
-        m_standardHeader.wrap(&m_tokens);
+        m_standardHeader.wrap(m_decoder);
         return *this;
     }
 
@@ -110,12 +110,12 @@ public:
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> encryptMethod() const
     {
-        return m_tokens.getUint32<98, false>();
+        return m_decoder->getUint32<98, false>();
     }
 
     [[nodiscard]] std::expected<uint32_t, Result::Values> heartbeatInterval() const
     {
-        return m_tokens.getUint32<108, true>();
+        return m_decoder->getUint32<108, true>();
     }
 
 };
@@ -138,7 +138,7 @@ public:
                         const uint32_t count)
     {
         Decoder::wrap(data, tokens, tags, count);
-        m_standardHeader.wrap(&m_tokens);
+        m_standardHeader.wrap(m_decoder);
         return *this;
     }
 
@@ -149,7 +149,7 @@ public:
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> text() const
     {
-        return m_tokens.getString<58, true>();
+        return m_decoder->getString<58, true>();
     }
 
 };
@@ -172,7 +172,7 @@ public:
                         const uint32_t count)
     {
         Decoder::wrap(data, tokens, tags, count);
-        m_standardHeader.wrap(&m_tokens);
+        m_standardHeader.wrap(m_decoder);
         return *this;
     }
 
@@ -183,7 +183,7 @@ public:
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> testReqID() const
     {
-        return m_tokens.getString<112, true>();
+        return m_decoder->getString<112, true>();
     }
 
 };

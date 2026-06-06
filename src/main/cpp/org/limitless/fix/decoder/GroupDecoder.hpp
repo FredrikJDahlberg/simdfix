@@ -7,8 +7,6 @@
 
 #include "org/limitless/fix/decoder/Dictionary.hpp"
 #include "org/limitless/fix/decoder/FieldDecoder.hpp"
-#include "org/limitless/fix/utils/Utils.hpp"
-//#include "org/limitless/fix/simd/LinearSearch.hpp"
 
 namespace org::limitless::fix::decoder {
 
@@ -43,7 +41,7 @@ public:
         if (token != nullptr)
         {
             m_offset = token - &m_group[0];
-            m_count = m_decoder->convertToUint32(token);
+            std::cout << "1 offset = " << m_offset << " tag = " << m_decoder->m_tokens[m_offset].tag << std::endl;            m_count = m_decoder->convertToUint32(token);
             m_delim = m_group[m_offset + 1].tag;
             m_repeat = 0;
         }
@@ -61,6 +59,7 @@ public:
         m_offset = 0;
     }
 
+    /*
     [[nodiscard]] Token* member(const int32_t tag) const
     {
         const auto tokens = m_decoder->m_tokens;
@@ -74,6 +73,7 @@ public:
         const auto position = simd::find(m_decoder->m_tags.data() + m_offset, end - m_offset, tag);
         return position >= 0 ? &m_group[m_offset + position] : nullptr;
     }
+    */
 
     [[nodiscard]] Token* next(const uint32_t tag)
     {
@@ -87,12 +87,8 @@ public:
 
     void next()
     {
-        auto tokens = m_decoder->m_tokens;
-        ++m_offset;
-        while (m_offset < tokens.size() && tokens[m_offset].tag != m_delim)
-        {
-            ++m_offset;
-        }
+        m_offset = m_decoder->nextDelim(m_offset + 1, m_delim);
+        std::cout << "2 offset = " << m_offset << " tag = " << m_decoder->m_tokens[m_offset].tag << std::endl;
         ++m_repeat;
     }
 

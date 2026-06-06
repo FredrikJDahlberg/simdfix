@@ -18,7 +18,6 @@ namespace decoder = limitless::fix::decoder;
 
 struct Generator
 {
-
     static std::string uncap(const std::string& value)
     {
         std::string result{value};
@@ -129,7 +128,7 @@ struct Generator
             }
         }
 
-        auto arg = record.m_parent == Parent::Message ? "&m_tokens" : "decoder";
+        auto arg = record.m_parent == Parent::Message ? "m_decoder" : "decoder";
         for (auto& field : record.m_records)
         {
             out << std::format("        m_{}.wrap({}{});\n",
@@ -142,7 +141,6 @@ struct Generator
 
     static void generateGetters(std::ostream& out, const Record& record)
     {
-        auto arg = record.m_parent != Parent::Message ? "this->m_decoder->" : "m_tokens.";
         for (auto& field : record.m_fields)
         {
             auto methodName = field.m_name;
@@ -152,14 +150,14 @@ struct Generator
             {
                 out << std::format("    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> {}() const\n", methodName);
                 out << "    {\n";
-                out << std::format("        return {}getString<{}, {}>();\n", arg, field.m_tag, mandatory);
+                out << std::format("        return m_decoder->getString<{}, {}>();\n", field.m_tag, mandatory);
                 out << "    }\n\n";
             }
             else if (field.m_category == Category::Int32)
             {
                 out << std::format("    [[nodiscard]] std::expected<uint32_t, Result::Values> {}() const\n", methodName);
                 out << "    {\n";
-                out << std::format("        return {}getUint32<{}, {}>();\n", arg, field.m_tag, mandatory);
+                out << std::format("        return m_decoder->getUint32<{}, {}>();\n", field.m_tag, mandatory);
                 out << "    }\n\n";
             }
         }

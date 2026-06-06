@@ -41,19 +41,27 @@ struct FieldDecoder
         m_size = size;
     }
 
+    [[nodiscard]] uint32_t nextDelim(int32_t offset, const uint16_t delim) const
+    {
+        while (offset < m_size && m_tokens[offset].tag != delim)
+        {
+            ++offset;
+        }
+        return offset;
+    }
+
     [[nodiscard]] Token* next(const uint32_t tag)
     {
-        const auto index = simd::find(m_tags.data(), m_size, tag);
-        return index >= 0 ? &m_tokens[index] : nullptr;
+        return const_cast<Token*>(std::as_const(*this).next(tag));
     }
 
     [[nodiscard]] const Token* next(const uint32_t tag) const
     {
         const auto index = simd::find(m_tags.data(), m_size, tag);
-        return index < m_size ? &m_tokens[index] : nullptr;
+        return index >= 0 ? &m_tokens[index] : nullptr;
     }
 
-    constexpr uint32_t convertToUint32(const Token* token) const
+    [[nodiscard]] constexpr uint32_t convertToUint32(const Token* token) const
     {
         return utils::asciiToDecimal(0, m_data.data() + token->position, token->length);
     }
