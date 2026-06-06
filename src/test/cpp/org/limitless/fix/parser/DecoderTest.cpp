@@ -35,7 +35,7 @@ TEST(Decoder, Basics)
         "8=FIXT.1.1" SOH "9=118" SOH);
     Decoder decoder;
     auto [processed, status] = decoder.parse(message);
-    ASSERT_EQ(DecoderStatus::Success, status);
+    ASSERT_EQ(Result::Success, status);
     ASSERT_EQ(message.size() - 17, processed);
     // ASSERT_EQ(218, checkSum);
     constexpr Token expectedTokens[] =
@@ -65,7 +65,7 @@ TEST(Decoder, TrailerSplitCheckSum)
         "49=Buyer" SOH "56=Seller" SOH "34=2000001" SOH "52=20190605" SOH "10=046" SOH);
     Decoder decoder{};
     auto [processed, status] = decoder.parse(message);
-    ASSERT_EQ(DecoderStatus::Success, status);
+    ASSERT_EQ(Result::Success, status);
     ASSERT_EQ(message.size(), processed);
     // ASSERT_EQ(48, checkSum);
 
@@ -89,7 +89,7 @@ TEST(Decoder, TrailerFieldEnd)
         "666=66" SOH "1=1" SOH "2=2" SOH "10=233" SOH);
     Decoder decoder{};
     auto [processed, status] = decoder.parse(message);
-    ASSERT_EQ(DecoderStatus::Success, status);
+    ASSERT_EQ(Result::Success, status);
 }
 
 TEST(Decoder, Fragment)
@@ -97,7 +97,7 @@ TEST(Decoder, Fragment)
     const auto message = utils::makeSpan("8=FIXT.");
     Decoder decoder{};
     auto [processed, status] = decoder.parse(message);
-    ASSERT_EQ(DecoderStatus::MessageFragment, status);
+    ASSERT_EQ(Result::MessageFragment, status);
     ASSERT_EQ(0, processed);
 }
 
@@ -108,7 +108,7 @@ TEST(Decoder, HopGroup)
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
     Decoder decoder{};
     auto [processed, status] = decoder.parse(logout);
-    ASSERT_EQ(DecoderStatus::Success, status);
+    ASSERT_EQ(Result::Success, status);
     constexpr Token expectedTokens[] =
     {
         { 2, 8, 8 },

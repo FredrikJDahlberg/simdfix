@@ -9,8 +9,8 @@
 #include <ostream>
 
 #include "org/limitless/fix/decoder/Token.hpp"
+#include "org/limitless/fix/decoder/Result.hpp"
 #include "org/limitless/fix/simd/Uint8x16.hpp"
-#include "org/limitless/fix/decoder/DecoderStatus.hpp"
 #include "org/limitless/fix/utils/BitSet64.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
@@ -21,12 +21,6 @@ class Decoder
 {
 public:
     static constexpr size_t MaxSize = 64;
-
-    struct Result
-    {
-        size_t processed;
-        DecoderStatus status;
-    };
 
     using position_t = uint32_t;
     using length_t = uint16_t;
@@ -66,11 +60,11 @@ public:
     Result parse(const std::span<const uint8_t> buffer, Handler& handler)
     {
         auto result = parse(buffer);
-        if (result.status != DecoderStatus::Success)
+        if (result.m_value != Result::Success)
         {
-            return { result.processed, result.status };
+            return { result.m_processed, result.m_value };
         }
-        result.status = handler.handle(buffer, std::span(m_tokens, m_count), std::span(m_tags, m_count), m_count);
+        result.m_value = handler.handle(buffer, std::span(m_tokens, m_count), std::span(m_tags, m_count), m_count);
         return result;
     }
 
@@ -79,7 +73,7 @@ public:
         using simd::Uint8x16;
         if (buffer.size() < 32)
         {
-            return { 0, DecoderStatus::MessageFragment };
+            return { 0, Result::MessageFragment };
         }
         m_count = 0;
         m_tag = 0;
@@ -88,7 +82,7 @@ public:
         const auto length = static_cast<length_t>(buffer.size());
         if (std::memcmp(data, BeginString, sizeof(BeginString) - 1) != 0)
         {
-            return { 8, DecoderStatus::InvalidBeginString };
+            return { 8, Result::InvalidBeginString };
         }
         m_tokens[0] = { 2, 8, 8 };
         m_count = 1;
@@ -167,18 +161,18 @@ private:
         // incomplete message with no checksum
         if (!hasCheckSum && m_count < 7)
         {
-            return {0, DecoderStatus::RequiredFieldMissing};
+            return {0, Result::RequiredFieldMissing};
         }
 
         // fixed-position header tags
         if (m_tokens[2].tag != MessageTypeTag)
         {
-            return {processed, DecoderStatus::InvalidMessageTypeTag};
+            return {processed, Result::InvalidMessageTypeTag};
         }
         const auto& bodyLenToken = m_tokens[1];
         if (bodyLenToken.tag != BodyLengthTag)
         {
-            return {processed, DecoderStatus::InvalidBodyLengthTag};
+            return {processed, Result::InvalidBodyLengthTag};
         }
 
         // body length
@@ -186,11 +180,11 @@ private:
         const uint32_t count = last->position - bodyLenToken.position - bodyLenToken.length - 4;
         if (!hasCheckSum && count < bodyLength)
         {
-            return {0, DecoderStatus::MessageFragment};
+            return {0, Result::MessageFragment};
         }
         if (count != bodyLength)
         {
-            return {processed, DecoderStatus::InvalidBodyLength};
+            return {processed, Result::InvalidBodyLength};
         }
 
 #if !defined(NDEBUG)
@@ -202,11 +196,11 @@ private:
 
         // checksum and field count
         const auto status = processCheckSum(data);
-        if (status != DecoderStatus::Success)
+        if (status != Result::Success)
         {
             return {processed, status};
         }
-        return {processed, m_count < 7 ? DecoderStatus::RequiredFieldMissing : status};
+        return {processed, m_count < 7 ? Result::RequiredFieldMissing : status};
     }
 
     bool processBlock(const position_t offset,
@@ -265,14 +259,14 @@ private:
         return m_tokens[m_count - 1].tag == 10;
     }
 
-    DecoderStatus processCheckSum(const std::span<const data_t>::pointer data) const
+    Result::Values processCheckSum(const std::span<const data_t>::pointer data) const
     {
         uint64_t checks = 0;
         memcpy(&checks, data + m_tokens[m_count - 1].position - 4, sizeof(uint64_t));
         const auto& checkSumToken = m_tokens[m_count - 1];
         if ((checks & CheckSumMask) != CheckSumMask)
         {
-            return DecoderStatus::InvalidCheckSumTag;
+            return Result::InvalidCheckSumTag;
         }
 
         uint64_t checkSumValue = 0;
@@ -290,9 +284,9 @@ private:
         }
         if (utils::asciiToDecimal(0, data + m_tokens[m_count - 1].position, 3) != (checkSumValue & 0xff))
         {
-            return DecoderStatus::InvalidCheckSum;
+            return Result::InvalidCheckSum;
         }
-        return DecoderStatus::Success;
+        return Result::Success;
     }
 
     void processTrailer(const position_t offset, const std::span<const uint8_t> buffer)

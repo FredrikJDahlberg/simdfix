@@ -31,18 +31,18 @@ TEST(Parser, Logon)
 
         bool found = false;
 
-        DecoderStatus handle(LogonDecoder& logon)
+        Result::Values handle(LogonDecoder& logon)
         {
             const auto sender = logon.standardHeader().sender().value();
             EXPECT_EQ(std::string("Buyer"), std::string(reinterpret_cast<const char*>(sender.data()), sender.size()));
             found = true;
-            return DecoderStatus::Success;
+            return Result::Success;
         }
     } app;
 
     Decoder decoder{};
     auto [processed, status] = decoder.parse(login, app);
-    ASSERT_EQ(DecoderStatus::Success, status);
+    ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
 
@@ -56,11 +56,11 @@ TEST(Parser, Logout)
 
         // skip logon
 
-        DecoderStatus handle(LogoutDecoder&)
+        Result::Values handle(LogoutDecoder&)
         {
             std::printf("Found Logout\n");
             found = true;
-            return DecoderStatus::Success;
+            return Result::Success;
         }
     } app;
 
@@ -70,14 +70,14 @@ TEST(Parser, Logout)
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
               "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
         auto [processed, status] = decoder.parse(logout, app);
-        ASSERT_EQ(DecoderStatus::Success, status);
+        ASSERT_EQ(Result::Success, status);
         ASSERT_TRUE(app.found);
     }
     {
         const auto reject = utils::makeSpan("8=FIXT.1.1" SOH "9=41" SOH "35=3" SOH
             "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "45=666" SOH "10=247" SOH);
         auto [processed, status] = decoder.parse(reject, app);
-        ASSERT_EQ(DecoderStatus::InvalidMessageType, status);
+        ASSERT_EQ(Result::InvalidMessageType, status);
     }
 }
 
@@ -91,11 +91,11 @@ TEST(Parser, MessageFragment)
 
         // skip logon
 
-        DecoderStatus handle(LogoutDecoder&)
+        Result::Values handle(LogoutDecoder&)
         {
             std::printf("Found Logout\n");
             found = true;
-            return DecoderStatus::Success;
+            return Result::Success;
         }
     } app;
 
@@ -104,7 +104,7 @@ TEST(Parser, MessageFragment)
         const auto logout1 = utils::makeSpan(
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH );
         auto [processed, status] = decoder.parse(logout1, app);
-        ASSERT_EQ(DecoderStatus::MessageFragment, status);
+        ASSERT_EQ(Result::MessageFragment, status);
         ASSERT_EQ(0, processed);
         ASSERT_FALSE(app.found);
     }
@@ -114,7 +114,7 @@ TEST(Parser, MessageFragment)
               "34=100101" SOH "52=10:11:12.123" SOH "627=2" SOH "629=10" SOH
               "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
         auto [processed, status] = decoder.parse(logout2, app);
-        ASSERT_EQ(DecoderStatus::Success, status);
+        ASSERT_EQ(Result::Success, status);
         ASSERT_EQ(107, processed);
     }
 }
@@ -127,7 +127,7 @@ TEST(Parser, HopGroup1)
 
         bool found = false;
 
-        DecoderStatus handle(LogoutDecoder& logout)
+        Result::Values handle(LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
             auto group = logout.standardHeader().hops();
@@ -147,7 +147,7 @@ TEST(Parser, HopGroup1)
                 EXPECT_EQ(std::string("20"), std::string(reinterpret_cast<const char*>(v.data()), v.size()));
             }
             EXPECT_FALSE(group.hasNext());
-            return DecoderStatus::Success;
+            return Result::Success;
         }
     } app;
     Decoder decoder{};
@@ -155,7 +155,7 @@ TEST(Parser, HopGroup1)
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
     auto[processed, status] = decoder.parse(logout, app);
-    ASSERT_EQ(DecoderStatus::Success, status);
+    ASSERT_EQ(Result::Success, status);
 }
 #if 0
 TEST(Parser, HopGroup2)

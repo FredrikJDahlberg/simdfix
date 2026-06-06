@@ -2,17 +2,17 @@
 // Created by Fredrik Dahlberg on 2026-05-16.
 //
 
-#ifndef SIMDFIX_SIMDLINEAR_HPP
-#define SIMDFIX_SIMDLINEAR_HPP
+#ifndef SIMD_FIX_LINEAR_HPP
+#define SIMD_FIX_LINEAR_HPP
 
 #include <arm_neon.h>
 #include <bit>
 
 namespace org::limitless::fix::simd {
+
 [[nodiscard]] inline int32_t find(const uint16_t* values, const int32_t cardinality, const uint16_t value)
 {
     const uint16x8_t vkey = vdupq_n_u16(value);
-
     int32_t i = 0;
     for (; i <= cardinality - 16; i += 16)
     {
@@ -30,10 +30,13 @@ namespace org::limitless::fix::simd {
     }
     for (; i < cardinality; ++i)
     {
-        if (values[i] == value) return i;
+        if (values[i] == value)
+        {
+            return i;
+        }
     }
     return -1;
 }
 }
 
-#endif //SIMDFIX_SIMDLINEAR_HPP
+#endif //SIMD_FIX_LINEAR_HPP

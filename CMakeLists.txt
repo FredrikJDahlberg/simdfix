@@ -8,10 +8,13 @@ enable_testing()
 
 find_package(GTest REQUIRED)
 
-include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp ${CMAKE_SOURCE_DIR}/src/test/cpp)
+include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp
+        ${CMAKE_SOURCE_DIR}/src/test/cpp
+        ${CMAKE_SOURCE_DIR}/src/generator)
 set(MAIN_PATH "src/main/cpp/org/limitless/fix")
 set(GEN_PATH "src/main/cpp/org/limitless/fix/messages")
 set(TEST_PATH "src/test/cpp/org/limitless/fix")
+set(GENERATOR_PATH "src/generator/org/limitless/generator/fix/")
 set(PROTOCOL_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/protocol.xml")
 set(GENERATED_DIR "${CMAKE_SOURCE_DIR}/${GEN_PATH}")
 set(GENERATED_HEADERS
@@ -23,7 +26,7 @@ set(FIX_HEADERS
         ${MAIN_PATH}/utils/BitSet64.hpp
         ${MAIN_PATH}/decoder/Decoder.hpp
         ${MAIN_PATH}/decoder/MessageDecoder.hpp
-        ${MAIN_PATH}/decoder/DecoderStatus.hpp
+        ${MAIN_PATH}/decoder/Result.hpp
         ${MAIN_PATH}/decoder/Dictionary.hpp
         ${MAIN_PATH}/decoder/GroupDecoder.hpp
         ${MAIN_PATH}/decoder/Token.hpp
@@ -61,7 +64,7 @@ set_target_properties(SimdFixBench PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEA
 
 list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/include")
 find_package(pugixml REQUIRED)
-add_executable(Generator src/generator/org/limitless/generator/fix/Generator.cpp)
+add_executable(Generator ${GENERATOR_PATH}/FixGenerator.cpp)
 target_compile_options(Generator PRIVATE -O0 -Wall)
 target_include_directories(Generator PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp"
@@ -73,7 +76,7 @@ add_custom_command(
         COMMAND $<TARGET_FILE:Generator> ${PROTOCOL_XML} ${GENERATED_DIR}
         DEPENDS Generator
                 ${PROTOCOL_XML}
-                ${CMAKE_SOURCE_DIR}/src/generator/org/limitless/generator/fix/Generator.cpp
+                ${GENERATOR_PATH}/FixGenerator.cpp ${GENERATOR_PATH}/Generator.hpp ${GENERATOR_PATH}/Processor.hpp
         COMMENT "Generating FIX message headers from protocol.xml"
         VERBATIM
 )
