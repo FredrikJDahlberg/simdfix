@@ -28,15 +28,14 @@ struct MessageDecoder
 
     MessageDecoder() = default;
 
-    MessageDecoder(const utils::String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const uint32_t size)
+    MessageDecoder(const utils::String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
       : m_tokens{data, tokens, tags, size}
     {
     }
 
-    void wrap(const utils::String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const uint32_t size)
+    void wrap(const utils::String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
     {
-        // m_tokens = tokens;
-        m_tokens.wrap(data, tokens, tags, size);;
+        m_tokens.wrap(data, tokens, tags, size);
     }
 
     [[nodiscard]] uint16_t type() const noexcept

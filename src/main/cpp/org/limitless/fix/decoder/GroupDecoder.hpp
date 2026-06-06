@@ -45,7 +45,6 @@ public:
             m_count = m_decoder->convertToUint32(token);
             m_delim = m_group[m_offset + 1].tag;
             m_repeat = 0;
-            m_offset = 0;
         }
         else
         {

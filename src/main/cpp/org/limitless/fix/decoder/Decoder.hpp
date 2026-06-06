@@ -158,24 +158,12 @@ private:
         const bool hasCheckSum = last->tag == CheckSumTag;
         const uint32_t processed = hasCheckSum ? last->position + last->length + 1 : 0;
 
-        // incomplete message with no checksum
-        if (!hasCheckSum && m_count < 7)
-        {
-            return {0, Result::RequiredFieldMissing};
-        }
-
-        // fixed-position header tags
-        if (m_tokens[2].tag != MessageTypeTag)
-        {
-            return {processed, Result::InvalidMessageTypeTag};
-        }
+        // body length
         const auto& bodyLenToken = m_tokens[1];
         if (bodyLenToken.tag != BodyLengthTag)
         {
             return {processed, Result::InvalidBodyLengthTag};
         }
-
-        // body length
         const auto bodyLength = utils::asciiToDecimal(0, data + bodyLenToken.position, bodyLenToken.length);
         const uint32_t count = last->position - bodyLenToken.position - bodyLenToken.length - 4;
         if (!hasCheckSum && count < bodyLength)
@@ -185,6 +173,17 @@ private:
         if (count != bodyLength)
         {
             return {processed, Result::InvalidBodyLength};
+        }
+
+        if (!hasCheckSum && m_count < 7)
+        {
+            return {0, Result::RequiredFieldMissing};
+        }
+
+        // fixed-position header tags
+        if (m_tokens[2].tag != MessageTypeTag)
+        {
+            return {processed, Result::InvalidMessageTypeTag};
         }
 
 #if !defined(NDEBUG)

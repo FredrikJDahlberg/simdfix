@@ -69,11 +69,6 @@ struct Generator
 
     static void generateDefinition(std::ostream& out, const Record& record)
     {
-        if (record.m_parent != Parent::Message)
-        {
-            // FIXME out << "template <typename Decoder>\n";
-        }
-
         out << std::format("struct {}Decoder : ", record.m_name);
         switch (record.m_parent.m_value)
         {
@@ -81,11 +76,9 @@ struct Generator
                 out << std::format("MessageDecoder<protocols::{}>\n", record.m_name);
                 break;
             case Parent::Component:
-                // out << "StructDecoder<Decoder>\n";
                 out << "StructDecoder\n";
                 break;
             case Parent::Group:
-                // out << "GroupDecoder<Decoder>\n";
                 out << "GroupDecoder\n";
                 break;
             default:
@@ -120,16 +113,18 @@ struct Generator
             switch (record.m_parent.m_value)
             {
                 case Parent::Group:
-                    out << ", uint32_t tag)\n    {\n";
-                    // FIXME out << "        GroupDecoder<Decoder>::wrap(decoder, tag);\n";
+                    out << ", uint32_t tag)\n";
+                    out << "    {\n";
                     out << "        GroupDecoder::wrap(decoder, tag);\n";
                     break;
                 case Parent::Component:
-                    // FIXME out << ")\n    {\n        StructDecoder<Decoder>::wrap(decoder);\n";
-                    out << ")\n    {\n        StructDecoder::wrap(decoder);\n";
+                    out << ")\n";
+                    out << "    {\n";
+                    out << "        StructDecoder::wrap(decoder);\n";
                     break;
                 default:
-                out << ")\n    {\n";
+                    out << ")\n";
+                    out << "    {\n";
                     break;
             }
         }
@@ -147,7 +142,7 @@ struct Generator
 
     static void generateGetters(std::ostream& out, const Record& record)
     {
-        auto arg = record.m_parent != Parent::Message ? "this->m_decoder->template " : "m_tokens.";
+        auto arg = record.m_parent != Parent::Message ? "this->m_decoder->" : "m_tokens.";
         for (auto& field : record.m_fields)
         {
             auto methodName = field.m_name;
@@ -177,7 +172,6 @@ struct Generator
             out << "private:\n";
             for (auto& comp : record.m_records)
             {
-                // FIXME out << std::format("    {}Decoder<Decoder> m_{}{{}};\n\n", comp.m_type, uncap(comp.m_name));
                 out << std::format("    {}Decoder m_{}{{}};\n\n", comp.m_type, uncap(comp.m_name));
             }
         }
@@ -188,7 +182,6 @@ struct Generator
         for (const auto& comp : record.m_records)
         {
             auto fieldName = uncap(comp.m_name);
-            // FIXME out << std::format("    {}Decoder<Decoder>& {}()\n    {{\n", comp.m_type, fieldName);
             out << std::format("    {}Decoder& {}()\n    {{\n", comp.m_type, fieldName);
             out << std::format("        return m_{};\n", fieldName);
             out << std::format("    }}\n\n");

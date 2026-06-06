@@ -5,6 +5,8 @@
 #ifndef SIMD_FIX_PARSER_STATUS_HPP
 #define SIMD_FIX_PARSER_STATUS_HPP
 
+#include <cstdint>
+
 namespace org::limitless::fix::decoder {
 
 struct Result
@@ -27,10 +29,11 @@ struct Result
         InvalidMessageType,
         InvalidSendingTime,
         RequiredFieldMissing,
-        InvalidLength, NullValue
+        InvalidLength,
+        NullValue
     };
 
-    size_t m_processed;
+    uint32_t m_processed;
     Values m_value;
 
     constexpr Result() : m_value{Success} {}
@@ -49,7 +52,7 @@ struct Result
         }
     }
 
-    constexpr Result(const size_t processed, const Values value) : m_processed{processed}, m_value{value}
+    constexpr Result(const uint32_t processed, const Values value) : m_processed{processed}, m_value{value}
     {
     }
 
