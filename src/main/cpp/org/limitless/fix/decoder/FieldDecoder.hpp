@@ -106,14 +106,16 @@ struct FieldDecoder
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
-    template <int32_t Tag, bool Required>
-    [[nodiscard]] constexpr Uint8Result getUint8() const
+    // FIXME: enum handling
+    template <int32_t Tag, bool Required, typename Enum>
+    [[nodiscard]] constexpr std::expected<Enum, Result::Values> getEnum() const
     {
         const auto index = simd::find(m_tags.data(), m_size, Tag);
         if (index >= 0)
         {
             const auto token = m_tokens[index];
-            return m_data[token.position];
+            const auto code = m_data[token.position];
+            return utils::find<Enum>(code);
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }

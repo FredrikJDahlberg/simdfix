@@ -14,6 +14,22 @@ using namespace org::limitless::fix::decoder;
 
 using String = std::span<const uint8_t>;  // FIXME
 
+struct Encryption
+{
+    enum Values
+    {
+        Null,
+        None
+    };
+    static constexpr uint8_t Codes[2]  =
+    {
+        '?',
+        '0'
+    };
+    Encryption() : m_value{Null} {}
+    Values m_value;
+};
+
 struct HopsDecoder : GroupDecoder
 {
     explicit HopsDecoder(FieldDecoder& decoder) : 
@@ -97,9 +113,9 @@ public:
     static constexpr uint16_t MessageId = 'A';
 
     LogonDecoder& wrap(const std::span<const uint8_t> data,
-                        const std::span<Token> tokens,
-                        const std::span<uint16_t> tags,
-                        const uint32_t count)
+            const std::span<Token> tokens,
+            const std::span<uint16_t> tags,
+            const uint32_t count)
     {
         MessageDecoder::wrap(data, tokens, tags, count);
         return *this;
@@ -110,9 +126,9 @@ public:
         return m_standardHeader;
     }
 
-    [[nodiscard]] std::expected<std::uint8_t, Result::Values> encryptMethod() const
+    [[nodiscard]] std::expected<Encryption, Result::Values> encryptMethod() const
     {
-        return m_decoder.getUint8<98, false>();
+        return m_decoder.getEnum<98, false, Encryption>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> heartbeatInterval() const
@@ -136,9 +152,9 @@ public:
     static constexpr uint16_t MessageId = '5';
 
     LogoutDecoder& wrap(const std::span<const uint8_t> data,
-                        const std::span<Token> tokens,
-                        const std::span<uint16_t> tags,
-                        const uint32_t count)
+            const std::span<Token> tokens,
+            const std::span<uint16_t> tags,
+            const uint32_t count)
     {
         MessageDecoder::wrap(data, tokens, tags, count);
         return *this;
@@ -170,9 +186,9 @@ public:
     static constexpr uint16_t MessageId = '0';
 
     HeartbeatDecoder& wrap(const std::span<const uint8_t> data,
-                        const std::span<Token> tokens,
-                        const std::span<uint16_t> tags,
-                        const uint32_t count)
+            const std::span<Token> tokens,
+            const std::span<uint16_t> tags,
+            const uint32_t count)
     {
         MessageDecoder::wrap(data, tokens, tags, count);
         return *this;
@@ -204,9 +220,9 @@ public:
     static constexpr uint16_t MessageId = '1';
 
     TestRequestDecoder& wrap(const std::span<const uint8_t> data,
-                        const std::span<Token> tokens,
-                        const std::span<uint16_t> tags,
-                        const uint32_t count)
+            const std::span<Token> tokens,
+            const std::span<uint16_t> tags,
+            const uint32_t count)
     {
         MessageDecoder::wrap(data, tokens, tags, count);
         return *this;

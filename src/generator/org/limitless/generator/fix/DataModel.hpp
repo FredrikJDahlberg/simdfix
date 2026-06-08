@@ -62,6 +62,11 @@ struct Record
 
     Record() = default;
 
+    Record(std::string name, std::string id, const Parent type)
+        : m_name(std::move(name)), m_id(std::move(id)), m_parent(type), m_fields{}, m_tag{0}
+    {
+    }
+
     Record(std::string name, std::string id, const Parent type, const std::vector<Field>& fields)
         : m_name(std::move(name)), m_id(std::move(id)), m_parent(type), m_fields{fields}, m_tag{0}
     {

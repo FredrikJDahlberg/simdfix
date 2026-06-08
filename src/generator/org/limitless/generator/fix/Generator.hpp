@@ -18,17 +18,7 @@ namespace decoder = limitless::fix::decoder;
 
 struct Generator
 {
-    static std::string uncap(const std::string& value)
-    {
-        std::string result{value};
-        if (!value.empty())
-        {
-            result[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(result[0])));
-        }
-        return result;
-    }
-
-    void generateGrammar(const std::string& grammarFile, const std::vector<Record>& messages) const
+    static void generateGrammar(const std::string& grammarFile, const std::vector<Record>& messages)
     {
         std::ofstream out(grammarFile);
         if (!out)
@@ -66,168 +56,9 @@ struct Generator
         out.close();
     }
 
-    static void generateDefinition(std::ostream& out, const Record& record)
-    {
-        out << std::format("struct {}Decoder : ", record.m_name);
-        switch (record.m_parent.m_value)
-        {
-            case Parent::Message:
-                out << std::format("MessageDecoder<protocols::{}>\n", record.m_name);
-                out << "{\n";
-                break;
-            case Parent::Component:
-                out << "StructDecoder\n{\n";
-                break;
-            case Parent::Group:
-                out << "GroupDecoder\n{\n";
-                break;
-            default:
-                break;
-        }
-    }
-
-    static void generateConstructors(std::ostream& out, const Record& record)
-    {
-        /*
-        LogonDecoder() :
-                m_standardHeader{m_decoder}
-            {
-            }
-
-        */
-
-        if (record.m_records.size() >= 1)
-        {
-            out << "public:\n";
-        }
-        std::string arg{};
-        switch (record.m_parent.m_value)
-        {
-            case Parent::Component:
-                arg = "StructDecoder";
-                break;
-            case Parent::Group:
-                arg = "GroupDecoder";
-                break;
-            default:
-                break;
-        }
-        const auto isMessage = record.m_parent == Parent::Message;
-        if (isMessage)
-        {
-            out << std::format("    {}Decoder() : \n", record.m_name);
-        }
-        else
-        {
-            out << std::format("    explicit {}Decoder(FieldDecoder& decoder) : \n", record.m_name);
-        }
-        if (!arg.empty())
-        {
-            out << std::format("        {}{{decoder}}{}\n", arg, record.m_records.empty() ? "" : ",");
-        }
-        for (auto const& field : record.m_records)
-        {
-            out << std::format("        m_{}{{{}decoder}}{}\n",
-                               uncap(field.m_name), isMessage ? "m_" : "",
-                               field.m_name != record.m_records.back().m_name ? "," : "");
-        }
-        out << "    {\n    }\n\n";
-    }
-
-    static void generateFields(std::ostream& out, const Record& record)
-    {
-        if (record.m_records.size() >= 1)
-        {
-            out << "private:\n";
-            for (auto& comp : record.m_records)
-            {
-                out << std::format("    {}Decoder m_{};\n\n", comp.m_type, uncap(comp.m_name));
-            }
-        }
-    }
-
-    static void generateWrap(std::ostream& out, const Record& record)
-    {
-        if (record.m_parent == Parent::Message)
-        {
-            out << std::format("    {}Decoder& wrap(", record.m_name);
-            out << "const std::span<const uint8_t> data,\n";
-            out << "                        const std::span<Token> tokens,\n";
-            out << "                        const std::span<uint16_t> tags,\n";
-            out << "                        const uint32_t count)\n";
-            out << "    {\n";
-            out << "        MessageDecoder::wrap(data, tokens, tags, count);\n";
-            out << "        return *this;\n";
-            out << "    }\n\n";
-        }
-        else if (record.m_parent == Parent::Group)
-        {
-            out << std::format("    {}Decoder& wrap()\n", record.m_name);
-            out << "    {\n";
-            out << std::format("        GroupDecoder::wrap({});\n", record.m_tag);
-            out << "        return *this;\n";
-            out << "    }\n\n";
-        }
-    }
-
-    static void generateGetters(std::ostream& out, const Record& record)
-    {
-        for (auto& field : record.m_fields)
-        {
-            auto methodName = field.m_name;
-            methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
-            std::string_view mandatory = field.m_presence.m_value == decoder::Presence::Required ? "true" : "false";
-            auto categoryName = field.m_category.name();
-            auto categoryType = field.m_category.type();
-            if (field.m_category != Category::Counter && field.m_category != Category::Struct)
-            {
-                out << std::format("    [[nodiscard]] std::expected<{}, Result::Values> {}() const\n",
-                                   categoryType, methodName);
-                out << "    {\n";
-                out << std::format("        return m_decoder.get{}<{}, {}>();\n",
-                                   categoryName, field.m_tag, mandatory);
-                out << "    }\n\n";
-            }
-            else if (field.m_category != Category::Struct && field.m_category != Category::Counter)
-            {
-                out << std::format("        throw std::invalid_argument(\"{} is not implemented\");\n",
-                                   field.m_category.name());
-            }
-        }
-    }
-
-    static void generateStructGetters(std::ostream& out, const Record& record)
-    {
-        for (const auto& comp : record.m_records)
-        {
-            auto fieldName = uncap(comp.m_name);
-            out << std::format("    {}Decoder& {}()\n    {{\n", comp.m_type, fieldName);
-            out << std::format("        return m_{}", fieldName);
-            if (comp.m_tag != 0)
-            {
-                out << std::format(".wrap()");
-            }
-            out << ";\n";
-            out << std::format("    }}\n\n");
-        }
-    }
-
-    static void generateRecord(std::ostream& out, const Record& record)
-    {
-        generateDefinition(out, record);
-        generateFields(out, record);
-        generateConstructors(out, record);
-        if (record.m_parent == Parent::Message)
-        {
-            out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
-        }
-        generateWrap(out, record);
-        generateStructGetters(out, record);
-        generateGetters(out, record);
-        out << "};\n\n";
-    }
-
-    void generateMessageDecoders(const std::string& fileName, const std::vector<Record>& records) const
+    static void generateDecoders(const std::string& fileName,
+                                 const std::vector<Record>& records,
+                                 const std::vector<Record>& enums)
     {
         std::ofstream out(fileName);
         if (!out)
@@ -246,6 +77,10 @@ struct Generator
         out << "namespace org::limitless::fix::generated {\n\n";
         out << "using namespace org::limitless::fix::decoder;\n\n";
         out << "using String = std::span<const uint8_t>;  // FIXME\n\n";
+        for (const auto& value : enums)
+        {
+            generateEnum(out, value);
+        }
         for (auto& record : records)
         {
             generateRecord(out, record);
@@ -256,7 +91,7 @@ struct Generator
         out.close();
     }
 
-    void generateMessageHandler(const std::string& fileName, const std::vector<Record>& records) const
+    static void generateMessageHandler(const std::string& fileName, const std::vector<Record>& records)
     {
         std::ofstream out(fileName);
         if (!out)
@@ -325,6 +160,201 @@ struct Generator
         out << "};\n\n";
         out << "} // namespace org::limitless::fix::generated\n\n";
         out << "#endif // SIMD_FIX_MESSAGE_HANDLER_HPP\n";
+    }
+
+private:
+
+    static std::string uncap(const std::string& value)
+    {
+        std::string result{value};
+        if (!value.empty())
+        {
+            result[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(result[0])));
+        }
+        return result;
+    }
+
+    static void generateDefinition(std::ostream& out, const Record& record)
+    {
+        out << std::format("struct {}Decoder : ", record.m_name);
+        switch (record.m_parent.m_value)
+        {
+            case Parent::Message:
+                out << std::format("MessageDecoder<protocols::{}>\n", record.m_name);
+                out << "{\n";
+                break;
+            case Parent::Component:
+                out << "StructDecoder\n{\n";
+                break;
+            case Parent::Group:
+                out << "GroupDecoder\n{\n";
+                break;
+            default:
+                break;
+        }
+    }
+
+    static void generateConstructors(std::ostream& out, const Record& record)
+    {
+        if (record.m_records.size() >= 1)
+        {
+            out << "public:\n";
+        }
+        std::string arg{};
+        switch (record.m_parent.m_value)
+        {
+            case Parent::Component:
+                arg = "StructDecoder";
+                break;
+            case Parent::Group:
+                arg = "GroupDecoder";
+                break;
+            default:
+                break;
+        }
+        const auto isMessage = record.m_parent == Parent::Message;
+        if (isMessage)
+        {
+            out << std::format("    {}Decoder() : \n", record.m_name);
+        }
+        else
+        {
+            out << std::format("    explicit {}Decoder(FieldDecoder& decoder) : \n", record.m_name);
+        }
+        if (!arg.empty())
+        {
+            out << std::format("        {}{{decoder}}{}\n", arg, record.m_records.empty() ? "" : ",");
+        }
+        for (auto const& field : record.m_records)
+        {
+            out << std::format("        m_{}{{{}decoder}}{}\n",
+                               uncap(field.m_name), isMessage ? "m_" : "",
+                               field.m_name != record.m_records.back().m_name ? "," : "");
+        }
+        out << "    {\n    }\n\n";
+    }
+
+    static void generateFields(std::ostream& out, const Record& record)
+    {
+        if (record.m_records.size() >= 1)
+        {
+            out << "private:\n";
+            for (auto& comp : record.m_records)
+            {
+                out << std::format("    {}Decoder m_{};\n\n", comp.m_type, uncap(comp.m_name));
+            }
+        }
+    }
+
+    static void generateWrap(std::ostream& out, const Record& record)
+    {
+        if (record.m_parent == Parent::Message)
+        {
+            out << std::format("    {}Decoder& wrap(", record.m_name);
+            out << "const std::span<const uint8_t> data,\n";
+            out << "            const std::span<Token> tokens,\n";
+            out << "            const std::span<uint16_t> tags,\n";
+            out << "            const uint32_t count)\n";
+            out << "    {\n";
+            out << "        MessageDecoder::wrap(data, tokens, tags, count);\n";
+            out << "        return *this;\n";
+            out << "    }\n\n";
+        }
+        else if (record.m_parent == Parent::Group)
+        {
+            out << std::format("    {}Decoder& wrap()\n", record.m_name);
+            out << "    {\n";
+            out << std::format("        GroupDecoder::wrap({});\n", record.m_tag);
+            out << "        return *this;\n";
+            out << "    }\n\n";
+        }
+    }
+
+    static void generateGetters(std::ostream& out, const Record& record)
+    {
+        for (auto& field : record.m_fields)
+        {
+            auto methodName = field.m_name;
+            methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
+            std::string_view mandatory = field.m_presence.m_value == decoder::Presence::Required ? "true" : "false";
+            auto categoryName = field.m_category.name();
+            auto categoryType = field.m_category.type();
+            if (field.m_category != Category::Counter && field.m_category != Category::Struct)
+            {
+                out << std::format("    [[nodiscard]] std::expected<{}, Result::Values> {}() const\n",
+                                   field.m_category == Category::Enum ? field.m_type : categoryType, methodName);
+                out << "    {\n";
+                std::string arg = field.m_category == Category::Enum ? std::format(", {}", field.m_type) : "";
+                out << std::format("        return m_decoder.get{}<{}, {}{}>();\n",
+                                   categoryName, field.m_tag, mandatory, arg);
+                out << "    }\n\n";
+            }
+            else if (field.m_category != Category::Struct && field.m_category != Category::Counter)
+            {
+                out << std::format("        throw std::invalid_argument(\"{} is not implemented\");\n",
+                                   field.m_category.name());
+            }
+        }
+    }
+
+    static void generateStructGetters(std::ostream& out, const Record& record)
+    {
+        for (const auto& comp : record.m_records)
+        {
+            auto fieldName = uncap(comp.m_name);
+            out << std::format("    {}Decoder& {}()\n    {{\n", comp.m_type, fieldName);
+            out << std::format("        return m_{}", fieldName);
+            if (comp.m_tag != 0)
+            {
+                out << std::format(".wrap()");
+            }
+            out << ";\n";
+            out << std::format("    }}\n\n");
+        }
+    }
+
+    static void generateRecord(std::ostream& out, const Record& record)
+    {
+        generateDefinition(out, record);
+        generateFields(out, record);
+        generateConstructors(out, record);
+        if (record.m_parent == Parent::Message)
+        {
+            out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
+        }
+        generateWrap(out, record);
+        generateStructGetters(out, record);
+        generateGetters(out, record);
+        out << "};\n\n";
+    }
+
+    static void generateEnum(std::ostream& out, const Record& record)
+    {
+        out << std::format("struct {}\n", record.m_name);
+        out << "{\n";
+        const auto end = record.m_fields.end();
+        out << "    enum Values\n    {\n";
+        for (auto value = record.m_fields.begin(); value != end; ++value)
+        {
+            out << std::format("        {}{}\n", value->m_name, value != end - 1? "," : "");
+        }
+        out << "    };\n";
+        auto size = record.m_fields.size();
+        out << std::format("    static constexpr uint8_t Codes[{}]  =\n    {{\n", size);
+        for (auto value = record.m_fields.begin(); value != end; ++value)
+        {
+            out << std::format("        '{}'{}\n", value->m_type[0], value != end - 1? "," : "");
+        }
+        out <<"    };\n";
+        /*
+        out << std::format("    explicit {}(const uint8_t code)\n", record.m_name);
+        out << "    {\n";
+        out << std::format("        m_value = utils::find(code, Codes, {});\n", size);
+        out << "    };\n";
+        */
+        out << std::format("    {}() : m_value{{Null}} {{}}\n", record.m_name);
+        out << "    Values m_value;\n";
+        out << "};\n\n";
     }
 };
 

@@ -24,7 +24,8 @@ struct Category
         Timestamp,
         Counter,
         Struct,
-        Group
+        Group,
+        Enum
     };
 
     static constexpr std::string_view Names[] =
@@ -39,12 +40,13 @@ struct Category
         "Timestamp",
         "Counter",
         "Struct",
-        "Group"
+        "Group",
+        "Enum"
     };
 
     static constexpr std::string_view Types[] =
     {
-        "null",
+        "Null",
         "std::uint8_t",
         "std::int32_t",
         "std::uint32_t",
@@ -53,8 +55,9 @@ struct Category
         "std::span<const uint8_t>",
         "std::int64_t",
         "std::uint32_t",
-        "struct"
-        "group"
+        "Struct",
+        "Group",
+        "Enum"
     };
 
     constexpr Category() : m_value{Null} {}
@@ -81,13 +84,13 @@ struct Category
         return Types[m_value];
     }
 
-    [[nodiscard]] constexpr bool operator==(const Values v) const
+    [[nodiscard]] constexpr bool operator==(const Values value) const
     {
-        return m_value == v;
+        return m_value == value;
     }
-    [[nodiscard]] constexpr bool operator!=(const Values v) const
+    [[nodiscard]] constexpr bool operator!=(const Values value) const
     {
-        return m_value != v;
+        return m_value != value;
     }
 
     Values m_value;
@@ -95,7 +98,7 @@ struct Category
 
 struct Parent
 {
-    enum Values { Null, Message, Component, Group };
+    enum Values { Null, Message, Component, Group, Enum };
 
     static constexpr std::string_view Names[] = {
         "Null", "Message", "Component", "Group"

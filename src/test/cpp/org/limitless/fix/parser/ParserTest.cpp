@@ -36,6 +36,7 @@ TEST(Parser, Logon)
         {
             const auto sender = logon.standardHeader().sender().value();
             EXPECT_EQ(std::string("Buyer"), std::string(reinterpret_cast<const char*>(sender.data()), sender.size()));
+            EXPECT_EQ(Encryption::None, logon.encryptMethod().value().m_value);
             found = true;
             return Result::Success;
         }

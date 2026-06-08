@@ -6,6 +6,8 @@
 #define SIMD_FIX_PROCESSOR_HPP
 
 #include <algorithm>
+#include <iostream>
+#include <ostream>
 #include <ranges>
 #include <unordered_map>
 #include <vector>
@@ -20,6 +22,7 @@ struct Processor
 {
     std::unordered_map<std::string, Type> m_types{};
     std::unordered_map<std::string, Record> m_recordsByType{};
+    std::vector<Record> m_enums{};
     std::vector<Record> m_records{};
     std::vector<Record> m_grammar{};
 
@@ -34,12 +37,26 @@ struct Processor
         m_types.try_emplace("timestamp", "timestamp", 8, 1, Category::Timestamp);
         for (auto typeNode : types)
         {
-            const std::string_view name = typeNode.attribute("name").as_string();
-            const std::string_view primitive = typeNode.attribute("primitiveType").as_string();
-            const std::string_view type = typeNode.attribute("type").as_string();
+            const auto name = std::string{typeNode.attribute("name").as_string()};
+            const auto primitive = std::string{typeNode.attribute("primitiveType").as_string()};
+            const auto type = std::string{typeNode.attribute("type").as_string()};
             auto primitiveType = m_types.find(std::string{primitive});
             auto refType = m_types.find(std::string{type});
-            if (!primitive.empty() && primitiveType == m_types.end())
+            if (std::strncmp(typeNode.name(), "enum", 4) == 0)
+            {
+                Record record{name, std::string{}, Parent::Enum};
+                record.m_fields.emplace_back(0, "Null", "?", 1, Presence::Null, Category::Enum, Parent::Enum);
+                for (auto element : typeNode.children())
+                {
+                    const auto fieldName = std::string{element.attribute("name").as_string()};
+                    const auto fieldValue = std::string{element.attribute("value").as_string()};
+                    record.m_fields.emplace_back(0, fieldName, fieldValue,1, Presence::Null,
+                                                 Category::Enum, Parent::Enum);
+                }
+                m_types.try_emplace(name, name, 1, 1, Category::Enum);
+                m_enums.emplace_back(record);
+            }
+            else if (!primitive.empty() && primitiveType == m_types.end())
             {
                 std::println("Error: type '{}' has an invalid primitive type '{}'", name, primitive);
             }
@@ -51,7 +68,7 @@ struct Processor
             {
                 auto* ref = refType != m_types.end() ? &refType->second : &primitiveType->second;
                 auto length = std::max(typeNode.attribute("length").as_int(), ref->m_length);
-                m_types.try_emplace(std::string{name}, std::string{name}, ref->m_size, length, ref->m_type);
+                m_types.try_emplace(name, name, ref->m_size, length, ref->m_type);
             }
         }
     }
@@ -61,7 +78,7 @@ struct Processor
         for (const auto& field : nodes)
         {
             const std::string_view nodeType = field.name();
-            const std::string_view name = field.attribute("name").as_string();
+            const std::string name = std::string{field.attribute("name").as_string()};
             const int32_t tag = field.attribute("tag").as_int();
             const std::string_view type = field.attribute("type").as_string();
             const std::string_view primitive = field.attribute("primitiveType").as_string();
@@ -71,12 +88,12 @@ struct Processor
             auto refType = m_types.find(resolvedType);
             if (nodeType == "group")
             {
-                const auto groupName = field.attribute("name").as_string();
-                record.m_fields.emplace_back(0, std::string{groupName}, std::string{groupName}, 0,
-                                             presence, Category::Struct, parent);
-                const auto counterName = field.attribute("counter").as_string();
-                record.m_fields.emplace_back(tag, std::string{counterName}, std::string{groupName}, 0,
-                                             presence, Category::Counter, parent);
+                const auto groupName = std::string{field.attribute("name").as_string()};
+                record.m_fields.emplace_back(0, groupName, groupName, 0, presence,
+                                             Category::Struct, parent);
+                const auto counterName = std::string{field.attribute("counter").as_string()};
+                record.m_fields.emplace_back(tag, counterName, groupName, 0, presence,
+                                             Category::Counter, parent);
                 record.m_records.emplace_back(tag, groupName, groupName, 0, presence,
                                               Category::Group, parent);
             }
@@ -101,7 +118,7 @@ struct Processor
                 {
                     const auto& ref = refType->second;
                     const int32_t length = std::max(field.attribute("length").as_int(), ref.m_length);
-                    record.m_fields.emplace_back(tag, std::string{name}, std::string{type}, length,
+                    record.m_fields.emplace_back(tag, name, resolvedType, length,
                                                  presence, ref.m_type, parent);
                 }
             }

@@ -34,7 +34,7 @@ int main(int argc, char** argv)
 
     std::string decodersFile{argv[2]};
     decodersFile.append("/MessageDecoders.hpp"); // FIXME: MessageDecoders
-    generator.generateMessageDecoders(decodersFile, processor.m_records);
+    generator.generateDecoders(decodersFile, processor.m_records, processor.m_enums);
 
     std::string handlerFile{argv[2]};
     handlerFile.append("/MessageHandler.hpp");

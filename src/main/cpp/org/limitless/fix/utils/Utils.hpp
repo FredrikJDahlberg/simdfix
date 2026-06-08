@@ -7,7 +7,7 @@
 
 #include <cstdint>
 #include <string_view>
-#include <chrono>
+#include <ranges>
 
 namespace org::limitless::fix::utils {
 
@@ -204,6 +204,20 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
 inline int64_t dateTimeToEpochUTC(const std::string_view dateTime)
 {
     return dateTimeToEpochUTC(reinterpret_cast<const uint8_t*>(dateTime.data()), dateTime.length());
+}
+
+template <typename Enum>
+Enum find(const uint8_t code)
+{
+    const auto end = Enum::Codes + std::size(Enum::Codes);
+    const auto found = std::find(Enum::Codes, end, code);
+    Enum value{};
+    if (found != end)
+    {
+        auto index = std::distance(Enum::Codes, found);
+        value.m_value = static_cast<Enum::Values>(index);
+    }
+    return value;
 }
 
 }
