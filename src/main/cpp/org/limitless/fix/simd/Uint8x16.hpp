@@ -9,7 +9,7 @@
 
 #include <arm_neon.h>
 
-namespace org::limitless::simd {
+namespace org::limitless::fix::simd {
 
 struct Uint8x16
 {

@@ -12,6 +12,8 @@ namespace org::limitless::fix::generated {
 
 using namespace org::limitless::fix::decoder;
 
+using String = std::span<const uint8_t>;  // FIXME
+
 struct HopsDecoder : GroupDecoder
 {
     explicit HopsDecoder(FieldDecoder& decoder) : 
@@ -19,9 +21,9 @@ struct HopsDecoder : GroupDecoder
     {
     }
 
-    HopsDecoder& wrap(uint32_t tag)
+    HopsDecoder& wrap()
     {
-        GroupDecoder::wrap(tag);
+        GroupDecoder::wrap(627);
         return *this;
     }
 
@@ -30,12 +32,12 @@ struct HopsDecoder : GroupDecoder
         return m_decoder.getString<628, false>();
     }
 
-    [[nodiscard]] std::expected<uint32_t, Result::Values> hopSendingTime() const
+    [[nodiscard]] std::expected<std::int64_t, Result::Values> hopSendingTime() const
     {
-        return m_decoder.getUint32<629, false>();
+        return m_decoder.getTimestamp<629, false>();
     }
 
-    [[nodiscard]] std::expected<uint32_t, Result::Values> hopRefID() const
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> hopRefID() const
     {
         return m_decoder.getUint32<630, false>();
     }
@@ -56,8 +58,7 @@ public:
 
     HopsDecoder& hops()
     {
-        m_hops.wrap(627);
-        return m_hops;
+        return m_hops.wrap();
     }
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
@@ -70,12 +71,12 @@ public:
         return m_decoder.getString<56, true>();
     }
 
-    [[nodiscard]] std::expected<uint32_t, Result::Values> sequenceNumber() const
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
         return m_decoder.getUint32<34, true>();
     }
 
-    [[nodiscard]] std::expected<uint32_t, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sendingTime() const
     {
         return m_decoder.getUint32<52, true>();
     }
@@ -109,12 +110,12 @@ public:
         return m_standardHeader;
     }
 
-    [[nodiscard]] std::expected<uint32_t, Result::Values> encryptMethod() const
+    [[nodiscard]] std::expected<std::uint8_t, Result::Values> encryptMethod() const
     {
-        return m_decoder.getUint32<98, false>();
+        return m_decoder.getUint8<98, false>();
     }
 
-    [[nodiscard]] std::expected<uint32_t, Result::Values> heartbeatInterval() const
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> heartbeatInterval() const
     {
         return m_decoder.getUint32<108, true>();
     }
@@ -184,7 +185,41 @@ public:
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> testReqID() const
     {
-        return m_decoder.getString<112, true>();
+        return m_decoder.getString<112, false>();
+    }
+
+};
+
+struct TestRequestDecoder : MessageDecoder<protocols::TestRequest>
+{
+private:
+    StandardHeaderDecoder m_standardHeader;
+
+public:
+    TestRequestDecoder() : 
+        m_standardHeader{m_decoder}
+    {
+    }
+
+    static constexpr uint16_t MessageId = '1';
+
+    TestRequestDecoder& wrap(const std::span<const uint8_t> data,
+                        const std::span<Token> tokens,
+                        const std::span<uint16_t> tags,
+                        const uint32_t count)
+    {
+        MessageDecoder::wrap(data, tokens, tags, count);
+        return *this;
+    }
+
+    StandardHeaderDecoder& standardHeader()
+    {
+        return m_standardHeader;
+    }
+
+    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> testReqID() const
+    {
+        return m_decoder.getString<112, false>();
     }
 
 };

@@ -16,8 +16,8 @@ namespace org::limitless::fix::simd {
 //
 [[nodiscard]] inline int32_t quadSearch(const uint16_t* carr, const int32_t cardinality, const uint16_t value)
 {
-    constexpr int32_t gap = 16;
-    if (cardinality < gap)
+    constexpr int32_t Gap = 16;
+    if (cardinality < Gap)
     {
         for (int32_t j = 0; j < cardinality; j++)
         {
@@ -29,15 +29,15 @@ namespace org::limitless::fix::simd {
         return -1;
     }
 
-    const int32_t num_blocks = cardinality / gap;
-    int32_t n = num_blocks;
+    const int32_t blocks = cardinality / Gap;
+    int32_t n = blocks;
     int32_t base = 0;
     while (n > 3)
     {
         const int32_t quarter = n >> 2;
-        const int32_t k1 = carr[(base + quarter + 1) * gap - 1];
-        const int32_t k2 = carr[(base + 2 * quarter + 1) * gap - 1];
-        const int32_t k3 = carr[(base + 3 * quarter + 1) * gap - 1];
+        const int32_t k1 = carr[(base + quarter + 1) * Gap - 1];
+        const int32_t k2 = carr[(base + 2 * quarter + 1) * Gap - 1];
+        const int32_t k3 = carr[(base + 3 * quarter + 1) * Gap - 1];
         const int32_t c1 = k1 < value;
         const int32_t c2 = k2 < value;
         const int32_t c3 = k3 < value;
@@ -47,14 +47,14 @@ namespace org::limitless::fix::simd {
     while (n > 1)
     {
         const int32_t half = n >> 1;
-        base = carr[(base + half + 1) * gap - 1] < value ? base + half : base;
+        base = carr[(base + half + 1) * Gap - 1] < value ? base + half : base;
         n -= half;
     }
 
-    int32_t lo = carr[(base + 1) * gap - 1] < value ? base + 1 : base;
-    if (lo < num_blocks)
+    const int32_t lo = carr[(base + 1) * Gap - 1] < value ? base + 1 : base;
+    if (lo < blocks)
     {
-        const uint16_t* blk = carr + lo * gap;
+        const uint16_t* blk = carr + lo * Gap;
         const uint16x8_t needle = vdupq_n_u16(value);
         const uint16x8_t m0 = vceqq_u16(vld1q_u16(blk), needle);
         const uint16x8_t m1 = vceqq_u16(vld1q_u16(blk + 8), needle);
@@ -65,7 +65,7 @@ namespace org::limitless::fix::simd {
         const uint64_t combined = low | high;
         return combined != 0 ? (std::countr_zero(combined) >> 3) + ((high != 0) << 3) : -1;
     }
-    for (int32_t j = num_blocks * gap; j < cardinality; j++)
+    for (int32_t j = blocks * Gap; j < cardinality; j++)
     {
         if (carr[j] >= value)
         {

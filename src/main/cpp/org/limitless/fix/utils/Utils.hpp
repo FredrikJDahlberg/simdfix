@@ -6,6 +6,8 @@
 #define SIMD_FIX_UTILS_HPP
 
 #include <cstdint>
+#include <string_view>
+#include <chrono>
 
 namespace org::limitless::fix::utils {
 
@@ -85,14 +87,24 @@ inline constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 
     return scale(value, length) + number;
 }
 
-[[nodiscard]] inline uint64_t asciiToDecimal(const uint64_t value, const uint8_t* digits, const uint32_t length)
+template <typename T>
+[[nodiscard]] uint64_t asciiToDecimal(const T* digits, const uint32_t length)
 {
+    static_assert(sizeof(T) == 1, "asciiToDecimal only accepts 1-byte data type arrays.");
+
+    const uint32_t offset = sizeof(uint64_t) - std::min(length, 8U);
     uint64_t number = 0x3030303030303030;
-    memcpy(reinterpret_cast<uint8_t*>(&number) + sizeof(uint64_t) - length, digits, length);
+    memcpy(reinterpret_cast<uint8_t*>(&number) + offset, digits, std::min(length, 8U));
     number -= 0x3030303030303030;
     number = number * 10 + (number >> 8); // val = (val * 2561) >> 8;
     number = ((number & SwarMask) * SwarFactor1 + (number >> 16 & SwarMask) * SwarFactor2) >> 32;
-    return scale(value, length) + number;
+    return number;
+}
+
+template <typename T>
+[[nodiscard]] uint64_t asciiToDecimal(const uint64_t value, const T* digits, const uint32_t length)
+{
+    return scale(value, length) + asciiToDecimal(digits, length);
 }
 
 template<size_t N>
@@ -119,6 +131,81 @@ constexpr uint64_t littleEndianUint64(const std::string_view str)
     }
     return result;
 }
+
+[[nodiscard]] inline uint32_t fastDivide100(const uint32_t number) {
+    return static_cast<uint32_t>(number * 0x51EB851FULL >> 37);
+}
+
+[[nodiscard]] inline uint32_t fastModulo100(const uint32_t number)
+{
+    return number - fastDivide100(number) * 100;
+}
+
+[[nodiscard]] inline uint32_t fastDivide10000(const uint32_t number) {
+    return static_cast<uint32_t>(number * 0xD1B71759ULL >> 45);
+}
+
+[[nodiscard]] inline uint32_t fastModulo10000(const uint32_t number) {
+    return number - fastDivide10000(number) * 10000;
+}
+
+[[nodiscard]] inline int64_t daysSince1970(int year, int month, int day) noexcept
+{
+    // Shift the calendar so that March is the first month of the "built-in" year.
+    // This trick moves the leap day (Feb 29) to the very end of the calculation loop,
+    // making the leap year distribution perfectly linear without if/else blocks.
+    year -= (month <= 2) ? 1 : 0;
+
+    // Calculate historical leap days using the standard formula layout
+    const int64_t era = fastDivide100 (year >= 0 ? year : year - 399) >> 2;
+    const int64_t yoe = static_cast<uint32_t>(year - era * 400);            // Year of era
+    const int64_t doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1; // Day of year
+    const int64_t doe = yoe * 365 + yoe / 4 - fastDivide100(yoe) + doy;              // Day of era
+
+    // Subtract the exact day count offset for January 1st, 1970
+    return era * 146097 + doe - 719468;
+}
+
+inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
+{
+    static constexpr uint64_t MillisPerDay = 24 * 60 * 60 * 1'000;
+    if (length < 17)
+    {
+        return -1;
+    }
+    const uint64_t date = asciiToDecimal(data, 8);
+    const auto years = fastDivide10000(date);
+    const auto month = fastDivide100(fastModulo10000(date));
+    const auto day = fastModulo100(date);
+    const auto days = daysSince1970(years, month, day);
+
+    uint64_t time = 0;
+    std::memcpy(&time, data + 9, sizeof(time));
+    time -= 0x30303a30303a3030ull;
+    const auto hours = (time & 0xff) * 10 + ((time >> 8) & 0xff);
+    const auto mins  = (time >> 24 & 0xff) * 10 + (time >> 32 & 0xff);
+    const auto secs  = (time >> 48 & 0xff) * 10 + (time >> 56);
+    uint64_t millis = days * MillisPerDay + (hours * 3'600 + mins * 60 + secs) * 1000;
+    if (length == 17)
+    {
+        return millis;
+    }
+    if (length == 21)
+    {
+        time = 0;
+        memcpy(&time, data + 17, 4);
+        time -= 0x3030302e;
+        millis += (time >> 24) + (time >> 16 & 0xff) * 10 + (time >> 8 & 0xff) * 100;
+        return millis;
+    }
+    return -1;
+}
+
+inline int64_t dateTimeToEpochUTC(const std::string_view dateTime)
+{
+    return dateTimeToEpochUTC(reinterpret_cast<const uint8_t*>(dateTime.data()), dateTime.length());
+}
+
 }
 
 #endif //SIMD_FIX_UTILS_HPP

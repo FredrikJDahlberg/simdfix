@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-#include "org/limitless/fix/decoder/Decoder.hpp"
+#include "org/limitless/fix/decoder/PayloadDecoder.hpp"
 #include "org/limitless/fix/messages/MessageDecoders.hpp"
 #include "org/limitless/fix/messages/MessageHandler.hpp"
 
@@ -41,7 +41,7 @@ TEST(Parser, Logon)
         }
     } app;
 
-    Decoder decoder{};
+    PayloadDecoder decoder{};
     auto [processed, status] = decoder.parse(login, app);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
@@ -65,7 +65,7 @@ TEST(Parser, Logout)
         }
     } app;
 
-    Decoder decoder{};
+    PayloadDecoder decoder{};
     {
         const auto logout = utils::makeSpan(
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
@@ -100,7 +100,7 @@ TEST(Parser, MessageFragment)
         }
     } app;
 
-    Decoder decoder{};
+    PayloadDecoder decoder{};
     {
         const auto logout1 = utils::makeSpan(
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH );
@@ -151,7 +151,7 @@ TEST(Parser, HopGroup1)
             return Result::Success;
         }
     } app;
-    Decoder decoder{};
+    PayloadDecoder decoder{};
     const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
@@ -192,7 +192,7 @@ TEST(Parser, HopGroup2)
             return Result::Success;
         }
     } app;
-    Decoder decoder{};
+    PayloadDecoder decoder{};
     const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=77" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
         "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "628=20" SOH  "10=148" SOH);
     auto[processed, status] = decoder.parse(logout, app);
@@ -225,7 +225,7 @@ TEST(Parser, HopGroup3)
             return Result::Success;
         }
     } app;
-    Decoder decoder{};
+    PayloadDecoder decoder{};
     const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=70" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
         "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "10=077" SOH);
     auto[processed, status] = decoder.parse(logout, app);
@@ -256,7 +256,7 @@ TEST(Parser, InvalidGroupCount)
             return Result::Success;
         }
     } app;
-    Decoder decoder{};
+    PayloadDecoder decoder{};
     const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=70" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=12:12:12.123" SOH
         "627=2" SOH "629=10" SOH "628=20" SOH "10=071" SOH);
@@ -266,7 +266,7 @@ TEST(Parser, InvalidGroupCount)
 
 TEST(Parser, InvalidMandatoryFields)
 {
-    Decoder decoder{};
+    PayloadDecoder decoder{};
     struct AppHandler : generated::MessageHandler<AppHandler>{} app;
     {
         const auto message = utils::makeSpan("666=FIXT.1.1" SOH);

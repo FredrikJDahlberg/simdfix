@@ -9,6 +9,8 @@
         -->
     </types>
 
+    <!-- FIXME: add begin string constant? -->
+
     <component name="StandardHeader">
         <!--
         <field name="BeginString" tag="8" primitiveType="char" length="7" presence="constant">FIX.4.3</field>
@@ -23,28 +25,33 @@
         <field name="SendingTime" tag="52" primitiveType="uint32"/>
         <group name="Hops" tag="627" counter="NoHops" presence="optional" primitiveType="uint32">
             <field name="HopCompID" tag="628" primitiveType="char" length="8" presence="optional"/>
-            <field name="HopSendingTime" tag="629" primitiveType="uint32" presence="optional"/>
+            <field name="HopSendingTime" tag="629" primitiveType="timestamp" presence="optional"/>
             <field name="HopRefID" tag="630" primitiveType="uint32" presence="optional"/>
         </group>
     </component>
 
     <message name="Logon" id="A">
         <field name="Header" type="StandardHeader"/>
-        <!-- <field name="EncryptMethod" tag="98" primitiveType="uint8" presence="constant">0</field> -->
+        <!-- FIXME <field name="EncryptMethod" tag="98" primitiveType="uint8" presence="constant">0</field> -->
         <field name="EncryptMethod" tag="98" primitiveType="uint8" presence="optional"/>
         <field name="HeartbeatInterval" tag="108" primitiveType="uint32"/>
-        <!-- <field name="CheckSum" tag="10" length="3" primitiveType="uint8"/> -->
+        <!-- FIXME <field name="CheckSum" tag="10" length="3" primitiveType="uint8"/> -->
     </message>
 
     <message name="Logout" id="5">
         <field name="Header" type="StandardHeader"/>
         <field name="Text" tag="58" primitiveType="char" length="8"/>
-        <!-- <field name="CheckSum" tag="10" length="3" primitiveType="uint8"/> -->
+        <!-- FIXME <field name="CheckSum" tag="10" length="3" primitiveType="uint8"/> -->
     </message>
 
     <message name="Heartbeat" id="0">
         <field name="Header" type="StandardHeader"/>
-        <field name="TestReqID" tag="112" primitiveType="char" length="32"/>
+        <field name="TestReqID" tag="112" primitiveType="char" length="32" presence="optional"/>
+    </message>
+
+    <message name="TestRequest" id="1">
+        <field name="Header" type="StandardHeader"/>
+        <field name="TestReqID" tag="112" primitiveType="char" length="32" presence="optional"/>
     </message>
 
 </protocol>

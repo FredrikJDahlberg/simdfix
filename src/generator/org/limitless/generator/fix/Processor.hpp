@@ -15,6 +15,7 @@
 #include "org/limitless/generator/fix/DataModel.hpp"
 
 namespace org::limitless::generator::fix {
+
 struct Processor
 {
     std::unordered_map<std::string, Type> m_types{};
@@ -25,10 +26,12 @@ struct Processor
     void processTypes(const pugi::xml_object_range<pugi::xml_node_iterator>& types)
     {
         m_types.try_emplace("char",   "char",   1, 1, Category::String);
-        m_types.try_emplace("uint8",  "uint8",  1, 1, Category::Int32);
+        m_types.try_emplace("uint8",  "uint8",  1, 1, Category::Uint8);
         m_types.try_emplace("int32",  "int32",  4, 1, Category::Int32);
-        m_types.try_emplace("uint32", "uint32", 4, 1, Category::Int32);
-
+        m_types.try_emplace("uint32", "uint32", 4, 1, Category::Uint32);
+        m_types.try_emplace("int64",  "int32",  4, 1, Category::Int64);
+        m_types.try_emplace("uint64", "uint32", 4, 1, Category::Uint64);
+        m_types.try_emplace("timestamp", "timestamp", 8, 1, Category::Timestamp);
         for (auto typeNode : types)
         {
             const std::string_view name = typeNode.attribute("name").as_string();
@@ -81,8 +84,7 @@ struct Processor
             {
                 if (refType == m_types.end())
                 {
-                    auto found = m_recordsByType.find(resolvedType);
-                    if (found != m_recordsByType.end())
+                    if (auto found = m_recordsByType.find(resolvedType); found != m_recordsByType.end())
                     {
                         auto comp = found->second.m_name;
                         record.m_fields.emplace_back(0, std::string{name}, std::string{type}, 0,
@@ -106,11 +108,11 @@ struct Processor
         }
     }
 
-    void processRecords(const pugi::xpath_node_set& components, const Parent parent)
+    void processRecords(const pugi::xpath_node_set& records, const Parent parent)
     {
-        for (const auto& xpathNode : components)
+        for (const auto& recordNode : records)
         {
-            const auto node = xpathNode.node();
+            const auto node = recordNode.node();
             std::string_view name = node.attribute("name").as_string();
             std::vector<Field> fields{};
             Record record{std::string{name}, std::string{}, parent, fields};
@@ -118,6 +120,10 @@ struct Processor
             if (parent == Parent::Message)
             {
                 record.m_id = node.attribute("id").as_string();
+            }
+            if (parent == Parent::Group)
+            {
+                record.m_tag = node.attribute("tag").as_int();
             }
             for (const auto& field : fields)
             {
@@ -170,7 +176,6 @@ struct Processor
             }
         }
     }
-
 };
 }
 

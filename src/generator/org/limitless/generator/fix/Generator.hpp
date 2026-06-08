@@ -41,7 +41,6 @@ struct Generator
         out << "#include \"org/limitless/fix/decoder/Dictionary.hpp\"\n\n";
         out << "namespace org::limitless::fix::protocols {\n\n";
         out << "using namespace org::limitless::fix::decoder;\n\n";
-
         for (const auto& message : messages)
         {
             auto sorted = message.m_fields;
@@ -163,10 +162,9 @@ struct Generator
         }
         else if (record.m_parent == Parent::Group)
         {
-            out << std::format("    {}Decoder& wrap(", record.m_name);
-            out << "uint32_t tag)\n";
+            out << std::format("    {}Decoder& wrap()\n", record.m_name);
             out << "    {\n";
-            out << "        GroupDecoder::wrap(tag);\n";
+            out << std::format("        GroupDecoder::wrap({});\n", record.m_tag);
             out << "        return *this;\n";
             out << "    }\n\n";
         }
@@ -174,25 +172,26 @@ struct Generator
 
     static void generateGetters(std::ostream& out, const Record& record)
     {
-        auto arg = record.m_parent != Parent::Message ? "." : ".";
         for (auto& field : record.m_fields)
         {
             auto methodName = field.m_name;
             methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
             std::string_view mandatory = field.m_presence.m_value == decoder::Presence::Required ? "true" : "false";
-            if (field.m_category == Category::String)
+            auto categoryName = field.m_category.name();
+            auto categoryType = field.m_category.type();
+            if (field.m_category != Category::Counter && field.m_category != Category::Struct)
             {
-                out << std::format("    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> {}() const\n", methodName);
+                out << std::format("    [[nodiscard]] std::expected<{}, Result::Values> {}() const\n",
+                                   categoryType, methodName);
                 out << "    {\n";
-                out << std::format("        return m_decoder{}getString<{}, {}>();\n", arg, field.m_tag, mandatory);
+                out << std::format("        return m_decoder.get{}<{}, {}>();\n",
+                                   categoryName, field.m_tag, mandatory);
                 out << "    }\n\n";
             }
-            else if (field.m_category == Category::Int32)
+            else if (field.m_category != Category::Struct && field.m_category != Category::Counter)
             {
-                out << std::format("    [[nodiscard]] std::expected<uint32_t, Result::Values> {}() const\n", methodName);
-                out << "    {\n";
-                out << std::format("        return m_decoder{}getUint32<{}, {}>();\n", arg, field.m_tag, mandatory);
-                out << "    }\n\n";
+                out << std::format("        throw std::invalid_argument(\"{} is not implemented\");\n",
+                                   field.m_category.name());
             }
         }
     }
@@ -203,11 +202,12 @@ struct Generator
         {
             auto fieldName = uncap(comp.m_name);
             out << std::format("    {}Decoder& {}()\n    {{\n", comp.m_type, fieldName);
+            out << std::format("        return m_{}", fieldName);
             if (comp.m_tag != 0)
             {
-                out << std::format("        m_{}.wrap({});\n", fieldName, comp.m_tag);
+                out << std::format(".wrap()");
             }
-            out << std::format("        return m_{};\n", fieldName);
+            out << ";\n";
             out << std::format("    }}\n\n");
         }
     }
@@ -245,6 +245,7 @@ struct Generator
         out << "#include \"org/limitless/fix/messages/Grammar.hpp\"\n\n";
         out << "namespace org::limitless::fix::generated {\n\n";
         out << "using namespace org::limitless::fix::decoder;\n\n";
+        out << "using String = std::span<const uint8_t>;  // FIXME\n\n";
         for (auto& record : records)
         {
             generateRecord(out, record);

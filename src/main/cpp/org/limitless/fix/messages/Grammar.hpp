@@ -79,7 +79,33 @@ struct Heartbeat {
         { 49, 8, Presence::Required },
         { 52, 1, Presence::Required },
         { 56, 8, Presence::Required },
-        { 112, 32, Presence::Required },
+        { 112, 32, Presence::Optional },
+        { 627, 0, Presence::Optional },
+        { 628, 8, Presence::Optional },
+        { 629, 1, Presence::Optional },
+        { 630, 1, Presence::Optional },
+    };
+};
+
+struct TestRequest {
+    static constexpr uint16_t Tags[] = {
+        34,
+        49,
+        52,
+        56,
+        112,
+        627,
+        628,
+        629,
+        630,
+    };
+
+    static constexpr Dictionary Grammar[] = {
+        { 34, 1, Presence::Required },
+        { 49, 8, Presence::Required },
+        { 52, 1, Presence::Required },
+        { 56, 8, Presence::Required },
+        { 112, 32, Presence::Optional },
         { 627, 0, Presence::Optional },
         { 628, 8, Presence::Optional },
         { 629, 1, Presence::Optional },

@@ -14,6 +14,7 @@ class MessageHandler
     LogonDecoder m_logon;
     LogoutDecoder m_logout;
     HeartbeatDecoder m_heartbeat;
+    TestRequestDecoder m_testRequest;
 
 public:
     template <typename Event>
@@ -55,6 +56,14 @@ public:
                     status = receive(m_heartbeat);
                 }
                 break;
+            case TestRequestDecoder::MessageId:
+                m_testRequest.wrap(data, tokens, tags, count);
+                status = m_testRequest.checkRequired();
+                if (status == Result::Success)
+                {
+                    status = receive(m_testRequest);
+                }
+                break;
             default:
                 break;
         }
@@ -65,6 +74,7 @@ protected:
     Result::Values handle(LogonDecoder&) { return Result::Success; }
     Result::Values handle(LogoutDecoder&) { return Result::Success; }
     Result::Values handle(HeartbeatDecoder&) { return Result::Success; }
+    Result::Values handle(TestRequestDecoder&) { return Result::Success; }
 };
 
 } // namespace org::limitless::fix::generated

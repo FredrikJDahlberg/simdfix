@@ -45,7 +45,7 @@ public:
         }
         else
         {
-            std::cout << "Tag not found = " << tag << std::endl;
+            throw std::invalid_argument("GroupDecoder::wrap: tag not found");
         }
         return *this;
     }
@@ -57,19 +57,9 @@ public:
         m_offset = 0;
     }
 
-    [[nodiscard]] Token* next(const uint32_t tag)
-    {
-        return m_decoder.next(tag);
-    }
-
-    [[nodiscard]] const Token* next(const uint32_t tag) const
-    {
-        return m_decoder.next(tag);
-    }
-
     void next()
     {
-        m_offset = m_decoder.nextDelim(m_offset + 1, m_delim);
+        m_offset = m_decoder.nextGroup(m_offset + 1, m_delim);
         ++m_repeat;
     }
 
@@ -77,6 +67,18 @@ public:
     {
         return m_count;
     }
+
+protected:
+    [[nodiscard]] Token* next(const uint32_t tag)
+    {
+        return m_decoder.nextField(tag);
+    }
+
+    [[nodiscard]] const Token* next(const uint32_t tag) const
+    {
+        return m_decoder.nextField(tag);
+    }
+
 };
 
 }

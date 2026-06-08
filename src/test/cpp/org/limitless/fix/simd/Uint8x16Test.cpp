@@ -5,9 +5,7 @@
 #include <gtest/gtest.h>
 #include "org/limitless/fix/simd/Uint8x16.hpp"
 
-using namespace org::limitless::simd;
-
-// ── helper ────────────────────────────────────────────────────────────────────
+using namespace org::limitless::fix::simd;
 
 static void extract(const Uint8x16& v, uint8_t (&out)[16])
 {
@@ -196,8 +194,6 @@ TEST(Uint8x16, RangeComparison)
     EXPECT_EQ(0x0000000000000000ull, (data <= below).toUint64());
 }
 
-// ── 8. In-place operators -=, &=, |= ─────────────────────────────────────────
-
 TEST(Uint8x16, InPlaceOperators)
 {
     uint8_t r[16]{};
@@ -228,11 +224,6 @@ TEST(Uint8x16, InPlaceOperators)
     }
 }
 
-// ── 9. equal() out-param and data() / value_type constructor ─────────────────
-//
-// equal() writes the comparison result into a caller-supplied Uint8x16.
-// data() exposes the raw NEON register; Uint8x16(value_type) reconstructs it.
-
 TEST(Uint8x16, EqualOutParamAndData)
 {
     uint8_t buf[16]{};
@@ -262,10 +253,6 @@ TEST(Uint8x16, EqualOutParamAndData)
         EXPECT_EQ(buf[i], rebuilt_out[i]) << "data() round-trip mismatch at lane " << i;
     }
 }
-
-// ── 10. Copy constructor and copy assignment ──────────────────────────────────
-//
-// Copies must be value-independent: mutating the source does not affect copies.
 
 TEST(Uint8x16, CopyConstructorAndAssignment)
 {

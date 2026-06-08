@@ -17,7 +17,7 @@
 namespace org::limitless::fix::decoder {
 
 // FIXME: do not clear token count and position on fragment
-class Decoder
+class PayloadDecoder
 {
 public:
     static constexpr size_t MaxSize = 64;
@@ -43,13 +43,13 @@ public:
     static inline const simd::Uint8x16 ZerosBlock{'0'};
     static inline const simd::Uint8x16 NineMask{9};
 
-    Decoder() noexcept = default;
-    ~Decoder() = default;
+    PayloadDecoder() noexcept = default;
+    ~PayloadDecoder() = default;
 
-    Decoder(const Decoder&) = delete;
-    Decoder& operator=(const Decoder&) = delete;
-    Decoder(Decoder&&) = delete;
-    Decoder& operator=(Decoder&&) = delete;
+    PayloadDecoder(const PayloadDecoder&) = delete;
+    PayloadDecoder& operator=(const PayloadDecoder&) = delete;
+    PayloadDecoder(PayloadDecoder&&) = delete;
+    PayloadDecoder& operator=(PayloadDecoder&&) = delete;
 
     [[nodiscard]] std::span<Token> tokens() noexcept
     {

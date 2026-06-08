@@ -12,15 +12,55 @@ namespace org::limitless::fix::decoder {
 
 struct Category
 {
-    enum Values { Null, Int32, String, Counter, Struct, Group };
+    enum Values
+    {
+        Null,
+        Uint8,
+        Int32,
+        Uint32,
+        Int64,
+        Uint64,
+        String,
+        Timestamp,
+        Counter,
+        Struct,
+        Group
+    };
 
-    static constexpr std::string_view Names[] = {
-        "Null", "Int32", "String", "Counter", "Struct"
+    static constexpr std::string_view Names[] =
+    {
+        "Null",
+        "Uint8",
+        "Int32",
+        "Uint32",
+        "Int64",
+        "Uint64",
+        "String",
+        "Timestamp",
+        "Counter",
+        "Struct",
+        "Group"
+    };
+
+    static constexpr std::string_view Types[] =
+    {
+        "null",
+        "std::uint8_t",
+        "std::int32_t",
+        "std::uint32_t",
+        "std::int64_t",
+        "std::uint64_t",
+        "std::span<const uint8_t>",
+        "std::int64_t",
+        "std::uint32_t",
+        "struct"
+        "group"
     };
 
     constexpr Category() : m_value{Null} {}
     constexpr Category(const Values value) : m_value{value} {}
-    constexpr Category(const std::string_view name) : m_value{Null}
+
+    explicit constexpr Category(const std::string_view name) : m_value{Null}
     {
         for (int i = 0; i < 7; ++i)
         {
@@ -32,10 +72,23 @@ struct Category
         }
     }
 
-    [[nodiscard]] constexpr std::string_view name() const { return Names[m_value]; }
+    [[nodiscard]] constexpr std::string_view name() const
+    {
+        return Names[m_value];
+    }
+    [[nodiscard]] constexpr std::string_view type() const
+    {
+        return Types[m_value];
+    }
 
-    constexpr bool operator==(const Values v) const { return m_value == v; }
-    constexpr bool operator!=(const Values v) const { return m_value != v; }
+    [[nodiscard]] constexpr bool operator==(const Values v) const
+    {
+        return m_value == v;
+    }
+    [[nodiscard]] constexpr bool operator!=(const Values v) const
+    {
+        return m_value != v;
+    }
 
     Values m_value;
 };

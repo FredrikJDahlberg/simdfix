@@ -24,7 +24,7 @@ set(GENERATED_HEADERS
 set(FIX_HEADERS
         ${MAIN_PATH}/utils/Utils.hpp
         ${MAIN_PATH}/utils/BitSet64.hpp
-        ${MAIN_PATH}/decoder/Decoder.hpp
+        ${MAIN_PATH}/decoder/PayloadDecoder.hpp
         ${MAIN_PATH}/decoder/MessageDecoder.hpp
         ${MAIN_PATH}/decoder/Result.hpp
         ${MAIN_PATH}/decoder/Dictionary.hpp
