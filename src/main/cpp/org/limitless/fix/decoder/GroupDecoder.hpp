@@ -27,13 +27,9 @@ public:
     {
     }
 
-    [[nodiscard]] bool hasNext() const
-    {
-        return m_repeat < m_count;
-    }
-
     GroupDecoder& wrap(const uint32_t tag)
     {
+        m_decoder.m_group = true;  // FIXME
         m_group = m_decoder.m_tokens;
         const Token* token = next(tag);
         if (token != nullptr)
@@ -50,17 +46,24 @@ public:
         return *this;
     }
 
-    void clear()
+    [[nodiscard]] bool hasNext() const
     {
-        m_count = 0;
-        m_repeat = 0;
-        m_offset = 0;
+        auto doWork = m_repeat < m_count;
+        m_decoder.m_group = doWork;
+        return doWork;
     }
 
     void next()
     {
         m_offset = m_decoder.nextGroup(m_offset + 1, m_delim);
         ++m_repeat;
+    }
+
+    void clear()
+    {
+        m_count = 0;
+        m_repeat = 0;
+        m_offset = 0;
     }
 
     [[nodiscard]] uint32_t count() const

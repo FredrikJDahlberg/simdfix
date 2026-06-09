@@ -23,7 +23,7 @@ struct MessageDecoder
     // FIXME: cache all parsed fields?
     utils::String m_sender{};           // FIXME: configuration and verification
     utils::String m_target{};           // FIXME: configuration and verification
-    utils::String m_sendingTime{};
+    uint64_t m_sendingTime{}; // FIXME
     uint32_t m_sequenceNumber{};
 
     MessageDecoder() = default;
@@ -83,7 +83,7 @@ struct MessageDecoder
         {
             return Result::InvalidSequenceNumber;
         }
-        if (const auto sendingTime = m_decoder.getString<52, true>())
+        if (const auto sendingTime = m_decoder.getTimestamp<52, true>())
         {
             m_sendingTime = sendingTime.value();
         }

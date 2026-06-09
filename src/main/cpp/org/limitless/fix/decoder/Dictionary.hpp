@@ -25,7 +25,9 @@ struct Category
         Counter,
         Struct,
         Group,
-        Enum
+        Enum,
+        Component,
+        Message
     };
 
     static constexpr std::string_view Names[] =
@@ -41,7 +43,9 @@ struct Category
         "Counter",
         "Struct",
         "Group",
-        "Enum"
+        "Enum",
+        "Component",
+        "Message"
     };
 
     static constexpr std::string_view Types[] =
@@ -57,7 +61,9 @@ struct Category
         "std::uint32_t",
         "Struct",
         "Group",
-        "Enum"
+        "Enum",
+        "Component",
+        "Message"
     };
 
     constexpr Category() : m_value{Null} {}
@@ -159,9 +165,10 @@ struct Presence
 
 struct Dictionary
 {
-    uint16_t tag;
-    uint16_t type;
-    Presence presence;
+    uint16_t m_tag;
+    uint16_t m_type;
+    Presence m_presence;
+    Category m_category;
 };
 
 [[nodiscard]] static consteval const Dictionary* dictionary(const uint16_t tag, std::span<const Dictionary> grammar) noexcept
@@ -169,9 +176,9 @@ struct Dictionary
     const auto it = std::lower_bound(grammar.begin(), grammar.end(), tag,
                                      [](const Dictionary& lhs, const uint16_t rhs)
                                      {
-                                         return lhs.tag < rhs;
+                                         return lhs.m_tag < rhs;
                                      });
-    if (it != grammar.end() && it->tag == tag)
+    if (it != grammar.end() && it->m_tag == tag)
     {
         return &*it;
     }

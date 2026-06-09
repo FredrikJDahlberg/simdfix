@@ -16,17 +16,18 @@
         <field name="BeginString" tag="8" primitiveType="char" length="7" presence="constant">FIX.4.3</field>
         <field name="BodyLength" tag="9" primitiveType="int32"/>
         <field name="MsgType" tag="35" primitiveType="uint8"/>
-        <field name="Sender" tag="49" type="String8"/>
-        <field name="Target" tag="56" type="String8"/>
         -->
         <field name="Sender" tag="49" primitiveType="char" length="8"/>
         <field name="Target" tag="56" primitiveType="char" length="8"/>
         <field name="SequenceNumber" tag="34" primitiveType="uint32"/>
-        <field name="SendingTime" tag="52" primitiveType="uint32"/>
+        <field name="SendingTime" tag="52" primitiveType="timestamp"/>
         <group name="Hops" tag="627" counter="NoHops" presence="optional" primitiveType="uint32">
             <field name="HopCompID" tag="628" primitiveType="char" length="8" presence="optional"/>
             <field name="HopSendingTime" tag="629" primitiveType="timestamp" presence="optional"/>
             <field name="HopRefID" tag="630" primitiveType="uint32" presence="optional"/>
+            <group name="Test" tag="500" counter="NoTests" presence="optional" primitiveType="uint32">
+                <field name="name" primitiveType="char" length="10"/>
+            </group>
         </group>
     </component>
 
@@ -36,13 +37,11 @@
         <!-- <field name="EncryptMethod" tag="98" primitiveType="uint8" presence="optional"/> -->
         <field name="EncryptMethod" tag="98" type="Encryption" presence="optional"/>
         <field name="HeartbeatInterval" tag="108" primitiveType="uint32"/>
-        <!-- FIXME <field name="CheckSum" tag="10" length="3" primitiveType="uint8"/> -->
     </message>
 
     <message name="Logout" id="5">
         <field name="Header" type="StandardHeader"/>
         <field name="Text" tag="58" primitiveType="char" length="8"/>
-        <!-- FIXME <field name="CheckSum" tag="10" length="3" primitiveType="uint8"/> -->
     </message>
 
     <message name="Heartbeat" id="0">

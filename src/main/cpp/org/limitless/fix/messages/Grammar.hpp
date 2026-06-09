@@ -15,6 +15,7 @@ struct Logon {
         56,
         98,
         108,
+        500,
         627,
         628,
         629,
@@ -22,16 +23,17 @@ struct Logon {
     };
 
     static constexpr Dictionary Grammar[] = {
-        { 34, 1, Presence::Required },
-        { 49, 8, Presence::Required },
-        { 52, 1, Presence::Required },
-        { 56, 8, Presence::Required },
-        { 98, 1, Presence::Optional },
-        { 108, 1, Presence::Required },
-        { 627, 0, Presence::Optional },
-        { 628, 8, Presence::Optional },
-        { 629, 1, Presence::Optional },
-        { 630, 1, Presence::Optional },
+        { 34, 1, Presence::Required, Category::Component },
+        { 49, 8, Presence::Required, Category::Component },
+        { 52, 1, Presence::Required, Category::Component },
+        { 56, 8, Presence::Required, Category::Component },
+        { 98, 1, Presence::Optional, Category::Message },
+        { 108, 1, Presence::Required, Category::Message },
+        { 500, 0, Presence::Optional, Category::Group },
+        { 627, 0, Presence::Optional, Category::Component },
+        { 628, 8, Presence::Optional, Category::Group },
+        { 629, 1, Presence::Optional, Category::Group },
+        { 630, 1, Presence::Optional, Category::Group },
     };
 };
 
@@ -42,6 +44,7 @@ struct Logout {
         52,
         56,
         58,
+        500,
         627,
         628,
         629,
@@ -49,15 +52,16 @@ struct Logout {
     };
 
     static constexpr Dictionary Grammar[] = {
-        { 34, 1, Presence::Required },
-        { 49, 8, Presence::Required },
-        { 52, 1, Presence::Required },
-        { 56, 8, Presence::Required },
-        { 58, 8, Presence::Required },
-        { 627, 0, Presence::Optional },
-        { 628, 8, Presence::Optional },
-        { 629, 1, Presence::Optional },
-        { 630, 1, Presence::Optional },
+        { 34, 1, Presence::Required, Category::Component },
+        { 49, 8, Presence::Required, Category::Component },
+        { 52, 1, Presence::Required, Category::Component },
+        { 56, 8, Presence::Required, Category::Component },
+        { 58, 8, Presence::Required, Category::Message },
+        { 500, 0, Presence::Optional, Category::Group },
+        { 627, 0, Presence::Optional, Category::Component },
+        { 628, 8, Presence::Optional, Category::Group },
+        { 629, 1, Presence::Optional, Category::Group },
+        { 630, 1, Presence::Optional, Category::Group },
     };
 };
 
@@ -68,6 +72,7 @@ struct Heartbeat {
         52,
         56,
         112,
+        500,
         627,
         628,
         629,
@@ -75,15 +80,16 @@ struct Heartbeat {
     };
 
     static constexpr Dictionary Grammar[] = {
-        { 34, 1, Presence::Required },
-        { 49, 8, Presence::Required },
-        { 52, 1, Presence::Required },
-        { 56, 8, Presence::Required },
-        { 112, 32, Presence::Optional },
-        { 627, 0, Presence::Optional },
-        { 628, 8, Presence::Optional },
-        { 629, 1, Presence::Optional },
-        { 630, 1, Presence::Optional },
+        { 34, 1, Presence::Required, Category::Component },
+        { 49, 8, Presence::Required, Category::Component },
+        { 52, 1, Presence::Required, Category::Component },
+        { 56, 8, Presence::Required, Category::Component },
+        { 112, 32, Presence::Optional, Category::Message },
+        { 500, 0, Presence::Optional, Category::Group },
+        { 627, 0, Presence::Optional, Category::Component },
+        { 628, 8, Presence::Optional, Category::Group },
+        { 629, 1, Presence::Optional, Category::Group },
+        { 630, 1, Presence::Optional, Category::Group },
     };
 };
 
@@ -94,6 +100,7 @@ struct TestRequest {
         52,
         56,
         112,
+        500,
         627,
         628,
         629,
@@ -101,15 +108,16 @@ struct TestRequest {
     };
 
     static constexpr Dictionary Grammar[] = {
-        { 34, 1, Presence::Required },
-        { 49, 8, Presence::Required },
-        { 52, 1, Presence::Required },
-        { 56, 8, Presence::Required },
-        { 112, 32, Presence::Optional },
-        { 627, 0, Presence::Optional },
-        { 628, 8, Presence::Optional },
-        { 629, 1, Presence::Optional },
-        { 630, 1, Presence::Optional },
+        { 34, 1, Presence::Required, Category::Component },
+        { 49, 8, Presence::Required, Category::Component },
+        { 52, 1, Presence::Required, Category::Component },
+        { 56, 8, Presence::Required, Category::Component },
+        { 112, 32, Presence::Optional, Category::Message },
+        { 500, 0, Presence::Optional, Category::Group },
+        { 627, 0, Presence::Optional, Category::Component },
+        { 628, 8, Presence::Optional, Category::Group },
+        { 629, 1, Presence::Optional, Category::Group },
+        { 630, 1, Presence::Optional, Category::Group },
     };
 };
 

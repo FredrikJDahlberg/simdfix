@@ -25,25 +25,35 @@ struct FieldDecoder
     using Uint32Result = std::expected<uint32_t, Result::Values>;
     using Int64Result = std::expected<int64_t, Result::Values>;
     using Uint64Result = std::expected<uint64_t, Result::Values>;
+    using TimestampResult = Uint64Result;
 
     Buffer m_data{};
     TokenSpan m_tokens{};
     TagSpan m_tags{};
     int32_t m_size;
 
+    bool m_group;
+    mutable int32_t m_offset;
+
     FieldDecoder() = default;
 
     FieldDecoder(const Buffer data, TokenSpan const tokens, TagSpan const tags, const int32_t size) :
-        m_data{data}, m_tokens{tokens}, m_tags{tags}, m_size{size}
+        m_data{data}, m_tokens{tokens}, m_tags{tags}, m_size{size}, m_group{false}, m_offset{0}
     {
     }
 
-    void wrap(const utils::String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
+    void wrap(const utils::String data,
+              const std::span<Token> tokens,
+              const std::span<uint16_t> tags,
+              const int32_t size,
+              const bool group = false)
     {
         m_data = data;
         m_tokens = tokens;
         m_tags = tags;
         m_size = size;
+        m_group = group;
+        m_offset = 0;
     }
 
     [[nodiscard]] Token* nextField(const uint32_t tag)
@@ -59,11 +69,11 @@ struct FieldDecoder
 
     [[nodiscard]] uint32_t nextGroup(int32_t offset, const uint16_t delim) const
     {
-        while (offset < m_size && m_tokens[offset].tag != delim)
+        while (m_offset < m_size && m_tokens[offset].tag != delim)
         {
-            ++offset;
+            ++m_offset;
         }
-        return offset;
+        return m_offset;
     }
 
     [[nodiscard]] constexpr uint32_t convertToUint32(const Token* token) const
@@ -94,10 +104,10 @@ struct FieldDecoder
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
-    template <int32_t Tag, bool Required>
-    [[nodiscard]] constexpr Uint32Result getTimestamp() const
+    template <uint32_t Tag, bool Required>
+    [[nodiscard]] constexpr Uint64Result getTimestamp() const
     {
-        const auto index = simd::find(m_tags.data(), m_size, Tag);
+        const auto index = simd::find(m_tags.data(), m_size , Tag);
         if (index >= 0)
         {
             auto token = m_tokens[index];
@@ -106,7 +116,6 @@ struct FieldDecoder
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
-    // FIXME: enum handling
     template <int32_t Tag, bool Required, typename Enum>
     [[nodiscard]] constexpr std::expected<Enum, Result::Values> getEnum() const
     {

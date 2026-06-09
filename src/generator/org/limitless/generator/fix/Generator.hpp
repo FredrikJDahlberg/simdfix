@@ -45,8 +45,8 @@ struct Generator
             out << "    static constexpr Dictionary Grammar[] = {\n";
             for (auto& field : sorted)
             {
-                out << std::format("        {{ {}, {}, Presence::{} }},\n",
-                                   field.m_tag, field.m_length, field.m_presence.name());
+                out << std::format("        {{ {}, {}, Presence::{}, Category::{} }},\n",
+                                   field.m_tag, field.m_length, field.m_presence.name(), field.m_parent.name());
             }
             out << "    };\n";
             out << "};\n\n";
@@ -77,6 +77,7 @@ struct Generator
         out << "namespace org::limitless::fix::generated {\n\n";
         out << "using namespace org::limitless::fix::decoder;\n\n";
         out << "using String = std::span<const uint8_t>;  // FIXME\n\n";
+        // FIXME: add constants
         for (const auto& value : enums)
         {
             generateEnum(out, value);
@@ -256,7 +257,7 @@ private:
             out << "            const std::span<uint16_t> tags,\n";
             out << "            const uint32_t count)\n";
             out << "    {\n";
-            out << "        MessageDecoder::wrap(data, tokens, tags, count);\n";
+            out << "        m_decoder.wrap(data, tokens, tags, count);\n";
             out << "        return *this;\n";
             out << "    }\n\n";
         }
@@ -276,29 +277,21 @@ private:
         {
             auto methodName = field.m_name;
             methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
-            std::string_view mandatory = field.m_presence.m_value == decoder::Presence::Required ? "true" : "false";
+            std::string_view mandatory = field.m_presence.m_value == Presence::Required ? "true" : "false";
             auto categoryName = field.m_category.name();
             auto categoryType = field.m_category.type();
             if (field.m_category != Category::Counter && field.m_category != Category::Struct)
             {
+                auto isEnum = field.m_category == Category::Enum;
                 out << std::format("    [[nodiscard]] std::expected<{}, Result::Values> {}() const\n",
-                                   field.m_category == Category::Enum ? field.m_type : categoryType, methodName);
+                                   isEnum? field.m_type : categoryType, methodName);
                 out << "    {\n";
-                std::string arg = field.m_category == Category::Enum ? std::format(", {}", field.m_type) : "";
+                std::string arg = isEnum ? std::format(", {}", field.m_type) : "";
                 out << std::format("        return m_decoder.get{}<{}, {}{}>();\n",
                                    categoryName, field.m_tag, mandatory, arg);
                 out << "    }\n\n";
             }
-            else if (field.m_category != Category::Struct && field.m_category != Category::Counter)
-            {
-                out << std::format("        throw std::invalid_argument(\"{} is not implemented\");\n",
-                                   field.m_category.name());
-            }
         }
-    }
-
-    static void generateStructGetters(std::ostream& out, const Record& record)
-    {
         for (const auto& comp : record.m_records)
         {
             auto fieldName = uncap(comp.m_name);
@@ -323,7 +316,6 @@ private:
             out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
         }
         generateWrap(out, record);
-        generateStructGetters(out, record);
         generateGetters(out, record);
         out << "};\n\n";
     }
@@ -346,12 +338,6 @@ private:
             out << std::format("        '{}'{}\n", value->m_type[0], value != end - 1? "," : "");
         }
         out <<"    };\n";
-        /*
-        out << std::format("    explicit {}(const uint8_t code)\n", record.m_name);
-        out << "    {\n";
-        out << std::format("        m_value = utils::find(code, Codes, {});\n", size);
-        out << "    };\n";
-        */
         out << std::format("    {}() : m_value{{Null}} {{}}\n", record.m_name);
         out << "    Values m_value;\n";
         out << "};\n\n";

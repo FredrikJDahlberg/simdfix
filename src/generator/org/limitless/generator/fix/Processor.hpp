@@ -129,6 +129,8 @@ struct Processor
     {
         for (const auto& recordNode : records)
         {
+            processRecords(recordNode.node().select_nodes("group"), parent);
+
             const auto node = recordNode.node();
             std::string_view name = node.attribute("name").as_string();
             std::vector<Field> fields{};
@@ -149,8 +151,11 @@ struct Processor
                     record.m_records.push_back(field);
                 }
             }
-            m_recordsByType.emplace(std::string{name}, record);
-            m_records.emplace_back(record);
+            auto [value, success] = m_recordsByType.try_emplace(std::string{name}, record);
+            if (success)
+            {
+                m_records.emplace_back(record);
+            }
         }
     }
 

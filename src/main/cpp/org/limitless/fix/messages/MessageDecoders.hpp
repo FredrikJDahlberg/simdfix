@@ -30,10 +30,35 @@ struct Encryption
     Values m_value;
 };
 
+struct TestDecoder : GroupDecoder
+{
+    explicit TestDecoder(FieldDecoder& decoder) : 
+        GroupDecoder{decoder}
+    {
+    }
+
+    TestDecoder& wrap()
+    {
+        GroupDecoder::wrap(500);
+        return *this;
+    }
+
+    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> name() const
+    {
+        return m_decoder.getString<0, true>();
+    }
+
+};
+
 struct HopsDecoder : GroupDecoder
 {
+private:
+    TestDecoder m_test;
+
+public:
     explicit HopsDecoder(FieldDecoder& decoder) : 
-        GroupDecoder{decoder}
+        GroupDecoder{decoder},
+        m_test{decoder}
     {
     }
 
@@ -58,6 +83,11 @@ struct HopsDecoder : GroupDecoder
         return m_decoder.getUint32<630, false>();
     }
 
+    TestDecoder& test()
+    {
+        return m_test.wrap()/*Test*/ ;
+    }
+
 };
 
 struct StandardHeaderDecoder : StructDecoder
@@ -70,11 +100,6 @@ public:
         StructDecoder{decoder},
         m_hops{decoder}
     {
-    }
-
-    HopsDecoder& hops()
-    {
-        return m_hops.wrap();
     }
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
@@ -92,9 +117,14 @@ public:
         return m_decoder.getUint32<34, true>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::int64_t, Result::Values> sendingTime() const
     {
-        return m_decoder.getUint32<52, true>();
+        return m_decoder.getTimestamp<52, true>();
+    }
+
+    HopsDecoder& hops()
+    {
+        return m_hops.wrap()/*Hops*/ ;
     }
 
 };
@@ -117,13 +147,8 @@ public:
             const std::span<uint16_t> tags,
             const uint32_t count)
     {
-        MessageDecoder::wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, tokens, tags, count);
         return *this;
-    }
-
-    StandardHeaderDecoder& standardHeader()
-    {
-        return m_standardHeader;
     }
 
     [[nodiscard]] std::expected<Encryption, Result::Values> encryptMethod() const
@@ -134,6 +159,11 @@ public:
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> heartbeatInterval() const
     {
         return m_decoder.getUint32<108, true>();
+    }
+
+    StandardHeaderDecoder& standardHeader()
+    {
+        return m_standardHeader/*StandardHeader*/ ;
     }
 
 };
@@ -156,18 +186,18 @@ public:
             const std::span<uint16_t> tags,
             const uint32_t count)
     {
-        MessageDecoder::wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, tokens, tags, count);
         return *this;
-    }
-
-    StandardHeaderDecoder& standardHeader()
-    {
-        return m_standardHeader;
     }
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> text() const
     {
         return m_decoder.getString<58, true>();
+    }
+
+    StandardHeaderDecoder& standardHeader()
+    {
+        return m_standardHeader/*StandardHeader*/ ;
     }
 
 };
@@ -190,18 +220,18 @@ public:
             const std::span<uint16_t> tags,
             const uint32_t count)
     {
-        MessageDecoder::wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, tokens, tags, count);
         return *this;
-    }
-
-    StandardHeaderDecoder& standardHeader()
-    {
-        return m_standardHeader;
     }
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> testReqID() const
     {
         return m_decoder.getString<112, false>();
+    }
+
+    StandardHeaderDecoder& standardHeader()
+    {
+        return m_standardHeader/*StandardHeader*/ ;
     }
 
 };
@@ -224,18 +254,18 @@ public:
             const std::span<uint16_t> tags,
             const uint32_t count)
     {
-        MessageDecoder::wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, tokens, tags, count);
         return *this;
-    }
-
-    StandardHeaderDecoder& standardHeader()
-    {
-        return m_standardHeader;
     }
 
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> testReqID() const
     {
         return m_decoder.getString<112, false>();
+    }
+
+    StandardHeaderDecoder& standardHeader()
+    {
+        return m_standardHeader/*StandardHeader*/ ;
     }
 
 };

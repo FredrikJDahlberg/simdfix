@@ -183,19 +183,18 @@ TEST(Parser, HopGroup2)
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
             group.next();
-            EXPECT_EQ("20", toString(group.hopCompID().value()));
+            EXPECT_EQ("", toString(group.hopCompID().value()));
             EXPECT_EQ(0, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
-            EXPECT_EQ(37, group.hopRefID().value_or(0));
             EXPECT_EQ("20", toString(group.hopCompID().value()));
             EXPECT_FALSE(group.hasNext());
             return Result::Success;
         }
     } app;
     PayloadDecoder decoder{};
-    const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=77" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
-        "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "628=20" SOH  "10=148" SOH);
+    const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=86" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
+        "52=20260609-12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "628=20" SOH  "10=090" SOH);
     auto[processed, status] = decoder.parse(logout, app);
     ASSERT_EQ(Result::Success, status);
 }
