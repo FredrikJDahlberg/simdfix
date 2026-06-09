@@ -130,9 +130,9 @@ struct Generator
         out << "    Result::Values handle(const std::span<const uint8_t> data,\n";
         out << "                          const std::span<Token> tokens,\n";
         out << "                          const std::span<uint16_t> tags,\n";
-        out << "                          const uint32_t count)\n";
+        out << "                          const uint32_t count,\n";
+        out << "                          const uint8_t messageType)\n";
         out << "    {\n";
-        out << "        const auto messageType = data[tokens[2].position];\n";
         out << "        auto status = Result::InvalidMessageType;\n";
         out << "        switch (messageType)\n";
         out << "        {\n";
@@ -180,14 +180,14 @@ private:
         out << std::format("struct {}Decoder : ", record.m_name);
         switch (record.m_parent.m_value)
         {
-            case Parent::Message:
+            case ParentType::Message:
                 out << std::format("MessageDecoder<protocols::{}>\n", record.m_name);
                 out << "{\n";
                 break;
-            case Parent::Component:
+            case ParentType::Component:
                 out << "StructDecoder\n{\n";
                 break;
-            case Parent::Group:
+            case ParentType::Group:
                 out << "GroupDecoder\n{\n";
                 break;
             default:
@@ -204,16 +204,16 @@ private:
         std::string arg{};
         switch (record.m_parent.m_value)
         {
-            case Parent::Component:
+            case ParentType::Component:
                 arg = "StructDecoder";
                 break;
-            case Parent::Group:
+            case ParentType::Group:
                 arg = "GroupDecoder";
                 break;
             default:
                 break;
         }
-        const auto isMessage = record.m_parent == Parent::Message;
+        const auto isMessage = record.m_parent == ParentType::Message;
         if (isMessage)
         {
             out << std::format("    {}Decoder() : \n", record.m_name);
@@ -249,7 +249,7 @@ private:
 
     static void generateWrap(std::ostream& out, const Record& record)
     {
-        if (record.m_parent == Parent::Message)
+        if (record.m_parent == ParentType::Message)
         {
             out << std::format("    {}Decoder& wrap(", record.m_name);
             out << "const std::span<const uint8_t> data,\n";
@@ -261,7 +261,7 @@ private:
             out << "        return *this;\n";
             out << "    }\n\n";
         }
-        else if (record.m_parent == Parent::Group)
+        else if (record.m_parent == ParentType::Group)
         {
             out << std::format("    {}Decoder& wrap()\n", record.m_name);
             out << "    {\n";
@@ -273,6 +273,7 @@ private:
 
     static void generateGetters(std::ostream& out, const Record& record)
     {
+        auto parent = record.m_parent.name();
         for (auto& field : record.m_fields)
         {
             auto methodName = field.m_name;
@@ -287,8 +288,8 @@ private:
                                    isEnum? field.m_type : categoryType, methodName);
                 out << "    {\n";
                 std::string arg = isEnum ? std::format(", {}", field.m_type) : "";
-                out << std::format("        return m_decoder.get{}<{}, {}{}>();\n",
-                                   categoryName, field.m_tag, mandatory, arg);
+                out << std::format("        return m_decoder.get{}<{}, {}{}, ParentType::{}>();\n",
+                                   categoryName, field.m_tag, mandatory, arg, parent);
                 out << "    }\n\n";
             }
         }
@@ -311,7 +312,7 @@ private:
         generateDefinition(out, record);
         generateFields(out, record);
         generateConstructors(out, record);
-        if (record.m_parent == Parent::Message)
+        if (record.m_parent == ParentType::Message)
         {
             out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
         }

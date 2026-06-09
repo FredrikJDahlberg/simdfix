@@ -9,9 +9,9 @@
 
 struct Token
 {
-    uint32_t position;
-    uint16_t tag;
-    uint16_t length;
+    uint16_t m_position;
+    uint16_t m_tag;
+    uint16_t m_length;
 };
 
 #endif //SIMD_FIX_TOKEN_HPP

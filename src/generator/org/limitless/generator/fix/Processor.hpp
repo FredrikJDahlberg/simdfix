@@ -44,14 +44,14 @@ struct Processor
             auto refType = m_types.find(std::string{type});
             if (std::strncmp(typeNode.name(), "enum", 4) == 0)
             {
-                Record record{name, std::string{}, Parent::Enum};
-                record.m_fields.emplace_back(0, "Null", "?", 1, Presence::Null, Category::Enum, Parent::Enum);
+                Record record{name, std::string{}, ParentType::Enum};
+                record.m_fields.emplace_back(0, "Null", "?", 1, Presence::Null, Category::Enum, ParentType::Enum);
                 for (auto element : typeNode.children())
                 {
                     const auto fieldName = std::string{element.attribute("name").as_string()};
                     const auto fieldValue = std::string{element.attribute("value").as_string()};
                     record.m_fields.emplace_back(0, fieldName, fieldValue,1, Presence::Null,
-                                                 Category::Enum, Parent::Enum);
+                                                 Category::Enum, ParentType::Enum);
                 }
                 m_types.try_emplace(name, name, 1, 1, Category::Enum);
                 m_enums.emplace_back(record);
@@ -73,7 +73,7 @@ struct Processor
         }
     }
 
-    void processFields(const pugi::xml_object_range<pugi::xml_node_iterator>& nodes, const Parent parent, Record& record)
+    void processFields(const pugi::xml_object_range<pugi::xml_node_iterator>& nodes, const ParentType parent, Record& record)
     {
         for (const auto& field : nodes)
         {
@@ -125,7 +125,7 @@ struct Processor
         }
     }
 
-    void processRecords(const pugi::xpath_node_set& records, const Parent parent)
+    void processRecords(const pugi::xpath_node_set& records, const ParentType parent)
     {
         for (const auto& recordNode : records)
         {
@@ -136,11 +136,11 @@ struct Processor
             std::vector<Field> fields{};
             Record record{std::string{name}, std::string{}, parent, fields};
             processFields(node.children(), parent, record);
-            if (parent == Parent::Message)
+            if (parent == ParentType::Message)
             {
                 record.m_id = node.attribute("id").as_string();
             }
-            if (parent == Parent::Group)
+            if (parent == ParentType::Group)
             {
                 record.m_tag = node.attribute("tag").as_int();
             }
@@ -187,12 +187,12 @@ struct Processor
     {
         const pugi::xml_node protocol = doc.child("protocol");
         processTypes(protocol.child("types").children());
-        processRecords(protocol.select_nodes(".//group"), Parent::Group);
-        processRecords(protocol.select_nodes(".//component"), Parent::Component);
-        processRecords(protocol.select_nodes(".//message"), Parent::Message);
+        processRecords(protocol.select_nodes(".//group"), ParentType::Group);
+        processRecords(protocol.select_nodes(".//component"), ParentType::Component);
+        processRecords(protocol.select_nodes(".//message"), ParentType::Message);
         for (auto& record : m_records)
         {
-            if (record.m_parent == Parent::Message)
+            if (record.m_parent == ParentType::Message)
             {
                 resolveGrammar(record);
             }

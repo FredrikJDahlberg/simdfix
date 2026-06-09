@@ -15,7 +15,7 @@ struct Uint8x16
 {
     typedef uint8x16_t value_type;
 
-    static size_t constexpr Size = 16;
+    static uint32_t constexpr Size = 16;
 
     static inline const value_type Ones = vdupq_n_u8(255);
     static inline const value_type Zeros = vdupq_n_u8(0);

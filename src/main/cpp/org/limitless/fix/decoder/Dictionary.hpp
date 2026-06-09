@@ -71,14 +71,9 @@ struct Category
 
     explicit constexpr Category(const std::string_view name) : m_value{Null}
     {
-        for (int i = 0; i < 7; ++i)
-        {
-            if (Names[i] == name)
-            {
-                m_value = static_cast<Values>(i);
-                return;
-            }
-        }
+        constexpr auto end = Names + std::size(Names);
+        const auto found = std::find(Names, end, name);
+        m_value = found != end ? static_cast<Values>(found - Names) : Null;
     }
 
     [[nodiscard]] constexpr std::string_view name() const
@@ -102,32 +97,26 @@ struct Category
     Values m_value;
 };
 
-struct Parent
+struct ParentType
 {
     enum Values { Null, Message, Component, Group, Enum };
 
     static constexpr std::string_view Names[] = {
-        "Null", "Message", "Component", "Group"
+        "Null", "Message", "Component", "Group", "Enum"
     };
 
-    constexpr Parent() : m_value{Null} {}
-    constexpr Parent(const Values value) : m_value{value} {}
-    constexpr Parent(const std::string_view name) : m_value{Null}
+    constexpr ParentType() : m_value{Null} {}
+    constexpr ParentType(const Values value) : m_value{value} {}
+    constexpr ParentType(const std::string_view name) : m_value{Null}
     {
-        for (int i = 0; i < 7; ++i)
-        {
-            if (Names[i] == name)
-            {
-                m_value = static_cast<Values>(i);
-                return;
-            }
-        }
+        constexpr auto end = Names + std::size(Names);
+        const auto found = std::find(Names, end, name);
+        m_value = found != end ? static_cast<Values>(found - Names) : Null;
     }
 
     [[nodiscard]] constexpr std::string_view name() const { return Names[m_value]; }
-
-    constexpr bool operator==(const Values v) const { return m_value == v; }
-    constexpr bool operator!=(const Values v) const { return m_value != v; }
+    constexpr bool operator==(const Values value) const { return m_value == value; }
+    constexpr bool operator!=(const Values value) const { return m_value != value; }
 
     Values m_value;
 };
@@ -136,23 +125,16 @@ struct Presence
 {
     enum Values { Null, Constant, Optional, Required };
 
-    static constexpr std::string_view Strings[] = { "??", "constant", "optional", "required" };
-    static constexpr std::string_view Names[] = { "??", "Constant", "Optional", "Required" };
+    static constexpr std::string_view Strings[] = { "NUll", "constant", "optional", "required" };
+    static constexpr std::string_view Names[] = { "Null", "Constant", "Optional", "Required" };
 
     constexpr Presence() : m_value{Null} {}
-
     constexpr Presence(const Values value) : m_value{value} {}
-
     constexpr Presence(const std::string_view name) : m_value{Required}
     {
-        for (int i = 1; i < 4; ++i)
-        {
-            if (Strings[i] == name)
-            {
-                m_value = static_cast<Values>(i);
-                return;
-            }
-        }
+        constexpr auto end = Strings + std::size(Strings);
+        const auto found = std::find(Strings, end, name);
+        m_value = found != end ? static_cast<Values>(found - Strings) : Null;
     }
 
     [[nodiscard]] constexpr std::string_view name() const

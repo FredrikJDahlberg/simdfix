@@ -36,7 +36,7 @@ public:
         {
             m_offset = token - &m_group[0];
             m_count = m_decoder.convertToUint32(token);
-            m_delim = m_group[m_offset + 1].tag;
+            m_delim = m_group[m_offset + 1].m_tag;
             m_repeat = 0;
         }
         else

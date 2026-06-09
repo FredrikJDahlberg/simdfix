@@ -7,6 +7,7 @@
 
 #include <span>
 
+#include "org/limitless/fix/decoder/Dictionary.hpp"
 #include "org/limitless/fix/decoder/Token.hpp"
 #include "org/limitless/fix/decoder/Result.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
@@ -69,7 +70,7 @@ struct FieldDecoder
 
     [[nodiscard]] uint32_t nextGroup(int32_t offset, const uint16_t delim) const
     {
-        while (m_offset < m_size && m_tokens[offset].tag != delim)
+        while (m_offset < m_size && m_tokens[offset].m_tag != delim)
         {
             ++m_offset;
         }
@@ -78,22 +79,22 @@ struct FieldDecoder
 
     [[nodiscard]] constexpr uint32_t convertToUint32(const Token* token) const
     {
-        return utils::asciiToDecimal(0, m_data.data() + token->position, token->length);
+        return utils::asciiToDecimal(0, m_data.data() + token->m_position, token->m_length);
     }
 
-    template <int32_t Tag, bool Required>
+    template <int32_t Tag, bool Required, ParentType Parent>
     [[nodiscard]] constexpr StringResult getString() const
     {
         const auto index = simd::find(m_tags.data(), m_size, Tag);
         if (index >= 0)
         {
             const auto& token = m_tokens[index];
-            return m_data.subspan(token.position, token.length);
+            return m_data.subspan(token.m_position, token.m_length);
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
-    template <int32_t Tag, bool Required>
+    template <int32_t Tag, bool Required, ParentType Parent>
     [[nodiscard]] constexpr Uint32Result getUint32() const
     {
         const auto index = simd::find(m_tags.data(), m_size, Tag);
@@ -104,26 +105,27 @@ struct FieldDecoder
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
-    template <uint32_t Tag, bool Required>
+    template <uint32_t Tag, bool Required, ParentType Parent>
     [[nodiscard]] constexpr Uint64Result getTimestamp() const
     {
+
         const auto index = simd::find(m_tags.data(), m_size , Tag);
         if (index >= 0)
         {
-            auto token = m_tokens[index];
-            return utils::dateTimeToEpochUTC(m_data.data() + token.position, token.length);
+            const auto token = m_tokens[index];
+            return utils::dateTimeToEpochUTC(m_data.data() + token.m_position, token.m_length);
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
-    template <int32_t Tag, bool Required, typename Enum>
+    template <int32_t Tag, bool Required, typename Enum, ParentType Parent>
     [[nodiscard]] constexpr std::expected<Enum, Result::Values> getEnum() const
     {
         const auto index = simd::find(m_tags.data(), m_size, Tag);
         if (index >= 0)
         {
             const auto token = m_tokens[index];
-            const auto code = m_data[token.position];
+            const auto code = m_data[token.m_position];
             return utils::find<Enum>(code);
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};

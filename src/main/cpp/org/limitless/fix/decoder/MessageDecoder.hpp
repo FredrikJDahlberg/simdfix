@@ -41,9 +41,9 @@ struct MessageDecoder
     [[nodiscard]] uint16_t type() const noexcept
     {
         const auto token = m_decoder.m_tokens[2];
-        const auto position = token.position;
+        const auto position = token.m_position;
         uint16_t type = m_decoder.m_data[position];
-        if (token.length == 2)
+        if (token.m_length == 2)
         {
             type = type + m_decoder.m_data[position + 1] * 256;
         }
@@ -59,7 +59,7 @@ struct MessageDecoder
 
     [[nodiscard]] Result::Values checkRequired()
     {
-        if (const auto sender = m_decoder.getString<49, true>())
+        if (const auto sender = m_decoder.getString<49, true, ParentType::Component>())
         {
             m_sender = sender.value();
         }
@@ -67,7 +67,7 @@ struct MessageDecoder
         {
             return Result::InvalidSenderCompId;
         }
-        if (const auto target = m_decoder.getString<56, true>())
+        if (const auto target = m_decoder.getString<56, true, ParentType::Component>())
         {
             m_target = target.value();
         }
@@ -75,7 +75,7 @@ struct MessageDecoder
         {
             return Result::InvalidTargetCompId;
         }
-        if (const auto sequenceNumber = m_decoder.getUint32<34, true>())
+        if (const auto sequenceNumber = m_decoder.getUint32<34, true, ParentType::Component>())
         {
             m_sequenceNumber = sequenceNumber.value();
         }
@@ -83,7 +83,7 @@ struct MessageDecoder
         {
             return Result::InvalidSequenceNumber;
         }
-        if (const auto sendingTime = m_decoder.getTimestamp<52, true>())
+        if (const auto sendingTime = m_decoder.getTimestamp<52, true, ParentType::Component>())
         {
             m_sendingTime = sendingTime.value();
         }

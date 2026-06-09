@@ -26,9 +26,9 @@ public:
     Result::Values handle(const std::span<const uint8_t> data,
                           const std::span<Token> tokens,
                           const std::span<uint16_t> tags,
-                          const uint32_t count)
+                          const uint32_t count,
+                          const uint8_t messageType)
     {
-        const auto messageType = data[tokens[2].position];
         auto status = Result::InvalidMessageType;
         switch (messageType)
         {

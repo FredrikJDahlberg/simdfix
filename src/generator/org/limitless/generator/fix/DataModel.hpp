@@ -12,7 +12,7 @@ namespace org::limitless::generator::fix {
 using namespace org::limitless::fix::decoder;
 
 using limitless::fix::decoder::Category;
-using limitless::fix::decoder::Parent;
+using limitless::fix::decoder::ParentType;
 
 struct Type
 {
@@ -34,12 +34,12 @@ struct Field
     std::string m_type;
     int32_t m_length{};
     Category m_category{Category::Null};
-    Parent m_parent{};
+    ParentType m_parent{};
     Presence m_presence{Presence::Required};
 
     Field() = default;
     Field(const int32_t tag, std::string  name, std::string type,
-          const int32_t length, const Presence presence, Category category, Parent parent) :
+          const int32_t length, const Presence presence, Category category, ParentType parent) :
         m_tag(tag), m_name(std::move(name)), m_type(std::move(type)), m_length(length),
         m_category(category), m_parent(parent), m_presence{presence}
     {
@@ -55,19 +55,19 @@ struct Record
 {
     std::string m_name{};
     std::string m_id{};
-    Parent m_parent{};
+    ParentType m_parent{};
     std::vector<Field> m_fields{};
     std::vector<Field> m_records{};
     uint32_t m_tag;
 
     Record() = default;
 
-    Record(std::string name, std::string id, const Parent type)
+    Record(std::string name, std::string id, const ParentType type)
         : m_name(std::move(name)), m_id(std::move(id)), m_parent(type), m_fields{}, m_tag{0}
     {
     }
 
-    Record(std::string name, std::string id, const Parent type, const std::vector<Field>& fields)
+    Record(std::string name, std::string id, const ParentType type, const std::vector<Field>& fields)
         : m_name(std::move(name)), m_id(std::move(id)), m_parent(type), m_fields{fields}, m_tag{0}
     {
     }
