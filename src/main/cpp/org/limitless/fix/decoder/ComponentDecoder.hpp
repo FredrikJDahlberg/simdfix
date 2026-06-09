@@ -9,14 +9,14 @@
 
 namespace org::limitless::fix::decoder {
 
-struct StructDecoder
+struct ComponentDecoder
 {
 protected:
     FieldDecoder& m_decoder;
 
 public:
 
-    explicit StructDecoder(FieldDecoder& decoder) : m_decoder{decoder}
+    explicit ComponentDecoder(FieldDecoder& decoder) : m_decoder{decoder}
     {
     }
 };

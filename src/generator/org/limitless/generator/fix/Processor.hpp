@@ -6,7 +6,6 @@
 #define SIMD_FIX_PROCESSOR_HPP
 
 #include <algorithm>
-#include <iostream>
 #include <ostream>
 #include <ranges>
 #include <unordered_map>
@@ -24,7 +23,7 @@ struct Processor
     std::unordered_map<std::string, Record> m_recordsByType{};
     std::vector<Record> m_enums{};
     std::vector<Record> m_records{};
-    std::vector<Record> m_grammar{};
+    // std::vector<Record> m_grammar{};
 
     void processTypes(const pugi::xml_object_range<pugi::xml_node_iterator>& types)
     {
@@ -45,7 +44,8 @@ struct Processor
             if (std::strncmp(typeNode.name(), "enum", 4) == 0)
             {
                 Record record{name, std::string{}, ParentType::Enum};
-                record.m_fields.emplace_back(0, "Null", "?", 1, Presence::Null, Category::Enum, ParentType::Enum);
+                record.m_fields.emplace_back(0, "Null", "?", 1, Presence::Null,
+                                             Category::Enum, ParentType::Enum);
                 for (auto element : typeNode.children())
                 {
                     const auto fieldName = std::string{element.attribute("name").as_string()};
@@ -73,12 +73,14 @@ struct Processor
         }
     }
 
-    void processFields(const pugi::xml_object_range<pugi::xml_node_iterator>& nodes, const ParentType parent, Record& record)
+    void processFields(const pugi::xml_object_range<pugi::xml_node_iterator>& nodes,
+                       const ParentType parent,
+                       Record& record)
     {
         for (const auto& field : nodes)
         {
             const std::string_view nodeType = field.name();
-            const std::string name = std::string{field.attribute("name").as_string()};
+            const auto name = std::string{field.attribute("name").as_string()};
             const int32_t tag = field.attribute("tag").as_int();
             const std::string_view type = field.attribute("type").as_string();
             const std::string_view primitive = field.attribute("primitiveType").as_string();
@@ -158,7 +160,7 @@ struct Processor
             }
         }
     }
-
+    /*
     void resolveGrammar(const Record& old)
     {
         auto record = old; // copy
@@ -182,7 +184,7 @@ struct Processor
         std::ranges::sort(record.m_fields, {}, &Field::m_tag);
         m_grammar.push_back(record);
     }
-
+    */
     void process(const pugi::xml_document& doc)
     {
         const pugi::xml_node protocol = doc.child("protocol");
@@ -190,6 +192,7 @@ struct Processor
         processRecords(protocol.select_nodes(".//group"), ParentType::Group);
         processRecords(protocol.select_nodes(".//component"), ParentType::Component);
         processRecords(protocol.select_nodes(".//message"), ParentType::Message);
+        /*
         for (auto& record : m_records)
         {
             if (record.m_parent == ParentType::Message)
@@ -197,6 +200,7 @@ struct Processor
                 resolveGrammar(record);
             }
         }
+        */
     }
 };
 }

@@ -8,7 +8,6 @@
 #include <span>
 
 #include "org/limitless/fix/decoder/Dictionary.hpp"
-#include "org/limitless/fix/decoder/Token.hpp"
 #include "org/limitless/fix/decoder/Result.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
@@ -33,28 +32,32 @@ struct FieldDecoder
     TagSpan m_tags{};
     int32_t m_size;
 
-    bool m_group;
-    mutable int32_t m_offset;
-
     FieldDecoder() = default;
 
     FieldDecoder(const Buffer data, TokenSpan const tokens, TagSpan const tags, const int32_t size) :
-        m_data{data}, m_tokens{tokens}, m_tags{tags}, m_size{size}, m_group{false}, m_offset{0}
+        m_data{data}, m_tokens{tokens}, m_tags{tags}, m_size{size}
     {
     }
 
     void wrap(const utils::String data,
               const std::span<Token> tokens,
               const std::span<uint16_t> tags,
-              const int32_t size,
-              const bool group = false)
+              const int32_t size)
     {
         m_data = data;
         m_tokens = tokens;
         m_tags = tags;
         m_size = size;
-        m_group = group;
-        m_offset = 0;
+    }
+
+    Token* find(int32_t offset, uint16_t tag)
+    {
+        // grammar
+        while (offset < m_size && m_tokens[offset].m_tag != tag) // FIXME:  && ...
+        {
+            ++offset;
+        }
+        return m_tokens.data() + offset;
     }
 
     [[nodiscard]] Token* nextField(const uint32_t tag)
@@ -66,15 +69,6 @@ struct FieldDecoder
     {
         const auto index = simd::find(m_tags.data(), m_size, tag);
         return index >= 0 ? &m_tokens[index] : nullptr;
-    }
-
-    [[nodiscard]] uint32_t nextGroup(int32_t offset, const uint16_t delim) const
-    {
-        while (m_offset < m_size && m_tokens[offset].m_tag != delim)
-        {
-            ++m_offset;
-        }
-        return m_offset;
     }
 
     [[nodiscard]] constexpr uint32_t convertToUint32(const Token* token) const
@@ -97,6 +91,11 @@ struct FieldDecoder
     template <int32_t Tag, bool Required, ParentType Parent>
     [[nodiscard]] constexpr Uint32Result getUint32() const
     {
+        if (Parent == ParentType::Group)
+        {
+            std::cout << "PARENT = " << Parent.name() << std::endl;
+            // find next delim
+        }
         const auto index = simd::find(m_tags.data(), m_size, Tag);
         if (index >= 0)
         {
@@ -108,7 +107,6 @@ struct FieldDecoder
     template <uint32_t Tag, bool Required, ParentType Parent>
     [[nodiscard]] constexpr Uint64Result getTimestamp() const
     {
-
         const auto index = simd::find(m_tags.data(), m_size , Tag);
         if (index >= 0)
         {

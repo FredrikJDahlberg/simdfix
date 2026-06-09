@@ -19,7 +19,7 @@ protected:
     int32_t m_count{};
     int32_t m_repeat{};
     uint16_t m_delim{};
-    uint32_t m_offset{};
+    int32_t m_offset{};
 
 public:
 
@@ -29,7 +29,6 @@ public:
 
     GroupDecoder& wrap(const uint32_t tag)
     {
-        m_decoder.m_group = true;  // FIXME
         m_group = m_decoder.m_tokens;
         const Token* token = next(tag);
         if (token != nullptr)
@@ -48,14 +47,21 @@ public:
 
     [[nodiscard]] bool hasNext() const
     {
-        auto doWork = m_repeat < m_count;
-        m_decoder.m_group = doWork;
-        return doWork;
+        return m_repeat < m_count;
+    }
+
+    [[nodiscard]] uint32_t nextGroup(const int32_t offset, const uint16_t delim)
+    {
+        auto found = m_decoder.find(m_offset, delim);
+        // FIXME
+        return m_offset;
     }
 
     void next()
     {
-        m_offset = m_decoder.nextGroup(m_offset + 1, m_delim);
+        auto found = m_decoder.find(m_offset, m_delim);
+
+
         ++m_repeat;
     }
 

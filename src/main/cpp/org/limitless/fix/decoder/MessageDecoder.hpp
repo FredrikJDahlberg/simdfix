@@ -15,15 +15,13 @@
 
 namespace org::limitless::fix::decoder {
 
-template <typename Protocol>
 struct MessageDecoder
 {
     FieldDecoder m_decoder{};
 
-    // FIXME: cache all parsed fields?
     utils::String m_sender{};           // FIXME: configuration and verification
     utils::String m_target{};           // FIXME: configuration and verification
-    uint64_t m_sendingTime{}; // FIXME
+    uint64_t m_sendingTime{};
     uint32_t m_sequenceNumber{};
 
     MessageDecoder() = default;
@@ -48,13 +46,6 @@ struct MessageDecoder
             type = type + m_decoder.m_data[position + 1] * 256;
         }
         return type;
-    }
-
-    [[nodiscard]] uint16_t tokenType(const uint16_t tag) const
-    {
-        constexpr auto& tags = Protocol::Tags;
-        const auto position = simd::find(tags.data(), tags.size(), tag);
-        return position >= 0 ? Protocol::Grammar[position].type : 0;
     }
 
     [[nodiscard]] Result::Values checkRequired()

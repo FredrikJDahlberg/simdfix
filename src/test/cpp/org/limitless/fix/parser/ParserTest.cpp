@@ -7,8 +7,8 @@
 #include <gtest/gtest.h>
 
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
-#include "org/limitless/fix/messages/MessageDecoders.hpp"
-#include "org/limitless/fix/messages/MessageHandler.hpp"
+#include "org/limitless/fix/messages/FixMessageDecoders.hpp"
+#include "org/limitless/fix/messages/FixMessageHandler.hpp"
 
 #define SOH "\x01"
 

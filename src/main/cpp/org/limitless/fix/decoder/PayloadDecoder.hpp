@@ -8,7 +8,7 @@
 #include <span>
 #include <ostream>
 
-#include "org/limitless/fix/decoder/Token.hpp"
+#include "org/limitless/fix/decoder/Dictionary.hpp"
 #include "org/limitless/fix/decoder/Result.hpp"
 #include "org/limitless/fix/simd/Uint8x16.hpp"
 #include "org/limitless/fix/utils/BitSet64.hpp"
@@ -271,7 +271,7 @@ private:
         }
 
         uint64_t checkSumValue = 0;
-        const auto checkSumEnd = checkSumToken.m_position - 3;
+        const uint32_t checkSumEnd = checkSumToken.m_position - 3;
         uint32_t position = 0;
         simd::Uint8x16 block;
         for (; position + simd::Uint8x16::Size <= checkSumEnd; position += simd::Uint8x16::Size)

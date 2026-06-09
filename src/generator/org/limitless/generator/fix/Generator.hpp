@@ -18,43 +18,6 @@ namespace decoder = limitless::fix::decoder;
 
 struct Generator
 {
-    static void generateGrammar(const std::string& grammarFile, const std::vector<Record>& messages)
-    {
-        std::ofstream out(grammarFile);
-        if (!out)
-        {
-            std::println("Error: could not open '{}' for writing", grammarFile);
-            return;
-        }
-        out << "#ifndef SIMD_FIX_GRAMMAR_HPP\n";
-        out << "#define SIMD_FIX_GRAMMAR_HPP\n\n";
-        out << "#include \"org/limitless/fix/decoder/Dictionary.hpp\"\n\n";
-        out << "namespace org::limitless::fix::protocols {\n\n";
-        out << "using namespace org::limitless::fix::decoder;\n\n";
-        for (const auto& message : messages)
-        {
-            auto sorted = message.m_fields;
-            std::ranges::sort(sorted, {}, &Field::m_tag);
-            out << std::format("struct {} {{\n", message.m_name);
-            out << "    static constexpr uint16_t Tags[] = {\n";
-            for (auto& field : sorted)
-            {
-                out << std::format("        {},\n", field.m_tag);
-            }
-            out << "    };\n\n";
-            out << "    static constexpr Dictionary Grammar[] = {\n";
-            for (auto& field : sorted)
-            {
-                out << std::format("        {{ {}, {}, Presence::{}, Category::{} }},\n",
-                                   field.m_tag, field.m_length, field.m_presence.name(), field.m_parent.name());
-            }
-            out << "    };\n";
-            out << "};\n\n";
-        }
-        out << "}\n\n";
-        out << "#endif //SIMD_FIX_GRAMMAR_HPP\n";
-        out.close();
-    }
 
     static void generateDecoders(const std::string& fileName,
                                  const std::vector<Record>& records,
@@ -71,13 +34,11 @@ struct Generator
         out << "#define SIMD_FIX_MESSAGE_DECODERS_HPP\n\n";
         out << "#include <expected>\n\n";
         out << "#include \"org/limitless/fix/decoder/GroupDecoder.hpp\"\n";
-        out << "#include \"org/limitless/fix/decoder/StructDecoder.hpp\"\n";
-        out << "#include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n";
-        out << "#include \"org/limitless/fix/messages/Grammar.hpp\"\n\n";
+        out << "#include \"org/limitless/fix/decoder/ComponentDecoder.hpp\"\n";
+        out << "#include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n\n";
         out << "namespace org::limitless::fix::generated {\n\n";
         out << "using namespace org::limitless::fix::decoder;\n\n";
-        out << "using String = std::span<const uint8_t>;  // FIXME\n\n";
-        // FIXME: add constants
+        out << "using String = std::span<const uint8_t>;\n\n";
         for (const auto& value : enums)
         {
             generateEnum(out, value);
@@ -112,7 +73,7 @@ struct Generator
         out << "#ifndef SIMD_FIX_MESSAGE_HANDLER_HPP\n";
         out << "#define SIMD_FIX_MESSAGE_HANDLER_HPP\n\n";
         out << "#include \"org/limitless/fix/decoder/Result.hpp\"\n";
-        out << "#include \"org/limitless/fix/messages/MessageDecoders.hpp\"\n\n";
+        out << "#include \"org/limitless/fix/messages/FixMessageDecoders.hpp\"\n\n";
         out << "namespace org::limitless::fix::generated {\n\n";
         out << "using decoder::Result;\n\n";
         out << "template <typename Handler>\n";
@@ -175,43 +136,11 @@ private:
         return result;
     }
 
-    static void generateDefinition(std::ostream& out, const Record& record)
-    {
-        out << std::format("struct {}Decoder : ", record.m_name);
-        switch (record.m_parent.m_value)
-        {
-            case ParentType::Message:
-                out << std::format("MessageDecoder<protocols::{}>\n", record.m_name);
-                out << "{\n";
-                break;
-            case ParentType::Component:
-                out << "StructDecoder\n{\n";
-                break;
-            case ParentType::Group:
-                out << "GroupDecoder\n{\n";
-                break;
-            default:
-                break;
-        }
-    }
-
     static void generateConstructors(std::ostream& out, const Record& record)
     {
         if (record.m_records.size() >= 1)
         {
             out << "public:\n";
-        }
-        std::string arg{};
-        switch (record.m_parent.m_value)
-        {
-            case ParentType::Component:
-                arg = "StructDecoder";
-                break;
-            case ParentType::Group:
-                arg = "GroupDecoder";
-                break;
-            default:
-                break;
         }
         const auto isMessage = record.m_parent == ParentType::Message;
         if (isMessage)
@@ -222,15 +151,17 @@ private:
         {
             out << std::format("    explicit {}Decoder(FieldDecoder& decoder) : \n", record.m_name);
         }
-        if (!arg.empty())
+        if (record.m_parent == ParentType::Component || record.m_parent == ParentType::Group)
         {
-            out << std::format("        {}{{decoder}}{}\n", arg, record.m_records.empty() ? "" : ",");
+            out << std::format("        {}Decoder{{decoder}}{}\n", record.m_parent.name(), record.m_records.empty() ? "" : ",");
         }
+
+        const auto& back = record.m_records.back();
         for (auto const& field : record.m_records)
         {
             out << std::format("        m_{}{{{}decoder}}{}\n",
                                uncap(field.m_name), isMessage ? "m_" : "",
-                               field.m_name != record.m_records.back().m_name ? "," : "");
+                               field.m_name != back.m_name ? "," : "");
         }
         out << "    {\n    }\n\n";
     }
@@ -309,7 +240,9 @@ private:
 
     static void generateRecord(std::ostream& out, const Record& record)
     {
-        generateDefinition(out, record);
+        out << std::format("struct {}Decoder : ", record.m_name);
+        out << std::format("{}Decoder\n{{\n", record.m_parent.name());
+
         generateFields(out, record);
         generateConstructors(out, record);
         if (record.m_parent == ParentType::Message)

@@ -2,7 +2,7 @@
 #define SIMD_FIX_MESSAGE_HANDLER_HPP
 
 #include "org/limitless/fix/decoder/Result.hpp"
-#include "org/limitless/fix/messages/MessageDecoders.hpp"
+#include "org/limitless/fix/messages/FixMessageDecoders.hpp"
 
 namespace org::limitless::fix::generated {
 

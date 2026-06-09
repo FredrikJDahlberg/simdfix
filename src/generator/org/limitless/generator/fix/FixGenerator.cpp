@@ -28,16 +28,13 @@ int main(int argc, char** argv)
     processor.process(doc);
 
     Generator generator{};
-    std::string grammarFile{argv[2]};
-    grammarFile.append("/Grammar.hpp");
-    generator.generateGrammar(grammarFile, processor.m_grammar);
 
     std::string decodersFile{argv[2]};
-    decodersFile.append("/MessageDecoders.hpp"); // FIXME: MessageDecoders
+    decodersFile.append("/FixMessageDecoders.hpp");
     generator.generateDecoders(decodersFile, processor.m_records, processor.m_enums);
 
     std::string handlerFile{argv[2]};
-    handlerFile.append("/MessageHandler.hpp");
+    handlerFile.append("/FixMessageHandler.hpp");
     generator.generateMessageHandler(handlerFile, processor.m_records);
     return 0;
 }

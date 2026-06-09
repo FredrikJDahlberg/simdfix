@@ -129,8 +129,10 @@ struct Presence
     static constexpr std::string_view Names[] = { "Null", "Constant", "Optional", "Required" };
 
     constexpr Presence() : m_value{Null} {}
+
     constexpr Presence(const Values value) : m_value{value} {}
-    constexpr Presence(const std::string_view name) : m_value{Required}
+
+    explicit constexpr Presence(const std::string_view name) : m_value{Required}
     {
         constexpr auto end = Strings + std::size(Strings);
         const auto found = std::find(Strings, end, name);
@@ -144,28 +146,6 @@ struct Presence
 
     Values m_value;
 };
-
-struct Dictionary
-{
-    uint16_t m_tag;
-    uint16_t m_type;
-    Presence m_presence;
-    Category m_category;
-};
-
-[[nodiscard]] static consteval const Dictionary* dictionary(const uint16_t tag, std::span<const Dictionary> grammar) noexcept
-{
-    const auto it = std::lower_bound(grammar.begin(), grammar.end(), tag,
-                                     [](const Dictionary& lhs, const uint16_t rhs)
-                                     {
-                                         return lhs.m_tag < rhs;
-                                     });
-    if (it != grammar.end() && it->m_tag == tag)
-    {
-        return &*it;
-    }
-    return nullptr;
-}
 
 }
 

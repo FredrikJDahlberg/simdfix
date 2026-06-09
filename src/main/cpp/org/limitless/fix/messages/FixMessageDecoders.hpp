@@ -4,15 +4,14 @@
 #include <expected>
 
 #include "org/limitless/fix/decoder/GroupDecoder.hpp"
-#include "org/limitless/fix/decoder/StructDecoder.hpp"
+#include "org/limitless/fix/decoder/ComponentDecoder.hpp"
 #include "org/limitless/fix/decoder/MessageDecoder.hpp"
-#include "org/limitless/fix/messages/Grammar.hpp"
 
 namespace org::limitless::fix::generated {
 
 using namespace org::limitless::fix::decoder;
 
-using String = std::span<const uint8_t>;  // FIXME
+using String = std::span<const uint8_t>;
 
 struct Encryption
 {
@@ -90,14 +89,14 @@ public:
 
 };
 
-struct StandardHeaderDecoder : StructDecoder
+struct StandardHeaderDecoder : ComponentDecoder
 {
 private:
     HopsDecoder m_hops;
 
 public:
     explicit StandardHeaderDecoder(FieldDecoder& decoder) : 
-        StructDecoder{decoder},
+        ComponentDecoder{decoder},
         m_hops{decoder}
     {
     }
@@ -129,7 +128,7 @@ public:
 
 };
 
-struct LogonDecoder : MessageDecoder<protocols::Logon>
+struct LogonDecoder : MessageDecoder
 {
 private:
     StandardHeaderDecoder m_standardHeader;
@@ -168,7 +167,7 @@ public:
 
 };
 
-struct LogoutDecoder : MessageDecoder<protocols::Logout>
+struct LogoutDecoder : MessageDecoder
 {
 private:
     StandardHeaderDecoder m_standardHeader;
@@ -202,7 +201,7 @@ public:
 
 };
 
-struct HeartbeatDecoder : MessageDecoder<protocols::Heartbeat>
+struct HeartbeatDecoder : MessageDecoder
 {
 private:
     StandardHeaderDecoder m_standardHeader;
@@ -236,7 +235,7 @@ public:
 
 };
 
-struct TestRequestDecoder : MessageDecoder<protocols::TestRequest>
+struct TestRequestDecoder : MessageDecoder
 {
 private:
     StandardHeaderDecoder m_standardHeader;

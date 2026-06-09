@@ -39,7 +39,7 @@ struct Field
 
     Field() = default;
     Field(const int32_t tag, std::string  name, std::string type,
-          const int32_t length, const Presence presence, Category category, ParentType parent) :
+          const int32_t length, const Presence presence, const Category category, const ParentType parent) :
         m_tag(tag), m_name(std::move(name)), m_type(std::move(type)), m_length(length),
         m_category(category), m_parent(parent), m_presence{presence}
     {
