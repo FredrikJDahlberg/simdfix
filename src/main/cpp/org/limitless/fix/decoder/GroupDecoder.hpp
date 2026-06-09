@@ -30,7 +30,7 @@ public:
     GroupDecoder& wrap(const uint32_t tag)
     {
         m_group = m_decoder.m_tokens;
-        const Token* token = next(tag);
+        const Token* token = m_decoder.nextField(tag);
         if (token != nullptr)
         {
             m_offset = token - &m_group[0];
@@ -50,18 +50,10 @@ public:
         return m_repeat < m_count;
     }
 
-    [[nodiscard]] uint32_t nextGroup(const int32_t offset, const uint16_t delim)
-    {
-        auto found = m_decoder.find(m_offset, delim);
-        // FIXME
-        return m_offset;
-    }
-
     void next()
     {
-        auto found = m_decoder.find(m_offset, m_delim);
-
-
+        const auto found = m_decoder.find(m_offset, m_delim);
+        m_offset = found - m_decoder.m_tokens.data();
         ++m_repeat;
     }
 
@@ -76,18 +68,6 @@ public:
     {
         return m_count;
     }
-
-protected:
-    [[nodiscard]] Token* next(const uint32_t tag)
-    {
-        return m_decoder.nextField(tag);
-    }
-
-    [[nodiscard]] const Token* next(const uint32_t tag) const
-    {
-        return m_decoder.nextField(tag);
-    }
-
 };
 
 }

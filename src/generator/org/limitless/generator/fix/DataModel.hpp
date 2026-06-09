@@ -5,7 +5,7 @@
 #ifndef SIMDFIX_DATA_MODEL_HPP
 #define SIMDFIX_DATA_MODEL_HPP
 
-#include "org/limitless/fix/decoder/Dictionary.hpp"
+#include "org/limitless/fix/decoder/DecoderTypes.hpp"
 
 namespace org::limitless::generator::fix {
 

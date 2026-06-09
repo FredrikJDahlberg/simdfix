@@ -40,6 +40,7 @@ struct MessageDecoder
     {
         const auto token = m_decoder.m_tokens[2];
         const auto position = token.m_position;
+        // FIXME: access
         uint16_t type = m_decoder.m_data[position];
         if (token.m_length == 2)
         {

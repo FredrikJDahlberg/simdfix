@@ -42,6 +42,12 @@ struct TestDecoder : GroupDecoder
         return *this;
     }
 
+    TestDecoder& next()
+    {
+        GroupDecoder::next();
+        return *this;
+    }
+
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> name() const
     {
         return m_decoder.getString<501, false, ParentType::Group>();
@@ -64,6 +70,12 @@ public:
     HopsDecoder& wrap()
     {
         GroupDecoder::wrap(627);
+        return *this;
+    }
+
+    HopsDecoder& next()
+    {
+        GroupDecoder::next();
         return *this;
     }
 

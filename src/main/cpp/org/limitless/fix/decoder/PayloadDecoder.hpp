@@ -6,10 +6,10 @@
 #define SIMD_FIX_DECODER_HPP
 
 #include <span>
-#include <ostream>
 
-#include "org/limitless/fix/decoder/Dictionary.hpp"
+#include "org/limitless/fix/decoder/DecoderTypes.hpp"
 #include "org/limitless/fix/decoder/Result.hpp"
+#include "org/limitless/fix/decoder/Token.hpp"
 #include "org/limitless/fix/simd/Uint8x16.hpp"
 #include "org/limitless/fix/utils/BitSet64.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
@@ -161,7 +161,7 @@ private:
         const uint32_t processed = hasCheckSum ? last->m_position + last->m_length + 1 : 0;
 
         // body length
-        const auto& bodyLenToken = m_tokens[1];
+        const auto& bodyLenToken = m_tokens[1]; // FIXME constant
         if (bodyLenToken.m_tag != BodyLengthTag)
         {
             return {processed, Result::InvalidBodyLengthTag};
@@ -183,6 +183,7 @@ private:
         }
 
         // fixed-position header tags
+        // FIXME constant
         if (m_tokens[2].m_tag != MessageTypeTag)
         {
             return {processed, Result::InvalidMessageTypeTag};

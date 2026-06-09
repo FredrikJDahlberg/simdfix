@@ -7,7 +7,7 @@
 
 #include <span>
 
-#include "org/limitless/fix/decoder/Dictionary.hpp"
+#include "org/limitless/fix/decoder/DecoderTypes.hpp"
 #include "org/limitless/fix/decoder/Result.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
@@ -26,11 +26,6 @@ struct FieldDecoder
     using Int64Result = std::expected<int64_t, Result::Values>;
     using Uint64Result = std::expected<uint64_t, Result::Values>;
     using TimestampResult = Uint64Result;
-
-    Buffer m_data{};
-    TokenSpan m_tokens{};
-    TagSpan m_tags{};
-    int32_t m_size;
 
     FieldDecoder() = default;
 
@@ -128,6 +123,15 @@ struct FieldDecoder
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
+
+    // FIXME: access method
+    Buffer m_data{};
+    TokenSpan m_tokens{};
+
+private:
+    TagSpan m_tags{};
+    int32_t m_size;
+
 };
 }
 #endif //SIMD_FIX_FIELD_DECODER_HPP

@@ -178,7 +178,7 @@ private:
         }
     }
 
-    static void generateWrap(std::ostream& out, const Record& record)
+    static void generateWrapNext(std::ostream& out, const Record& record)
     {
         if (record.m_parent == ParentType::Message)
         {
@@ -199,7 +199,13 @@ private:
             out << std::format("        GroupDecoder::wrap({});\n", record.m_tag);
             out << "        return *this;\n";
             out << "    }\n\n";
-        }
+
+            out << std::format("    {}Decoder& next()\n", record.m_name);
+            out << "    {\n";
+            out << std::format("        GroupDecoder::next();\n", record.m_tag);
+            out << "        return *this;\n";
+            out << "    }\n\n";
+            }
     }
 
     static void generateGetters(std::ostream& out, const Record& record)
@@ -249,7 +255,7 @@ private:
         {
             out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
         }
-        generateWrap(out, record);
+        generateWrapNext(out, record);
         generateGetters(out, record);
         out << "};\n\n";
     }
