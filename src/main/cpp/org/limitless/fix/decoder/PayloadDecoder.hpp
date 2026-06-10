@@ -115,21 +115,26 @@ public:
 #if !defined(NDEBUG)
             utils::print(16, data + offset);
 #endif
-            // A digit is valid when followed by '=' or a digit
             const Uint8x16 shifted{m_block - ZerosBlock};
             const Uint8x16 digitFlags{shifted <= NineMask};
             const Uint8x16 tagEnds{m_block == TagEndsBlock};
-            Uint8x16 after{digitFlags & tagEnds.shiftLeft<1>()};
-            after |= digitFlags & after.shiftLeft<1>();
-            after |= digitFlags & after.shiftLeft<1>();
-            after |= digitFlags & after.shiftLeft<1>();
+            const Uint8x16 fieldEnds{m_block == FieldEndsBlock};
 
-            // A digit is valid if preceded by 0x1 or a digit
-            Uint8x16 fieldEnds{m_block == FieldEndsBlock};
-            Uint8x16 before = digitFlags & fieldEnds.shiftRight<1>();
-            before |= digitFlags & before.shiftRight<1>();
-            before |= digitFlags & before.shiftRight<1>();
-            before |= digitFlags & before.shiftRight<1>();
+            // A digit is valid when followed by '=' or a digit. Propagates up to
+            // 4 positions via Kogge-Stone doubling (shift by 1, then by 2) instead
+            // of four sequential shift-by-1 steps, shortening the dependency chain.
+            Uint8x16 after{digitFlags & tagEnds.shiftLeft<1>()};
+            Uint8x16 afterReach{digitFlags};
+            after |= afterReach & after.shiftLeft<1>();
+            afterReach &= afterReach.shiftLeft<1>();
+            after |= afterReach & after.shiftLeft<2>();
+
+            // A digit is valid if preceded by 0x1 or a digit; same doubling scheme.
+            Uint8x16 before{digitFlags & fieldEnds.shiftRight<1>()};
+            Uint8x16 beforeReach{digitFlags};
+            before |= beforeReach & before.shiftRight<1>();
+            beforeReach &= beforeReach.shiftRight<1>();
+            before |= beforeReach & before.shiftRight<2>();
 
             const Uint8x16 validTags{after | before};
             const Uint8x16 tagsBlock{validTags.whenTrue(shifted)};
