@@ -102,12 +102,15 @@ add_custom_command(
 add_custom_target(GenerateMessages DEPENDS ${GENERATED_HEADERS})
 add_dependencies(SimdFix GenerateMessages)
 
+include(GoogleTest)
+
 function(add_fix_test name source)
     add_executable(${name} ${source})
     target_compile_options(${name} PRIVATE -O0 -Wall -fprofile-instr-generate -fcoverage-mapping)
     target_link_libraries(${name} PRIVATE SimdFix GTest::gtest_main)
     target_link_options(${name} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address> -fprofile-instr-generate)
     add_dependencies(${name} GenerateMessages)
+    gtest_discover_tests(${name})
 endfunction()
 
 add_fix_test(PayloadDecoderTest     "${TEST_PATH}/decoder/PayloadDecoderTest.cpp")
@@ -116,6 +119,22 @@ add_fix_test(GroupDecoderTest "${TEST_PATH}/decoder/GroupDecoderTest.cpp")
 add_fix_test(UtilsTest       "${TEST_PATH}/utils/UtilsTest.cpp")
 add_fix_test(BitSetTest      "${TEST_PATH}/utils/BitSetTest.cpp")
 add_fix_test(Uint8x16Test    "${TEST_PATH}/simd/Uint8x16Test.cpp")
+
+set(FIX_TEST_TARGETS
+        PayloadDecoderTest
+        MessageDecoderTest
+        GroupDecoderTest
+        UtilsTest
+        BitSetTest
+        Uint8x16Test)
+
+add_custom_target(AllTests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+        DEPENDS ${FIX_TEST_TARGETS}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Building and running all test suites"
+        USES_TERMINAL
+)
 
 # Dynamically create an executable or library treating headers as source items
 # Using set_source_files_properties forces CMake/Compilers to attempt compilation

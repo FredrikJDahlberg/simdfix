@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <string_view>
 #include <ranges>
+#include <print>
 
 namespace org::limitless::fix::utils {
 
@@ -93,24 +94,45 @@ inline constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 
     return scale(value, length) + number;
 }
 
-template <typename T>
-[[nodiscard]] uint64_t asciiToDecimal(const T* digits, const uint32_t length)
-{
-    static_assert(sizeof(T) == 1, "asciiToDecimal only accepts 1-byte data type arrays.");
+inline constexpr uint64_t AsciiZeros = 0x3030303030303030ULL;
 
-    const uint32_t offset = sizeof(uint64_t) - std::min(length, 8U);
-    uint64_t number = 0x3030303030303030;
-    memcpy(reinterpret_cast<uint8_t*>(&number) + offset, digits, std::min(length, 8U));
-    number -= 0x3030303030303030;
-    number = number * 10 + (number >> 8); // val = (val * 2561) >> 8;
-    number = ((number & SwarMask) * SwarFactor1 + (number >> 16 & SwarMask) * SwarFactor2) >> 32;
+// digits,  must have at least sizeof(uint64_t) readable bytes; bytes beyond
+// length,  are shifted out and do not affect the result.
+template <typename CharType>
+[[nodiscard]] uint64_t asciiToUint64(const CharType* digits, const uint32_t length, const bool padded)
+{
+    static_assert(sizeof(CharType) == 1, "asciiToUint64 only accepts 1-byte data type arrays.");
+
+    if (length == 0)
+    {
+        return 0;
+    }
+    uint64_t number = 0;
+    if (padded)
+    {
+        const uint32_t shift = (sizeof(uint64_t) - std::min(length, 8U)) * 8;
+        uint64_t raw;
+        memcpy(&raw, digits, sizeof(uint64_t));
+        number = (raw << shift) | (AsciiZeros & ((1ULL << shift) - 1));
+        number -= AsciiZeros;
+        number = number * 10 + (number >> 8); // val = (val * 2561) >> 8;
+        number = ((number & SwarMask) * SwarFactor1 + (number >> 16 & SwarMask) * SwarFactor2) >> 32;
+    }
+    else
+    {
+        for (uint32_t i = 0; i < length; ++i)
+        {
+            number *= 10;
+            number += digits[i] - '0';
+        }
+    }
     return number;
 }
 
 template <typename T>
-[[nodiscard]] uint64_t asciiToDecimal(const uint64_t value, const T* digits, const uint32_t length)
+[[nodiscard]] uint64_t asciiToUint64(const uint64_t value, const T* digits, const uint32_t length, const bool padded)
 {
-    return scale(value, length) + asciiToDecimal(digits, length);
+    return scale(value, length) + asciiToUint64(digits, length, padded);
 }
 
 template<size_t N>
@@ -179,7 +201,7 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     {
         return -1;
     }
-    const uint64_t date = asciiToDecimal(data, 8);
+    const uint64_t date = asciiToUint64(data, 8, true);
     const auto years = fastDivide10000(date);
     const auto month = fastDivide100(fastModulo10000(date));
     const auto day = fastModulo100(date);

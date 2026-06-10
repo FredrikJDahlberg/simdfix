@@ -10,13 +10,13 @@
 
 namespace org::limitless::fix::simd {
 
-[[nodiscard]] inline int32_t find(const uint16_t* values, const int32_t cardinality, const uint16_t value)
+[[nodiscard]] inline int32_t find(const uint16_t* values, const int32_t cardinality, const uint16_t key)
 {
-    const uint16x8_t vkey = vdupq_n_u16(value);
+    const uint16x8_t keys = vdupq_n_u16(key);
     int32_t i = 0;
     for (; i <= cardinality - 8; i += 8)
     {
-        const uint16x8_t m = vceqq_u16(vld1q_u16(values + i), vkey);
+        const uint16x8_t m = vceqq_u16(vld1q_u16(values + i), keys);
         const uint8x8_t n = vshrn_n_u16(m, 4);
         const uint64_t bits = vget_lane_u64(vreinterpret_u64_u8(n), 0);
         if (bits != 0)
@@ -26,7 +26,7 @@ namespace org::limitless::fix::simd {
     }
     for (; i < cardinality; ++i)
     {
-        if (values[i] == value)
+        if (values[i] == key)
         {
             return i;
         }

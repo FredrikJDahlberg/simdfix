@@ -29,10 +29,10 @@ TEST(QuadSearch, Sorted)
         ASSERT_EQ(8, simd::quadSearch(values, std::size(values), 98));
     }
     {
-        const uint16_t values[] = { 0, 0, 0, 0, 0, 0, 0, 0, 8, 9, 49, 35, 56, 34, 52, 1128, 98 };
-        ASSERT_EQ(13, simd::quadSearch(values, std::size(values), 34));
+        const uint16_t values[] = { 0, 0, 0, 0, 0, 0, 0, 0, 8, 9, 34, 35, 49, 52, 56, 98, 1128 };
+        ASSERT_EQ(10, simd::quadSearch(values, std::size(values), 34));
         ASSERT_EQ(11, simd::quadSearch(values, std::size(values), 35));
-        ASSERT_EQ(16, simd::quadSearch(values, std::size(values), 98));
+        ASSERT_EQ(16, simd::quadSearch(values, std::size(values), 1128));
     }
 }
 
@@ -56,17 +56,18 @@ TEST(Find, Basics)
 
 TEST(Parse, AsciiToDecimal)
 {
+    // asciiToUint64 reads 8 bytes regardless of length, so inputs need padding.
     {
-        const auto value = reinterpret_cast<const uint8_t*>("1234");
-        ASSERT_EQ(1234, utils::asciiToDecimal(0, value, 4));
+        constexpr uint8_t value[] = { '1', '2', '3', '4', 0, 0, 0, 0 };
+        ASSERT_EQ(1234, utils::asciiToUint64(0, value, 4, true));
     }
     {
-        const auto value = reinterpret_cast<const uint8_t*>("345");
-        ASSERT_EQ(12345, utils::asciiToDecimal(12, value, 3));
+        constexpr uint8_t value[] = { '3', '4', '5', 0, 0, 0, 0, 0 };
+        ASSERT_EQ(12345, utils::asciiToUint64(12, value, 3, true));
     }
     {
         const auto value = reinterpret_cast<const uint8_t*>("12345678901234");
-        ASSERT_EQ(1234, utils::asciiToDecimal(0, value, 4));
+        ASSERT_EQ(1234, utils::asciiToUint64(0, value, 4, true));
     }
 }
 

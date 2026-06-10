@@ -77,7 +77,8 @@ struct FieldDecoder
 
     [[nodiscard]] constexpr uint32_t convertToUint32(const Token* token) const
     {
-        return utils::asciiToDecimal(0, m_data.data() + token->m_position, token->m_length);
+        const auto padded = m_data.size() > token->m_position + token->m_position;
+        return utils::asciiToUint64(0, m_data.data() + token->m_position, token->m_length, padded);
     }
 
     [[nodiscard]] const Token& tokenAt(const uint32_t index) const

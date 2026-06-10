@@ -163,24 +163,23 @@ public:
         {
             m_tags[i] = m_tokens[i].m_tag;
         }
-        return checkRequiredFields(data);
+        return checkRequiredFields(data, length);
     }
 
 private:
 
-    Result checkRequiredFields(const data_t* data) const
+    Result checkRequiredFields(const data_t* data, const size_t size) const
     {
         const auto* last = &m_tokens[m_count - 1];
         const bool hasCheckSum = last->m_tag == CheckSumTag;
         const uint32_t processed = hasCheckSum ? last->m_position + last->m_length + 1 : 0;
-
         const auto& bodyLength = m_tokens[BodyLengthPosition];
         if (bodyLength.m_tag != BodyLengthTag)
         {
             return {processed, Result::InvalidBodyLengthTag};
         }
 
-        const auto length = utils::asciiToDecimal(0, data + bodyLength.m_position, bodyLength.m_length);
+        const auto length = utils::asciiToUint64(0, data + bodyLength.m_position, bodyLength.m_length, true);
         const uint32_t byteCount = last->m_position - bodyLength.m_position - bodyLength.m_length - 4;
         if (!hasCheckSum && byteCount < length)
         {
@@ -206,6 +205,7 @@ private:
             std::printf("%3zu tag = %3d, pos = %3d, len = %3d\n", i, m_tokens[i].m_tag, m_tokens[i].m_position, m_tokens[i].m_length);
         }
 #endif
+
 
         // checksum and field count
         const auto status = processCheckSum(data);
@@ -297,7 +297,7 @@ private:
         }
 
         const auto messageCheckSum = checkSumValue & 0xff;
-        if (utils::asciiToDecimal(0, data + m_tokens[m_count - 1].m_position, 3) != messageCheckSum)
+        if (utils::asciiToUint64(0, data + m_tokens[m_count - 1].m_position, 3, false) != messageCheckSum)
         {
             return Result::InvalidCheckSum;
         }
@@ -325,7 +325,7 @@ private:
         { // handle split tag
             last->m_length = offset + m_position - 1 - last->m_position;
             last = &m_tokens[m_count++];
-            last->m_tag = utils::asciiToDecimal(m_tag, data, tagEndPos);
+            last->m_tag = utils::asciiToUint64(m_tag, data, tagEndPos, false);
             last->m_position = offset + tagEndPos + 1;
             last->m_length = fieldEndPos - tagEndPos - 1;
             position = fieldEndPos + 1;
@@ -340,7 +340,7 @@ private:
         }
         while (position + 7 < remaining)
         {
-            last->m_tag = utils::asciiToDecimal(0, data + position, tagEndPos - position);
+            last->m_tag = utils::asciiToUint64(0, data + position, tagEndPos - position, false);
             position += tagEndPos - position + 1;
             last->m_position = position + offset;
             last->m_length = fieldEndPos - position;
