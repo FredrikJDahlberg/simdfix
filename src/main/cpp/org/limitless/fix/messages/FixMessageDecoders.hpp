@@ -29,20 +29,20 @@ struct Encryption
     Values m_value;
 };
 
-struct TestDecoder : GroupDecoder
+struct NestedGroupDecoder : GroupDecoder
 {
-    explicit TestDecoder(FieldDecoder& decoder) : 
+    explicit NestedGroupDecoder(FieldDecoder& decoder) : 
         GroupDecoder{decoder}
     {
     }
 
-    TestDecoder& wrap()
+    NestedGroupDecoder& wrap()
     {
         GroupDecoder::wrap(500);
         return *this;
     }
 
-    TestDecoder& next()
+    NestedGroupDecoder& next()
     {
         GroupDecoder::next();
         return *this;
@@ -53,17 +53,27 @@ struct TestDecoder : GroupDecoder
         return m_decoder.getString<501, false, ParentType::Group>();
     }
 
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> nestedOne() const
+    {
+        return m_decoder.getUint32<601, false, ParentType::Group>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> nestedTwo() const
+    {
+        return m_decoder.getUint32<602, false, ParentType::Group>();
+    }
+
 };
 
 struct HopsDecoder : GroupDecoder
 {
 private:
-    TestDecoder m_test;
+    NestedGroupDecoder m_nestedGroup;
 
 public:
     explicit HopsDecoder(FieldDecoder& decoder) : 
         GroupDecoder{decoder},
-        m_test{decoder}
+        m_nestedGroup{decoder}
     {
     }
 
@@ -94,63 +104,15 @@ public:
         return m_decoder.getUint32<630, false, ParentType::Group>();
     }
 
-    TestDecoder& test()
+    NestedGroupDecoder& nestedGroup()
     {
-        return m_test.wrap();
-    }
-
-};
-
-struct StandardHeaderDecoder : ComponentDecoder
-{
-private:
-    HopsDecoder m_hops;
-
-public:
-    explicit StandardHeaderDecoder(FieldDecoder& decoder) : 
-        ComponentDecoder{decoder},
-        m_hops{decoder}
-    {
-    }
-
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
-    {
-        return m_decoder.getString<49, false, ParentType::Component>();
-    }
-
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> target() const
-    {
-        return m_decoder.getString<56, false, ParentType::Component>();
-    }
-
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
-    {
-        return m_decoder.getUint32<34, false, ParentType::Component>();
-    }
-
-    [[nodiscard]] std::expected<std::int64_t, Result::Values> sendingTime() const
-    {
-        return m_decoder.getTimestamp<52, false, ParentType::Component>();
-    }
-
-    HopsDecoder& hops()
-    {
-        return m_hops.wrap();
+        return m_nestedGroup.wrap();
     }
 
 };
 
 struct LogonDecoder : MessageDecoder
 {
-private:
-    StandardHeaderDecoder m_standardHeader;
-
-public:
-    LogonDecoder() : 
-        m_standardHeader{m_decoder}
-    {
-    }
-
     static constexpr uint16_t MessageId = 'A';
 
     LogonDecoder& wrap(const std::span<const uint8_t> data,
@@ -160,6 +122,26 @@ public:
     {
         m_decoder.wrap(data, tokens, tags, count);
         return *this;
+    }
+
+    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
+    {
+        return m_decoder.getString<49, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> target() const
+    {
+        return m_decoder.getString<56, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    {
+        return m_decoder.getUint32<34, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::int64_t, Result::Values> sendingTime() const
+    {
+        return m_decoder.getTimestamp<52, false, ParentType::Message>();
     }
 
     [[nodiscard]] std::expected<Encryption, Result::Values> encryptMethod() const
@@ -172,24 +154,10 @@ public:
         return m_decoder.getUint32<108, false, ParentType::Message>();
     }
 
-    StandardHeaderDecoder& standardHeader()
-    {
-        return m_standardHeader;
-    }
-
 };
 
 struct LogoutDecoder : MessageDecoder
 {
-private:
-    StandardHeaderDecoder m_standardHeader;
-
-public:
-    LogoutDecoder() : 
-        m_standardHeader{m_decoder}
-    {
-    }
-
     static constexpr uint16_t MessageId = '5';
 
     LogoutDecoder& wrap(const std::span<const uint8_t> data,
@@ -201,29 +169,35 @@ public:
         return *this;
     }
 
+    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
+    {
+        return m_decoder.getString<49, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> target() const
+    {
+        return m_decoder.getString<56, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    {
+        return m_decoder.getUint32<34, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::int64_t, Result::Values> sendingTime() const
+    {
+        return m_decoder.getTimestamp<52, false, ParentType::Message>();
+    }
+
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> text() const
     {
         return m_decoder.getString<58, false, ParentType::Message>();
-    }
-
-    StandardHeaderDecoder& standardHeader()
-    {
-        return m_standardHeader;
     }
 
 };
 
 struct HeartbeatDecoder : MessageDecoder
 {
-private:
-    StandardHeaderDecoder m_standardHeader;
-
-public:
-    HeartbeatDecoder() : 
-        m_standardHeader{m_decoder}
-    {
-    }
-
     static constexpr uint16_t MessageId = '0';
 
     HeartbeatDecoder& wrap(const std::span<const uint8_t> data,
@@ -235,29 +209,35 @@ public:
         return *this;
     }
 
+    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
+    {
+        return m_decoder.getString<49, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> target() const
+    {
+        return m_decoder.getString<56, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    {
+        return m_decoder.getUint32<34, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::int64_t, Result::Values> sendingTime() const
+    {
+        return m_decoder.getTimestamp<52, false, ParentType::Message>();
+    }
+
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> testReqID() const
     {
         return m_decoder.getString<112, false, ParentType::Message>();
-    }
-
-    StandardHeaderDecoder& standardHeader()
-    {
-        return m_standardHeader;
     }
 
 };
 
 struct TestRequestDecoder : MessageDecoder
 {
-private:
-    StandardHeaderDecoder m_standardHeader;
-
-public:
-    TestRequestDecoder() : 
-        m_standardHeader{m_decoder}
-    {
-    }
-
     static constexpr uint16_t MessageId = '1';
 
     TestRequestDecoder& wrap(const std::span<const uint8_t> data,
@@ -269,14 +249,29 @@ public:
         return *this;
     }
 
+    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
+    {
+        return m_decoder.getString<49, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> target() const
+    {
+        return m_decoder.getString<56, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    {
+        return m_decoder.getUint32<34, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::int64_t, Result::Values> sendingTime() const
+    {
+        return m_decoder.getTimestamp<52, false, ParentType::Message>();
+    }
+
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> testReqID() const
     {
         return m_decoder.getString<112, false, ParentType::Message>();
-    }
-
-    StandardHeaderDecoder& standardHeader()
-    {
-        return m_standardHeader;
     }
 
 };

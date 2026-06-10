@@ -62,8 +62,8 @@ struct Record
 
     Record() = default;
 
-    Record(std::string name, std::string id, const ParentType type)
-        : m_name(std::move(name)), m_id(std::move(id)), m_parent(type), m_fields{}, m_tag{0}
+    Record(std::string name, std::string id, const ParentType parent)
+        : m_name(std::move(name)), m_id(std::move(id)), m_parent(parent), m_tag{0}
     {
     }
 

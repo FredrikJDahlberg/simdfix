@@ -138,32 +138,34 @@ private:
 
     static void generateConstructors(std::ostream& out, const Record& record)
     {
-        if (record.m_records.size() >= 1)
+        if (!record.m_records.empty())
         {
             out << "public:\n";
         }
-        const auto isMessage = record.m_parent == ParentType::Message;
-        if (isMessage)
-        {
-            out << std::format("    {}Decoder() : \n", record.m_name);
-        }
-        else
+        if (record.m_parent != ParentType::Message)
         {
             out << std::format("    explicit {}Decoder(FieldDecoder& decoder) : \n", record.m_name);
         }
         if (record.m_parent == ParentType::Component || record.m_parent == ParentType::Group)
         {
-            out << std::format("        {}Decoder{{decoder}}{}\n", record.m_parent.name(), record.m_records.empty() ? "" : ",");
+            out << std::format("        {}Decoder{{decoder}}{}\n",
+                               record.m_parent.name(),
+                               record.m_records.empty() ? "" : ",");
         }
-
-        const auto& back = record.m_records.back();
-        for (auto const& field : record.m_records)
+        if (!record.m_records.empty())
         {
-            out << std::format("        m_{}{{{}decoder}}{}\n",
-                               uncap(field.m_name), isMessage ? "m_" : "",
-                               field.m_name != back.m_name ? "," : "");
+            const auto& back = record.m_records.back();
+            for (auto const& field : record.m_records)
+            {
+                out << std::format("        m_{}{{{}decoder}}{}\n",
+                                   uncap(field.m_name), record.m_parent == ParentType::Message ? "m_" : "",
+                                   field.m_name != back.m_name ? "," : "");
+            }
         }
-        out << "    {\n    }\n\n";
+        if (!record.m_records.empty() || record.m_parent == ParentType::Group)
+        {
+            out << "    {\n    }\n\n";
+        }
     }
 
     static void generateFields(std::ostream& out, const Record& record)
@@ -211,7 +213,7 @@ private:
     static void generateGetters(std::ostream& out, const Record& record)
     {
         auto parent = record.m_parent.name();
-        for (auto& field : record.m_fields)
+        for (const auto& field : record.m_fields)
         {
             auto methodName = field.m_name;
             methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));

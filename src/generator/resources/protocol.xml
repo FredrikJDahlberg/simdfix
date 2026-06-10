@@ -10,11 +10,16 @@
     </types>
 
     <!-- FIXME: add begin string constant? -->
+    <!-- FIXME: inline components in order to get context right or add argument  -->
+    <component name="NestedComp">
+        <field name="NestedOne" tag="601" primitiveType="uint32" length="8" presence="optional"/>
+        <field name="NestedTwo" tag="602" primitiveType="uint32" presence="optional"/>
+    </component>
 
     <component name="StandardHeader">
         <!--
         <field name="BeginString" tag="8" primitiveType="char" length="7" presence="constant">FIX.4.3</field>
-        <field name="BodyLength" tag="9" primitiveType="int32"/>
+        <field name="BodyLength" tag="9" primitiveType="uint32"/>
         <field name="MsgType" tag="35" primitiveType="uint8"/>
         -->
         <field name="Sender" tag="49" primitiveType="char" length="8"/>
@@ -25,8 +30,9 @@
             <field name="HopCompID" tag="628" primitiveType="char" length="8" presence="optional"/>
             <field name="HopSendingTime" tag="629" primitiveType="timestamp" presence="optional"/>
             <field name="HopRefID" tag="630" primitiveType="uint32" presence="optional"/>
-            <group name="Test" tag="500" counter="NoTests" presence="optional" primitiveType="uint32">
-                <field name="name" tag="501" primitiveType="char" length="10"/>
+            <group name="NestedGroup" tag="500" counter="NoTests" presence="optional" primitiveType="uint32">
+                <field name="Name" tag="501" primitiveType="char" length="10"/>
+                <field name="Comp" type="NestedComp"/>
             </group>
         </group>
     </component>

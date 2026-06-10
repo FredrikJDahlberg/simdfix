@@ -23,7 +23,6 @@ struct Processor
     std::unordered_map<std::string, Record> m_recordsByType{};
     std::vector<Record> m_enums{};
     std::vector<Record> m_records{};
-    // std::vector<Record> m_grammar{};
 
     void processTypes(const pugi::xml_object_range<pugi::xml_node_iterator>& types)
     {
@@ -82,7 +81,7 @@ struct Processor
             const std::string_view nodeType = field.name();
             const auto name = std::string{field.attribute("name").as_string()};
             const int32_t tag = field.attribute("tag").as_int();
-            const std::string_view type = field.attribute("type").as_string();
+            const auto type = std::string{field.attribute("type").as_string()};
             const std::string_view primitive = field.attribute("primitiveType").as_string();
             const auto resolvedType = std::string{type.empty() ? primitive : type};
             const std::string_view presenceAttr = field.attribute("presence").as_string();
@@ -105,11 +104,12 @@ struct Processor
                 {
                     if (auto found = m_recordsByType.find(resolvedType); found != m_recordsByType.end())
                     {
-                        auto comp = found->second.m_name;
-                        record.m_fields.emplace_back(0, std::string{name}, std::string{type}, 0,
-                                                     presence, Category::Struct, parent);
-                        record.m_records.emplace_back(0, comp, comp, 0, presence,
-                                                      Category::Struct, parent);
+                        auto component = found->second;
+                        //record.m_fields.emplace_back(0, name, type, 0,
+                        //                             presence, Category::Struct, parent);
+                        //record.m_records.emplace_back(0, component.m_name, component.m_name, 0, presence,
+                        //                              Category::Struct, parent);
+                        record.m_fields.append_range(component.m_fields);
                     }
                     else
                     {
@@ -131,7 +131,7 @@ struct Processor
     {
         for (const auto& recordNode : records)
         {
-            processRecords(recordNode.node().select_nodes("group"), parent);
+            processRecords(recordNode.node().select_nodes("group"), ParentType::Group);
 
             const auto node = recordNode.node();
             std::string_view name = node.attribute("name").as_string();
@@ -153,54 +153,24 @@ struct Processor
                     record.m_records.push_back(field);
                 }
             }
-            auto [value, success] = m_recordsByType.try_emplace(std::string{name}, record);
+            auto [old, success] = m_recordsByType.try_emplace(std::string{name}, record);
             if (success)
             {
-                m_records.emplace_back(record);
+                if (record.m_parent != ParentType::Component)
+                {
+                    m_records.emplace_back(record);
+                }
             }
         }
     }
-    /*
-    void resolveGrammar(const Record& old)
-    {
-        auto record = old; // copy
-        while (!record.m_records.empty())
-        {
-            const auto& ref = record.m_records.back();
-            if (const auto found = m_recordsByType.find(ref.m_type); found != m_recordsByType.end())
-            {
-                const auto& component = found->second;
-                record.m_fields.append_range(component.m_fields);
-                record.m_records.pop_back();
-                record.m_records.append_range(component.m_records);
-            }
-            else
-            {
-                std::println("Record not found: name = {}, type = {}", ref.m_name, ref.m_type);
-                exit(1);
-            }
-        }
-        std::erase_if(record.m_fields, [](const Field& f) { return f.m_tag == 0; });
-        std::ranges::sort(record.m_fields, {}, &Field::m_tag);
-        m_grammar.push_back(record);
-    }
-    */
+
     void process(const pugi::xml_document& doc)
     {
         const pugi::xml_node protocol = doc.child("protocol");
         processTypes(protocol.child("types").children());
-        processRecords(protocol.select_nodes(".//group"), ParentType::Group);
         processRecords(protocol.select_nodes(".//component"), ParentType::Component);
+        processRecords(protocol.select_nodes(".//group"), ParentType::Group);
         processRecords(protocol.select_nodes(".//message"), ParentType::Message);
-        /*
-        for (auto& record : m_records)
-        {
-            if (record.m_parent == ParentType::Message)
-            {
-                resolveGrammar(record);
-            }
-        }
-        */
     }
 };
 }
