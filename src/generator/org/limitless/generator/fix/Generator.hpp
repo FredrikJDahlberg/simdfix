@@ -142,10 +142,8 @@ private:
         {
             out << "public:\n";
         }
-        if (record.m_parent != ParentType::Message)
-        {
-            out << std::format("    explicit {}Decoder(FieldDecoder& decoder) : \n", record.m_name);
-        }
+        out << std::format("    explicit {}Decoder(FieldDecoder& decoder) : \n", record.m_name);
+
         if (record.m_parent == ParentType::Component || record.m_parent == ParentType::Group)
         {
             out << std::format("        {}Decoder{{decoder}}{}\n",
@@ -217,18 +215,17 @@ private:
         {
             auto methodName = field.m_name;
             methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
-            std::string_view mandatory = field.m_presence.m_value == Presence::Required ? "true" : "false";
-            auto categoryName = field.m_category.name();
-            auto categoryType = field.m_category.type();
+            auto category = field.m_category;
             if (field.m_category != Category::Counter && field.m_category != Category::Struct)
             {
-                auto isEnum = field.m_category == Category::Enum;
+                const auto isEnum = field.m_category == Category::Enum;
+                const auto mandatory = std::string{field.m_presence.m_value == Presence::Required ? "true" : "false"};
                 out << std::format("    [[nodiscard]] std::expected<{}, Result::Values> {}() const\n",
-                                   isEnum? field.m_type : categoryType, methodName);
+                                   isEnum? field.m_type : category.type(), methodName);
                 out << "    {\n";
                 std::string arg = isEnum ? std::format(", {}", field.m_type) : "";
                 out << std::format("        return m_decoder.get{}<{}, {}{}, ParentType::{}>();\n",
-                                   categoryName, field.m_tag, mandatory, arg, parent);
+                                   category.name(), field.m_tag, mandatory, arg, parent);
                 out << "    }\n\n";
             }
         }

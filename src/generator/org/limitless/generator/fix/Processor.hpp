@@ -104,12 +104,13 @@ struct Processor
                 {
                     if (auto found = m_recordsByType.find(resolvedType); found != m_recordsByType.end())
                     {
-                        auto component = found->second;
-                        //record.m_fields.emplace_back(0, name, type, 0,
-                        //                             presence, Category::Struct, parent);
-                        //record.m_records.emplace_back(0, component.m_name, component.m_name, 0, presence,
-                        //                              Category::Struct, parent);
+                        auto& component = found->second;
                         record.m_fields.append_range(component.m_fields);
+                        for (const auto& field : component.m_records)
+                        {
+                            record.m_records.emplace_back(field.m_tag, field.m_name, field.m_name, 0,
+                                                          presence, Category::Struct, parent);
+                        }
                     }
                     else
                     {
