@@ -15,7 +15,7 @@
 namespace org::limitless::fix::decoder {
 
 using namespace org::limitless::fix::decoder;
-using namespace org::limitless::fix::generated;
+using namespace org::limitless::fix::messages;
 
 TEST(Parser, Logon)
 {
@@ -85,7 +85,7 @@ TEST(Parser, Logout)
 
 TEST(Parser, MessageFragment)
 {
-    struct AppHandler : generated::MessageHandler<AppHandler>
+    struct AppHandler : MessageHandler<AppHandler>
     {
         using MessageHandler::handle;
 
@@ -169,13 +169,13 @@ std::string toString(Span span)
 
 TEST(Parser, HopGroup2)
 {
-    struct AppHandler : generated::MessageHandler<AppHandler>
+    struct AppHandler : MessageHandler<AppHandler>
     {
         using MessageHandler::handle;
 
         bool found = false;
 
-        Result::Values handle(generated::LogoutDecoder& logout)
+        Result::Values handle(LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
             auto group = logout.hops();
@@ -202,13 +202,13 @@ TEST(Parser, HopGroup2)
 
 TEST(Parser, HopGroup3)
 {
-    struct AppHandler : generated::MessageHandler<AppHandler>
+    struct AppHandler : MessageHandler<AppHandler>
     {
         using MessageHandler::handle;
 
         bool found = false;
 
-        Result::Values handle(generated::LogoutDecoder& logout)
+        Result::Values handle(LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
             auto group = logout.hops();
@@ -244,7 +244,7 @@ TEST(Parser, InvalidGroupCount)
 
         bool found = false;
 
-        Result::Values handle(generated::LogoutDecoder& logout)
+        Result::Values handle(LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
             auto group = logout.hops();

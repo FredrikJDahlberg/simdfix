@@ -7,7 +7,7 @@
 #include "org/limitless/fix/decoder/ComponentDecoder.hpp"
 #include "org/limitless/fix/decoder/MessageDecoder.hpp"
 
-namespace org::limitless::fix::generated {
+namespace org::limitless::fix::messages {
 
 using namespace org::limitless::fix::decoder;
 
@@ -332,6 +332,6 @@ public:
 
 };
 
-} // namespace org::limitless::fix::generated
+} // namespace org::limitless::fix::messages
 
 #endif //SIMD_FIX_MESSAGE_DECODERS_HPP

@@ -4,7 +4,7 @@
 #include "org/limitless/fix/decoder/Result.hpp"
 #include "org/limitless/fix/messages/FixMessageDecoders.hpp"
 
-namespace org::limitless::fix::generated {
+namespace org::limitless::fix::messages {
 
 using decoder::Result;
 
@@ -77,6 +77,6 @@ protected:
     Result::Values handle(TestRequestDecoder&) { return Result::Success; }
 };
 
-} // namespace org::limitless::fix::generated
+} // namespace org::limitless::fix::messages
 
 #endif // SIMD_FIX_MESSAGE_HANDLER_HPP

@@ -36,7 +36,7 @@ struct Generator
         out << "#include \"org/limitless/fix/decoder/GroupDecoder.hpp\"\n";
         out << "#include \"org/limitless/fix/decoder/ComponentDecoder.hpp\"\n";
         out << "#include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n\n";
-        out << "namespace org::limitless::fix::generated {\n\n";
+        out << "namespace org::limitless::fix::messages {\n\n";
         out << "using namespace org::limitless::fix::decoder;\n\n";
         out << "using String = std::span<const uint8_t>;\n\n";
         for (const auto& value : enums)
@@ -47,7 +47,7 @@ struct Generator
         {
             generateRecord(out, record);
         }
-        out << "} // namespace org::limitless::fix::generated\n\n";
+        out << "} // namespace org::limitless::fix::messages\n\n";
         out << "#endif //SIMD_FIX_MESSAGE_DECODERS_HPP\n";
 
         out.close();
@@ -74,7 +74,7 @@ struct Generator
         out << "#define SIMD_FIX_MESSAGE_HANDLER_HPP\n\n";
         out << "#include \"org/limitless/fix/decoder/Result.hpp\"\n";
         out << "#include \"org/limitless/fix/messages/FixMessageDecoders.hpp\"\n\n";
-        out << "namespace org::limitless::fix::generated {\n\n";
+        out << "namespace org::limitless::fix::messages {\n\n";
         out << "using decoder::Result;\n\n";
         out << "template <typename Handler>\n";
         out << "class MessageHandler\n{\n";
@@ -120,7 +120,7 @@ struct Generator
             out << std::format("    Result::Values handle({}Decoder&) {{ return Result::Success; }}\n", message.m_name);
         }
         out << "};\n\n";
-        out << "} // namespace org::limitless::fix::generated\n\n";
+        out << "} // namespace org::limitless::fix::messages\n\n";
         out << "#endif // SIMD_FIX_MESSAGE_HANDLER_HPP\n";
     }
 
