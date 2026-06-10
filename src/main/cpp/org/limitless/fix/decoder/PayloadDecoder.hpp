@@ -27,7 +27,11 @@ public:
     using value_t = uint16_t;
     using data_t = uint8_t;
 
-    static constexpr data_t False = 0;
+    static constexpr uint32_t BodyLengthPosition = 1;
+    static constexpr uint32_t MessageTypePosition = 2;
+
+    static constexpr uint32_t RequiredFieldCount = 7;
+
     static constexpr uint32_t CheckSumTag = 10;
     static constexpr uint32_t BodyLengthTag = 9;
     static constexpr uint32_t MessageTypeTag = 35;
@@ -65,7 +69,7 @@ public:
             return { result.m_processed, result.m_value };
         }
 
-        const auto messageType = buffer[m_tokens[2].m_position]; // FIXME: enum
+        const auto messageType = buffer[m_tokens[MessageTypePosition].m_position];
         result.m_value = handler.handle(buffer, std::span(m_tokens, m_count), std::span(m_tags, m_count), m_count, messageType);
         return result;
     }
@@ -160,31 +164,28 @@ private:
         const bool hasCheckSum = last->m_tag == CheckSumTag;
         const uint32_t processed = hasCheckSum ? last->m_position + last->m_length + 1 : 0;
 
-        // body length
-        const auto& bodyLenToken = m_tokens[1]; // FIXME constant
-        if (bodyLenToken.m_tag != BodyLengthTag)
+        const auto& bodyLength = m_tokens[BodyLengthPosition];
+        if (bodyLength.m_tag != BodyLengthTag)
         {
             return {processed, Result::InvalidBodyLengthTag};
         }
-        const auto bodyLength = utils::asciiToDecimal(0, data + bodyLenToken.m_position, bodyLenToken.m_length);
-        const uint32_t count = last->m_position - bodyLenToken.m_position - bodyLenToken.m_length - 4;
-        if (!hasCheckSum && count < bodyLength)
+
+        const auto length = utils::asciiToDecimal(0, data + bodyLength.m_position, bodyLength.m_length);
+        const uint32_t byteCount = last->m_position - bodyLength.m_position - bodyLength.m_length - 4;
+        if (!hasCheckSum && byteCount < length)
         {
             return {0, Result::MessageFragment};
         }
-        if (count != bodyLength)
+        if (byteCount != length)
         {
             return {processed, Result::InvalidBodyLength};
         }
 
-        if (!hasCheckSum && m_count < 7)
+        if (!hasCheckSum && m_count < RequiredFieldCount)
         {
             return {0, Result::RequiredFieldMissing};
         }
-
-        // fixed-position header tags
-        // FIXME constant
-        if (m_tokens[2].m_tag != MessageTypeTag)
+        if (m_tokens[MessageTypePosition].m_tag != MessageTypeTag)
         {
             return {processed, Result::InvalidMessageTypeTag};
         }

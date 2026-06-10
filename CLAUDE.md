@@ -77,3 +77,15 @@ Raw FIX bytes
 1. Add the message definition to `protocol.xml`.
 2. Run `Generator` to regenerate `Grammar.hpp` and produce the new `FooDecoder.hpp`.
 3. Add a `handle(FooDecoder&)` override in `MessageHandler.hpp` dispatch and in application handlers.
+
+## Coding Style
+
+- **Brace style**: Allman (opening brace on its own line) for namespaces, structs, functions, and control flow.
+- **Indentation**: 4 spaces, no tabs.
+- **Naming**: `PascalCase` for types/structs/enums (`FieldDecoder`, `GroupDecoder`, `ParentType`); `camelCase` for functions, methods, and local variables (`findIndex`, `pushGroupScope`, `nextGroupOffset`); `m_` prefix for member variables (`m_decoder`, `m_offset`, `m_scopeDepth`).
+- **Template parameters**: `PascalCase`, including non-type parameters (`Tag`, `Required`, `Parent`, `Enum`).
+- **`[[nodiscard]]`**: applied to all accessor/getter methods that return a value.
+- **`constexpr`**: applied to methods that can be evaluated at compile time, especially field accessors.
+- **Error handling**: no exceptions in the parsing/decoding path — fallible operations return `std::expected<T, Result::Values>`. (`std::invalid_argument` thrown from `GroupDecoder::wrap` on a missing tag is a known exception to this rule.)
+- **Encapsulation**: keep raw buffers/spans (`m_data`, `m_tokens`, `m_tags`) private; expose narrow accessors (`tokenAt`, `indexOf`, `byteAt`) instead of the underlying containers.
+- **Generated code**: never hand-edit files produced by `Generator` (e.g. `FixMessageDecoders.hpp`, `FixMessageHandler.hpp`, `Grammar.hpp`); change `protocol.xml` or the generator templates instead.

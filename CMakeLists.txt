@@ -49,19 +49,19 @@ target_link_options(SimdFix INTERFACE
         $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>
 )
 
-add_executable(SimdFixBench ${TEST_PATH}/benchmark/SimdFixBench.cpp)
-target_include_directories(SimdFixBench PRIVATE
+add_executable(SimdFixBenchmark ${TEST_PATH}/benchmark/SimdFixBenchmark.cpp)
+target_include_directories(SimdFixBenchmark PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/test/cpp")
-target_link_libraries(SimdFixBench PRIVATE SimdFix)
-add_dependencies(SimdFixBench GenerateMessages)
-target_compile_definitions(SimdFixBench PRIVATE $<$<CONFIG:Release>:NDEBUG>)
-target_compile_options(SimdFixBench PRIVATE -Wall
+target_link_libraries(SimdFixBenchmark PRIVATE SimdFix)
+add_dependencies(SimdFixBenchmark GenerateMessages)
+target_compile_definitions(SimdFixBenchmark PRIVATE $<$<CONFIG:Release>:NDEBUG>)
+target_compile_options(SimdFixBenchmark PRIVATE -Wall
         $<$<CONFIG:Debug>:-g -O0 -fsanitize=address -fno-omit-frame-pointer>
         $<$<CONFIG:Release>:-O3 -march=native>
 )
-target_link_options(SimdFixBench PRIVATE $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>)
-set_target_properties(SimdFixBench PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+target_link_options(SimdFixBenchmark PRIVATE $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>)
+set_target_properties(SimdFixBenchmark PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 
 list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/include")
 find_package(pugixml REQUIRED)
