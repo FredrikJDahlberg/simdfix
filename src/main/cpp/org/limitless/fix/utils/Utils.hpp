@@ -78,10 +78,16 @@ inline constexpr uint64_t SwarMask = 0x000000FF000000FF;
 inline constexpr uint64_t SwarFactor1 = 0x000F424000000064; // 100 + (1000000ULL << 32)
 inline constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 32)
 
+// `digits` must have at least sizeof(uint64_t) readable bytes; bytes beyond
+// `length` are shifted out and do not affect the result.
 [[nodiscard]] inline uint32_t binaryToDecimal(const uint32_t value, const uint8_t* digits, const uint32_t length)
 {
     uint64_t number = 0;
-    memcpy(reinterpret_cast<uint8_t*>(&number) + sizeof(uint64_t) - length, digits, length);
+    if (length != 0)
+    {
+        memcpy(&number, digits, sizeof(uint64_t));
+        number <<= (sizeof(uint64_t) - length) * 8;
+    }
     number = number * 10 + (number >> 8); // val = (val * 2561) >> 8;
     number = ((number & SwarMask) * SwarFactor1 + (number >> 16 & SwarMask) * SwarFactor2) >> 32;
     return scale(value, length) + number;

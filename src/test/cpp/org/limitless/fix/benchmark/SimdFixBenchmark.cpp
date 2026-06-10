@@ -3,9 +3,12 @@
 //
 #define NDEBUG 1
 
-#include <memory>
-#include <cstddef>
+#include <algorithm>
 #include <chrono>
+#include <cstdio>
+#include <cstring>
+#include <memory>
+#include <string_view>
 
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
 #include "org/limitless/fix/messages/FixMessageDecoders.hpp"
@@ -64,15 +67,15 @@ static void report(const char* label, const nanoseconds duration, const size_t m
 
 // Applies every getter exposed by LogonDecoder, accumulating the results into
 // a sink so the compiler cannot optimize the field accesses away.
-struct LogonGetterHandler : org::limitless::fix::generated::MessageHandler<LogonGetterHandler>
+struct LogonGetterHandler : org::limitless::fix::messages::MessageHandler<LogonGetterHandler>
 {
     using MessageHandler::handle;
 
     uint64_t sink = 0;
 
-    org::limitless::fix::decoder::Result::Values handle(org::limitless::fix::generated::LogonDecoder& logon)
+    org::limitless::fix::decoder::Result::Values handle(org::limitless::fix::messages::LogonDecoder& logon)
     {
-        using org::limitless::fix::generated::Encryption;
+        using org::limitless::fix::messages::Encryption;
 
         const auto sender = logon.sender().value_or(std::span<const uint8_t>{});
         const auto target = logon.target().value_or(std::span<const uint8_t>{});
@@ -86,33 +89,11 @@ struct LogonGetterHandler : org::limitless::fix::generated::MessageHandler<Logon
     }
 };
 
-static nanoseconds runGetterBenchmark(org::limitless::fix::decoder::PayloadDecoder& decoder,
-                                       uint8_t* buf, const size_t msgsPerPass, const size_t iterations)
-{
-    LogonGetterHandler handler{};
-    const auto duration = timer([&]
-    {
-        for (size_t iter = 0; iter < iterations; ++iter)
-        {
-            for (size_t i = 0; i < msgsPerPass; ++i)
-            {
-                const std::span<const uint8_t> bytes(&buf[i * LOGIN_LENGTH], LOGIN_LENGTH);
-                const auto result = decoder.parse(bytes, handler);
-                (void) result;
-            }
-        }
-    });
-    std::printf("sink = %llu\n", static_cast<unsigned long long>(handler.sink));
-    return duration;
-}
-
-int main()
+// COLD: 1 GB buffer — data comes from DRAM for most of the run.
+static void benchColdCache()
 {
     org::limitless::fix::decoder::PayloadDecoder decoder;
 
-    std::printf("Message length = %zu bytes\n\n", LOGIN_LENGTH);
-
-    // COLD: 1 GB buffer — data comes from DRAM for most of the run.
     constexpr size_t COLD_SIZE = 1024ULL * 1024 * 1024;
     auto coldBuf = std::make_unique<uint8_t[]>(COLD_SIZE);
     fillBuffer(coldBuf.get(), COLD_SIZE);
@@ -127,8 +108,13 @@ int main()
         }
     });
     report("COLD CACHE", coldDuration, coldMessages, LOGIN_LENGTH);
+}
 
-    // HOT: 256 KB buffer — fits in L2, measures pure compute throughput.
+// HOT: 256 KB buffer — fits in L2, measures pure compute throughput.
+static void benchHotCache()
+{
+    org::limitless::fix::decoder::PayloadDecoder decoder;
+
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
     auto hotBuf = std::make_unique<uint8_t[]>(HOT_SIZE);
@@ -142,7 +128,7 @@ int main()
         {
             const std::span<const uint8_t> bytes(&hotBuf[i * LOGIN_LENGTH], LOGIN_LENGTH);
             const auto result = decoder.parse(bytes);
-            (void)result;
+            (void) result;
         }
     }
 
@@ -155,15 +141,98 @@ int main()
             {
                 const std::span<const uint8_t> bytes(&hotBuf[i * LOGIN_LENGTH], LOGIN_LENGTH);
                 const auto result = decoder.parse(bytes);
-                (void)result;
+                (void) result;
             }
         }
     });
     report("HOT CACHE", hotDuration, hotMsgs, LOGIN_LENGTH);
+}
 
-    // GETTERS: parse + apply every LogonDecoder getter to the message.
-    const auto getterDuration = runGetterBenchmark(decoder, hotBuf.get(), msgsPerPass, HOT_COUNT);
-    report("GETTERS", getterDuration, hotMsgs, LOGIN_LENGTH);
+// GETTERS: parse + apply every LogonDecoder getter to the message.
+static void benchGetters()
+{
+    org::limitless::fix::decoder::PayloadDecoder decoder;
 
+    constexpr size_t HOT_SIZE  = 256 * 1024;
+    constexpr size_t HOT_COUNT = 4096;
+    auto hotBuf = std::make_unique<uint8_t[]>(HOT_SIZE);
+    fillBuffer(hotBuf.get(), HOT_SIZE);
+
+    constexpr size_t msgsPerPass = HOT_SIZE / LOGIN_LENGTH;
+    constexpr size_t hotMsgs = msgsPerPass * HOT_COUNT;
+
+    LogonGetterHandler handler{};
+    const auto duration = timer([&]
+    {
+        for (size_t iter = 0; iter < HOT_COUNT; ++iter)
+        {
+            for (size_t i = 0; i < msgsPerPass; ++i)
+            {
+                const std::span<const uint8_t> bytes(&hotBuf[i * LOGIN_LENGTH], LOGIN_LENGTH);
+                const auto result = decoder.parse(bytes, handler);
+                (void) result;
+            }
+        }
+    });
+    std::printf("sink = %llu\n", static_cast<unsigned long long>(handler.sink));
+    report("GETTERS", duration, hotMsgs, LOGIN_LENGTH);
+}
+
+struct Benchmark
+{
+    std::string_view name;
+    void (*run)();
+};
+
+static constexpr Benchmark BENCHMARKS[] = {
+    {"cold",    benchColdCache},
+    {"hot",     benchHotCache},
+    {"getters", benchGetters},
+};
+
+static void printUsage(const char* program)
+{
+    std::fprintf(stderr, "Usage: %s [all", program);
+    for (const auto& benchmark : BENCHMARKS)
+    {
+        std::fprintf(stderr, "|%.*s", static_cast<int>(benchmark.name.size()), benchmark.name.data());
+    }
+    std::fprintf(stderr, "]...\n");
+}
+
+int main(const int argc, char** argv)
+{
+    std::printf("Message length = %zu bytes\n\n", LOGIN_LENGTH);
+
+    if (argc < 2)
+    {
+        for (const auto& benchmark : BENCHMARKS)
+        {
+            benchmark.run();
+        }
+        return 0;
+    }
+
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string_view name = argv[i];
+        if (name == "all")
+        {
+            for (const auto& benchmark : BENCHMARKS)
+            {
+                benchmark.run();
+            }
+            continue;
+        }
+
+        const auto* found = std::ranges::find(BENCHMARKS, name, &Benchmark::name);
+        if (found == std::end(BENCHMARKS))
+        {
+            std::fprintf(stderr, "Unknown benchmark '%s'\n", argv[i]);
+            printUsage(argv[0]);
+            return 1;
+        }
+        found->run();
+    }
     return 0;
 }

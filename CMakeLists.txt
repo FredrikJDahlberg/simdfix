@@ -63,6 +63,24 @@ target_compile_options(SimdFixBenchmark PRIVATE -Wall
 target_link_options(SimdFixBenchmark PRIVATE $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>)
 set_target_properties(SimdFixBenchmark PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 
+add_custom_target(ProfileCounters
+        COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/counterprofile.trace
+        COMMAND xcrun xctrace record --template "CPU Counters" --output ${CMAKE_BINARY_DIR}/counterprofile.trace --launch -- $<TARGET_FILE:SimdFixBenchmark> all
+        DEPENDS SimdFixBenchmark
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Running SimdFix benchmarks under Instruments CPU Counters (use a Release build for meaningful numbers)"
+        USES_TERMINAL
+)
+
+add_custom_target(ProfileTime
+        COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/timeprofile.trace
+        COMMAND xcrun xctrace record --template "Time Profiler" --output ${CMAKE_BINARY_DIR}/timeprofile.trace --launch -- $<TARGET_FILE:SimdFixBenchmark> all
+        DEPENDS SimdFixBenchmark
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Running SimdFix benchmarks under Instruments Time Profiler (use a Release build for meaningful numbers)"
+        USES_TERMINAL
+)
+
 list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/include")
 find_package(pugixml REQUIRED)
 add_executable(Generator ${GENERATOR_PATH}/FixGenerator.cpp)

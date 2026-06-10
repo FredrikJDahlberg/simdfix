@@ -104,7 +104,8 @@ public:
         m_tokens[BeginStringPosition] = { 2, 8, 8 };
         m_count = 1;
 
-        data_t digits[Uint8x16::Size];
+        // Padded so binaryToDecimal can always read 8 bytes from any digits[0..15] start.
+        data_t digits[Uint8x16::Size + sizeof(uint64_t)]{};
         position_t offset = 0;
         bool complete = false;
         position_t bits = 4;

@@ -72,12 +72,13 @@ TEST(Parse, AsciiToDecimal)
 
 TEST(Parse, BinaryToDecimal)
 {
+    // binaryToDecimal reads 8 bytes regardless of length, so inputs need padding.
     {
-        constexpr uint8_t value[]= { 1, 2, 3, 4 };
+        constexpr uint8_t value[]= { 1, 2, 3, 4, 0, 0, 0, 0 };
         ASSERT_EQ(1234, utils::binaryToDecimal(0, value, 4));
     }
     {
-        constexpr uint8_t value[]= { 3, 4, 5 };
+        constexpr uint8_t value[]= { 3, 4, 5, 0, 0, 0, 0, 0 };
         ASSERT_EQ(12345, utils::binaryToDecimal(12, value, 3));
     }
 }

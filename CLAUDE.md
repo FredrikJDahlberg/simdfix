@@ -34,8 +34,9 @@ cd cmake-build-debug && ctest
 ./cmake-build-debug/ParserTest --gtest_filter="Parser.Logon"
 ./cmake-build-debug/DecoderTest --gtest_filter="Decoder.TrailerSplitCheckSum"
 
-# Run benchmark (release build recommended)
-./cmake-build-release/SimdFixBench
+# Run benchmark (always use the release build; debug build numbers are meaningless due to ASan/coverage overhead)
+./cmake-build-release/SimdFixBenchmark
+./cmake-build-release/SimdFixBenchmark cold|hot|getters|all   # default is all
 ```
 
 ## Architecture
