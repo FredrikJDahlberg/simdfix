@@ -6,7 +6,6 @@
 #define SIMD_FIX_GROUP_DECODER_HPP
 
 #include "org/limitless/fix/decoder/FieldDecoder.hpp"
-#include "org/limitless/fix/decoder/Token.hpp"
 
 namespace org::limitless::fix::decoder {
 

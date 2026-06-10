@@ -6,6 +6,7 @@
 #define SIMD_FIX_BITSET_HPP
 
 #include <bit>
+#include <cstddef>
 
 namespace org::limitless::fix::decoder {
 

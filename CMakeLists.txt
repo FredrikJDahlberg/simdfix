@@ -98,3 +98,8 @@ add_fix_test(GroupDecoderTest "${TEST_PATH}/decoder/GroupDecoderTest.cpp")
 add_fix_test(UtilsTest       "${TEST_PATH}/utils/UtilsTest.cpp")
 add_fix_test(BitSetTest      "${TEST_PATH}/utils/BitSetTest.cpp")
 add_fix_test(Uint8x16Test    "${TEST_PATH}/simd/Uint8x16Test.cpp")
+
+# Dynamically create an executable or library treating headers as source items
+# Using set_source_files_properties forces CMake/Compilers to attempt compilation
+add_library(header_test EXCLUDE_FROM_ALL ${FIX_HEADERS})
+set_source_files_properties(${FIX_HEADERS} PROPERTIES LANGUAGE CXX)

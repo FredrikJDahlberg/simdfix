@@ -10,7 +10,6 @@
 #include <cstring>
 #include <span>
 
-#include "org/limitless/fix/decoder/DecoderTypes.hpp"
 #include "org/limitless/fix/decoder/Result.hpp"
 #include "org/limitless/fix/decoder/Token.hpp"
 #include "org/limitless/fix/simd/Uint8x16.hpp"
