@@ -163,12 +163,12 @@ public:
         {
             m_tags[i] = m_tokens[i].m_tag;
         }
-        return checkRequiredFields(data, length);
+        return checkRequiredFields(data);
     }
 
 private:
 
-    Result checkRequiredFields(const data_t* data, const size_t size) const
+    Result checkRequiredFields(const data_t* data) const
     {
         const auto* last = &m_tokens[m_count - 1];
         const bool hasCheckSum = last->m_tag == CheckSumTag;
@@ -311,9 +311,9 @@ private:
 #endif
         auto* last = &m_tokens[m_count - 1];
         const uint8_t* data = buffer.data() + offset;
-        const auto remaining = static_cast<uint32_t>(buffer.size()) - offset;
+        const size_t remaining = buffer.size() - offset;
         uint64_t bytes = 0;
-        memcpy(&bytes, data, std::min(remaining, static_cast<uint32_t>(sizeof(uint64_t))));
+        memcpy(&bytes, data, std::min(remaining, sizeof(uint64_t)));
         auto tagEnds = BitSet64{utils::findByte(TagEnd, bytes)};
         auto fieldEnds = BitSet64{utils::findByte(FieldEnd, bytes)};
         uint32_t tagEndBit = tagEnds.zerosRight();

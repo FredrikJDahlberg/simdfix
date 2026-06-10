@@ -98,7 +98,7 @@ TEST(PayloadDecoder, Fragment)
     PayloadDecoder decoder{};
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(Result::MessageFragment, status);
-    ASSERT_EQ(0, processed);
+    ASSERT_EQ(0UL, processed);
 }
 
 TEST(PayloadDecoder, HopGroup)

@@ -107,7 +107,7 @@ TEST(MessageDecoder, MessageFragment)
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH );
         auto [processed, status] = decoder.parse(logout1, app);
         ASSERT_EQ(Result::MessageFragment, status);
-        ASSERT_EQ(0, processed);
+        ASSERT_EQ(0UL, processed);
         ASSERT_FALSE(app.found);
     }
     {
@@ -117,7 +117,7 @@ TEST(MessageDecoder, MessageFragment)
               "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
         auto [processed, status] = decoder.parse(logout2, app);
         ASSERT_EQ(Result::Success, status);
-        ASSERT_EQ(107, processed);
+        ASSERT_EQ(107UL, processed);
     }
 }
 
@@ -134,16 +134,16 @@ TEST(MessageDecoder, HopGroup1)
             std::printf("Got logout\n");
             auto group = logout.hops();
             const auto count = group.count();
-            EXPECT_EQ(2, count);
+            EXPECT_EQ(2UL, count);
             group.next();
             {
                 const auto v = group.hopCompID().value_or(std::span<const uint8_t>{});
                 EXPECT_EQ(std::string("12"), std::string(reinterpret_cast<const char*>(v.data()), v.size()));
             }
-            EXPECT_EQ(0, group.hopRefID().value_or(0));
+            EXPECT_EQ(0UL, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
-            EXPECT_EQ(0, group.hopRefID().value_or(0));
+            EXPECT_EQ(0UL, group.hopRefID().value_or(0));
             {
                 const auto v = group.hopCompID().value_or(std::span<const uint8_t>{});
                 EXPECT_EQ(std::string("20"), std::string(reinterpret_cast<const char*>(v.data()), v.size()));
@@ -181,11 +181,11 @@ TEST(MessageDecoder, HopGroup2)
             auto group = logout.hops();
             const auto count = group.count();
             std::printf("Group hops=%d\n", count);
-            EXPECT_EQ(2, count);
+            EXPECT_EQ(2UL, count);
             group.next();
             std::span<const uint8_t> empty{};
             EXPECT_EQ("", toString(group.hopCompID().value_or(empty)));
-            EXPECT_EQ(0, group.hopRefID().value_or(0));
+            EXPECT_EQ(0UL, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
             EXPECT_EQ("20", toString(group.hopCompID().value()));
@@ -214,7 +214,7 @@ TEST(MessageDecoder, HopGroup3)
             auto group = logout.hops();
             const auto count = group.count();//.value_or(0);
             std::printf("Group hops=%d\n", count);
-            EXPECT_EQ(2, count);
+            EXPECT_EQ(2UL, count);
             group.next();
             // FIXME: string EXPECT_EQ(0, group.hopCompID().value_or(0));
             EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:14.000")),
@@ -250,7 +250,7 @@ TEST(MessageDecoder, InvalidGroupCount)
             auto group = logout.hops();
             const auto count = group.count();
             std::printf("Group hops=%d\n", count);
-            EXPECT_EQ(2, count);
+            EXPECT_EQ(2UL, count);
             group.next();
             EXPECT_EQ("20", toString(group.hopCompID().value()));
             //EXPECT_EQ(10, group.hopRefID().value_or(0));

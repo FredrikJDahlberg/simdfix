@@ -40,7 +40,6 @@ inline void print(const uint32_t length, const uint8_t* buffer)
         case 8: return value * 100'000'000;
         case 9: return value * 1'000'000'000;
         default: return value;
-
     }
 }
 
@@ -112,7 +111,7 @@ template <typename CharType>
     {
         const uint32_t shift = (sizeof(uint64_t) - std::min(length, 8U)) * 8;
         uint64_t raw;
-        memcpy(&raw, digits, sizeof(uint64_t));
+        memcpy(&raw, digits, sizeof(raw));
         number = (raw << shift) | (AsciiZeros & ((1ULL << shift) - 1));
         number -= AsciiZeros;
         number = number * 10 + (number >> 8); // val = (val * 2561) >> 8;
@@ -208,7 +207,7 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     const auto days = daysSince1970(years, month, day);
 
     uint64_t time = 0;
-    std::memcpy(&time, data + 9, sizeof(time));
+    memcpy(&time, data + 9, sizeof(time));
     time -= 0x30303a30303a3030ull;
     const auto hours = (time & 0xff) * 10 + ((time >> 8) & 0xff);
     const auto mins  = (time >> 24 & 0xff) * 10 + (time >> 32 & 0xff);
