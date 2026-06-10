@@ -18,16 +18,17 @@ set(GENERATOR_PATH "src/generator/org/limitless/generator/fix/")
 set(PROTOCOL_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/protocol.xml")
 set(GENERATED_DIR "${CMAKE_SOURCE_DIR}/${GEN_PATH}")
 set(GENERATED_HEADERS
-        ${GENERATED_DIR}/Grammar.hpp
-        ${GENERATED_DIR}/MessageDecoders.hpp
-        ${GENERATED_DIR}/MessageHandler.hpp)
+        ${GENERATED_DIR}/FixMessageDecoders.hpp
+        ${GENERATED_DIR}/FixMessageHandler.hpp)
 set(FIX_HEADERS
         ${MAIN_PATH}/utils/Utils.hpp
         ${MAIN_PATH}/utils/BitSet64.hpp
         ${MAIN_PATH}/decoder/PayloadDecoder.hpp
         ${MAIN_PATH}/decoder/MessageDecoder.hpp
         ${MAIN_PATH}/decoder/Result.hpp
-        ${MAIN_PATH}/decoder/Dictionary.hpp
+        ${MAIN_PATH}/decoder/DecoderTypes.hpp
+        ${MAIN_PATH}/decoder/FieldDecoder.hpp
+        ${MAIN_PATH}/decoder/ComponentDecoder.hpp
         ${MAIN_PATH}/decoder/GroupDecoder.hpp
         ${MAIN_PATH}/decoder/Token.hpp
         ${MAIN_PATH}/simd/Uint8x16.hpp
@@ -91,8 +92,9 @@ function(add_fix_test name source)
     add_dependencies(${name} GenerateMessages)
 endfunction()
 
-add_fix_test(DecoderTest     "${TEST_PATH}/parser/DecoderTest.cpp")
-add_fix_test(ParserTest      "${TEST_PATH}/parser/ParserTest.cpp")
+add_fix_test(DecoderTest     "${TEST_PATH}/decoder/DecoderTest.cpp")
+add_fix_test(ParserTest      "${TEST_PATH}/decoder/ParserTest.cpp")
+add_fix_test(GroupDecoderTest "${TEST_PATH}/decoder/GroupDecoderTest.cpp")
 add_fix_test(UtilsTest       "${TEST_PATH}/utils/UtilsTest.cpp")
 add_fix_test(BitSetTest      "${TEST_PATH}/utils/BitSetTest.cpp")
 add_fix_test(Uint8x16Test    "${TEST_PATH}/simd/Uint8x16Test.cpp")

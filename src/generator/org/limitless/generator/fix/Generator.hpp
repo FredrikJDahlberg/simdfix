@@ -142,7 +142,14 @@ private:
         {
             out << "public:\n";
         }
-        out << std::format("    explicit {}Decoder(FieldDecoder& decoder) : \n", record.m_name);
+        if (record.m_parent == ParentType::Message)
+        {
+            out << std::format("    {}Decoder() : \n", record.m_name);
+        }
+        else
+        {
+            out << std::format("    explicit {}Decoder(FieldDecoder& decoder) : \n", record.m_name);
+        }
 
         if (record.m_parent == ParentType::Component || record.m_parent == ParentType::Group)
         {
@@ -245,7 +252,7 @@ private:
 
     static void generateRecord(std::ostream& out, const Record& record)
     {
-        out << std::format("struct {}Decoder : ", record.m_name);
+        out << std::format("struct {}Decoder :", record.m_name);
         out << std::format("{}Decoder\n{{\n", record.m_parent.name());
 
         generateFields(out, record);

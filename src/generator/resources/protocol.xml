@@ -39,8 +39,6 @@
 
     <message name="Logon" id="A">
         <field name="Header" type="StandardHeader"/>
-        <!-- <field name="EncryptMethod" tag="98" primitiveType="uint8" presence="constant">0</field> -->
-        <!-- <field name="EncryptMethod" tag="98" primitiveType="uint8" presence="optional"/> -->
         <field name="EncryptMethod" tag="98" type="Encryption" presence="optional"/>
         <field name="HeartbeatInterval" tag="108" primitiveType="uint32"/>
     </message>

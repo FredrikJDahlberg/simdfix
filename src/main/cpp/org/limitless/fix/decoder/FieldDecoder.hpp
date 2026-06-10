@@ -5,6 +5,8 @@
 #ifndef SIMD_FIX_FIELD_DECODER_HPP
 #define SIMD_FIX_FIELD_DECODER_HPP
 
+#include <array>
+#include <expected>
 #include <span>
 
 #include "org/limitless/fix/decoder/DecoderTypes.hpp"
@@ -27,6 +29,8 @@ struct FieldDecoder
     using Uint64Result = std::expected<uint64_t, Result::Values>;
     using TimestampResult = Uint64Result;
 
+    static constexpr int32_t MaxGroupDepth = 8; // FIXME: verify in processor
+
     FieldDecoder() = default;
 
     FieldDecoder(const Buffer data, TokenSpan const tokens, TagSpan const tags, const int32_t size) :
@@ -45,14 +49,18 @@ struct FieldDecoder
         m_size = size;
     }
 
-    Token* find(int32_t offset, uint16_t tag)
+    Token* find(int32_t offset, const uint16_t tag, const int32_t end)
     {
-        // grammar
-        while (offset < m_size && m_tokens[offset].m_tag != tag) // FIXME:  && ...
+        while (offset < end && m_tokens[offset].m_tag != tag)
         {
             ++offset;
         }
         return m_tokens.data() + offset;
+    }
+
+    Token* find(const int32_t offset, const uint16_t tag)
+    {
+        return find(offset, tag, m_size);
     }
 
     [[nodiscard]] Token* nextField(const uint32_t tag)
@@ -71,10 +79,61 @@ struct FieldDecoder
         return utils::asciiToDecimal(0, m_data.data() + token->m_position, token->m_length);
     }
 
+    [[nodiscard]] const Token& tokenAt(const int32_t index) const
+    {
+        return m_tokens[index];
+    }
+
+    [[nodiscard]] int32_t indexOf(const Token* token) const
+    {
+        return static_cast<int32_t>(token - m_tokens.data());
+    }
+
+    [[nodiscard]] uint8_t byteAt(const int32_t position) const
+    {
+        return m_data[position];
+    }
+
+    struct Scope
+    {
+        int32_t begin;
+        int32_t end;
+    };
+
+    [[nodiscard]] Scope groupScope() const
+    {
+        return m_scopeDepth > 0 ? m_scopes[m_scopeDepth - 1] : Scope{0, m_size};
+    }
+
+    void pushGroupScope(const int32_t begin, const int32_t end)
+    {
+        m_scopes[m_scopeDepth++] = Scope{begin, end};
+    }
+
+    void popGroupScope()
+    {
+        --m_scopeDepth;
+    }
+
+    template <int32_t Tag, ParentType Parent>
+    [[nodiscard]] int32_t findIndex() const
+    {
+        if constexpr (Parent == ParentType::Group)
+        {
+            const auto [begin, end] = groupScope();
+            const auto index = simd::find(m_tags.data() + begin, end - begin, Tag);
+            return index >= 0 ? begin + index : -1;
+        }
+        else
+        {
+            return simd::find(m_tags.data(), m_size, Tag);
+        }
+    }
+
     template <int32_t Tag, bool Required, ParentType Parent>
     [[nodiscard]] constexpr StringResult getString() const
     {
-        const auto index = simd::find(m_tags.data(), m_size, Tag);
+        const auto index = findIndex<Tag, Parent>();
         if (index >= 0)
         {
             const auto& token = m_tokens[index];
@@ -86,12 +145,7 @@ struct FieldDecoder
     template <int32_t Tag, bool Required, ParentType Parent>
     [[nodiscard]] constexpr Uint32Result getUint32() const
     {
-        if (Parent == ParentType::Group)
-        {
-            std::cout << "PARENT = " << Parent.name() << std::endl;
-            // find next delim
-        }
-        const auto index = simd::find(m_tags.data(), m_size, Tag);
+        const auto index = findIndex<Tag, Parent>();
         if (index >= 0)
         {
             return convertToUint32(&m_tokens[index]);
@@ -102,7 +156,7 @@ struct FieldDecoder
     template <uint32_t Tag, bool Required, ParentType Parent>
     [[nodiscard]] constexpr Uint64Result getTimestamp() const
     {
-        const auto index = simd::find(m_tags.data(), m_size , Tag);
+        const auto index = findIndex<Tag, Parent>();
         if (index >= 0)
         {
             const auto token = m_tokens[index];
@@ -114,7 +168,7 @@ struct FieldDecoder
     template <int32_t Tag, bool Required, typename Enum, ParentType Parent>
     [[nodiscard]] constexpr std::expected<Enum, Result::Values> getEnum() const
     {
-        const auto index = simd::find(m_tags.data(), m_size, Tag);
+        const auto index = findIndex<Tag, Parent>();
         if (index >= 0)
         {
             const auto token = m_tokens[index];
@@ -124,14 +178,14 @@ struct FieldDecoder
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
-    // FIXME: access method
+private:
     Buffer m_data{};
     TokenSpan m_tokens{};
-
-private:
     TagSpan m_tags{};
     int32_t m_size;
 
+    std::array<Scope, MaxGroupDepth> m_scopes{};
+    int32_t m_scopeDepth{};
 };
 }
 #endif //SIMD_FIX_FIELD_DECODER_HPP

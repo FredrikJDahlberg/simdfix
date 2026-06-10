@@ -38,13 +38,12 @@ struct MessageDecoder
 
     [[nodiscard]] uint16_t type() const noexcept
     {
-        const auto token = m_decoder.m_tokens[2];
+        const auto token = m_decoder.tokenAt(2);
         const auto position = token.m_position;
-        // FIXME: access
-        uint16_t type = m_decoder.m_data[position];
+        uint16_t type = m_decoder.byteAt(position);
         if (token.m_length == 2)
         {
-            type = type + m_decoder.m_data[position + 1] * 256;
+            type = type + m_decoder.byteAt(position + 1) * 256;
         }
         return type;
     }

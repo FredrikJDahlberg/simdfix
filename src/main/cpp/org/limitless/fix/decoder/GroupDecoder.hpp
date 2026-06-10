@@ -14,8 +14,6 @@ struct GroupDecoder
 protected:
     FieldDecoder& m_decoder;
 
-    std::span<Token> m_group{};
-
     int32_t m_count{};
     int32_t m_repeat{};
     uint16_t m_delim{};
@@ -29,13 +27,12 @@ public:
 
     GroupDecoder& wrap(const uint32_t tag)
     {
-        m_group = m_decoder.m_tokens;
         const Token* token = m_decoder.nextField(tag);
         if (token != nullptr)
         {
-            m_offset = token - &m_group[0];
+            m_offset = m_decoder.indexOf(token);
             m_count = m_decoder.convertToUint32(token);
-            m_delim = m_group[m_offset + 1].m_tag;
+            m_delim = m_decoder.tokenAt(m_offset + 1).m_tag;
             m_repeat = 0;
         }
         else
@@ -52,13 +49,23 @@ public:
 
     void next()
     {
-        const auto found = m_decoder.find(m_offset, m_delim);
-        m_offset = found - m_decoder.m_tokens.data();
+        if (m_repeat > 0)
+        {
+            m_decoder.popGroupScope();
+        }
+        m_offset = nextGroupOffset();
         ++m_repeat;
+
+        const auto found = nextGroupOffset();
+        m_decoder.pushGroupScope(m_offset, found);
     }
 
     void clear()
     {
+        if (m_repeat > 0)
+        {
+            m_decoder.popGroupScope();
+        }
         m_count = 0;
         m_repeat = 0;
         m_offset = 0;
@@ -67,6 +74,14 @@ public:
     [[nodiscard]] uint32_t count() const
     {
         return m_count;
+    }
+
+private:
+    int32_t nextGroupOffset() const
+    {
+        const auto outerEnd = m_decoder.groupScope().end;
+        const auto end = m_decoder.find(m_offset + 1, m_delim, outerEnd);
+        return m_decoder.indexOf(end);
     }
 };
 

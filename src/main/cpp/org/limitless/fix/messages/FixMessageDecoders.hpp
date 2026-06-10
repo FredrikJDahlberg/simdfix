@@ -29,7 +29,7 @@ struct Encryption
     Values m_value;
 };
 
-struct NestedGroupDecoder : GroupDecoder
+struct NestedGroupDecoder :GroupDecoder
 {
     explicit NestedGroupDecoder(FieldDecoder& decoder) : 
         GroupDecoder{decoder}
@@ -65,7 +65,7 @@ struct NestedGroupDecoder : GroupDecoder
 
 };
 
-struct HopsDecoder : GroupDecoder
+struct HopsDecoder :GroupDecoder
 {
 private:
     NestedGroupDecoder m_nestedGroup;
@@ -111,8 +111,17 @@ public:
 
 };
 
-struct LogonDecoder : MessageDecoder
+struct LogonDecoder :MessageDecoder
 {
+private:
+    HopsDecoder m_hops;
+
+public:
+    LogonDecoder() : 
+        m_hops{m_decoder}
+    {
+    }
+
     static constexpr uint16_t MessageId = 'A';
 
     LogonDecoder& wrap(const std::span<const uint8_t> data,
@@ -154,10 +163,24 @@ struct LogonDecoder : MessageDecoder
         return m_decoder.getUint32<108, false, ParentType::Message>();
     }
 
+    HopsDecoder& hops()
+    {
+        return m_hops.wrap();
+    }
+
 };
 
-struct LogoutDecoder : MessageDecoder
+struct LogoutDecoder :MessageDecoder
 {
+private:
+    HopsDecoder m_hops;
+
+public:
+    LogoutDecoder() : 
+        m_hops{m_decoder}
+    {
+    }
+
     static constexpr uint16_t MessageId = '5';
 
     LogoutDecoder& wrap(const std::span<const uint8_t> data,
@@ -194,10 +217,24 @@ struct LogoutDecoder : MessageDecoder
         return m_decoder.getString<58, false, ParentType::Message>();
     }
 
+    HopsDecoder& hops()
+    {
+        return m_hops.wrap();
+    }
+
 };
 
-struct HeartbeatDecoder : MessageDecoder
+struct HeartbeatDecoder :MessageDecoder
 {
+private:
+    HopsDecoder m_hops;
+
+public:
+    HeartbeatDecoder() : 
+        m_hops{m_decoder}
+    {
+    }
+
     static constexpr uint16_t MessageId = '0';
 
     HeartbeatDecoder& wrap(const std::span<const uint8_t> data,
@@ -234,10 +271,24 @@ struct HeartbeatDecoder : MessageDecoder
         return m_decoder.getString<112, false, ParentType::Message>();
     }
 
+    HopsDecoder& hops()
+    {
+        return m_hops.wrap();
+    }
+
 };
 
-struct TestRequestDecoder : MessageDecoder
+struct TestRequestDecoder :MessageDecoder
 {
+private:
+    HopsDecoder m_hops;
+
+public:
+    TestRequestDecoder() : 
+        m_hops{m_decoder}
+    {
+    }
+
     static constexpr uint16_t MessageId = '1';
 
     TestRequestDecoder& wrap(const std::span<const uint8_t> data,
@@ -272,6 +323,11 @@ struct TestRequestDecoder : MessageDecoder
     [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> testReqID() const
     {
         return m_decoder.getString<112, false, ParentType::Message>();
+    }
+
+    HopsDecoder& hops()
+    {
+        return m_hops.wrap();
     }
 
 };

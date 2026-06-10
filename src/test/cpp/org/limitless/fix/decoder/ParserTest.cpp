@@ -34,7 +34,7 @@ TEST(Parser, Logon)
 
         Result::Values handle(LogonDecoder& logon)
         {
-            const auto sender = logon.standardHeader().sender().value();
+            const auto sender = logon.sender().value();
             EXPECT_EQ(std::string("Buyer"), std::string(reinterpret_cast<const char*>(sender.data()), sender.size()));
             EXPECT_EQ(Encryption::None, logon.encryptMethod().value().m_value);
             found = true;
@@ -132,7 +132,7 @@ TEST(Parser, HopGroup1)
         Result::Values handle(LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
-            auto group = logout.standardHeader().hops();
+            auto group = logout.hops();
             const auto count = group.count();
             EXPECT_EQ(2, count);
             group.next();
@@ -146,7 +146,7 @@ TEST(Parser, HopGroup1)
             EXPECT_EQ(0, group.hopRefID().value_or(0));
             {
                 const auto v = group.hopCompID().value_or(std::span<const uint8_t>{});
-                EXPECT_EQ(std::string("12"), std::string(reinterpret_cast<const char*>(v.data()), v.size()));
+                EXPECT_EQ(std::string("20"), std::string(reinterpret_cast<const char*>(v.data()), v.size()));
             }
             EXPECT_FALSE(group.hasNext());
             return Result::Success;
@@ -178,12 +178,13 @@ TEST(Parser, HopGroup2)
         Result::Values handle(generated::LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
-            auto group = logout.standardHeader().hops();
+            auto group = logout.hops();
             const auto count = group.count();
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
             group.next();
-            EXPECT_EQ("", toString(group.hopCompID().value()));
+            std::span<const uint8_t> empty{};
+            EXPECT_EQ("", toString(group.hopCompID().value_or(empty)));
             EXPECT_EQ(0, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
@@ -210,24 +211,27 @@ TEST(Parser, HopGroup3)
         Result::Values handle(generated::LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
-            auto group = logout.standardHeader().hops();
+            auto group = logout.hops();
             const auto count = group.count();//.value_or(0);
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
             group.next();
             // FIXME: string EXPECT_EQ(0, group.hopCompID().value_or(0));
-            EXPECT_EQ(10, group.hopRefID().value_or(0));
+            EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:14.000")),
+                      group.hopSendingTime().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
-            EXPECT_EQ(37, group.hopRefID().value_or(0));
+            EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:15.000")),
+                      group.hopSendingTime().value_or(0));
             // FIXME string EXPECT_EQ(0, group.hopCompID().value_or(0));
             EXPECT_FALSE(group.hasNext());
             return Result::Success;
         }
     } app;
     PayloadDecoder decoder{};
-    const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=70" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
-        "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "10=077" SOH);
+    const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=108" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
+        "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=20260609-12:13:14.000" SOH
+        "629=20260609-12:13:15.000" SOH "10=253" SOH);
     auto[processed, status] = decoder.parse(logout, app);
     ASSERT_EQ(Result::Success, status);
 }
@@ -243,7 +247,7 @@ TEST(Parser, InvalidGroupCount)
         Result::Values handle(generated::LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
-            auto group = logout.standardHeader().hops();
+            auto group = logout.hops();
             const auto count = group.count();
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2, count);
