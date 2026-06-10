@@ -11,6 +11,7 @@
 
 #include "org/limitless/fix/decoder/DecoderTypes.hpp"
 #include "org/limitless/fix/decoder/Result.hpp"
+#include "org/limitless/fix/decoder/Token.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 

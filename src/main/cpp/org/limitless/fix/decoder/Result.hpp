@@ -6,6 +6,7 @@
 #define SIMD_FIX_PARSER_STATUS_HPP
 
 #include <cstdint>
+#include <string_view>
 
 namespace org::limitless::fix::decoder {
 

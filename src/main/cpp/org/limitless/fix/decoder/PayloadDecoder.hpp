@@ -5,6 +5,9 @@
 #ifndef SIMD_FIX_DECODER_HPP
 #define SIMD_FIX_DECODER_HPP
 
+#include <algorithm>
+#include <bit>
+#include <cstring>
 #include <span>
 
 #include "org/limitless/fix/decoder/DecoderTypes.hpp"
