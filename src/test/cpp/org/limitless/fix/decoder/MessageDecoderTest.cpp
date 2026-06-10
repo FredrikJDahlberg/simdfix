@@ -17,7 +17,7 @@ namespace org::limitless::fix::decoder {
 using namespace org::limitless::fix::decoder;
 using namespace org::limitless::fix::messages;
 
-TEST(Parser, Logon)
+TEST(MessageDecoder, Logon)
 {
     const auto login = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH "56=SellerSide" SOH "34=1" SOH
@@ -48,7 +48,7 @@ TEST(Parser, Logon)
     ASSERT_TRUE(app.found);
 }
 
-TEST(Parser, Logout)
+TEST(MessageDecoder, Logout)
 {
     struct AppHandler : MessageHandler<AppHandler>
     {
@@ -83,7 +83,7 @@ TEST(Parser, Logout)
     }
 }
 
-TEST(Parser, MessageFragment)
+TEST(MessageDecoder, MessageFragment)
 {
     struct AppHandler : MessageHandler<AppHandler>
     {
@@ -121,7 +121,7 @@ TEST(Parser, MessageFragment)
     }
 }
 
-TEST(Parser, HopGroup1)
+TEST(MessageDecoder, HopGroup1)
 {
     struct AppHandler : MessageHandler<AppHandler>
     {
@@ -167,7 +167,7 @@ std::string toString(Span span)
     return std::string(reinterpret_cast<const char*>(span.data()), span.size());
 }
 
-TEST(Parser, HopGroup2)
+TEST(MessageDecoder, HopGroup2)
 {
     struct AppHandler : MessageHandler<AppHandler>
     {
@@ -200,7 +200,7 @@ TEST(Parser, HopGroup2)
     ASSERT_EQ(Result::Success, status);
 }
 
-TEST(Parser, HopGroup3)
+TEST(MessageDecoder, HopGroup3)
 {
     struct AppHandler : MessageHandler<AppHandler>
     {
@@ -236,7 +236,7 @@ TEST(Parser, HopGroup3)
     ASSERT_EQ(Result::Success, status);
 }
 
-TEST(Parser, InvalidGroupCount)
+TEST(MessageDecoder, InvalidGroupCount)
 {
     struct AppHandler : MessageHandler<AppHandler>
     {
@@ -268,7 +268,7 @@ TEST(Parser, InvalidGroupCount)
     ASSERT_EQ(Result::Success, status);
 }
 
-TEST(Parser, InvalidMandatoryFields)
+TEST(MessageDecoder, InvalidMandatoryFields)
 {
     PayloadDecoder decoder{};
     struct AppHandler : MessageHandler<AppHandler>{} app;

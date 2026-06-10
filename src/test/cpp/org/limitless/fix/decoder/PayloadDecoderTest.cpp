@@ -26,7 +26,7 @@ void check(std::span<Token> result, const std::span<const Token> expected)
     ASSERT_EQ(expected.size(), result.size());
 }
 
-TEST(Decoder, Basics)
+TEST(PayloadDecoder, Basics)
 {
     const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH
         "56=SellerSide" SOH "34=1" SOH "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH
@@ -59,7 +59,7 @@ TEST(Decoder, Basics)
     check(decoder.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
 }
 
-TEST(Decoder, TrailerSplitCheckSum)
+TEST(PayloadDecoder, TrailerSplitCheckSum)
 {
     const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=47" SOH "35=A" SOH
         "49=Buyer" SOH "56=Seller" SOH "34=2000001" SOH "52=20190605" SOH "10=046" SOH);
@@ -83,7 +83,7 @@ TEST(Decoder, TrailerSplitCheckSum)
     check(decoder.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
 }
 
-TEST(Decoder, TrailerFieldEnd)
+TEST(PayloadDecoder, TrailerFieldEnd)
 {
     const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=21" SOH "35=66" SOH
         "666=66" SOH "1=1" SOH "2=2" SOH "10=233" SOH);
@@ -92,7 +92,7 @@ TEST(Decoder, TrailerFieldEnd)
     ASSERT_EQ(Result::Success, status);
 }
 
-TEST(Decoder, Fragment)
+TEST(PayloadDecoder, Fragment)
 {
     const auto message = utils::makeSpan("8=FIXT.");
     PayloadDecoder decoder{};
@@ -101,7 +101,7 @@ TEST(Decoder, Fragment)
     ASSERT_EQ(0, processed);
 }
 
-TEST(Decoder, HopGroup)
+TEST(PayloadDecoder, HopGroup)
 {
     const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH

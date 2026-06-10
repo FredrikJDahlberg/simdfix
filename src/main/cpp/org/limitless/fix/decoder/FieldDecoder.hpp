@@ -80,7 +80,7 @@ struct FieldDecoder
         return utils::asciiToDecimal(0, m_data.data() + token->m_position, token->m_length);
     }
 
-    [[nodiscard]] const Token& tokenAt(const int32_t index) const
+    [[nodiscard]] const Token& tokenAt(const uint32_t index) const
     {
         return m_tokens[index];
     }

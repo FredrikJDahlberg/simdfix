@@ -18,21 +18,30 @@
 
 namespace org::limitless::fix::decoder {
 
-// FIXME: do not clear token count and position on fragment
 class PayloadDecoder
 {
-public:
     static constexpr size_t MaxSize = 64;
 
+    Token m_tokens[MaxSize]{};
+    uint16_t m_tags[MaxSize]{};
+
+    simd::Uint8x16 m_block{};
+    uint32_t m_tag{};
+    int32_t m_position{};
+    size_t m_count{};
+
+public:
     using position_t = uint32_t;
     using length_t = uint16_t;
     using value_t = uint16_t;
     using data_t = uint8_t;
 
+    static constexpr uint32_t BeginStringPosition = 0;
     static constexpr uint32_t BodyLengthPosition = 1;
     static constexpr uint32_t MessageTypePosition = 2;
 
     static constexpr uint32_t RequiredFieldCount = 7;
+    static constexpr uint32_t MessageFragmentLimit = 32;
 
     static constexpr uint32_t CheckSumTag = 10;
     static constexpr uint32_t BodyLengthTag = 9;
@@ -79,7 +88,7 @@ public:
     Result parse(const std::span<const data_t> buffer)
     {
         using simd::Uint8x16;
-        if (buffer.size() < 32)
+        if (buffer.size() < MessageFragmentLimit)
         {
             return { 0, Result::MessageFragment };
         }
@@ -92,7 +101,7 @@ public:
         {
             return { 8, Result::InvalidBeginString };
         }
-        m_tokens[0] = { 2, 8, 8 };
+        m_tokens[BeginStringPosition] = { 2, 8, 8 };
         m_count = 1;
 
         data_t digits[Uint8x16::Size];
@@ -152,13 +161,6 @@ public:
     }
 
 private:
-    Token m_tokens[MaxSize]{};
-    uint16_t m_tags[MaxSize]{};
-
-    simd::Uint8x16 m_block{};
-    uint32_t m_tag{};
-    int32_t m_position{};
-    size_t m_count{};
 
     Result checkRequiredFields(const data_t* data) const
     {
@@ -287,7 +289,9 @@ private:
         {
             checkSumValue += data[position];
         }
-        if (utils::asciiToDecimal(0, data + m_tokens[m_count - 1].m_position, 3) != (checkSumValue & 0xff))
+
+        const auto messageCheckSum = checkSumValue & 0xff;
+        if (utils::asciiToDecimal(0, data + m_tokens[m_count - 1].m_position, 3) != messageCheckSum)
         {
             return Result::InvalidCheckSum;
         }

@@ -14,10 +14,10 @@ struct GroupDecoder
 protected:
     FieldDecoder& m_decoder;
 
-    int32_t m_count{};
-    int32_t m_repeat{};
+    uint32_t m_count{};
+    uint32_t m_repeat{};
     uint16_t m_delim{};
-    int32_t m_offset{};
+    uint32_t m_offset{};
 
 public:
 
