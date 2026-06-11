@@ -306,9 +306,9 @@ int main(const int argc, char** argv)
 
     if (argc < 2)
     {
-        for (const auto& benchmark : BENCHMARKS)
+        for (const auto& [name, run] : BENCHMARKS)
         {
-            benchmark.run();
+            run();
         }
         return 0;
     }

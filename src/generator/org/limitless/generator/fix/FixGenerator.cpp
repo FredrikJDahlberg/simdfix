@@ -13,11 +13,15 @@ using namespace org::limitless::generator::fix;
 static void generateDecoders(const std::string& fileName,
                              const std::vector<Record>& records,
                              const std::vector<Record>& enums);
+static void generateEncoders(const std::string& fileName,
+                             const std::vector<Record>& records,
+                             const std::vector<Record>& enums);
 
 static void generateMessageHandler(const std::string& fileName,
                                    const std::vector<Record>& records);
 
-static void generateRecord(std::ostream& out, const Record& record);
+static void generateRecordDecoders(std::ostream& out, const Record& record);
+static void generateRecordEncoders(std::ostream& out, const Record& record);
 
 int main(int argc, char** argv)
 {
@@ -26,9 +30,6 @@ int main(int argc, char** argv)
 
     pugi::xml_document doc;
     const auto result = doc.load_file(argv[1]);
-
-    std::println("{} {} {}", argc, argv[0], argv[1]);
-
     if (argc != 3 || !result)
     {
         std::println("XML error: {}, dir = {}, file = {}", result.description(),
@@ -47,10 +48,15 @@ int main(int argc, char** argv)
     std::string handlerFile{argv[2]};
     handlerFile.append("/FixMessageHandler.hpp");
     generateMessageHandler(handlerFile, model.m_records);
+
+    std::string encodersFile{argv[2]};
+    encodersFile.append("/FixMessageEncoders.hpp");
+    generateEncoders(encodersFile, model.m_records, model.m_enums);
+
     return 0;
 }
 
-static void generateEnum(std::ostream& out, const Record& record)
+static void generateEnumDecoders(std::ostream& out, const Record& record)
 {
     out << std::format("struct {}\n", record.m_name);
     out << "{\n";
@@ -80,7 +86,7 @@ static void generateDecoders(const std::string& fileName,
     std::ofstream out(fileName);
     if (!out)
     {
-        std::println("Error: could not open '{}' for writing", fileName);
+        std::println("Decoder/Error: could not open '{}' for writing", fileName);
         return;
     }
 
@@ -92,16 +98,51 @@ static void generateDecoders(const std::string& fileName,
     out << "#include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n\n";
     out << "namespace org::limitless::fix::messages {\n\n";
     out << "using namespace org::limitless::fix::decoder;\n\n";
-    for (const auto& value: enums)
+    for (const auto& type: enums)
     {
-        generateEnum(out, value);
+        generateEnumDecoders(out, type);
     }
     for (auto& record: records)
     {
-        generateRecord(out, record);
+        generateRecordDecoders(out, record);
     }
     out << "} // namespace org::limitless::fix::messages\n\n";
     out << "#endif //SIMD_FIX_MESSAGE_DECODERS_HPP\n";
+
+    out.close();
+}
+
+static void generateEncoders(const std::string& fileName,
+                             const std::vector<Record>& records,
+                             const std::vector<Record>& enums)
+{
+    std::ofstream out(fileName);
+    if (!out)
+    {
+        std::println("Encoder/Error: could not open '{}' for writing", fileName);
+        return;
+    }
+
+    out << "#ifndef SIMD_FIX_MESSAGE_ENCODERS_HPP\n";
+    out << "#define SIMD_FIX_MESSAGE_ENCODERS_HPP\n\n";
+    out << "#include <expected>\n\n";
+    out << "// #include \"org/limitless/fix/decoder/GroupDecoder.hpp\"\n";
+    out << "// #include \"org/limitless/fix/decoder/ComponentDecoder.hpp\"\n";
+    out << "// #include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n\n";
+    out << "namespace org::limitless::fix::messages {\n\n";
+    out << "// using namespace org::limitless::fix::encoder;\n\n";
+    for (const auto& type: enums)
+    {
+        // generateEnumDecoders(out, value);
+        out << std::format("    // {}\n", type.m_name);
+    }
+    for (auto& record: records)
+    {
+        generateRecordEncoders(out, record);
+        // out << std::format("    // {}\n", record.m_name);
+    }
+    out << "} // namespace org::limitless::fix::messages\n\n";
+    out << "#endif //SIMD_FIX_MESSAGE_ENCODERS_HPP\n";
 
     out.close();
 }
@@ -194,7 +235,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "#endif // SIMD_FIX_MESSAGE_HANDLER_HPP\n";
 }
 
-static void generateConstructors(std::ostream& out, const Record& record)
+static void generateDecoderConstructors(std::ostream& out, const Record& record, const std::string& codec)
 {
     if (!record.m_records.empty())
     {
@@ -202,16 +243,16 @@ static void generateConstructors(std::ostream& out, const Record& record)
     }
     if (record.m_parent == ParentType::Message)
     {
-        out << std::format("    {}Decoder() : \n", record.m_name);
+        out << std::format("    {}{}() : \n", record.m_name, codec);
     } else
     {
-        out << std::format("    explicit {}Decoder(FieldDecoder& decoder) : \n", record.m_name);
+        out << std::format("    explicit {}{}(Field{}& {}) : \n", record.m_name, codec, codec, uncap(codec));
     }
 
     if (record.m_parent == ParentType::Component || record.m_parent == ParentType::Group)
     {
-        out << std::format("        {}Decoder{{decoder}}{}\n",
-                           record.m_parent.name(),
+        out << std::format("        {}{}{{{}}}{}\n",
+                           record.m_parent.name(), codec, uncap(codec),
                            record.m_records.empty() ? "" : ",");
     }
     if (!record.m_records.empty())
@@ -219,9 +260,9 @@ static void generateConstructors(std::ostream& out, const Record& record)
         const auto& back = record.m_records.back();
         for (auto const& field: record.m_records)
         {
-            out << std::format("        m_{}{{{}decoder}}{}\n",
+            out << std::format("        m_{}{{{}{}}}{}\n",
                                uncap(field.m_name), record.m_parent == ParentType::Message ? "m_" : "",
-                               field.m_name != back.m_name ? "," : "");
+                               uncap(codec), field.m_name != back.m_name ? "," : "");
         }
     }
     if (!record.m_records.empty() || record.m_parent == ParentType::Group)
@@ -230,14 +271,14 @@ static void generateConstructors(std::ostream& out, const Record& record)
     }
 }
 
-static void generateFields(std::ostream& out, const Record& record)
+static void generateStructFields(std::ostream& out, const Record& record, const std::string& codec)
 {
     if (record.m_records.size() >= 1)
     {
         out << "private:\n";
         for (auto& comp: record.m_records)
         {
-            out << std::format("    {}Decoder m_{};\n\n", comp.m_type, uncap(comp.m_name));
+            out << std::format("    {}{} m_{};\n\n", comp.m_type, codec, uncap(comp.m_name));
         }
     }
 }
@@ -306,18 +347,34 @@ static void generateGetters(std::ostream& out, const Record& record)
     }
 }
 
-static void generateRecord(std::ostream& out, const Record& record)
+static void generateRecordDecoders(std::ostream& out, const Record& record)
 {
-    out << std::format("struct {}Decoder :", record.m_name);
+    out << std::format("struct {}Decoder : ", record.m_name);
     out << std::format("{}Decoder\n{{\n", record.m_parent.name());
 
-    generateFields(out, record);
-    generateConstructors(out, record);
+    generateStructFields(out, record, "Decoder");
+    generateDecoderConstructors(out, record, "Decoder");
     if (record.m_parent == ParentType::Message)
     {
         out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
     }
     generateWrapNext(out, record);
     generateGetters(out, record);
+    out << "};\n\n";
+}
+
+static void generateRecordEncoders(std::ostream& out, const Record& record)
+{
+    out << std::format("struct {}Encoder : ", record.m_name);
+    out << std::format("{}Encoder\n{{\n", record.m_parent.name());
+
+    generateStructFields(out, record, "Encoder");
+    generateDecoderConstructors(out, record, "Encoder");
+    if (record.m_parent == ParentType::Message)
+    {
+        out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
+    }
+    // generateWrapNext(out, record);
+    // generateGetters(out, record);
     out << "};\n\n";
 }

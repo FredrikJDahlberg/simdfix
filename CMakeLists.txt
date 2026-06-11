@@ -33,8 +33,12 @@ set(FIX_HEADERS
         ${MAIN_PATH}/simd/LinearSearch.hpp
         ${MAIN_PATH}/encoder/FieldEncoder.hpp
         ${MAIN_PATH}/encoder/PayloadEncoder.hpp
-        ${MAIN_PATH}/encoder/MessageEncoder.hpp)
-add_library(SimdFix INTERFACE)
+        ${MAIN_PATH}/encoder/MessageEncoder.hpp
+        src/main/cpp/org/limitless/fix/encoder/GroupEncoder.hpp
+        src/main/cpp/org/limitless/fix/encoder/ComponentEncoder.hpp)
+add_library(SimdFix INTERFACE
+        src/main/cpp/org/limitless/fix/encoder/GroupEncoder.hpp
+        src/main/cpp/org/limitless/fix/encoder/ComponentEncoder.hpp)
 target_sources(SimdFix INTERFACE ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_include_directories(SimdFix INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
 target_compile_definitions(SimdFix INTERFACE

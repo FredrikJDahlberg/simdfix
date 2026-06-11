@@ -6,6 +6,7 @@
 #define SIMD_FIX_FIELD_ENCODER_HPP
 
 namespace org::limitless::fix::encoder {
+
 struct FieldEncoder
 {
 

@@ -27,7 +27,7 @@ struct Encryption
     Values m_value;
 };
 
-struct NestedGroupDecoder :GroupDecoder
+struct NestedGroupDecoder : GroupDecoder
 {
     explicit NestedGroupDecoder(FieldDecoder& decoder) : 
         GroupDecoder{decoder}
@@ -63,7 +63,7 @@ struct NestedGroupDecoder :GroupDecoder
 
 };
 
-struct HopsDecoder :GroupDecoder
+struct HopsDecoder : GroupDecoder
 {
 private:
     NestedGroupDecoder m_nestedGroup;
@@ -109,7 +109,7 @@ public:
 
 };
 
-struct LogonDecoder :MessageDecoder
+struct LogonDecoder : MessageDecoder
 {
 private:
     HopsDecoder m_hops;
@@ -168,7 +168,7 @@ public:
 
 };
 
-struct LogoutDecoder :MessageDecoder
+struct LogoutDecoder : MessageDecoder
 {
 private:
     HopsDecoder m_hops;
@@ -222,7 +222,7 @@ public:
 
 };
 
-struct HeartbeatDecoder :MessageDecoder
+struct HeartbeatDecoder : MessageDecoder
 {
 private:
     HopsDecoder m_hops;
@@ -276,7 +276,7 @@ public:
 
 };
 
-struct TestRequestDecoder :MessageDecoder
+struct TestRequestDecoder : MessageDecoder
 {
 private:
     HopsDecoder m_hops;
