@@ -25,12 +25,10 @@ set(FIX_HEADERS
         ${MAIN_PATH}/utils/BitSet64.hpp
         ${MAIN_PATH}/decoder/PayloadDecoder.hpp
         ${MAIN_PATH}/decoder/MessageDecoder.hpp
-        ${MAIN_PATH}/decoder/Result.hpp
-        ${MAIN_PATH}/decoder/DecoderTypes.hpp
+        ${MAIN_PATH}/DecoderTypes.hpp
         ${MAIN_PATH}/decoder/FieldDecoder.hpp
         ${MAIN_PATH}/decoder/ComponentDecoder.hpp
         ${MAIN_PATH}/decoder/GroupDecoder.hpp
-        ${MAIN_PATH}/decoder/Token.hpp
         ${MAIN_PATH}/simd/Uint8x16.hpp
         ${MAIN_PATH}/simd/LinearSearch.hpp
         ${MAIN_PATH}/encoder/FieldEncoder.hpp

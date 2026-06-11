@@ -6,7 +6,7 @@
 
 namespace org::limitless::fix::messages {
 
-using decoder::Result;
+using fix::Result;
 
 template <typename Handler>
 class MessageHandler
@@ -23,7 +23,7 @@ public:
         return static_cast<Handler*>(this)->handle(std::forward<Event>(event));
     }
 
-    void setSessionContext(const decoder::SessionContext& context)
+    void setSessionContext(const SessionContext& context)
     {
         m_logon.m_context = &context;
         m_logout.m_context = &context;

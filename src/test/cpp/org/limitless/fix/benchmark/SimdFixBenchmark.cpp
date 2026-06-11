@@ -101,7 +101,7 @@ struct LogonGetterHandler : org::limitless::fix::messages::MessageHandler<LogonG
 
     uint64_t sink = 0;
 
-    org::limitless::fix::decoder::Result::Values handle(org::limitless::fix::messages::LogonDecoder& logon)
+    org::limitless::fix::Result::Values handle(org::limitless::fix::messages::LogonDecoder& logon)
     {
         using org::limitless::fix::messages::Encryption;
 
@@ -113,7 +113,7 @@ struct LogonGetterHandler : org::limitless::fix::messages::MessageHandler<LogonG
         sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
         sink += logon.encryptMethod().value_or(Encryption{}).m_value;
         sink += logon.heartbeatInterval().value_or(0);
-        return org::limitless::fix::decoder::Result::Success;
+        return org::limitless::fix::Result::Success;
     }
 };
 
@@ -126,7 +126,7 @@ struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<L
 
     uint64_t sink = 0;
 
-    org::limitless::fix::decoder::Result::Values handle(org::limitless::fix::messages::LogonDecoder& logon)
+    org::limitless::fix::Result::Values handle(org::limitless::fix::messages::LogonDecoder& logon)
     {
         using org::limitless::fix::messages::Encryption;
 
@@ -147,7 +147,7 @@ struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<L
             sink += hops.hopCompID().value_or(std::string_view{}).size();
             sink += static_cast<uint64_t>(hops.hopSendingTime().value_or(std::chrono::milliseconds{0}).count());
         }
-        return org::limitless::fix::decoder::Result::Success;
+        return org::limitless::fix::Result::Success;
     }
 };
 

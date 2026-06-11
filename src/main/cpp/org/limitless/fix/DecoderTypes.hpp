@@ -12,7 +12,7 @@
 #include <expected>
 #include <chrono>
 
-namespace org::limitless::fix::decoder {
+namespace org::limitless::fix {
 
 struct Token
 {
