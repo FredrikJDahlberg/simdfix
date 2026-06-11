@@ -95,7 +95,7 @@ add_custom_command(
         COMMAND $<TARGET_FILE:Generator> ${PROTOCOL_XML} ${GENERATED_DIR}
         DEPENDS Generator
                 ${PROTOCOL_XML}
-                ${GENERATOR_PATH}/FixGenerator.cpp ${GENERATOR_PATH}/Generator.hpp ${GENERATOR_PATH}/Processor.hpp
+                ${GENERATOR_PATH}/FixGenerator.cpp ${GENERATOR_PATH}/DataModel.hpp
         COMMENT "Generating FIX message headers from protocol.xml"
         VERBATIM
 )

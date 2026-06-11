@@ -8,6 +8,7 @@
 #include <array>
 #include <expected>
 #include <span>
+#include <chrono>
 
 #include "org/limitless/fix/decoder/DecoderTypes.hpp"
 #include "org/limitless/fix/decoder/Result.hpp"
@@ -28,7 +29,7 @@ struct FieldDecoder
     using Uint32Result = std::expected<uint32_t, Result::Values>;
     using Int64Result = std::expected<int64_t, Result::Values>;
     using Uint64Result = std::expected<uint64_t, Result::Values>;
-    using TimestampResult = Uint64Result;
+    using TimestampResult = std::expected<std::chrono::milliseconds, Result::Values>;
 
     static constexpr int32_t MaxGroupDepth = 8; // FIXME: verify in processor
 
@@ -156,7 +157,7 @@ struct FieldDecoder
     }
 
     template <uint32_t Tag, bool Required, ParentType Parent>
-    [[nodiscard]] constexpr Uint64Result getTimestamp() const
+    [[nodiscard]] constexpr TimestampResult getTimestamp() const
     {
         const auto index = findIndex<Tag, Parent>();
         if (index >= 0)

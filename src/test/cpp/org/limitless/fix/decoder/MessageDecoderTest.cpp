@@ -3,6 +3,7 @@
 //
 #include <span>
 #include <string>
+#include <chrono>
 
 #include <gtest/gtest.h>
 
@@ -216,14 +217,14 @@ TEST(MessageDecoder, HopGroup3)
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2UL, count);
             group.next();
-            // FIXME: string EXPECT_EQ(0, group.hopCompID().value_or(0));
-            EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:14.000")),
+            EXPECT_EQ("", toString(group.hopCompID().value_or(std::span<const uint8_t>{})));
+            EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:14.000")).count(),
                       group.hopSendingTime().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
-            EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:15.000")),
+            EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:15.000")).count(),
                       group.hopSendingTime().value_or(0));
-            // FIXME string EXPECT_EQ(0, group.hopCompID().value_or(0));
+            EXPECT_EQ("", toString(group.hopCompID().value_or(std::span<const uint8_t>({}))));
             EXPECT_FALSE(group.hasNext());
             return Result::Success;
         }

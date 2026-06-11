@@ -8,11 +8,10 @@
 #include <cstdint>
 #include <string_view>
 #include <ranges>
-#include <print>
+#include <chrono>
 
 namespace org::limitless::fix::utils {
 
-// FIXME: restructure
 using String = std::span<const uint8_t>;
 
 inline void print(const uint32_t length, const uint8_t* buffer)
@@ -228,9 +227,10 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     return -1;
 }
 
-inline int64_t dateTimeToEpochUTC(const std::string_view dateTime)
+inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateTime)
 {
-    return dateTimeToEpochUTC(reinterpret_cast<const uint8_t*>(dateTime.data()), dateTime.length());
+    const auto data = reinterpret_cast<const uint8_t*>(dateTime.data());
+    return std::chrono::milliseconds{dateTimeToEpochUTC(data, dateTime.length())};
 }
 
 template <typename Enum>
