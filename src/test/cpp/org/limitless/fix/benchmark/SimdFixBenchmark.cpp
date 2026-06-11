@@ -36,6 +36,34 @@ static constexpr std::uint8_t LOGIN[] =
 // Actual message length, excluding the C-string null terminator.
 static constexpr size_t LOGIN_LENGTH = sizeof(LOGIN) - 1;
 
+// Logon message with a 3-entry HopsRepeatingGroup (tags 627/628/629).
+static constexpr std::uint8_t LOGIN_GROUP[] =
+    "8=FIXT.1.1" SOH
+    "9=229" SOH
+    "35=A" SOH
+    "49=Buyer" SOH
+    "56=SellSide_1" SOH
+    "34=1" SOH
+    "52=20190605-11:51:27.84800" SOH
+    "1128=9" SOH
+    "98=0" SOH
+    "108=30" SOH
+    "141=Y" SOH
+    "553=Username" SOH
+    "554=Password" SOH
+    "1137=9" SOH
+    "627=3" SOH
+    "628=HOP1" SOH
+    "629=20260609-12:13:14.000" SOH
+    "628=HOP2" SOH
+    "629=20260609-12:13:15.000" SOH
+    "628=HOP3" SOH
+    "629=20260609-12:13:16.000" SOH
+    "10=151" SOH;
+
+// Actual message length, excluding the C-string null terminator.
+static constexpr size_t LOGIN_GROUP_LENGTH = sizeof(LOGIN_GROUP) - 1;
+
 using namespace std::chrono;
 
 template <typename Handler>
@@ -82,9 +110,43 @@ struct LogonGetterHandler : org::limitless::fix::messages::MessageHandler<LogonG
         sink += sender.size();
         sink += target.size();
         sink += logon.sequenceNumber().value_or(0);
-        sink += static_cast<uint64_t>(logon.sendingTime().value_or(0));
+        sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
         sink += logon.encryptMethod().value_or(Encryption{}).m_value;
         sink += logon.heartbeatInterval().value_or(0);
+        return org::limitless::fix::decoder::Result::Success;
+    }
+};
+
+// Applies every getter exposed by LogonDecoder, including iterating over the
+// HopsRepeatingGroup, accumulating the results into a sink so the compiler
+// cannot optimize the field accesses away.
+struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<LogonGroupGetterHandler>
+{
+    using MessageHandler::handle;
+
+    uint64_t sink = 0;
+
+    org::limitless::fix::decoder::Result::Values handle(org::limitless::fix::messages::LogonDecoder& logon)
+    {
+        using org::limitless::fix::messages::Encryption;
+
+        const auto sender = logon.sender().value_or(std::span<const uint8_t>{});
+        const auto target = logon.target().value_or(std::span<const uint8_t>{});
+        sink += sender.size();
+        sink += target.size();
+        sink += logon.sequenceNumber().value_or(0);
+        sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
+        sink += logon.encryptMethod().value_or(Encryption{}).m_value;
+        sink += logon.heartbeatInterval().value_or(0);
+
+        auto& hops = logon.hops();
+        sink += hops.count();
+        while (hops.hasNext())
+        {
+            hops.next();
+            sink += hops.hopCompID().value_or(std::span<const uint8_t>{}).size();
+            sink += static_cast<uint64_t>(hops.hopSendingTime().value_or(std::chrono::milliseconds{0}).count());
+        }
         return org::limitless::fix::decoder::Result::Success;
     }
 };
@@ -178,6 +240,43 @@ static void benchGetters()
     report("GETTERS", duration, hotMsgs, LOGIN_LENGTH);
 }
 
+// GROUPS: parse + apply every LogonDecoder getter, including a 3-entry hops
+// repeating group, to the message.
+static void benchGroups()
+{
+    org::limitless::fix::decoder::PayloadDecoder decoder;
+
+    constexpr size_t HOT_SIZE  = 256 * 1024;
+    constexpr size_t HOT_COUNT = 4096;
+    auto hotBuf = std::make_unique<uint8_t[]>(HOT_SIZE);
+
+    size_t i = 0;
+    for (; i + LOGIN_GROUP_LENGTH <= HOT_SIZE; i += LOGIN_GROUP_LENGTH)
+    {
+        std::memcpy(&hotBuf[i], LOGIN_GROUP, LOGIN_GROUP_LENGTH);
+    }
+    std::memset(&hotBuf[i], ' ', HOT_SIZE - i);
+
+    constexpr size_t msgsPerPass = HOT_SIZE / LOGIN_GROUP_LENGTH;
+    constexpr size_t hotMsgs = msgsPerPass * HOT_COUNT;
+
+    LogonGroupGetterHandler handler{};
+    const auto duration = timer([&]
+    {
+        for (size_t iter = 0; iter < HOT_COUNT; ++iter)
+        {
+            for (size_t j = 0; j < msgsPerPass; ++j)
+            {
+                const std::span<const uint8_t> bytes(&hotBuf[j * LOGIN_GROUP_LENGTH], LOGIN_GROUP_LENGTH);
+                const auto result = decoder.parse(bytes, handler);
+                (void) result;
+            }
+        }
+    });
+    std::printf("sink = %llu\n", static_cast<unsigned long long>(handler.sink));
+    report("GROUPS", duration, hotMsgs, LOGIN_GROUP_LENGTH);
+}
+
 struct Benchmark
 {
     std::string_view name;
@@ -188,6 +287,7 @@ static constexpr Benchmark BENCHMARKS[] = {
     {"cold",    benchColdCache},
     {"hot",     benchHotCache},
     {"getters", benchGetters},
+    {"groups",  benchGroups},
 };
 
 static void printUsage(const char* program)

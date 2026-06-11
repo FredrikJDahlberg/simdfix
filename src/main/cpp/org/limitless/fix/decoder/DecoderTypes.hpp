@@ -57,7 +57,7 @@ struct Category
         "std::int64_t",
         "std::uint64_t",
         "std::span<const uint8_t>",
-        "std::int64_t",
+        "std::chrono::milliseconds",
         "std::uint32_t",
         "Struct",
         "Group",

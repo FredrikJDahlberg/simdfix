@@ -87,34 +87,34 @@ TEST(Parse, BinaryToDecimal)
 TEST(Time, DateTimeToEpochUTC)
 {
     // epoch reference point
-    EXPECT_EQ(0LL,             utils::dateTimeToEpochUTC("19700101-00:00:00.000"));
-    EXPECT_EQ(1767225600000LL, utils::dateTimeToEpochUTC("20260101-00:00:00.000"));
-    EXPECT_EQ(1767269594000LL, utils::dateTimeToEpochUTC("20260101-12:13:14.000"));
-    EXPECT_EQ(1780835696000LL, utils::dateTimeToEpochUTC("20260607-12:34:56"));
-    EXPECT_EQ(1780835696123LL, utils::dateTimeToEpochUTC("20260607-12:34:56.123"));
-    EXPECT_EQ(1781515800500LL, utils::dateTimeToEpochUTC("20260615-09:30:00.500"));
+    EXPECT_EQ(0LL,             utils::dateTimeToEpochUTC("19700101-00:00:00.000").count());
+    EXPECT_EQ(1767225600000LL, utils::dateTimeToEpochUTC("20260101-00:00:00.000").count());
+    EXPECT_EQ(1767269594000LL, utils::dateTimeToEpochUTC("20260101-12:13:14.000").count());
+    EXPECT_EQ(1780835696000LL, utils::dateTimeToEpochUTC("20260607-12:34:56").count());
+    EXPECT_EQ(1780835696123LL, utils::dateTimeToEpochUTC("20260607-12:34:56.123").count());
+    EXPECT_EQ(1781515800500LL, utils::dateTimeToEpochUTC("20260615-09:30:00.500").count());
 
     // leap day and century leap year (2000 is divisible by 400)
-    EXPECT_EQ(951825600000LL,  utils::dateTimeToEpochUTC("20000229-12:00:00.000"));
-    EXPECT_EQ(946684800000LL,  utils::dateTimeToEpochUTC("20000101-00:00:00.000"));
+    EXPECT_EQ(951825600000LL,  utils::dateTimeToEpochUTC("20000229-12:00:00.000").count());
+    EXPECT_EQ(946684800000LL,  utils::dateTimeToEpochUTC("20000101-00:00:00.000").count());
 
     // day after Feb 29th differs between a leap year (2020) and a non-leap year (2021)
-    EXPECT_EQ(1582934400000LL, utils::dateTimeToEpochUTC("20200229-00:00:00.000"));
-    EXPECT_EQ(1583020800000LL, utils::dateTimeToEpochUTC("20200301-00:00:00.000"));
-    EXPECT_EQ(1614556800000LL, utils::dateTimeToEpochUTC("20210301-00:00:00.000"));
+    EXPECT_EQ(1582934400000LL, utils::dateTimeToEpochUTC("20200229-00:00:00.000").count());
+    EXPECT_EQ(1583020800000LL, utils::dateTimeToEpochUTC("20200301-00:00:00.000").count());
+    EXPECT_EQ(1614556800000LL, utils::dateTimeToEpochUTC("20210301-00:00:00.000").count());
 
     // year boundary spanning into a leap year
-    EXPECT_EQ(1704067199999LL, utils::dateTimeToEpochUTC("20231231-23:59:59.999"));
-    EXPECT_EQ(1704067200000LL, utils::dateTimeToEpochUTC("20240101-00:00:00.000"));
+    EXPECT_EQ(1704067199999LL, utils::dateTimeToEpochUTC("20231231-23:59:59.999").count());
+    EXPECT_EQ(1704067200000LL, utils::dateTimeToEpochUTC("20240101-00:00:00.000").count());
 
     // far future date
-    EXPECT_EQ(4102444799999LL, utils::dateTimeToEpochUTC("20991231-23:59:59.999"));
+    EXPECT_EQ(4102444799999LL, utils::dateTimeToEpochUTC("20991231-23:59:59.999").count());
 }
 
 TEST(Time, DateTimeToEpochUTCInvalidLength)
 {
-    EXPECT_EQ(-1, utils::dateTimeToEpochUTC(""));
-    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260607-12:34:56.12")); // one char short, 20 chars
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("").count());
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260607-12:34:56.12").count()); // one char short, 20 chars
 }
 
 }

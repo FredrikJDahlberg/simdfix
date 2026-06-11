@@ -218,12 +218,12 @@ TEST(MessageDecoder, HopGroup3)
             EXPECT_EQ(2UL, count);
             group.next();
             EXPECT_EQ("", toString(group.hopCompID().value_or(std::span<const uint8_t>{})));
-            EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:14.000")).count(),
-                      group.hopSendingTime().value_or(0));
+            EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:14.000")),
+                      group.hopSendingTime().value_or(std::chrono::milliseconds{0}));
             EXPECT_TRUE(group.hasNext());
             group.next();
-            EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:15.000")).count(),
-                      group.hopSendingTime().value_or(0));
+            EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:15.000")),
+                      group.hopSendingTime().value_or(std::chrono::milliseconds{0}));
             EXPECT_EQ("", toString(group.hopCompID().value_or(std::span<const uint8_t>({}))));
             EXPECT_FALSE(group.hasNext());
             return Result::Success;

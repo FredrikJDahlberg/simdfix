@@ -94,7 +94,7 @@ public:
         return m_decoder.getString<628, false, ParentType::Group>();
     }
 
-    [[nodiscard]] std::expected<std::int64_t, Result::Values> hopSendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> hopSendingTime() const
     {
         return m_decoder.getTimestamp<629, false, ParentType::Group>();
     }
@@ -148,7 +148,7 @@ public:
         return m_decoder.getUint32<34, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::int64_t, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
         return m_decoder.getTimestamp<52, false, ParentType::Message>();
     }
@@ -207,7 +207,7 @@ public:
         return m_decoder.getUint32<34, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::int64_t, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
         return m_decoder.getTimestamp<52, false, ParentType::Message>();
     }
@@ -261,7 +261,7 @@ public:
         return m_decoder.getUint32<34, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::int64_t, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
         return m_decoder.getTimestamp<52, false, ParentType::Message>();
     }
@@ -315,7 +315,7 @@ public:
         return m_decoder.getUint32<34, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::int64_t, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
         return m_decoder.getTimestamp<52, false, ParentType::Message>();
     }

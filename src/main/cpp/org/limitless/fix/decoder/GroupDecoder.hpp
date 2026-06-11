@@ -30,6 +30,10 @@ public:
         const Token* token = m_decoder.nextField(tag);
         if (token != nullptr)
         {
+            if (m_repeat > 0)
+            {
+                m_decoder.popGroupScope();
+            }
             m_offset = m_decoder.indexOf(token);
             m_count = m_decoder.convertToUint32(token);
             m_delim = m_decoder.tokenAt(m_offset + 1).m_tag;

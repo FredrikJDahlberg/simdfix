@@ -163,7 +163,7 @@ struct FieldDecoder
         if (index >= 0)
         {
             const auto token = m_tokens[index];
-            return utils::dateTimeToEpochUTC(m_data.data() + token.m_position, token.m_length);
+            return std::chrono::milliseconds{utils::dateTimeToEpochUTC(m_data.data() + token.m_position, token.m_length)};
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
