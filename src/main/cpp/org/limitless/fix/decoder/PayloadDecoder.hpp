@@ -109,9 +109,11 @@ public:
         position_t offset = 0;
         bool complete = false;
         position_t bits = 4;
+        uint64_t blockSum = 0;
         for (; offset + 15 < length && !complete; offset += Uint8x16::Size)
         {
             m_block.load(data + offset);
+            blockSum += m_block.sum();
 #if !defined(NDEBUG)
             utils::print(16, data + offset);
 #endif
@@ -163,12 +165,12 @@ public:
         {
             m_tags[i] = m_tokens[i].m_tag;
         }
-        return checkRequiredFields(data);
+        return checkRequiredFields(data, blockSum, offset);
     }
 
 private:
 
-    Result checkRequiredFields(const data_t* data) const
+    Result checkRequiredFields(const data_t* data, const uint64_t blockSum, const position_t blockEnd) const
     {
         const auto* last = &m_tokens[m_count - 1];
         const bool hasCheckSum = last->m_tag == CheckSumTag;
@@ -208,7 +210,7 @@ private:
 
 
         // checksum and field count
-        const auto status = processCheckSum(data);
+        const auto status = processCheckSum(data, blockSum, blockEnd);
         if (status != Result::Success)
         {
             return {processed, status};
@@ -272,7 +274,9 @@ private:
         return m_tokens[m_count - 1].m_tag == 10;
     }
 
-    Result::Values processCheckSum(const std::span<const data_t>::pointer data) const
+    Result::Values processCheckSum(const std::span<const data_t>::pointer data,
+                                   const uint64_t blockSum,
+                                   const position_t blockEnd) const
     {
         uint64_t checks = 0;
         memcpy(&checks, data + m_tokens[m_count - 1].m_position - 4, sizeof(uint64_t));
@@ -282,16 +286,15 @@ private:
             return Result::InvalidCheckSumTag;
         }
 
-        uint64_t checkSumValue = 0;
+        // blockSum covers [0, blockEnd); the checksum covers [0, checkSumEnd),
+        // so correct for the difference (at most one block plus the checksum field).
+        uint64_t checkSumValue = blockSum;
         const uint32_t checkSumEnd = checkSumToken.m_position - 3;
-        uint32_t position = 0;
-        simd::Uint8x16 block;
-        for (; position + simd::Uint8x16::Size <= checkSumEnd; position += simd::Uint8x16::Size)
+        for (uint32_t position = checkSumEnd; position < blockEnd; ++position)
         {
-            block.load(data + position);
-            checkSumValue += block.sum();
+            checkSumValue -= data[position];
         }
-        for (; position < checkSumEnd; ++position)
+        for (uint32_t position = blockEnd; position < checkSumEnd; ++position)
         {
             checkSumValue += data[position];
         }
@@ -313,7 +316,17 @@ private:
         const uint8_t* data = buffer.data() + offset;
         const size_t remaining = buffer.size() - offset;
         uint64_t bytes = 0;
-        memcpy(&bytes, data, std::min(remaining, sizeof(uint64_t)));
+        if (remaining >= sizeof(uint64_t))
+        { // fixed size so the compiler inlines the copy to a single load
+            memcpy(&bytes, data, sizeof(uint64_t));
+        }
+        else
+        {
+            for (size_t i = 0; i < remaining; ++i)
+            {
+                bytes |= static_cast<uint64_t>(data[i]) << (i * 8);
+            }
+        }
         auto tagEnds = BitSet64{utils::findByte(TagEnd, bytes)};
         auto fieldEnds = BitSet64{utils::findByte(FieldEnd, bytes)};
         uint32_t tagEndBit = tagEnds.zerosRight();

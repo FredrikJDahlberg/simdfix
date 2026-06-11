@@ -54,7 +54,9 @@ struct FieldDecoder
 
     Token* find(int32_t offset, const uint16_t tag, const int32_t end)
     {
-        while (offset < end && m_tokens[offset].m_tag != tag)
+        // Scalar scan over the contiguous tag array; group scopes are only a
+        // few tokens wide, so this beats the 8-wide NEON search setup cost.
+        while (offset < end && m_tags[offset] != tag)
         {
             ++offset;
         }
@@ -79,7 +81,7 @@ struct FieldDecoder
 
     [[nodiscard]] constexpr uint32_t convertToUint32(const Token* token) const
     {
-        const auto padded = m_data.size() > token->m_position + token->m_position;
+        const auto padded = m_data.size() >= token->m_position + sizeof(uint64_t);
         return utils::asciiToUint64(0, m_data.data() + token->m_position, token->m_length, padded);
     }
 
@@ -188,7 +190,7 @@ private:
     Buffer m_data{};
     TokenSpan m_tokens{};
     TagSpan m_tags{};
-    int32_t m_size;
+    int32_t m_size{};
 
     std::array<Scope, MaxGroupDepth> m_scopes{};
     int32_t m_scopeDepth{};
