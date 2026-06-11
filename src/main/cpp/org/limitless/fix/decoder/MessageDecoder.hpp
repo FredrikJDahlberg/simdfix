@@ -10,11 +10,9 @@
 #include <span>
 #include <expected>
 #include <utility>
-#include <ranges>
 
+#include "org/limitless/fix/DecoderTypes.hpp"
 #include "org/limitless/fix/decoder/FieldDecoder.hpp"
-#include "org/limitless/fix/decoder/DecoderTypes.hpp"
-#include "org/limitless/fix/utils/Utils.hpp"
 
 namespace org::limitless::fix::decoder {
 
@@ -22,20 +20,20 @@ struct MessageDecoder
 {
     FieldDecoder m_decoder{};
 
-    utils::String m_sender{};
-    utils::String m_target{};
+    String m_sender{};
+    String m_target{};
     std::chrono::milliseconds m_sendingTime{};
     uint32_t m_sequenceNumber{};
     const SessionContext* m_context{};
 
     MessageDecoder() = default;
 
-    MessageDecoder(const utils::Buffer data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
+    MessageDecoder(const Buffer data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
       : m_decoder{data, tokens, tags, size}
     {
     }
 
-    void wrap(const utils::Buffer data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
+    void wrap(const Buffer data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
     {
         m_decoder.wrap(data, tokens, tags, size);
     }

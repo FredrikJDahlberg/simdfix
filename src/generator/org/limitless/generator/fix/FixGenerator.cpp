@@ -131,7 +131,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     }
     out << "#ifndef SIMD_FIX_MESSAGE_HANDLER_HPP\n";
     out << "#define SIMD_FIX_MESSAGE_HANDLER_HPP\n\n";
-    out << "#include \"org/limitless/fix/decoder/Result.hpp\"\n";
+    out << "#include \"org/limitless/fix/DecoderTypes.hpp\"\n";
     out << "#include \"org/limitless/fix/messages/FixMessageDecoders.hpp\"\n\n";
     out << "namespace org::limitless::fix::messages {\n\n";
     out << "using decoder::Result;\n\n";

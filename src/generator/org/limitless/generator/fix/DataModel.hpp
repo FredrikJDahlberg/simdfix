@@ -10,7 +10,7 @@
 
 #include "pugixml.hpp"
 
-#include "org/limitless/fix/decoder/DecoderTypes.hpp"
+#include "../../../../../main/cpp/org/limitless/fix/DecoderTypes.hpp"
 
 namespace org::limitless::generator::fix {
 

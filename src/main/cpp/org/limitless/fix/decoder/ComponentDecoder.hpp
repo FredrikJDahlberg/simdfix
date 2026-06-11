@@ -5,7 +5,7 @@
 #ifndef SIMD_FIX_STRUCT_DECODER_HPP
 #define SIMD_FIX_STRUCT_DECODER_HPP
 
-#include "org/limitless/fix/decoder/FieldDecoder.hpp"
+#include "FieldDecoder.hpp"
 
 namespace org::limitless::fix::decoder {
 

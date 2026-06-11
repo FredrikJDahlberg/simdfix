@@ -7,14 +7,10 @@
 
 #include <cstdint>
 #include <string_view>
-#include <ranges>
 #include <chrono>
+#include <span>
 
 namespace org::limitless::fix::utils {
-
-// using String = std::span<const uint8_t>;
-using String = std::string_view;
-using Buffer = std::span<const uint8_t>;
 
 inline void print(const uint32_t length, const uint8_t* buffer)
 {

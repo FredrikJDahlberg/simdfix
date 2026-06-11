@@ -9,8 +9,17 @@
 #include <cstdint>
 #include <span>
 #include <string_view>
+#include <expected>
+#include <chrono>
 
 namespace org::limitless::fix::decoder {
+
+struct Token
+{
+    uint16_t m_position;
+    uint16_t m_tag;
+    uint16_t m_length;
+};
 
 struct Category
 {
@@ -156,6 +165,100 @@ struct Presence
 
     Values m_value;
 };
+
+struct Result
+{
+    enum Values
+    {
+        Success,
+        MessageFragment,
+        InvalidBeginString,
+        InvalidCheckSumTag,
+        InvalidBodyLengthTag,
+        InvalidBodyLength,
+        InvalidCheckSum,
+        InvalidTargetCompTag,
+        InvalidTargetCompId,
+        InvalidSenderCompTag,
+        InvalidSenderCompId,
+        InvalidSequenceNumber,
+        InvalidMessageTypeTag,
+        InvalidMessageType,
+        InvalidSendingTime,
+        RequiredFieldMissing,
+        InvalidLength,
+        NullValue
+    };
+
+    uint32_t m_processed;
+    Values m_value;
+
+    constexpr Result() : m_value{Success} {}
+
+    explicit constexpr Result(const Values value) : m_value{value} {}
+
+    explicit constexpr Result(const std::string_view name) : m_value{Success}
+    {
+        for (int i = 0; i < 7; ++i)
+        {
+            if (Names[i] == name)
+            {
+                m_value = static_cast<Values>(i);
+                return;
+            }
+        }
+    }
+
+    constexpr Result(const uint32_t processed, const Values value) : m_processed{processed}, m_value{value}
+    {
+    }
+
+    [[nodiscard]] constexpr std::string_view name() const
+    {
+        return Names[m_value];
+    }
+
+    constexpr bool operator==(const Values value) const
+    {
+        return m_value == value;
+    }
+
+    constexpr bool operator!=(const Values value) const
+    {
+        return m_value != value;
+    }
+
+    static constexpr std::string_view Names[] = {
+        "Success",
+        "MessageFragment",
+        "InvalidBeginString",
+        "InvalidCheckSumTag",
+        "InvalidBodyLengthTag",
+        "InvalidBodyLength",
+        "InvalidCheckSum",
+        "InvalidTargetCompTag",
+        "InvalidTargetCompId",
+        "InvalidSenderCompTag",
+        "InvalidSenderCompId",
+        "InvalidSequenceNumber",
+        "InvalidMessageTypeTag",
+        "InvalidMessageType",
+        "InvalidSendingTime",
+        "RequiredFieldMissing",
+        "InvalidLength",
+        "NullValue"
+    };
+};
+
+using String = std::string_view;
+using Buffer = std::span<const uint8_t>;
+using Uint8Result = std::expected<uint8_t, Result::Values>;
+using StringResult = std::expected<String, Result::Values>;
+using Int32Result = std::expected<int32_t, Result::Values>;
+using Uint32Result = std::expected<uint32_t, Result::Values>;
+using Int64Result = std::expected<int64_t, Result::Values>;
+using Uint64Result = std::expected<uint64_t, Result::Values>;
+using TimestampResult = std::expected<std::chrono::milliseconds, Result::Values>;
 
 }
 

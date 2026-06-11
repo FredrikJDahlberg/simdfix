@@ -10,9 +10,7 @@
 #include <span>
 #include <chrono>
 
-#include "org/limitless/fix/decoder/DecoderTypes.hpp"
-#include "org/limitless/fix/decoder/Result.hpp"
-#include "org/limitless/fix/decoder/Token.hpp"
+#include "org/limitless/fix/DecoderTypes.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
@@ -20,17 +18,8 @@ namespace org::limitless::fix::decoder {
 
 struct FieldDecoder
 {
-    using Buffer = std::span<const uint8_t>;
     using TokenSpan = std::span<Token>;
     using TagSpan = std::span<uint16_t>;
-    using Uint8Result = std::expected<uint8_t, Result::Values>;
-    //using StringResult = std::expected<utils::String, Result::Values>;
-    using StringResult = std::expected<utils::String, Result::Values>;
-    using Int32Result = std::expected<int32_t, Result::Values>;
-    using Uint32Result = std::expected<uint32_t, Result::Values>;
-    using Int64Result = std::expected<int64_t, Result::Values>;
-    using Uint64Result = std::expected<uint64_t, Result::Values>;
-    using TimestampResult = std::expected<std::chrono::milliseconds, Result::Values>;
 
     static constexpr int32_t MaxGroupDepth = 8; // FIXME: verify in processor
 

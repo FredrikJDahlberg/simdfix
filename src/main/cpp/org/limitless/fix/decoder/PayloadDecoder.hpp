@@ -10,8 +10,7 @@
 #include <cstring>
 #include <span>
 
-#include "org/limitless/fix/decoder/Result.hpp"
-#include "org/limitless/fix/decoder/Token.hpp"
+#include "org/limitless/fix/DecoderTypes.hpp"
 #include "org/limitless/fix/simd/Uint8x16.hpp"
 #include "org/limitless/fix/utils/BitSet64.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
@@ -72,7 +71,7 @@ public:
     }
 
     template <typename Handler>
-    Result parse(const utils::Buffer buffer, Handler& handler)
+    Result parse(const Buffer buffer, Handler& handler)
     {
         auto result = parse(buffer);
         if (result.m_value != Result::Success)
@@ -85,7 +84,7 @@ public:
         return result;
     }
 
-    Result parse(const utils::Buffer buffer)
+    Result parse(const Buffer buffer)
     {
         using simd::Uint8x16;
         if (buffer.size() < MessageFragmentLimit)
@@ -307,7 +306,7 @@ private:
         return Result::Success;
     }
 
-    void processTrailer(const position_t offset, const utils::Buffer buffer)
+    void processTrailer(const position_t offset, const Buffer buffer)
     {
 #if !defined(NDEBUG)
         utils::print(buffer.size() % 16, buffer.data() + offset);

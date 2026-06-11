@@ -138,7 +138,7 @@ TEST(MessageDecoder, HopGroup1)
             EXPECT_EQ(2UL, count);
             group.next();
             {
-                const auto v = group.hopCompID().value_or(utils::String{});
+                const auto v = group.hopCompID().value_or(String{});
                 EXPECT_EQ(std::string{"12"}, std::string(v.data(), v.size()));
             }
             EXPECT_EQ(0UL, group.hopRefID().value_or(0));
