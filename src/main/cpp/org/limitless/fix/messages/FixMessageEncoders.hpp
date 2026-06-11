@@ -3,9 +3,9 @@
 
 #include <expected>
 
-// #include "org/limitless/fix/decoder/GroupDecoder.hpp"
-// #include "org/limitless/fix/decoder/ComponentDecoder.hpp"
-// #include "org/limitless/fix/decoder/MessageDecoder.hpp"
+#include "org/limitless/fix/decoder/GroupEncoder.hpp"
+#include "org/limitless/fix/decoder/ComponentEncoder.hpp"
+#include "org/limitless/fix/decoder/MessageEncoder.hpp"
 
 namespace org::limitless::fix::messages {
 
@@ -17,6 +17,24 @@ struct NestedGroupEncoder : GroupEncoder
     explicit NestedGroupEncoder(FieldEncoder& encoder) : 
         GroupEncoder{encoder}
     {
+    }
+
+    std::string_view& name(const char& value)
+    {
+        m_encoder.setString<501, false, ParentType::Group>(value);
+        return *this;
+    }
+
+    std::uint32_t& nestedOne(const uint32& value)
+    {
+        m_encoder.setUint32<601, false, ParentType::Group>(value);
+        return *this;
+    }
+
+    std::uint32_t& nestedTwo(const uint32& value)
+    {
+        m_encoder.setUint32<602, false, ParentType::Group>(value);
+        return *this;
     }
 
 };
@@ -31,6 +49,29 @@ public:
         GroupEncoder{encoder},
         m_nestedGroup{encoder}
     {
+    }
+
+    std::string_view& hopCompID(const char& value)
+    {
+        m_encoder.setString<628, false, ParentType::Group>(value);
+        return *this;
+    }
+
+    std::chrono::milliseconds& hopSendingTime(const timestamp& value)
+    {
+        m_encoder.setTimestamp<629, false, ParentType::Group>(value);
+        return *this;
+    }
+
+    std::uint32_t& hopRefID(const uint32& value)
+    {
+        m_encoder.setUint32<630, false, ParentType::Group>(value);
+        return *this;
+    }
+
+    NestedGroupEncoder& nestedGroup()
+    {
+        return m_nestedGroup.wrap();
     }
 
 };
@@ -48,6 +89,47 @@ public:
 
     static constexpr uint16_t MessageId = 'A';
 
+    std::string_view& sender(const string& value)
+    {
+        m_encoder.setString<49, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::string_view& target(const string& value)
+    {
+        m_encoder.setString<56, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::uint32_t& sequenceNumber(const uint32& value)
+    {
+        m_encoder.setUint32<34, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::chrono::milliseconds& sendingTime(const timestamp& value)
+    {
+        m_encoder.setTimestamp<52, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    Encryption& encryptMethod(const Encryption& value)
+    {
+        m_encoder.setEnum<98, false, Encryption, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::uint32_t& heartbeatInterval(const uint32& value)
+    {
+        m_encoder.setUint32<108, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    HopsEncoder& hops()
+    {
+        return m_hops.wrap();
+    }
+
 };
 
 struct LogoutEncoder : MessageEncoder
@@ -62,6 +144,41 @@ public:
     }
 
     static constexpr uint16_t MessageId = '5';
+
+    std::string_view& sender(const string& value)
+    {
+        m_encoder.setString<49, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::string_view& target(const string& value)
+    {
+        m_encoder.setString<56, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::uint32_t& sequenceNumber(const uint32& value)
+    {
+        m_encoder.setUint32<34, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::chrono::milliseconds& sendingTime(const timestamp& value)
+    {
+        m_encoder.setTimestamp<52, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::string_view& text(const char& value)
+    {
+        m_encoder.setString<58, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    HopsEncoder& hops()
+    {
+        return m_hops.wrap();
+    }
 
 };
 
@@ -78,6 +195,41 @@ public:
 
     static constexpr uint16_t MessageId = '0';
 
+    std::string_view& sender(const string& value)
+    {
+        m_encoder.setString<49, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::string_view& target(const string& value)
+    {
+        m_encoder.setString<56, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::uint32_t& sequenceNumber(const uint32& value)
+    {
+        m_encoder.setUint32<34, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::chrono::milliseconds& sendingTime(const timestamp& value)
+    {
+        m_encoder.setTimestamp<52, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::string_view& testReqID(const char& value)
+    {
+        m_encoder.setString<112, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    HopsEncoder& hops()
+    {
+        return m_hops.wrap();
+    }
+
 };
 
 struct TestRequestEncoder : MessageEncoder
@@ -92,6 +244,41 @@ public:
     }
 
     static constexpr uint16_t MessageId = '1';
+
+    std::string_view& sender(const string& value)
+    {
+        m_encoder.setString<49, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::string_view& target(const string& value)
+    {
+        m_encoder.setString<56, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::uint32_t& sequenceNumber(const uint32& value)
+    {
+        m_encoder.setUint32<34, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::chrono::milliseconds& sendingTime(const timestamp& value)
+    {
+        m_encoder.setTimestamp<52, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::string_view& testReqID(const char& value)
+    {
+        m_encoder.setString<112, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    HopsEncoder& hops()
+    {
+        return m_hops.wrap();
+    }
 
 };
 

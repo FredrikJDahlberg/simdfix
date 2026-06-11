@@ -7,7 +7,7 @@
 
 #include "org/limitless/fix/encoder/FieldEncoder.hpp"
 
-namespace org::limitless::fix::messages::encoder {
+namespace org::limitless::fix::encoder {
 
 struct MessageEncoder
 {

@@ -18,9 +18,6 @@ namespace org::limitless::fix::decoder {
 
 struct FieldDecoder
 {
-    using TokenSpan = std::span<Token>;
-    using TagSpan = std::span<uint16_t>;
-
     static constexpr int32_t MaxGroupDepth = 8; // FIXME: verify in processor
 
     FieldDecoder() = default;

@@ -259,6 +259,8 @@ using Uint32Result = std::expected<uint32_t, Result::Values>;
 using Int64Result = std::expected<int64_t, Result::Values>;
 using Uint64Result = std::expected<uint64_t, Result::Values>;
 using TimestampResult = std::expected<std::chrono::milliseconds, Result::Values>;
+using TokenSpan = std::span<Token>;
+using TagSpan = std::span<uint16_t>;
 
 }
 

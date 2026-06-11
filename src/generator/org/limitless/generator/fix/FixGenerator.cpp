@@ -122,15 +122,15 @@ static void generateEncoders(const std::string& fileName,
         std::println("Encoder/Error: could not open '{}' for writing", fileName);
         return;
     }
-
+gi
     out << "#ifndef SIMD_FIX_MESSAGE_ENCODERS_HPP\n";
     out << "#define SIMD_FIX_MESSAGE_ENCODERS_HPP\n\n";
     out << "#include <expected>\n\n";
-    out << "// #include \"org/limitless/fix/decoder/GroupDecoder.hpp\"\n";
-    out << "// #include \"org/limitless/fix/decoder/ComponentDecoder.hpp\"\n";
-    out << "// #include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n\n";
+    out << "#include \"org/limitless/fix/decoder/GroupEncoder.hpp\"\n";
+    out << "#include \"org/limitless/fix/decoder/ComponentEncoder.hpp\"\n";
+    out << "#include \"org/limitless/fix/decoder/MessageEncoder.hpp\"\n\n";
     out << "namespace org::limitless::fix::messages {\n\n";
-    out << "// using namespace org::limitless::fix::encoder;\n\n";
+    out << "using namespace org::limitless::fix::encoder;\n\n";
     for (const auto& type: enums)
     {
         // generateEnumDecoders(out, value);
@@ -139,9 +139,8 @@ static void generateEncoders(const std::string& fileName,
     for (auto& record: records)
     {
         generateRecordEncoders(out, record);
-        // out << std::format("    // {}\n", record.m_name);
     }
-    out << "} // namespace org::limitless::fix::messages\n\n";
+    out << "} // namespace org::limitless::fix::encoder\n\n";
     out << "#endif //SIMD_FIX_MESSAGE_ENCODERS_HPP\n";
 
     out.close();
@@ -347,6 +346,42 @@ static void generateGetters(std::ostream& out, const Record& record)
     }
 }
 
+static void generateSetters(std::ostream& out, const Record& record)
+{
+    auto parent = record.m_parent.name();
+    for (const auto& field: record.m_fields)
+    {
+        auto methodName = field.m_name;
+        methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
+        auto category = field.m_category;
+        if (field.m_category != Category::Counter && field.m_category != Category::Struct)
+        {
+            const auto isEnum = field.m_category == Category::Enum;
+            const auto mandatory = std::string{field.m_presence.m_value == Presence::Required ? "true" : "false"};
+            out << std::format("    {}& {}(const {}& value)\n",
+                               isEnum ? field.m_type : category.type(), methodName, field.m_type);
+            out << "    {\n";
+            std::string arg = isEnum ? std::format(", {}", field.m_type) : "";
+            out << std::format("        m_encoder.set{}<{}, {}{}, ParentType::{}>(value);\n",
+                               category.name(), field.m_tag, mandatory, arg, parent);
+            out << "        return *this;\n";
+            out << "    }\n\n";
+        }
+    }
+    for (const auto& comp: record.m_records)
+    {
+        auto fieldName = uncap(comp.m_name);
+        out << std::format("    {}Encoder& {}()\n    {{\n", comp.m_type, fieldName);
+        out << std::format("        return m_{}", fieldName);
+        if (comp.m_tag != 0)
+        {
+            out << std::format(".wrap()");
+        }
+        out << ";\n";
+        out << std::format("    }}\n\n");
+    }
+}
+
 static void generateRecordDecoders(std::ostream& out, const Record& record)
 {
     out << std::format("struct {}Decoder : ", record.m_name);
@@ -375,6 +410,6 @@ static void generateRecordEncoders(std::ostream& out, const Record& record)
         out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
     }
     // generateWrapNext(out, record);
-    // generateGetters(out, record);
+    generateSetters(out, record);
     out << "};\n\n";
 }
