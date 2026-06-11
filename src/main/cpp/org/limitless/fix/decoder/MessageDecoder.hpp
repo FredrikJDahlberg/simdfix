@@ -5,12 +5,15 @@
 #ifndef SIMD_FIX_MESSAGE_DECODER_HPP
 #define SIMD_FIX_MESSAGE_DECODER_HPP
 
+#include <algorithm>
 #include <chrono>
 #include <span>
 #include <expected>
+#include <utility>
+#include <ranges>
 
 #include "org/limitless/fix/decoder/FieldDecoder.hpp"
-
+#include "org/limitless/fix/decoder/DecoderTypes.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
 namespace org::limitless::fix::decoder {
@@ -19,19 +22,20 @@ struct MessageDecoder
 {
     FieldDecoder m_decoder{};
 
-    utils::String m_sender{};           // FIXME: configuration and verification
-    utils::String m_target{};           // FIXME: configuration and verification
+    utils::String m_sender{};
+    utils::String m_target{};
     std::chrono::milliseconds m_sendingTime{};
     uint32_t m_sequenceNumber{};
+    const SessionContext* m_context{};
 
     MessageDecoder() = default;
 
-    MessageDecoder(const utils::String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
+    MessageDecoder(const utils::Buffer data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
       : m_decoder{data, tokens, tags, size}
     {
     }
 
-    void wrap(const utils::String data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
+    void wrap(const utils::Buffer data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
     {
         m_decoder.wrap(data, tokens, tags, size);
     }
@@ -53,6 +57,22 @@ struct MessageDecoder
         if (const auto sender = m_decoder.getString<49, true, ParentType::Component>())
         {
             m_sender = sender.value();
+            if (m_context)
+
+                if (m_context != nullptr && !m_context->m_expectedSenderCompId.empty()
+                    && !std::ranges::equal(std::as_const(m_sender),
+                                           std::as_const(m_context->m_expectedSenderCompId)))
+                {
+                    return Result::InvalidSenderCompId;
+                }
+
+            if (m_context)
+
+                if (m_context != nullptr && !m_context->m_expectedSenderCompId.empty()
+                    && !std::ranges::equal(m_sender, m_context->m_expectedSenderCompId))
+                {
+                    return Result::InvalidSenderCompId;
+                }
         }
         else
         {
@@ -61,6 +81,11 @@ struct MessageDecoder
         if (const auto target = m_decoder.getString<56, true, ParentType::Component>())
         {
             m_target = target.value();
+            if (m_context != nullptr && !m_context->m_expectedTargetCompId.empty()
+                && !std::ranges::equal(m_target, m_context->m_expectedTargetCompId))
+            {
+                return Result::InvalidTargetCompId;
+            }
         }
         else
         {

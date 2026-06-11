@@ -6,6 +6,8 @@
 #define SIMD_FIX_DICTIONARY_HPP
 
 #include <algorithm>
+#include <cstdint>
+#include <span>
 #include <string_view>
 
 namespace org::limitless::fix::decoder {
@@ -56,7 +58,7 @@ struct Category
         "std::uint32_t",
         "std::int64_t",
         "std::uint64_t",
-        "std::span<const uint8_t>",
+        "std::string_view",
         "std::chrono::milliseconds",
         "std::uint32_t",
         "Struct",
@@ -95,6 +97,14 @@ struct Category
     }
 
     Values m_value;
+};
+
+// Per-session expectations checked by MessageDecoder::checkRequired.
+// Non-owning: the spans must remain valid for the lifetime of the session.
+struct SessionContext
+{
+    std::span<const uint8_t> m_expectedSenderCompId{}; // tag 49 of incoming messages, the counterparty's CompID
+    std::span<const uint8_t> m_expectedTargetCompId{}; // tag 56 of incoming messages, our own CompID
 };
 
 struct ParentType

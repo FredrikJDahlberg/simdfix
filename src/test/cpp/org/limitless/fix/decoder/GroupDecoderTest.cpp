@@ -13,14 +13,7 @@ namespace org::limitless::fix::decoder {
 
 #define SOH "\x01"
 
-namespace {
-
-std::string toString(const std::span<const uint8_t> span)
-{
-    return std::string(reinterpret_cast<const char*>(span.data()), span.size());
-}
-
-}
+static constexpr auto Empty = std::string_view{};
 
 // Group: NoHops(627)=2, repeats of HopSendingTime(629)/HopCompID(628)
 TEST(GroupDecoder, ScopesFieldLookupToCurrentRepeat)
@@ -49,18 +42,18 @@ TEST(GroupDecoder, ScopesFieldLookupToCurrentRepeat)
     group.next();
     {
         const auto sendingTime = field.getUint32<629, false, ParentType::Group>().value_or(0);
-        const auto compID = field.getString<628, false, ParentType::Group>().value_or(std::span<const uint8_t>{});
+        const auto compID = field.getString<628, false, ParentType::Group>().value_or(Empty);
         EXPECT_EQ(10u, sendingTime);
-        EXPECT_EQ("12", toString(compID));
+        EXPECT_EQ("12", compID);
     }
 
     ASSERT_TRUE(group.hasNext());
     group.next();
     {
         const auto sendingTime = field.getUint32<629, false, ParentType::Group>().value_or(0);
-        const auto compID = field.getString<628, false, ParentType::Group>().value_or(std::span<const uint8_t>{});
+        const auto compID = field.getString<628, false, ParentType::Group>().value_or(Empty);
         EXPECT_EQ(37u, sendingTime);
-        EXPECT_EQ("20", toString(compID));
+        EXPECT_EQ("20", compID);
     }
 
     EXPECT_FALSE(group.hasNext());
@@ -105,18 +98,18 @@ TEST(GroupDecoder, RewrapWithoutClearDoesNotLeakScopeDepth)
         group.next();
         {
             const auto sendingTime = field.getUint32<629, false, ParentType::Group>().value_or(0);
-            const auto compID = field.getString<628, false, ParentType::Group>().value_or(std::span<const uint8_t>{});
+            const auto compID = field.getString<628, false, ParentType::Group>().value_or(Empty);
             EXPECT_EQ(10u, sendingTime);
-            EXPECT_EQ("12", toString(compID));
+            EXPECT_EQ("12", compID);
         }
 
         ASSERT_TRUE(group.hasNext());
         group.next();
         {
             const auto sendingTime = field.getUint32<629, false, ParentType::Group>().value_or(0);
-            const auto compID = field.getString<628, false, ParentType::Group>().value_or(std::span<const uint8_t>{});
+            const auto compID = field.getString<628, false, ParentType::Group>().value_or(Empty);
             EXPECT_EQ(37u, sendingTime);
-            EXPECT_EQ("20", toString(compID));
+            EXPECT_EQ("20", compID);
         }
 
         EXPECT_FALSE(group.hasNext());

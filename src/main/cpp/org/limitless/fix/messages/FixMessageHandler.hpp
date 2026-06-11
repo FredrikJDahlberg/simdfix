@@ -23,6 +23,14 @@ public:
         return static_cast<Handler*>(this)->handle(std::forward<Event>(event));
     }
 
+    void setSessionContext(const decoder::SessionContext& context)
+    {
+        m_logon.m_context = &context;
+        m_logout.m_context = &context;
+        m_heartbeat.m_context = &context;
+        m_testRequest.m_context = &context;
+    }
+
     Result::Values handle(const std::span<const uint8_t> data,
                           const std::span<Token> tokens,
                           const std::span<uint16_t> tags,

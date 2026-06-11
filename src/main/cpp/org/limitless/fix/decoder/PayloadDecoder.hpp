@@ -72,7 +72,7 @@ public:
     }
 
     template <typename Handler>
-    Result parse(const std::span<const uint8_t> buffer, Handler& handler)
+    Result parse(const utils::Buffer buffer, Handler& handler)
     {
         auto result = parse(buffer);
         if (result.m_value != Result::Success)
@@ -85,7 +85,7 @@ public:
         return result;
     }
 
-    Result parse(const std::span<const data_t> buffer)
+    Result parse(const utils::Buffer buffer)
     {
         using simd::Uint8x16;
         if (buffer.size() < MessageFragmentLimit)
@@ -304,7 +304,7 @@ private:
         return Result::Success;
     }
 
-    void processTrailer(const position_t offset, const std::span<const uint8_t> buffer)
+    void processTrailer(const position_t offset, const utils::Buffer buffer)
     {
 #if !defined(NDEBUG)
         utils::print(buffer.size() % 16, buffer.data() + offset);

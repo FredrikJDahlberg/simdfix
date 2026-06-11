@@ -11,8 +11,6 @@ namespace org::limitless::fix::messages {
 
 using namespace org::limitless::fix::decoder;
 
-using String = std::span<const uint8_t>;
-
 struct Encryption
 {
     enum Values
@@ -48,7 +46,7 @@ struct NestedGroupDecoder :GroupDecoder
         return *this;
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> name() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> name() const
     {
         return m_decoder.getString<501, false, ParentType::Group>();
     }
@@ -89,7 +87,7 @@ public:
         return *this;
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> hopCompID() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> hopCompID() const
     {
         return m_decoder.getString<628, false, ParentType::Group>();
     }
@@ -133,12 +131,12 @@ public:
         return *this;
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
         return m_decoder.getString<49, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
         return m_decoder.getString<56, false, ParentType::Message>();
     }
@@ -192,12 +190,12 @@ public:
         return *this;
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
         return m_decoder.getString<49, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
         return m_decoder.getString<56, false, ParentType::Message>();
     }
@@ -212,7 +210,7 @@ public:
         return m_decoder.getTimestamp<52, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> text() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
     {
         return m_decoder.getString<58, false, ParentType::Message>();
     }
@@ -246,12 +244,12 @@ public:
         return *this;
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
         return m_decoder.getString<49, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
         return m_decoder.getString<56, false, ParentType::Message>();
     }
@@ -266,7 +264,7 @@ public:
         return m_decoder.getTimestamp<52, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> testReqID() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> testReqID() const
     {
         return m_decoder.getString<112, false, ParentType::Message>();
     }
@@ -300,12 +298,12 @@ public:
         return *this;
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
         return m_decoder.getString<49, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
         return m_decoder.getString<56, false, ParentType::Message>();
     }
@@ -320,7 +318,7 @@ public:
         return m_decoder.getTimestamp<52, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::span<const uint8_t>, Result::Values> testReqID() const
+    [[nodiscard]] std::expected<std::string_view, Result::Values> testReqID() const
     {
         return m_decoder.getString<112, false, ParentType::Message>();
     }

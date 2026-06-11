@@ -22,8 +22,8 @@
         <field name="BodyLength" tag="9" primitiveType="uint32"/>
         <field name="MsgType" tag="35" primitiveType="uint8"/>
         -->
-        <field name="Sender" tag="49" primitiveType="char" length="8"/>
-        <field name="Target" tag="56" primitiveType="char" length="8"/>
+        <field name="Sender" tag="49" primitiveType="string" length="8"/>
+        <field name="Target" tag="56" primitiveType="string" length="8"/>
         <field name="SequenceNumber" tag="34" primitiveType="uint32"/>
         <field name="SendingTime" tag="52" primitiveType="timestamp"/>
         <group name="Hops" tag="627" counter="NoHops" presence="optional" primitiveType="uint32">

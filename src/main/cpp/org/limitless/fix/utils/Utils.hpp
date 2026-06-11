@@ -12,7 +12,9 @@
 
 namespace org::limitless::fix::utils {
 
-using String = std::span<const uint8_t>;
+// using String = std::span<const uint8_t>;
+using String = std::string_view;
+using Buffer = std::span<const uint8_t>;
 
 inline void print(const uint32_t length, const uint8_t* buffer)
 {

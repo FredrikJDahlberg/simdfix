@@ -24,6 +24,7 @@ struct FieldDecoder
     using TokenSpan = std::span<Token>;
     using TagSpan = std::span<uint16_t>;
     using Uint8Result = std::expected<uint8_t, Result::Values>;
+    //using StringResult = std::expected<utils::String, Result::Values>;
     using StringResult = std::expected<utils::String, Result::Values>;
     using Int32Result = std::expected<int32_t, Result::Values>;
     using Uint32Result = std::expected<uint32_t, Result::Values>;
@@ -40,7 +41,7 @@ struct FieldDecoder
     {
     }
 
-    void wrap(const utils::String data,
+    void wrap(const Buffer data,
               const std::span<Token> tokens,
               const std::span<uint16_t> tags,
               const int32_t size)
@@ -92,6 +93,7 @@ struct FieldDecoder
         return static_cast<int32_t>(token - m_tokens.data());
     }
 
+
     [[nodiscard]] uint8_t byteAt(const int32_t position) const
     {
         return m_data[position];
@@ -140,7 +142,8 @@ struct FieldDecoder
         if (index >= 0)
         {
             const auto& token = m_tokens[index];
-            return m_data.subspan(token.m_position, token.m_length);
+            auto subspan = m_data.subspan(token.m_position, token.m_length);
+            return std::string_view{reinterpret_cast<const char*>(subspan.data()), subspan.size()};
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }

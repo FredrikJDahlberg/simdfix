@@ -138,16 +138,16 @@ TEST(MessageDecoder, HopGroup1)
             EXPECT_EQ(2UL, count);
             group.next();
             {
-                const auto v = group.hopCompID().value_or(std::span<const uint8_t>{});
-                EXPECT_EQ(std::string("12"), std::string(reinterpret_cast<const char*>(v.data()), v.size()));
+                const auto v = group.hopCompID().value_or(utils::String{});
+                EXPECT_EQ(std::string{"12"}, std::string(v.data(), v.size()));
             }
             EXPECT_EQ(0UL, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
             EXPECT_EQ(0UL, group.hopRefID().value_or(0));
             {
-                const auto v = group.hopCompID().value_or(std::span<const uint8_t>{});
-                EXPECT_EQ(std::string("20"), std::string(reinterpret_cast<const char*>(v.data()), v.size()));
+                const auto v = group.hopCompID().value_or(std::string{});
+                EXPECT_EQ(std::string{"20"}, std::string(v.data(), v.size()));
             }
             EXPECT_FALSE(group.hasNext());
             return Result::Success;
@@ -184,8 +184,8 @@ TEST(MessageDecoder, HopGroup2)
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2UL, count);
             group.next();
-            std::span<const uint8_t> empty{};
-            EXPECT_EQ("", toString(group.hopCompID().value_or(empty)));
+            std::string empty{};
+            EXPECT_EQ(empty, group.hopCompID().value_or(empty));
             EXPECT_EQ(0UL, group.hopRefID().value_or(0));
             EXPECT_TRUE(group.hasNext());
             group.next();
@@ -217,14 +217,15 @@ TEST(MessageDecoder, HopGroup3)
             std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2UL, count);
             group.next();
-            EXPECT_EQ("", toString(group.hopCompID().value_or(std::span<const uint8_t>{})));
+            std::string empty{};
+            EXPECT_EQ(empty, group.hopCompID().value_or(empty));
             EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:14.000")),
                       group.hopSendingTime().value_or(std::chrono::milliseconds{0}));
             EXPECT_TRUE(group.hasNext());
             group.next();
             EXPECT_EQ(utils::dateTimeToEpochUTC(std::string_view("20260609-12:13:15.000")),
                       group.hopSendingTime().value_or(std::chrono::milliseconds{0}));
-            EXPECT_EQ("", toString(group.hopCompID().value_or(std::span<const uint8_t>({}))));
+            EXPECT_EQ(empty, group.hopCompID().value_or(empty));
             EXPECT_FALSE(group.hasNext());
             return Result::Success;
         }
@@ -316,5 +317,3 @@ TEST(MessageDecoder, InvalidMandatoryFields)
 }
 
 }
-
-

@@ -88,7 +88,6 @@ static void generateDecoders(const std::string& fileName,
     out << "#include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n\n";
     out << "namespace org::limitless::fix::messages {\n\n";
     out << "using namespace org::limitless::fix::decoder;\n\n";
-    out << "using String = std::span<const uint8_t>;\n\n";
     for (const auto& value: enums)
     {
         generateEnum(out, value);
@@ -147,6 +146,13 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "    Result::Values receive(Event&& event)\n";
     out << "    {\n";
     out << "        return static_cast<Handler*>(this)->handle(std::forward<Event>(event));\n";
+    out << "    }\n\n";
+    out << "    void setSessionContext(const decoder::SessionContext& context)\n";
+    out << "    {\n";
+    for (auto& message: messages)
+    {
+        out << std::format("        m_{}.m_context = &context;\n", uncap(message.m_name));
+    }
     out << "    }\n\n";
     out << "    Result::Values handle(const std::span<const uint8_t> data,\n";
     out << "                          const std::span<Token> tokens,\n";

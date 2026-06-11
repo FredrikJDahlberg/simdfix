@@ -105,8 +105,8 @@ struct LogonGetterHandler : org::limitless::fix::messages::MessageHandler<LogonG
     {
         using org::limitless::fix::messages::Encryption;
 
-        const auto sender = logon.sender().value_or(std::span<const uint8_t>{});
-        const auto target = logon.target().value_or(std::span<const uint8_t>{});
+        const auto sender = logon.sender().value_or(std::string_view{});
+        const auto target = logon.target().value_or(std::string_view{});
         sink += sender.size();
         sink += target.size();
         sink += logon.sequenceNumber().value_or(0);
@@ -130,8 +130,8 @@ struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<L
     {
         using org::limitless::fix::messages::Encryption;
 
-        const auto sender = logon.sender().value_or(std::span<const uint8_t>{});
-        const auto target = logon.target().value_or(std::span<const uint8_t>{});
+        const auto sender = logon.sender().value_or(std::string_view{});
+        const auto target = logon.target().value_or(std::string_view{});
         sink += sender.size();
         sink += target.size();
         sink += logon.sequenceNumber().value_or(0);
@@ -144,7 +144,7 @@ struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<L
         while (hops.hasNext())
         {
             hops.next();
-            sink += hops.hopCompID().value_or(std::span<const uint8_t>{}).size();
+            sink += hops.hopCompID().value_or(std::string_view{}).size();
             sink += static_cast<uint64_t>(hops.hopSendingTime().value_or(std::chrono::milliseconds{0}).count());
         }
         return org::limitless::fix::decoder::Result::Success;

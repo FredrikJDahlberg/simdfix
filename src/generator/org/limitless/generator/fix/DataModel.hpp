@@ -99,6 +99,7 @@ struct DataModel
         m_types.try_emplace("int64",  "int32",  4, 1, Category::Int64);
         m_types.try_emplace("uint64", "uint32", 4, 1, Category::Uint64);
         m_types.try_emplace("timestamp", "std::chrono::millis", 8, 1, Category::Timestamp);
+        m_types.try_emplace("string", "std::string_view", 1, 1, Category::String);
         for (auto typeNode : types)
         {
             const auto name = std::string{typeNode.attribute("name").as_string()};

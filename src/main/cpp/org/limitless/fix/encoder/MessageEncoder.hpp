@@ -1,0 +1,8 @@
+//
+// Created by Fredrik Dahlberg on 2026-06-11.
+//
+
+#ifndef SIMDFIX_MESSAGEENCODER_HPP
+#define SIMDFIX_MESSAGEENCODER_HPP
+
+#endif //SIMDFIX_MESSAGEENCODER_HPP
