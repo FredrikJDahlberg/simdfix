@@ -21,15 +21,19 @@ static void generateRecord(std::ostream& out, const Record& record);
 
 int main(int argc, char** argv)
 {
-    using namespace org::limitless::fix::decoder;
+    using namespace org::limitless::fix;
     using namespace org::limitless::generator::fix;
 
     pugi::xml_document doc;
     const auto result = doc.load_file(argv[1]);
-    if (!result)
+
+    std::println("{} {} {}", argc, argv[0], argv[1]);
+
+    if (argc != 3 || !result)
     {
         std::println("XML error: {}, dir = {}, file = {}", result.description(),
                      std::filesystem::current_path().c_str(), argv[1]);
+        std::println("Usage: generator <protocol file> <output director>");
         return 1;
     }
 
@@ -134,7 +138,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "#include \"org/limitless/fix/DecoderTypes.hpp\"\n";
     out << "#include \"org/limitless/fix/messages/FixMessageDecoders.hpp\"\n\n";
     out << "namespace org::limitless::fix::messages {\n\n";
-    out << "using decoder::Result;\n\n";
+    out << "using fix::Result;\n\n";
     out << "template <typename Handler>\n";
     out << "class MessageHandler\n{\n";
     for (auto& message: messages)
@@ -147,7 +151,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "    {\n";
     out << "        return static_cast<Handler*>(this)->handle(std::forward<Event>(event));\n";
     out << "    }\n\n";
-    out << "    void setSessionContext(const decoder::SessionContext& context)\n";
+    out << "    void setSessionContext(const SessionContext& context)\n";
     out << "    {\n";
     for (auto& message: messages)
     {

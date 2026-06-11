@@ -14,10 +14,9 @@
 
 namespace org::limitless::generator::fix {
 
-using namespace org::limitless::fix::decoder;
-
-using limitless::fix::decoder::Category;
-using limitless::fix::decoder::ParentType;
+using limitless::fix::Category;
+using limitless::fix::ParentType;
+using limitless::fix::Presence;
 
 struct Type
 {
