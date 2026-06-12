@@ -10,7 +10,7 @@
 
 #include "pugixml.hpp"
 
-#include "org/limitless/fix/DecoderTypes.hpp"
+#include "org/limitless/fix/CodecTypes.hpp"
 
 namespace org::limitless::generator::fix {
 

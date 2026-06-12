@@ -15,18 +15,18 @@ namespace org::limitless::fix::decoder {
  * FieldDecoder group scope for each entry so that getString/getUint32/...
  * with ParentType::Group resolve against the current entry only.
  */
-struct GroupDecoder
+class GroupDecoder
 {
-protected:
-    FieldDecoder& m_decoder;
-
+private:
     uint32_t m_count{};
     uint32_t m_repeat{};
     uint16_t m_delim{};
     uint32_t m_offset{};
 
-public:
+protected:
+    FieldDecoder& m_decoder;
 
+public:
     /**
      * @param decoder field decoder over the message containing this group
      */

@@ -22,6 +22,12 @@ inline void print(const uint32_t length, const uint8_t* buffer)
     std::printf("\n");
 }
 
+/**
+ * Scale int32 value by power of 10
+ * @param value
+ * @param power
+ * @return
+ */
 [[nodiscard]] inline uint32_t scale(const uint32_t value, const uint32_t power)
 {
     switch (power)
@@ -40,6 +46,12 @@ inline void print(const uint32_t length, const uint8_t* buffer)
     }
 }
 
+/**
+ * Scale int64_t value by power of 10
+ * @param value
+ * @param power
+ * @return
+ */
 [[nodiscard]] inline uint64_t scale(const uint64_t value, const uint32_t power)
 {
     switch (power)
@@ -68,16 +80,20 @@ inline void print(const uint32_t length, const uint8_t* buffer)
     }
 }
 
-//
-// See https://lemire.me/blog/2022/01/21/swar-explained-parsing-eight-digits/
-//
 inline constexpr uint64_t SwarMask = 0x000000FF000000FF;
 inline constexpr uint64_t SwarFactor1 = 0x000F424000000064; // 100 + (1000000ULL << 32)
 inline constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 32)
 
-// `digits` must have at least sizeof(uint64_t) readable bytes; bytes beyond
-// `length` are shifted out and do not affect the result.
-[[nodiscard]] inline uint32_t binaryToDecimal(const uint32_t value, const uint8_t* digits, const uint32_t length)
+/**
+ * FIXME
+ * See https://lemire.me/blog/2022/01/21/swar-explained-parsing-eight-digits/
+ * @param value
+ * @param digits must have at least sizeof(uint64_t) readable bytes; bytes beyond
+ *               are shifted out and do not affect the result.
+ * @param length
+ * @return uint32
+ */
+[[nodiscard]] inline uint32_t asciiToUin32(const uint32_t value, const uint8_t* digits, const uint32_t length)
 {
     uint64_t number = 0;
     if (length != 0)
@@ -92,8 +108,14 @@ inline constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 
 
 inline constexpr uint64_t AsciiZeros = 0x3030303030303030ULL;
 
-// digits,  must have at least sizeof(uint64_t) readable bytes; bytes beyond
-// length,  are shifted out and do not affect the result.
+/**
+ * FIXME
+ * @tparam CharType
+ * @param digits must have at least sizeof(uint64_t) readable bytes; bytes beyond
+ * @param length are shifted out and do not affect the result.
+ * @param padded
+ * @return
+ */
 template <typename CharType>
 [[nodiscard]] uint64_t asciiToUint64(const CharType* digits, const uint32_t length, const bool padded)
 {

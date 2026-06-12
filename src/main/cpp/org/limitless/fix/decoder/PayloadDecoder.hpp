@@ -10,7 +10,7 @@
 #include <cstring>
 #include <span>
 
-#include "org/limitless/fix/DecoderTypes.hpp"
+#include "org/limitless/fix/CodecTypes.hpp"
 #include "org/limitless/fix/simd/Uint8x16.hpp"
 #include "org/limitless/fix/utils/BitSet64.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
@@ -313,7 +313,7 @@ private:
                 value = m_tag;
                 m_tag = 0;
             }
-            token->m_tag = utils::binaryToDecimal(value, digit, count);
+            token->m_tag = utils::asciiToUin32(value, digit, count);
             token->m_position = offset + tagPos + count + 1;
             remainingDigitFlags >>= digitBits;
             nonTagBitPos += digitBits;
@@ -323,7 +323,7 @@ private:
         {
             const auto count = trailingCount >> 2;
             const auto digit = &digits[simd::Uint8x16::Size - count];
-            m_tag = utils::binaryToDecimal(0, digit, count);
+            m_tag = utils::asciiToUin32(0, digit, count);
             m_position = -count;
         }
         return m_tokens[m_count - 1].m_tag == 10;

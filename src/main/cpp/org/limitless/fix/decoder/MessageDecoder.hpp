@@ -11,7 +11,7 @@
 #include <expected>
 #include <utility>
 
-#include "org/limitless/fix/DecoderTypes.hpp"
+#include "org/limitless/fix/CodecTypes.hpp"
 #include "org/limitless/fix/decoder/FieldDecoder.hpp"
 
 namespace org::limitless::fix::decoder {
@@ -22,16 +22,20 @@ namespace org::limitless::fix::decoder {
  * header fields (SenderCompID, TargetCompID, MsgSeqNum, SendingTime) shared
  * by every message, validating them against an optional SessionContext.
  */
-struct MessageDecoder
+class MessageDecoder
 {
-    FieldDecoder m_decoder{};
-
+private:
     String m_sender{};
     String m_target{};
     std::chrono::milliseconds m_sendingTime{};
     uint32_t m_sequenceNumber{};
-    const SessionContext* m_context{};
 
+    SessionContext* m_context{};
+
+protected:
+    FieldDecoder m_decoder{};
+
+public:
     MessageDecoder() = default;
 
     /**
@@ -75,6 +79,15 @@ struct MessageDecoder
             type = type + m_decoder.byteAt(position + 1) * 256;
         }
         return type;
+    }
+
+    /**
+     *  Set session context
+     * @param context
+     */
+    void context(SessionContext& context)
+    {
+        m_context = &context;
     }
 
     /**

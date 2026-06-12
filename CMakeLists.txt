@@ -23,13 +23,11 @@ set(GENERATED_HEADERS
 set(FIX_HEADERS
         ${MAIN_PATH}/utils/Utils.hpp ${MAIN_PATH}/utils/BitSet64.hpp
         ${MAIN_PATH}/decoder/PayloadDecoder.hpp ${MAIN_PATH}/decoder/MessageDecoder.hpp
-        ${MAIN_PATH}/DecoderTypes.hpp ${MAIN_PATH}/decoder/FieldDecoder.hpp
-        ${MAIN_PATH}/decoder/ComponentDecoder.hpp ${MAIN_PATH}/decoder/GroupDecoder.hpp
-        ${MAIN_PATH}/simd/Uint8x16.hpp ${MAIN_PATH}/simd/LinearSearch.hpp
-        ${MAIN_PATH}/encoder/FieldEncoder.hpp ${MAIN_PATH}/encoder/PayloadEncoder.hpp
-        ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp
-        ${MAIN_PATH}/encoder/ComponentEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp
-        ${MAIN_PATH}/encoder/ComponentEncoder.hpp)
+        ${MAIN_PATH}/CodecTypes.hpp ${MAIN_PATH}/decoder/FieldDecoder.hpp
+        ${MAIN_PATH}/decoder/GroupDecoder.hpp ${MAIN_PATH}/simd/Uint8x16.hpp
+        ${MAIN_PATH}/simd/LinearSearch.hpp ${MAIN_PATH}/encoder/FieldEncoder.hpp
+        ${MAIN_PATH}/encoder/PayloadEncoder.hpp ${MAIN_PATH}/encoder/MessageEncoder.hpp
+        ${MAIN_PATH}/encoder/GroupEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp)
 add_library(SimdFix ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_sources(SimdFix INTERFACE ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_include_directories(SimdFix INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")

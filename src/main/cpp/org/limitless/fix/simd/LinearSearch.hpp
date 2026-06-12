@@ -34,6 +34,7 @@ namespace org::limitless::fix::simd {
     }
     return -1;
 }
+
 }
 
 #endif //SIMD_FIX_LINEAR_HPP

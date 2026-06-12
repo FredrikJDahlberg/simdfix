@@ -10,7 +10,7 @@
 #include <span>
 #include <chrono>
 
-#include "org/limitless/fix/DecoderTypes.hpp"
+#include "org/limitless/fix/CodecTypes.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
@@ -23,8 +23,9 @@ namespace org::limitless::fix::decoder {
  * typed field accessors, and repeating-group scope tracking. Non-owning:
  * all spans must remain valid for the lifetime of use.
  */
-struct FieldDecoder
+class FieldDecoder
 {
+public:
     FieldDecoder() = default;
 
     /**

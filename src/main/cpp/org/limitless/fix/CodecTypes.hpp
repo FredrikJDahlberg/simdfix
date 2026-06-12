@@ -172,6 +172,7 @@ struct Result
 {
     enum Values
     {
+        NullValue,
         Success,
         MessageFragment,
         InvalidBeginString,
@@ -188,8 +189,7 @@ struct Result
         InvalidMessageType,
         InvalidSendingTime,
         RequiredFieldMissing,
-        InvalidLength,
-        NullValue
+        InvalidLength
     };
 
     uint32_t m_processed;
@@ -198,18 +198,6 @@ struct Result
     constexpr Result() : m_value{Success} {}
 
     explicit constexpr Result(const Values value) : m_value{value} {}
-
-    explicit constexpr Result(const std::string_view name) : m_value{Success}
-    {
-        for (int i = 0; i < 7; ++i)
-        {
-            if (Names[i] == name)
-            {
-                m_value = static_cast<Values>(i);
-                return;
-            }
-        }
-    }
 
     constexpr Result(const uint32_t processed, const Values value) : m_processed{processed}, m_value{value}
     {
@@ -231,6 +219,7 @@ struct Result
     }
 
     static constexpr std::string_view Names[] = {
+        "NullValue"
         "Success",
         "MessageFragment",
         "InvalidBeginString",
@@ -247,9 +236,9 @@ struct Result
         "InvalidMessageType",
         "InvalidSendingTime",
         "RequiredFieldMissing",
-        "InvalidLength",
-        "NullValue"
+        "InvalidLength"
     };
+
 };
 
 using String = std::string_view;
