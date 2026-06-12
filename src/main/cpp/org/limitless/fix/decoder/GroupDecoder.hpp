@@ -9,6 +9,12 @@
 
 namespace org::limitless::fix::decoder {
 
+/**
+ * Iterates the repeating entries of a FIX repeating group. Wraps the
+ * NumInGroup count field, then advances entry-by-entry, pushing a
+ * FieldDecoder group scope for each entry so that getString/getUint32/...
+ * with ParentType::Group resolve against the current entry only.
+ */
 struct GroupDecoder
 {
 protected:
@@ -21,10 +27,21 @@ protected:
 
 public:
 
+    /**
+     * @param decoder field decoder over the message containing this group
+     */
     explicit GroupDecoder(FieldDecoder& decoder) : m_decoder(decoder)
     {
     }
 
+    /**
+     * Locates the NumInGroup count field for tag and resets iteration. The
+     * tag immediately following it is taken as the group's delimiter
+     * (first field of each repeating entry).
+     * @param tag NumInGroup tag number for this group
+     * @return this decoder
+     * @throws std::invalid_argument if tag is not found
+     */
     GroupDecoder& wrap(const uint32_t tag)
     {
         const Token* token = m_decoder.nextField(tag);
@@ -46,11 +63,19 @@ public:
         return *this;
     }
 
+    /**
+     * @return true if there are more entries to iterate via next()
+     */
     [[nodiscard]] bool hasNext() const
     {
         return m_repeat < m_count;
     }
 
+    /**
+     * Advances to the next repeating-group entry, replacing the current
+     * FieldDecoder group scope (if any) with the new entry's
+     * [begin, end) token range.
+     */
     void next()
     {
         if (m_repeat > 0)
@@ -64,6 +89,9 @@ public:
         m_decoder.pushGroupScope(m_offset, found);
     }
 
+    /**
+     * Leaves the current group scope, if any, and resets iteration state.
+     */
     void clear()
     {
         if (m_repeat > 0)
@@ -75,12 +103,22 @@ public:
         m_offset = 0;
     }
 
+    /**
+     * @return the NumInGroup value from the most recent wrap()
+     */
     [[nodiscard]] uint32_t count() const
     {
         return m_count;
     }
 
 private:
+    /**
+     * Finds the token index where the next repeating-group entry begins:
+     * the next occurrence of the delimiter tag after the current offset,
+     * bounded by the enclosing group scope (or the whole message if this
+     * group is not nested).
+     * @return token/tag index of the next entry's delimiter field
+     */
     int32_t nextGroupOffset() const
     {
         const auto outerEnd = m_decoder.groupScope().end;
