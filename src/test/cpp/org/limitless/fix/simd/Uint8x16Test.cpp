@@ -2,6 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-05-15.
 //
 
+#include <bit>
+
 #include <gtest/gtest.h>
 #include "org/limitless/fix/simd/Uint8x16.hpp"
 
@@ -166,16 +168,17 @@ TEST(Uint8x16, Put)
     }
 
     Uint8x16 v{0xAA};  // pre-fill with 0xAA
-    // Short buffer: put() must return false and leave the block unchanged.
-    EXPECT_FALSE(v.put(src, 15));
+    // Short buffer: put() must load the valid bytes and zero-fill the rest.
+    v.put(src, 15);
     uint8_t out[16]{};
     extract(v, out);
-    for (int i = 0; i < 16; ++i)
+    for (int i = 0; i < 15; ++i)
     {
-        EXPECT_EQ(0xAA, out[i]) << "block modified despite short length at lane " << i;
+        EXPECT_EQ(src[i], out[i]) << "short put() load mismatch at lane " << i;
     }
-    // Full buffer: put() must return true and load the data.
-    EXPECT_TRUE(v.put(src, 16));
+    EXPECT_EQ(0u, out[15]) << "lane beyond the valid length must be zero";
+    // Full buffer: put() must load the data.
+    v.put(src, 16);
     extract(v, out);
     for (int i = 0; i < 16; ++i)
     {
@@ -237,6 +240,28 @@ TEST(Uint8x16, InPlaceOperators)
     {
         EXPECT_EQ(0xB4u | 0x67u, r[i]) << "|= mismatch at lane " << i;
     }
+}
+
+TEST(Uint8x16, Uint16Lanes)
+{
+    // 8 16-bit values; lane 5 holds the key.
+    const uint16_t values[8] = {10, 270, 522, 1128, 35, 553, 9, 108};
+    const uint16_t key = 553;
+
+    const Uint8x16 keys{key};
+    const uint64_t bits = Uint8x16{}.put(values, sizeof(values)).equal(keys).toUint64();
+    EXPECT_NE(0u, bits);
+    EXPECT_EQ(5, std::countr_zero(bits) >> 3);
+
+    // A lane matching in only one of its two bytes must not match:
+    // 0x0102 vs 0x0103 share the high byte.
+    const uint16_t partial[8] = {0x0103, 0x0103, 0x0103, 0x0103, 0x0103, 0x0103, 0x0103, 0x0103};
+    const Uint8x16 needle{static_cast<uint16_t>(0x0102)};
+    EXPECT_EQ(0u, Uint8x16{}.put(partial, sizeof(partial)).equal(needle).toUint64());
+
+    // No match at all.
+    const Uint8x16 missing{static_cast<uint16_t>(9999)};
+    EXPECT_EQ(0u, Uint8x16{}.put(values, sizeof(values)).equal(missing).toUint64());
 }
 
 TEST(Uint8x16, EqualOutParamAndData)

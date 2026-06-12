@@ -16,6 +16,12 @@
 
 namespace org::limitless::fix::decoder {
 
+/**
+ * Base for generated message decoders (e.g. LogonDecoder, LogoutDecoder).
+ * Wraps a FieldDecoder over a tokenized message and extracts the standard
+ * header fields (SenderCompID, TargetCompID, MsgSeqNum, SendingTime) shared
+ * by every message, validating them against an optional SessionContext.
+ */
 struct MessageDecoder
 {
     FieldDecoder m_decoder{};
@@ -28,16 +34,37 @@ struct MessageDecoder
 
     MessageDecoder() = default;
 
+    /**
+     * Constructs a decoder over an already-tokenized message.
+     * @param data raw message bytes
+     * @param tokens token array produced by the tokenizer
+     * @param tags tag numbers, parallel to tokens
+     * @param size number of valid tokens/tags
+     */
     MessageDecoder(const Buffer data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
       : m_decoder{data, tokens, tags, size}
     {
     }
 
+    /**
+     * Rebinds the decoder to a new tokenized message.
+     * @param data raw message bytes
+     * @param tokens token array produced by the tokenizer
+     * @param tags tag numbers, parallel to tokens
+     * @param size number of valid tokens/tags
+     */
     void wrap(const Buffer data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
     {
         m_decoder.wrap(data, tokens, tags, size);
     }
 
+    /**
+     * Reads the MsgType (tag 35) value from the third token. Single-byte
+     * MsgTypes (e.g. 'A') are returned as-is; two-byte MsgTypes are packed
+     * little-endian into the result so they remain comparable to the
+     * generated MessageId constants.
+     * @return MsgType value
+     */
     [[nodiscard]] uint16_t type() const noexcept
     {
         const auto token = m_decoder.tokenAt(2);
@@ -50,6 +77,13 @@ struct MessageDecoder
         return type;
     }
 
+    /**
+     * Extracts and validates the standard header fields: SenderCompID (49),
+     * TargetCompID (56), MsgSeqNum (34), and SendingTime (52). If m_context
+     * is set and specifies expected CompIDs, the corresponding field must
+     * match or the message is rejected.
+     * @return Result::Success, or the first validation failure encountered
+     */
     [[nodiscard]] Result::Values checkRequired()
     {
         if (const auto sender = m_decoder.getString<49, true, ParentType::Component>())

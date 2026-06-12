@@ -12,7 +12,7 @@ namespace org::limitless::fix::simd {
 //
 // https://lemire.me/blog/2026/04/27/you-can-beat-the-binary-search/
 //
-// modified to return position instead of presence
+// modified to return position instead of presence, requires sorted arrays
 //
 [[nodiscard]] inline int32_t quadSearch(const uint16_t* carr, const int32_t cardinality, const uint16_t value)
 {

@@ -17,6 +17,14 @@
 
 namespace org::limitless::fix::decoder {
 
+/**
+ * SIMD tokenizer for raw FIX message bytes. Scans the buffer 16 bytes at a
+ * time with NEON to locate tag/value boundaries ('=' and SOH), filling a
+ * fixed-size Token[] array (position + tag + length, no copies) and a
+ * parallel tag array. Also validates BeginString, BodyLength, and the
+ * trailing CheckSum. Handles messages that are fragmented across chunk
+ * boundaries, including tags split across a 16-byte block boundary.
+ */
 class PayloadDecoder
 {
     static constexpr size_t MaxSize = 64;
@@ -65,11 +73,23 @@ public:
     PayloadDecoder(PayloadDecoder&&) = delete;
     PayloadDecoder& operator=(PayloadDecoder&&) = delete;
 
+    /**
+     * @return the tokens produced by the most recent parse() call
+     */
     [[nodiscard]] std::span<Token> tokens() noexcept
     {
         return { m_tokens, m_count };
     }
 
+    /**
+     * Tokenizes buffer and, on success, dispatches the decoded message to
+     * handler by MsgType.
+     * @param buffer raw FIX message bytes
+     * @param handler receives the tokenized message via handle(); see
+     *        MessageHandler
+     * @return Result::Success and handler's status, or the tokenizer's
+     *         failure status if parsing failed
+     */
     template <typename Handler>
     Result parse(const Buffer buffer, Handler& handler)
     {
@@ -84,6 +104,15 @@ public:
         return result;
     }
 
+    /**
+     * Tokenizes buffer into m_tokens/m_tags: validates BeginString, scans
+     * 16 bytes at a time to locate tag/value boundaries, and validates
+     * BodyLength and CheckSum on completion.
+     * @param buffer raw FIX message bytes
+     * @return Result::Success with the number of bytes processed, or a
+     *         failure status (e.g. Result::MessageFragment if buffer ends
+     *         mid-message)
+     */
     Result parse(const Buffer buffer)
     {
         using simd::Uint8x16;
@@ -169,6 +198,17 @@ public:
 
 private:
 
+    /**
+     * Validates BodyLength against the actual message size and checks for
+     * the minimum required field count and MsgType tag, then verifies the
+     * checksum via processCheckSum.
+     * @param data raw message bytes
+     * @param blockSum running sum of bytes covered by the SIMD scan, used
+     *        to derive the checksum
+     * @param blockEnd offset one past the last byte covered by blockSum
+     * @return Result::Success with the number of bytes processed, or the
+     *         first validation failure
+     */
     Result checkRequiredFields(const data_t* data, const uint64_t blockSum, const position_t blockEnd) const
     {
         const auto* last = &m_tokens[m_count - 1];
@@ -217,6 +257,21 @@ private:
         return {processed, m_count < 7 ? Result::RequiredFieldMissing : status};
     }
 
+    /**
+     * Consumes one 16-byte block's worth of tag digits: closes out the
+     * previous token (handling a tag split across the block boundary),
+     * extracts each tag number found in this block into new tokens, and
+     * carries over a trailing partial tag to the next block.
+     * @param offset byte offset of this block within the message
+     * @param tagDigitFlags bitmask with a 4-bit-aligned nibble set for each
+     *        byte position in this block that is part of a tag number
+     * @param digits ASCII digit value at each lane where validTags was set,
+     *        zero elsewhere
+     * @param nonTagBitPos bit position to resume scanning from; nonzero
+     *        only for the first block, to skip the already-consumed
+     *        BeginString
+     * @return true once the CheckSum tag (10) has been tokenized
+     */
     bool processBlock(const position_t offset,
                       const uint64_t tagDigitFlags,
                       const data_t* digits,
@@ -273,6 +328,17 @@ private:
         return m_tokens[m_count - 1].m_tag == 10;
     }
 
+    /**
+     * Validates the trailing CheckSum field (tag 10) format and value
+     * against the sum of all preceding bytes.
+     * @param data raw message bytes
+     * @param blockSum running sum of bytes covered by the SIMD scan, used
+     *        as the starting point for the checksum
+     * @param blockEnd offset one past the last byte covered by blockSum
+     * @return Result::Success, Result::InvalidCheckSumTag if the trailing
+     *         bytes are not "\x01""10=...", or Result::InvalidCheckSum if
+     *         the value does not match
+     */
     Result::Values processCheckSum(const std::span<const data_t>::pointer data,
                                    const uint64_t blockSum,
                                    const position_t blockEnd) const
@@ -306,6 +372,15 @@ private:
         return Result::Success;
     }
 
+    /**
+     * Tokenizes the final, less-than-16-byte tail of the message. Loads the
+     * remaining bytes into a single uint64_t and uses BitSet64 masks of
+     * TagEnd ('=') and FieldEnd (SOH) byte positions to walk the remaining
+     * tag=value pairs, handling a tag or value split across the previous
+     * block boundary and finally emitting the CheckSum token (tag 10).
+     * @param offset byte offset of the tail within the message
+     * @param buffer raw FIX message bytes
+     */
     void processTrailer(const position_t offset, const Buffer buffer)
     {
 #if !defined(NDEBUG)
