@@ -114,6 +114,7 @@ struct Category
 // Non-owning: the spans must remain valid for the lifetime of the session.
 struct SessionContext
 {
+    std::span<const uint8_t> m_protocol;
     std::span<const uint8_t> m_expectedSenderCompId{}; // tag 49 of incoming messages, the counterparty's CompID
     std::span<const uint8_t> m_expectedTargetCompId{}; // tag 56 of incoming messages, our own CompID
 };

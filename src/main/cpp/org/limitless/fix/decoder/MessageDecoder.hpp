@@ -25,11 +25,6 @@ namespace org::limitless::fix::decoder {
 class MessageDecoder
 {
 private:
-    String m_sender{};
-    String m_target{};
-    std::chrono::milliseconds m_sendingTime{};
-    uint32_t m_sequenceNumber{};
-
     SessionContext* m_context{};
 
 protected:
@@ -99,56 +94,28 @@ public:
      */
     [[nodiscard]] Result::Values checkRequired()
     {
-        if (const auto sender = m_decoder.getString<49, true, ParentType::Component>())
-        {
-            m_sender = sender.value();
-            if (m_context)
-
-                if (m_context != nullptr && !m_context->m_expectedSenderCompId.empty()
-                    && !std::ranges::equal(std::as_const(m_sender),
-                                           std::as_const(m_context->m_expectedSenderCompId)))
-                {
-                    return Result::InvalidSenderCompId;
-                }
-
-            if (m_context)
-
-                if (m_context != nullptr && !m_context->m_expectedSenderCompId.empty()
-                    && !std::ranges::equal(m_sender, m_context->m_expectedSenderCompId))
-                {
-                    return Result::InvalidSenderCompId;
-                }
-        }
-        else
+        const auto sender = m_decoder.getString<49, true, ParentType::Component>();
+        if (!sender || (m_context != nullptr &&
+                        !std::ranges::equal(sender.value(), m_context->m_expectedSenderCompId)))
         {
             return Result::InvalidSenderCompId;
         }
-        if (const auto target = m_decoder.getString<56, true, ParentType::Component>())
-        {
-            m_target = target.value();
-            if (m_context != nullptr && !m_context->m_expectedTargetCompId.empty()
-                && !std::ranges::equal(m_target, m_context->m_expectedTargetCompId))
-            {
-                return Result::InvalidTargetCompId;
-            }
-        }
-        else
+
+        const auto target = m_decoder.getString<56, true, ParentType::Component>();
+        if (!target || (m_context != nullptr &&
+                        !std::ranges::equal(target.value(), m_context->m_expectedTargetCompId)))
         {
             return Result::InvalidTargetCompId;
         }
-        if (const auto sequenceNumber = m_decoder.getUint32<34, true, ParentType::Component>())
-        {
-            m_sequenceNumber = sequenceNumber.value();
-        }
-        else
+
+        const auto sequenceNumber = m_decoder.getUint32<34, true, ParentType::Component>();
+        if (!sequenceNumber)
         {
             return Result::InvalidSequenceNumber;
         }
-        if (const auto sendingTime = m_decoder.getTimestamp<52, true, ParentType::Component>())
-        {
-            m_sendingTime = sendingTime.value();
-        }
-        else
+
+        const auto sendingTime = m_decoder.getTimestamp<52, true, ParentType::Component>();
+        if (!sendingTime)
         {
             return Result::InvalidSendingTime;
         }
