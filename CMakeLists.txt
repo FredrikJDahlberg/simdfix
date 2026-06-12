@@ -18,6 +18,7 @@ set(GENERATOR_PATH "src/generator/org/limitless/generator/fix/")
 set(PROTOCOL_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/protocol.xml")
 set(GENERATED_DIR "${CMAKE_SOURCE_DIR}/${GEN_PATH}")
 set(GENERATED_HEADERS
+        ${GENERATED_DIR}/FixTypes.hpp
         ${GENERATED_DIR}/FixMessageDecoders.hpp
         ${GENERATED_DIR}/FixMessageHandler.hpp)
 set(FIX_HEADERS

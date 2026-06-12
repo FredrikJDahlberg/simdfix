@@ -3,15 +3,15 @@
 
 #include <expected>
 
-#include "org/limitless/fix/decoder/GroupEncoder.hpp"
-#include "org/limitless/fix/decoder/ComponentEncoder.hpp"
-#include "org/limitless/fix/decoder/MessageEncoder.hpp"
+#include "org/limitless/fix/encoder/GroupEncoder.hpp"
+#include "org/limitless/fix/encoder/ComponentEncoder.hpp"
+#include "org/limitless/fix/encoder/MessageEncoder.hpp"
+#include "org/limitless/fix/messages/FixTypes.hpp"
 
 namespace org::limitless::fix::messages {
 
-// using namespace org::limitless::fix::encoder;
+using namespace org::limitless::fix::encoder;
 
-    // Encryption
 struct NestedGroupEncoder : GroupEncoder
 {
     explicit NestedGroupEncoder(FieldEncoder& encoder) : 
@@ -89,6 +89,24 @@ public:
 
     static constexpr uint16_t MessageId = 'A';
 
+    Protocol& beginString(const Protocol& value)
+    {
+        m_encoder.setEnum<8, false, Protocol, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::uint32_t& bodyLength(const uint32& value)
+    {
+        m_encoder.setUint32<9, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    MessageType& msgType(const MessageType& value)
+    {
+        m_encoder.setEnum<35, false, MessageType, ParentType::Message>(value);
+        return *this;
+    }
+
     std::string_view& sender(const string& value)
     {
         m_encoder.setString<49, false, ParentType::Message>(value);
@@ -145,6 +163,24 @@ public:
 
     static constexpr uint16_t MessageId = '5';
 
+    Protocol& beginString(const Protocol& value)
+    {
+        m_encoder.setEnum<8, false, Protocol, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::uint32_t& bodyLength(const uint32& value)
+    {
+        m_encoder.setUint32<9, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    MessageType& msgType(const MessageType& value)
+    {
+        m_encoder.setEnum<35, false, MessageType, ParentType::Message>(value);
+        return *this;
+    }
+
     std::string_view& sender(const string& value)
     {
         m_encoder.setString<49, false, ParentType::Message>(value);
@@ -194,6 +230,24 @@ public:
     }
 
     static constexpr uint16_t MessageId = '0';
+
+    Protocol& beginString(const Protocol& value)
+    {
+        m_encoder.setEnum<8, false, Protocol, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::uint32_t& bodyLength(const uint32& value)
+    {
+        m_encoder.setUint32<9, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    MessageType& msgType(const MessageType& value)
+    {
+        m_encoder.setEnum<35, false, MessageType, ParentType::Message>(value);
+        return *this;
+    }
 
     std::string_view& sender(const string& value)
     {
@@ -245,6 +299,24 @@ public:
 
     static constexpr uint16_t MessageId = '1';
 
+    Protocol& beginString(const Protocol& value)
+    {
+        m_encoder.setEnum<8, false, Protocol, ParentType::Message>(value);
+        return *this;
+    }
+
+    std::uint32_t& bodyLength(const uint32& value)
+    {
+        m_encoder.setUint32<9, false, ParentType::Message>(value);
+        return *this;
+    }
+
+    MessageType& msgType(const MessageType& value)
+    {
+        m_encoder.setEnum<35, false, MessageType, ParentType::Message>(value);
+        return *this;
+    }
+
     std::string_view& sender(const string& value)
     {
         m_encoder.setString<49, false, ParentType::Message>(value);
@@ -282,6 +354,6 @@ public:
 
 };
 
-} // namespace org::limitless::fix::messages
+} // namespace org::limitless::fix::encoder
 
 #endif //SIMD_FIX_MESSAGE_ENCODERS_HPP

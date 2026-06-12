@@ -8,14 +8,15 @@
 
 #include "org/limitless/generator/fix/DataModel.hpp"
 
+using namespace org::limitless::fix;
 using namespace org::limitless::generator::fix;
 
+static void generateTypes(const std::string& fileName,
+                          const std::vector<Record>& enums);
 static void generateDecoders(const std::string& fileName,
-                             const std::vector<Record>& records,
-                             const std::vector<Record>& enums);
+                             const std::vector<Record>& records);
 static void generateEncoders(const std::string& fileName,
-                             const std::vector<Record>& records,
-                             const std::vector<Record>& enums);
+                             const std::vector<Record>& records);
 
 static void generateMessageHandler(const std::string& fileName,
                                    const std::vector<Record>& records);
@@ -25,9 +26,6 @@ static void generateRecordEncoders(std::ostream& out, const Record& record);
 
 int main(int argc, char** argv)
 {
-    using namespace org::limitless::fix;
-    using namespace org::limitless::generator::fix;
-
     pugi::xml_document doc;
     const auto result = doc.load_file(argv[1]);
     if (argc != 3 || !result)
@@ -41,9 +39,13 @@ int main(int argc, char** argv)
     DataModel model{};
     model.process(doc);
 
+    std::string typesFile{argv[2]};
+    typesFile.append("/FixTypes.hpp");
+    generateTypes(typesFile, model.m_enums);
+
     std::string decodersFile{argv[2]};
     decodersFile.append("/FixMessageDecoders.hpp");
-    generateDecoders(decodersFile, model.m_records, model.m_enums);
+    generateDecoders(decodersFile, model.m_records);
 
     std::string handlerFile{argv[2]};
     handlerFile.append("/FixMessageHandler.hpp");
@@ -51,12 +53,12 @@ int main(int argc, char** argv)
 
     std::string encodersFile{argv[2]};
     encodersFile.append("/FixMessageEncoders.hpp");
-    generateEncoders(encodersFile, model.m_records, model.m_enums);
+    generateEncoders(encodersFile, model.m_records);
 
     return 0;
 }
 
-static void generateEnumDecoders(std::ostream& out, const Record& record)
+static void generateEnums(std::ostream& out, const Record& record)
 {
     out << std::format("struct {}\n", record.m_name);
     out << "{\n";
@@ -79,9 +81,32 @@ static void generateEnumDecoders(std::ostream& out, const Record& record)
     out << "};\n\n";
 }
 
+static void generateTypes(const std::string& fileName,
+                          const std::vector<Record>& enums)
+{
+    std::ofstream out(fileName);
+    if (!out)
+    {
+        std::println("Types/Error: could not open '{}' for writing", fileName);
+        return;
+    }
+
+    out << "#ifndef SIMD_FIX_TYPES_HPP\n";
+    out << "#define SIMD_FIX_TYPES_HPP\n\n";
+    out << "#include <cstdint>\n\n";
+    out << "namespace org::limitless::fix::messages {\n\n";
+    for (const auto& type: enums)
+    {
+        generateEnums(out, type);
+    }
+    out << "} // namespace org::limitless::fix::messages\n\n";
+    out << "#endif //SIMD_FIX_TYPES_HPP\n";
+
+    out.close();
+}
+
 static void generateDecoders(const std::string& fileName,
-                             const std::vector<Record>& records,
-                             const std::vector<Record>& enums)
+                             const std::vector<Record>& records)
 {
     std::ofstream out(fileName);
     if (!out)
@@ -95,13 +120,10 @@ static void generateDecoders(const std::string& fileName,
     out << "#include <expected>\n\n";
     out << "#include \"org/limitless/fix/decoder/GroupDecoder.hpp\"\n";
     out << "#include \"org/limitless/fix/decoder/ComponentDecoder.hpp\"\n";
-    out << "#include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n\n";
+    out << "#include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n";
+    out << "#include \"org/limitless/fix/messages/FixTypes.hpp\"\n\n";
     out << "namespace org::limitless::fix::messages {\n\n";
     out << "using namespace org::limitless::fix::decoder;\n\n";
-    for (const auto& type: enums)
-    {
-        generateEnumDecoders(out, type);
-    }
     for (auto& record: records)
     {
         generateRecordDecoders(out, record);
@@ -113,8 +135,7 @@ static void generateDecoders(const std::string& fileName,
 }
 
 static void generateEncoders(const std::string& fileName,
-                             const std::vector<Record>& records,
-                             const std::vector<Record>& enums)
+                             const std::vector<Record>& records)
 {
     std::ofstream out(fileName);
     if (!out)
@@ -122,20 +143,16 @@ static void generateEncoders(const std::string& fileName,
         std::println("Encoder/Error: could not open '{}' for writing", fileName);
         return;
     }
-gi
+
     out << "#ifndef SIMD_FIX_MESSAGE_ENCODERS_HPP\n";
     out << "#define SIMD_FIX_MESSAGE_ENCODERS_HPP\n\n";
     out << "#include <expected>\n\n";
-    out << "#include \"org/limitless/fix/decoder/GroupEncoder.hpp\"\n";
-    out << "#include \"org/limitless/fix/decoder/ComponentEncoder.hpp\"\n";
-    out << "#include \"org/limitless/fix/decoder/MessageEncoder.hpp\"\n\n";
+    out << "#include \"org/limitless/fix/encoder/GroupEncoder.hpp\"\n";
+    out << "#include \"org/limitless/fix/encoder/ComponentEncoder.hpp\"\n";
+    out << "#include \"org/limitless/fix/encoder/MessageEncoder.hpp\"\n";
+    out << "#include \"org/limitless/fix/messages/FixTypes.hpp\"\n\n";
     out << "namespace org::limitless::fix::messages {\n\n";
     out << "using namespace org::limitless::fix::encoder;\n\n";
-    for (const auto& type: enums)
-    {
-        // generateEnumDecoders(out, value);
-        out << std::format("    // {}\n", type.m_name);
-    }
     for (auto& record: records)
     {
         generateRecordEncoders(out, record);

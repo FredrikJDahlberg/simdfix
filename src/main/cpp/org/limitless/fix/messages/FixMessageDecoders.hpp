@@ -6,26 +6,11 @@
 #include "org/limitless/fix/decoder/GroupDecoder.hpp"
 #include "org/limitless/fix/decoder/ComponentDecoder.hpp"
 #include "org/limitless/fix/decoder/MessageDecoder.hpp"
+#include "org/limitless/fix/messages/FixTypes.hpp"
 
 namespace org::limitless::fix::messages {
 
 using namespace org::limitless::fix::decoder;
-
-struct Encryption
-{
-    enum Values
-    {
-        Null,
-        None
-    };
-    static constexpr uint8_t Codes[2]  =
-    {
-        '?',
-        '0'
-    };
-    Encryption() : m_value{Null} {}
-    Values m_value;
-};
 
 struct NestedGroupDecoder : GroupDecoder
 {
@@ -131,6 +116,21 @@ public:
         return *this;
     }
 
+    [[nodiscard]] std::expected<Protocol, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, false, Protocol, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    {
+        return m_decoder.getUint32<9, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<MessageType, Result::Values> msgType() const
+    {
+        return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
+    }
+
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
         return m_decoder.getString<49, false, ParentType::Message>();
@@ -190,6 +190,21 @@ public:
         return *this;
     }
 
+    [[nodiscard]] std::expected<Protocol, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, false, Protocol, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    {
+        return m_decoder.getUint32<9, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<MessageType, Result::Values> msgType() const
+    {
+        return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
+    }
+
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
         return m_decoder.getString<49, false, ParentType::Message>();
@@ -244,6 +259,21 @@ public:
         return *this;
     }
 
+    [[nodiscard]] std::expected<Protocol, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, false, Protocol, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    {
+        return m_decoder.getUint32<9, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<MessageType, Result::Values> msgType() const
+    {
+        return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
+    }
+
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
         return m_decoder.getString<49, false, ParentType::Message>();
@@ -296,6 +326,21 @@ public:
     {
         m_decoder.wrap(data, tokens, tags, count);
         return *this;
+    }
+
+    [[nodiscard]] std::expected<Protocol, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, false, Protocol, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    {
+        return m_decoder.getUint32<9, false, ParentType::Message>();
+    }
+
+    [[nodiscard]] std::expected<MessageType, Result::Values> msgType() const
+    {
+        return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const

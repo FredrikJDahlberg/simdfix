@@ -10,13 +10,14 @@
 
 #include "pugixml.hpp"
 
-#include "../../../../../main/cpp/org/limitless/fix/DecoderTypes.hpp"
+#include "org/limitless/fix/DecoderTypes.hpp"
 
 namespace org::limitless::generator::fix {
 
 using limitless::fix::Category;
 using limitless::fix::ParentType;
 using limitless::fix::Presence;
+using limitless::fix::MaxGroupDepth;
 
 struct Type
 {
@@ -198,9 +199,14 @@ struct DataModel
     {
         for (const auto& recordNode : records)
         {
-            processRecords(recordNode.node().select_nodes("group"), ParentType::Group);
-
             const auto node = recordNode.node();
+            processRecords(node.select_nodes("group"), ParentType::Group);
+
+            if (parent == ParentType::Group && node.select_nodes("ancestor::group").size() >= MaxGroupDepth)
+            {
+                throw std::invalid_argument(std::format("Group nesting cannot exceed {}", MaxGroupDepth));
+            }
+
             std::string_view name = node.attribute("name").as_string();
             std::vector<Field> fields{};
             Record record{std::string{name}, std::string{}, parent, fields};

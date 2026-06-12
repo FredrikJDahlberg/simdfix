@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-06-05.
 //
 
-#ifndef SIMD_FIX_STRUCT_DECODER_HPP
-#define SIMD_FIX_STRUCT_DECODER_HPP
+#ifndef SIMD_FIX_COMPONENT_DECODER_HPP
+#define SIMD_FIX_COMPONENT_DECODER_HPP
 
 #include "FieldDecoder.hpp"
 
@@ -22,4 +22,4 @@ public:
 };
 
 }
-#endif //SIMD_FIX_STRUCT_DECODER_HPP
+#endif //SIMD_FIX_COMPONENT_DECODER_HPP

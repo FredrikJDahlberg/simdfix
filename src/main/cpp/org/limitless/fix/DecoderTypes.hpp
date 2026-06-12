@@ -14,6 +14,8 @@
 
 namespace org::limitless::fix {
 
+inline constexpr int32_t MaxGroupDepth = 8;
+
 struct Token
 {
     uint16_t m_position;

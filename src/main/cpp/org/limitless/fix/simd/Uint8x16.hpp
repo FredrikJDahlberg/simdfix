@@ -5,7 +5,7 @@
 #ifndef SIMD_UNT8X16_H
 #define SIMD_UNT8X16_H
 
-#include <iostream>
+#include <print>
 
 #include <arm_neon.h>
 
@@ -129,7 +129,16 @@ struct Uint8x16
         return *this;
     }
 
-    // TODO +=
+    Uint8x16 operator+(const Uint8x16& block) const
+    {
+        return Uint8x16(vaddq_u8(m_block, block.m_block));
+    }
+
+    Uint8x16& operator+=(const Uint8x16& block)
+    {
+        m_block = vaddq_u8(m_block, block.m_block);
+        return *this;
+    }
 
     Uint8x16& operator=(const value_type& vector)
     {
@@ -191,22 +200,17 @@ struct Uint8x16
 
     void print() const
     {
-        const auto data = reinterpret_cast<const uint8_t*>(&m_block);
-        for (int i = 0; i < 16; ++i)
-        {
-            std::printf("%02x ", data[i]);
-        }
-        std::printf("\n");
+        print(m_block);
     }
 
-    static void dump(const uint8x16_t& vector)
+    static void print(const uint8x16_t& block)
     {
-        const auto data = reinterpret_cast<const uint8_t*>(&vector);
+        const auto data = reinterpret_cast<const uint8_t*>(&block);
         for (int i = 0; i < 16; ++i)
         {
-            std::printf("%02x ", data[i]);
+            std::print("{:02x} ", data[i]);
         }
-        std::printf("\n");
+        std::println();
     }
 };
 

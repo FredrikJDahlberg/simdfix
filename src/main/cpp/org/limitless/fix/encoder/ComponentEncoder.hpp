@@ -3,11 +3,11 @@
 //
 
 #ifndef SIMD_FIX_COMPONENT_ENCODER_HPP
-#define SIMDF_IX_COMPONENT_ENCODER_HPP
+#define SIMD_FIX_COMPONENT_ENCODER_HPP
 
 namespace org::limitless::fix::encoder {
 
-struct MessageEncoder
+struct ComponentEncoder
 {
 
 };

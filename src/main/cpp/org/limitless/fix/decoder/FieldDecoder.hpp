@@ -18,8 +18,6 @@ namespace org::limitless::fix::decoder {
 
 struct FieldDecoder
 {
-    static constexpr int32_t MaxGroupDepth = 8; // FIXME: verify in processor
-
     FieldDecoder() = default;
 
     FieldDecoder(const Buffer data, TokenSpan const tokens, TagSpan const tags, const int32_t size) :
@@ -100,6 +98,10 @@ struct FieldDecoder
 
     void pushGroupScope(const int32_t begin, const int32_t end)
     {
+        if (m_scopeDepth >= MaxGroupDepth) [[unlikely]]
+        {
+            throw std::runtime_error{"Too many group scopes."};
+        }
         m_scopes[m_scopeDepth++] = Scope{begin, end};
     }
 

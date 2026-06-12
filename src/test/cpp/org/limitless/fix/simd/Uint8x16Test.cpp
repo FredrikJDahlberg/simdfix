@@ -120,6 +120,13 @@ TEST(Uint8x16, BitwiseAndArithmetic)
     {
         EXPECT_EQ(static_cast<uint8_t>(10 - 20), r[i]) << "SUB wrap mismatch at lane " << i;
     }
+
+    // Addition: 180 + 103 = 283 = 27 (mod 256)
+    extract(a + b, r);
+    for (int i = 0; i < 16; ++i)
+    {
+        EXPECT_EQ(static_cast<uint8_t>(180 + 103), r[i]) << "ADD mismatch at lane " << i;
+    }
 }
 
 TEST(Uint8x16, WhenTrueAndSum)
@@ -205,6 +212,14 @@ TEST(Uint8x16, InPlaceOperators)
     for (int i = 0; i < 16; ++i)
     {
         EXPECT_EQ(77u, r[i]) << "-= mismatch at lane " << i;
+    }
+    // operator+= : same result as operator+, wrapping
+    Uint8x16 add{180};
+    add += Uint8x16{103};
+    extract(add, r);
+    for (int i = 0; i < 16; ++i)
+    {
+        EXPECT_EQ(static_cast<uint8_t>(180 + 103), r[i]) << "+= mismatch at lane " << i;
     }
     // operator&= : same result as operator&
     Uint8x16 andv{0xB4};

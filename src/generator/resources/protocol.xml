@@ -3,25 +3,34 @@
     <types>
         <type name="String8" primitiveType="char" length="8"/>
 
+        <enum name="Protocol">
+            <element name="FIX_1_1" value="FIXT.1.1"/>
+        </enum>
+
         <enum name="Encryption">
             <element name="None" value="0"/>
         </enum>
 
+        <enum name="MessageType">
+            <element name="Logon" value="A"/>
+            <element name="Logout" value="5"/>
+            <element name="TestRequest" value="1"/>
+            <element name="Heartbeat" value="0"/>
+        </enum>
+
     </types>
 
-    <!-- FIXME: add begin string constant? -->
-    <!-- FIXME: inline components in order to get context right or add argument  -->
     <component name="NestedComp">
         <field name="NestedOne" tag="601" primitiveType="uint32" length="8" presence="optional"/>
         <field name="NestedTwo" tag="602" primitiveType="uint32" presence="optional"/>
     </component>
 
     <component name="StandardHeader">
-        <!--
-        <field name="BeginString" tag="8" primitiveType="char" length="7" presence="constant">FIX.4.3</field>
+        <!-- <field name="BeginString" tag="8" primitiveType="char" length="7" presence="constant">FIX.4.3</field> -->
+        <field name="BeginString" tag="8" type="Protocol"/>
         <field name="BodyLength" tag="9" primitiveType="uint32"/>
-        <field name="MsgType" tag="35" primitiveType="uint8"/>
-        -->
+        <field name="MsgType" tag="35" type="MessageType"/>
+
         <field name="Sender" tag="49" primitiveType="string" length="8"/>
         <field name="Target" tag="56" primitiveType="string" length="8"/>
         <field name="SequenceNumber" tag="34" primitiveType="uint32"/>
