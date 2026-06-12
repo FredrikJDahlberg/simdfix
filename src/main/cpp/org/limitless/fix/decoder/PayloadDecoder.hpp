@@ -74,6 +74,7 @@ public:
     PayloadDecoder& operator=(PayloadDecoder&&) = delete;
 
     /**
+     * Used for testing.
      * @return the tokens produced by the most recent parse() call
      */
     [[nodiscard]] std::span<Token> tokens() noexcept

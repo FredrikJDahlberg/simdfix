@@ -67,7 +67,6 @@ TEST(PayloadDecoder, TrailerSplitCheckSum)
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(Result::Success, status);
     ASSERT_EQ(message.size(), processed);
-    // ASSERT_EQ(48, checkSum);
 
     constexpr Token expectedTokens[] =
     {

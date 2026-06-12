@@ -3,8 +3,7 @@ TODO
 
 1. keep decoder/encoder types separate
 2. move decoding functions from utils to decoder
-3. keep encoding utils in encoder
-4. decide on API
+3. decide on API
 
        encoder.wrap(buffer)
            .one(1).two(2).three(3)
@@ -12,6 +11,8 @@ TODO
                .next().time(10).string("hepp")
                .next().time(20)
                .next().time(20).string("hepp")
+4. configure decoder/encoder with protocol constants.
+
 
 FIXMEs/TODOs in source
 -----
@@ -28,6 +29,3 @@ items 1–4 above:
 2. `src/main/cpp/org/limitless/fix/encoder/GroupEncoder.hpp:13` — `GroupEncoder`
 3. `src/main/cpp/org/limitless/fix/encoder/PayloadEncoder.hpp:13` — `PayloadEncoder`
 4. `src/main/cpp/org/limitless/fix/encoder/ComponentEncoder.hpp:13` — `ComponentEncoder`
-
-(`AppHandler` in `MessageDecoderTest.cpp:276` is also empty, but intentionally —
-it is a do-nothing test handler relying on the `MessageHandler` defaults.)

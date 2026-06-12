@@ -18,33 +18,22 @@ set(GENERATOR_PATH "src/generator/org/limitless/generator/fix/")
 set(PROTOCOL_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/protocol.xml")
 set(GENERATED_DIR "${CMAKE_SOURCE_DIR}/${GEN_PATH}")
 set(GENERATED_HEADERS
-        ${GENERATED_DIR}/FixTypes.hpp
-        ${GENERATED_DIR}/FixMessageDecoders.hpp
-        ${GENERATED_DIR}/FixMessageHandler.hpp)
+        ${GENERATED_DIR}/FixTypes.hpp ${GENERATED_DIR}/FixMessageDecoders.hpp
+        ${GENERATED_DIR}/FixMessageEncoders.hpp ${GENERATED_DIR}/FixMessageHandler.hpp)
 set(FIX_HEADERS
-        ${MAIN_PATH}/utils/Utils.hpp
-        ${MAIN_PATH}/utils/BitSet64.hpp
-        ${MAIN_PATH}/decoder/PayloadDecoder.hpp
-        ${MAIN_PATH}/decoder/MessageDecoder.hpp
-        ${MAIN_PATH}/DecoderTypes.hpp
-        ${MAIN_PATH}/decoder/FieldDecoder.hpp
-        ${MAIN_PATH}/decoder/ComponentDecoder.hpp
-        ${MAIN_PATH}/decoder/GroupDecoder.hpp
-        ${MAIN_PATH}/simd/Uint8x16.hpp
-        ${MAIN_PATH}/simd/LinearSearch.hpp
-        ${MAIN_PATH}/encoder/FieldEncoder.hpp
-        ${MAIN_PATH}/encoder/PayloadEncoder.hpp
-        ${MAIN_PATH}/encoder/MessageEncoder.hpp
-        src/main/cpp/org/limitless/fix/encoder/GroupEncoder.hpp
-        src/main/cpp/org/limitless/fix/encoder/ComponentEncoder.hpp)
-add_library(SimdFix INTERFACE
-        src/main/cpp/org/limitless/fix/encoder/GroupEncoder.hpp
-        src/main/cpp/org/limitless/fix/encoder/ComponentEncoder.hpp)
+        ${MAIN_PATH}/utils/Utils.hpp ${MAIN_PATH}/utils/BitSet64.hpp
+        ${MAIN_PATH}/decoder/PayloadDecoder.hpp ${MAIN_PATH}/decoder/MessageDecoder.hpp
+        ${MAIN_PATH}/DecoderTypes.hpp ${MAIN_PATH}/decoder/FieldDecoder.hpp
+        ${MAIN_PATH}/decoder/ComponentDecoder.hpp ${MAIN_PATH}/decoder/GroupDecoder.hpp
+        ${MAIN_PATH}/simd/Uint8x16.hpp ${MAIN_PATH}/simd/LinearSearch.hpp
+        ${MAIN_PATH}/encoder/FieldEncoder.hpp ${MAIN_PATH}/encoder/PayloadEncoder.hpp
+        ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp
+        ${MAIN_PATH}/encoder/ComponentEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp
+        ${MAIN_PATH}/encoder/ComponentEncoder.hpp)
+add_library(SimdFix ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_sources(SimdFix INTERFACE ${FIX_HEADERS} ${GENERATED_HEADERS})
 target_include_directories(SimdFix INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
-target_compile_definitions(SimdFix INTERFACE
-        $<$<CONFIG:Debug>:DEBUG_MODE>
-        $<$<CONFIG:Release>:NDEBUG>
+target_compile_definitions(SimdFix INTERFACE $<$<CONFIG:Debug>:DEBUG_MODE> $<$<CONFIG:Release>:NDEBUG>
 )
 target_compile_options(SimdFix INTERFACE
         -Wall -Wextra
@@ -144,5 +133,5 @@ add_custom_target(AllTests
 
 # Dynamically create an executable or library treating headers as source items
 # Using set_source_files_properties forces CMake/Compilers to attempt compilation
-add_library(header_test EXCLUDE_FROM_ALL ${FIX_HEADERS})
+add_library(header_test EXCLUDE_FROM_ALL ${FIX_HEADERS} ${FIX_GENERATED_HEADERS})
 set_source_files_properties(${FIX_HEADERS} PROPERTIES LANGUAGE CXX)
