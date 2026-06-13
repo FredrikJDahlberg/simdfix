@@ -93,11 +93,11 @@ struct DataModel
     void processTypes(const pugi::xml_object_range<pugi::xml_node_iterator>& types)
     {
         m_types.try_emplace("char",   "char",   1, 1, Category::String);
-        m_types.try_emplace("uint8",  "uint8",  1, 1, Category::Uint8);
-        m_types.try_emplace("int32",  "int32",  4, 1, Category::Int32);
-        m_types.try_emplace("uint32", "uint32", 4, 1, Category::Uint32);
-        m_types.try_emplace("int64",  "int32",  4, 1, Category::Int64);
-        m_types.try_emplace("uint64", "uint32", 4, 1, Category::Uint64);
+        m_types.try_emplace("uint8",  "uint8_t",  1, 1, Category::Uint8);
+        m_types.try_emplace("int32",  "int32_t",  4, 1, Category::Int32);
+        m_types.try_emplace("uint32", "uint32_t", 4, 1, Category::Uint32);
+        m_types.try_emplace("int64",  "int32_t",  4, 1, Category::Int64);
+        m_types.try_emplace("uint64", "uint64_t", 4, 1, Category::Uint64);
         m_types.try_emplace("timestamp", "std::chrono::millis", 8, 1, Category::Timestamp);
         m_types.try_emplace("string", "std::string_view", 1, 1, Category::String);
         for (auto typeNode : types)

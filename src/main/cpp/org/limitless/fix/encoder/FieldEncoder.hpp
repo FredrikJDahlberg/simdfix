@@ -20,59 +20,71 @@
 namespace org::limitless::fix::encoder {
 
 
-
-enum class ParentType { A, B };
-
-template <typename T>
-concept EncodableInteger = std::same_as<T, uint32_t> ||
-                           std::same_as<T, uint64_t> ||
-                           std::same_as<T, int32_t>;
+template <typename ValueType>
+concept EncodableInteger = std::same_as<ValueType, int32_t> ||
+                           std::same_as<ValueType, uint32_t> ||
+                           std::same_as<ValueType, uint64_t> ||
+                           std::same_as<ValueType, int64_t>;
 class FieldEncoder
 {
-    std::span<uint8_t> m_dest_buffer;
-    size_t m_offset = 0;
+    Buffer m_data{};
+    size_t m_offset{};
 
-    template <int32_t Tag, ParentType Parent, typename T>
+    template <int32_t Tag, ParentType::Values Parent, typename ValueType>
     static constexpr size_t getEncodedSize() noexcept
     {
-        return sizeof(T);
+        return sizeof(ValueType);
     }
 
-    template <typename T>
-    void encode(T value, size_t size)
+    template <typename ValueType>
+    void encode(const ValueType value, const size_t size)
     {
-        if (m_offset + size > m_dest_buffer.size()) [[unlikely]]
+        if (m_offset + size > m_data.size()) [[unlikely]]
         {
             throw std::runtime_error("Buffer overflow");
         }
         // FIXME
-        std::span<uint8_t> target = m_dest_buffer.subspan(m_offset, size);
-        std::memcpy(target.data(), &value, size);
+        // std::span<uint8_t> target = m_data.subspan(m_offset, size);
+        // std::memcpy(target.data(), &value, size);
         m_offset += size;
     }
 
 public:
 
-    /*
-    std::optional<uint32_t> empty_field = std::nullopt;
-    std::optional<uint32_t> filled_field = 100;
+    FieldEncoder() = default;
 
-    size_t bytes4 = encoder.setUint32<4, false, ParentType::A>(empty_field);  // Returns 0
-    size_t bytes5 = encoder.setUint32<5, false, ParentType::A>(filled_field); // Returns 4
-    */
-
-    template <int32_t Tag, bool Required, ParentType Parent, typename T>
-    requires EncodableInteger<T>
-    size_t setValue(T value)
+    /**
+     * Constructs an encoder over a destination buffer.
+     * @param data destination message bytes
+     */
+    explicit FieldEncoder(const Buffer data) : m_data{data}
     {
-        constexpr size_t encoded_bytes = getEncodedSize<Tag, Parent, T>();
-        writeToBuffer(value, encoded_bytes);
+    }
+
+    void wrap(const Buffer data)
+    {
+        m_data = data;
+    }
+
+    template <int32_t Tag, bool Required, ParentType::Values Parent, typename ValueType>
+    requires EncodableInteger<ValueType>
+    size_t encode(const ValueType value)
+    {
+        constexpr size_t encoded_bytes = getEncodedSize<Tag, Parent, ValueType>();
+        encode(value, encoded_bytes);
         return encoded_bytes;
     }
 
-    template <int32_t Tag, bool Required, ParentType Parent, typename T>
-    requires EncodableInteger<T>
-    size_t setValue(std::optional<T> value)
+    template <int32_t Tag, bool Required, ParentType::Values Parent, typename ValueType>
+    size_t encode(const ValueType value)
+    {
+        constexpr size_t encoded_bytes = getEncodedSize<Tag, Parent, ValueType>();
+        encode(value, encoded_bytes);
+        return encoded_bytes;
+    }
+
+    template <int32_t Tag, bool Required, ParentType::Values Parent, typename ValueType>
+    size_t encode(const std::optional<ValueType> value)
     {
         if (!value.has_value())
         {
@@ -82,8 +94,9 @@ public:
             }
             return 0;
         }
-        return setValue<Tag, Required, Parent>(*value);
+        return encode<Tag, Required, Parent>(*value);
     }
+
 };
 
 }

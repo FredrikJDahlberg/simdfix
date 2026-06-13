@@ -9,9 +9,19 @@
 
 namespace org::limitless::fix::encoder {
 
-struct MessageEncoder
+class MessageEncoder
 {
-    FieldEncoder m_encoder;
+
+protected:
+    FieldEncoder m_encoder{};
+
+public:
+    MessageEncoder() = default;
+
+    void wrap(Buffer data)
+    {
+        m_encoder.wrap(data);
+    }
 };
 
 }
