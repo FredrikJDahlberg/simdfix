@@ -247,6 +247,29 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     return -1;
 }
 
+inline size_t uint32ToAscii(const uint32_t value, std::span<uint8_t> dest, const size_t offset)
+{
+    if (value == 0)
+    {
+        dest[offset] = '0';
+        return 1;
+    }
+
+    const uint64_t high4 = (static_cast<uint64_t>(value) * 0x51EB851F) >> 37; // val / 10000
+    const uint64_t low4  = value - (high4 * 10000);                          // val % 10000
+    const uint64_t packed_digits = (high4 << 32) | low4;
+    const uint64_t tens = ((packed_digits * 0x147AE148ULL) >> 35) & 0x00FF00FF00FF00FFULL;
+    const uint64_t ones = packed_digits - (tens * 100);
+    uint64_t ascii = tens | (ones << 8);
+    ascii |= 0x3030303030303030ULL;
+    const uint64_t reversed = __builtin_bswap64(ascii);
+    size_t leading_zeros = std::countl_zero(reversed ^ 0x3030303030303030ULL) / 8;
+    const size_t length = 8 - leading_zeros;
+    const char* src_start = reinterpret_cast<const char*>(&ascii) + leading_zeros;
+    std::memcpy(dest.data() + offset, src_start, length);
+    return length;
+}
+
 inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateTime)
 {
     const auto data = reinterpret_cast<const uint8_t*>(dateTime.data());

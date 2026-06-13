@@ -17,6 +17,8 @@
 #include <concepts>
 #include <stdexcept>
 
+#include "org/limitless/fix/utils/Utils.hpp"
+
 namespace org::limitless::fix::encoder {
 
 
@@ -27,7 +29,7 @@ concept EncodableInteger = std::same_as<ValueType, int32_t> ||
                            std::same_as<ValueType, int64_t>;
 class FieldEncoder
 {
-    Buffer m_data{};
+    std::span<uint8_t> m_data{};
     size_t m_offset{};
 
     template <int32_t Tag, ParentType::Values Parent, typename ValueType>
@@ -57,22 +59,27 @@ public:
      * Constructs an encoder over a destination buffer.
      * @param data destination message bytes
      */
-    explicit FieldEncoder(const Buffer data) : m_data{data}
+    explicit FieldEncoder(const std::span<uint8_t> data) : m_data{data}
     {
     }
 
-    void wrap(const Buffer data)
+    void wrap(const std::span<uint8_t> data)
     {
         m_data = data;
     }
 
     template <int32_t Tag, bool Required, ParentType::Values Parent, typename ValueType>
     requires EncodableInteger<ValueType>
-    size_t encode(const ValueType value)
+    void encode(const ValueType value)
     {
-        constexpr size_t encoded_bytes = getEncodedSize<Tag, Parent, ValueType>();
-        encode(value, encoded_bytes);
-        return encoded_bytes;
+        if constexpr (Required)
+        {
+            // check null value
+        }
+        m_offset += utils::uint32ToAscii(Tag, m_data, m_offset);
+        m_data[m_offset ++] = '=';
+        m_offset += utils::uint32ToAscii(value, m_data, m_offset);
+        m_data[m_offset++] = 1;
     }
 
     template <int32_t Tag, bool Required, ParentType::Values Parent, typename ValueType>

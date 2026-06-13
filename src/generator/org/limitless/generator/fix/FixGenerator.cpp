@@ -339,14 +339,11 @@ static void generateWrapNextDecoders(std::ostream& out, const Record& record)
     }
 }
 
-// msg.hops().next().one(1).two(2).next().one(1).next().two();
-
 static void generateWrapNextEncoders(std::ostream& out, const Record& record)
 {
     if (record.m_parent == ParentType::Message)
     {
-        out << std::format("    {}Encoder& wrap(", record.m_name);
-        out << "const std::span<const uint8_t> data)\n";
+        out << std::format("    {}Encoder& wrap(const std::span<uint8_t> data)\n", record.m_name);
         out << "    {\n";
         out << "        MessageEncoder::wrap(data);\n";
         out << "        return *this;\n";

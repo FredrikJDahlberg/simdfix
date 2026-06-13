@@ -18,7 +18,7 @@ protected:
 public:
     MessageEncoder() = default;
 
-    void wrap(Buffer data)
+    void wrap(const std::span<uint8_t> data)
     {
         m_encoder.wrap(data);
     }

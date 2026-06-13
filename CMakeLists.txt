@@ -108,6 +108,7 @@ endfunction()
 
 add_fix_test(PayloadDecoderTest     "${TEST_PATH}/decoder/PayloadDecoderTest.cpp")
 add_fix_test(MessageDecoderTest      "${TEST_PATH}/decoder/MessageDecoderTest.cpp")
+add_fix_test(MessageEncoderTest      "${TEST_PATH}/encoder/MessageEncoderTest.cpp")
 add_fix_test(GroupDecoderTest "${TEST_PATH}/decoder/GroupDecoderTest.cpp")
 add_fix_test(UtilsTest       "${TEST_PATH}/utils/UtilsTest.cpp")
 add_fix_test(BitSetTest      "${TEST_PATH}/utils/BitSetTest.cpp")
@@ -115,11 +116,9 @@ add_fix_test(Uint8x16Test    "${TEST_PATH}/simd/Uint8x16Test.cpp")
 
 set(FIX_TEST_TARGETS
         PayloadDecoderTest
-        MessageDecoderTest
+        MessageDecoderTest MessageEncoderTest
         GroupDecoderTest
-        UtilsTest
-        BitSetTest
-        Uint8x16Test)
+        UtilsTest BitSetTest Uint8x16Test)
 
 add_custom_target(AllTests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
