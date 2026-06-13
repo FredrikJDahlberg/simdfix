@@ -11,16 +11,41 @@
 #include <string_view>
 #include <expected>
 #include <chrono>
+#include "org/limitless/fix/simd/Uint8x16.hpp"
 
 namespace org::limitless::fix {
 
 inline constexpr int32_t MaxGroupDepth = 8;
 
+struct Protocol
+{
+    enum Values
+    {
+        Null,
+        FIXT_1_1,
+        FIX_4_3,
+        FIX_4_4,
+        Max
+    };
+    static constexpr std::string_view Codes[]  =
+    {
+        "?",
+        "FIXT.1.1",
+        "FIX.4.3",
+        "FIX.4.4"
+    };
+
+    static constexpr auto code(const Values value)
+    {
+        return value >= Null && value < Max ? Codes[value] : Codes[0];
+    }
+};
+
 struct Token
 {
-    uint16_t m_position;
-    uint16_t m_tag;
-    uint16_t m_length;
+    uint16_t m_position{};
+    uint16_t m_tag{};
+    uint16_t m_length{};
 };
 
 struct Category

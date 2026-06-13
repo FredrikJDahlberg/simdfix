@@ -34,6 +34,11 @@ public:
     {
     }
 
+    GroupDecoder(const GroupDecoder&) = delete;
+    GroupDecoder& operator=(const GroupDecoder&) = delete;
+    GroupDecoder(GroupDecoder&&) = delete;
+    GroupDecoder& operator=(GroupDecoder&&) = delete;
+
     /**
      * Locates the NumInGroup count field for tag and resets iteration. The
      * tag immediately following it is taken as the group's delimiter

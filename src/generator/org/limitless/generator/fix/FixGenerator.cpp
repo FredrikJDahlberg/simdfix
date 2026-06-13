@@ -69,15 +69,14 @@ static void generateEnums(std::ostream& out, const Record& record)
         out << std::format("        {}{}\n", value->m_name, value != end - 1 ? "," : "");
     }
     out << "    };\n";
+
     auto size = record.m_fields.size();
-    out << std::format("    static constexpr uint8_t Codes[{}]  =\n    {{\n", size);
+    out << std::format("    static constexpr std::string_view Codes[{}]  =\n    {{\n", size);
     for (auto value = record.m_fields.begin(); value != end; ++value)
     {
-        out << std::format("        '{}'{}\n", value->m_type[0], value != end - 1 ? "," : "");
+        out << std::format("        \"{}\"{}\n", value->m_type, value != end - 1 ? "," : "");
     }
     out << "    };\n";
-    out << std::format("    {}() : m_value{{Null}} {{}}\n", record.m_name);
-    out << "    Values m_value;\n";
     out << "};\n\n";
 }
 
@@ -286,6 +285,12 @@ static void generateDecoderConstructors(std::ostream& out, const Record& record,
     if (!record.m_records.empty() || record.m_parent == ParentType::Group)
     {
         out << "    {\n    }\n\n";
+
+        const auto name = std::format("{}{}", record.m_name, codec);
+        out << std::format("    {}(const {}&) = delete;\n", name, name);
+        out << std::format("    {}& operator=(const {}&) = delete;\n", name, name);
+        out << std::format("    {}({}&&) = delete;\n", name, name);
+        out << std::format("    {}& operator=({}&&) = delete;\n\n", name, name);
     }
 }
 
@@ -319,8 +324,6 @@ static void generateWrapNext(std::ostream& out, const Record& record)
         out << "    {\n";
         out << "        MessageDecoder::context(context);\n";
         out << "    }\n\n";
-        out << "// m_decoder.context(" << record.m_parent.name() << ");\n";
-
     } else if (record.m_parent == ParentType::Group)
     {
         out << std::format("    {}Decoder& wrap()\n", record.m_name);
@@ -350,7 +353,7 @@ static void generateGetters(std::ostream& out, const Record& record)
             const auto isEnum = field.m_category == Category::Enum;
             const auto mandatory = std::string{field.m_presence.m_value == Presence::Required ? "true" : "false"};
             out << std::format("    [[nodiscard]] std::expected<{}, Result::Values> {}() const\n",
-                               isEnum ? field.m_type : category.type(), methodName);
+                               isEnum ? std::format("{}::Values", field.m_type) : category.type(), methodName);
             out << "    {\n";
             std::string arg = isEnum ? std::format(", {}", field.m_type) : "";
             out << std::format("        return m_decoder.get{}<{}, {}{}, ParentType::{}>();\n",

@@ -254,17 +254,16 @@ inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateT
 }
 
 template <typename Enum>
-Enum find(const uint8_t code)
+Enum::Values find(const std::string_view code)
 {
     const auto end = Enum::Codes + std::size(Enum::Codes);
     const auto found = std::find(Enum::Codes, end, code);
-    Enum value{};
     if (found != end)
     {
         auto index = std::distance(Enum::Codes, found);
-        value.m_value = static_cast<Enum::Values>(index);
+        return static_cast<Enum::Values>(index);
     }
-    return value;
+    return Enum::Values::Null;
 }
 
 }

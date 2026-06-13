@@ -284,13 +284,13 @@ public:
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
     template <int32_t Tag, bool Required, typename Enum, ParentType Parent>
-    [[nodiscard]] constexpr std::expected<Enum, Result::Values> getEnum() const
+    [[nodiscard]] constexpr std::expected<typename Enum::Values, Result::Values> getEnum() const
     {
         const auto index = findIndex<Tag, Parent>();
         if (index >= 0)
         {
             const auto token = m_tokens[index];
-            const auto code = m_data[token.m_position];
+            const auto code = std::string_view{reinterpret_cast<const char*>(m_data.data() + token.m_position), token.m_length};
             return utils::find<Enum>(code);
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};

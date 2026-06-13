@@ -6,22 +6,6 @@
 
 namespace org::limitless::fix::messages {
 
-struct Protocol
-{
-    enum Values
-    {
-        Null,
-        FIX_1_1
-    };
-    static constexpr uint8_t Codes[2]  =
-    {
-        '?',
-        'F'
-    };
-    Protocol() : m_value{Null} {}
-    Values m_value;
-};
-
 struct Encryption
 {
     enum Values
@@ -29,13 +13,11 @@ struct Encryption
         Null,
         None
     };
-    static constexpr uint8_t Codes[2]  =
+    static constexpr std::string_view Codes[2]  =
     {
-        '?',
-        '0'
+        "?",
+        "0"
     };
-    Encryption() : m_value{Null} {}
-    Values m_value;
 };
 
 struct MessageType
@@ -48,16 +30,14 @@ struct MessageType
         TestRequest,
         Heartbeat
     };
-    static constexpr uint8_t Codes[5]  =
+    static constexpr std::string_view Codes[5]  =
     {
-        '?',
-        'A',
-        '5',
-        '1',
-        '0'
+        "?",
+        "A",
+        "5",
+        "1",
+        "0"
     };
-    MessageType() : m_value{Null} {}
-    Values m_value;
 };
 
 } // namespace org::limitless::fix::messages

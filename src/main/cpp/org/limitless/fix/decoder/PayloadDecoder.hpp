@@ -29,26 +29,19 @@ class PayloadDecoder
 {
     static constexpr size_t MaxSize = 64;
 
-    Token m_tokens[MaxSize]{};
-    uint16_t m_tags[MaxSize]{};
+    static constexpr uint32_t RequiredFieldCount = 7;
+    static constexpr uint32_t MessageFragmentLimit = 32;
 
-    simd::Uint8x16 m_block{};
-    uint32_t m_tag{};
-    int32_t m_position{};
-    size_t m_count{};
+    static constexpr uint64_t CheckSumMask = 1 |  '1' << 8 | '0' << 16 | '=' << 24 | 1ULL << 56;
 
-public:
-    using position_t = uint32_t;
-    using length_t = uint16_t;
-    using value_t = uint16_t;
-    using data_t = uint8_t;
+    static inline const simd::Uint8x16 TagEndsBlock{'='};
+    static inline const simd::Uint8x16 FieldEndsBlock{0x01};
+    static inline const simd::Uint8x16 ZerosBlock{'0'};
+    static inline const simd::Uint8x16 NineMask{9};
 
     static constexpr uint32_t BeginStringPosition = 0;
     static constexpr uint32_t BodyLengthPosition = 1;
     static constexpr uint32_t MessageTypePosition = 2;
-
-    static constexpr uint32_t RequiredFieldCount = 7;
-    static constexpr uint32_t MessageFragmentLimit = 32;
 
     static constexpr uint32_t CheckSumTag = 10;
     static constexpr uint32_t BodyLengthTag = 9;
@@ -57,15 +50,36 @@ public:
     static constexpr uint8_t TagEnd = '=';
     static constexpr uint8_t FieldEnd = 0x01;
 
-    static constexpr uint8_t BeginString[12] = { '8', '=', 'F', 'I', 'X', 'T', '.', '1', '.', '1', FieldEnd, '9' };
-    static constexpr uint64_t CheckSumMask = 1 |  '1' << 8 | '0' << 16 | '=' << 24 | 1ULL << 56;
+    Token m_tokens[MaxSize]{};
+    uint16_t m_tags[MaxSize]{};
 
-    static inline const simd::Uint8x16 TagEndsBlock{'='};
-    static inline const simd::Uint8x16 FieldEndsBlock{0x01};
-    static inline const simd::Uint8x16 ZerosBlock{'0'};
-    static inline const simd::Uint8x16 NineMask{9};
+    simd::Uint8x16 m_block{};
+    uint32_t m_tag{};
+    int32_t m_position{};
+    size_t m_count{};
 
-    PayloadDecoder() noexcept = default;
+    uint8_t m_protocol[16];
+    uint32_t m_protocolLength;
+
+public:
+    using position_t = uint32_t;
+    using length_t = uint16_t;
+    using value_t = uint16_t;
+    using data_t = uint8_t;
+
+    PayloadDecoder() = delete;
+
+    explicit PayloadDecoder(const Protocol::Values protocol)
+    {
+        m_protocol[0] = '8';
+        m_protocol[1] = '=';
+        const auto code = Protocol::code(protocol);
+        const auto size = code.size();
+        std::memcpy(m_protocol + 2, code.data(), size);
+        m_protocol[2 + size] = '\001'; // FIXME
+        m_protocolLength = size + 2;
+    }
+
     ~PayloadDecoder() = default;
 
     PayloadDecoder(const PayloadDecoder&) = delete;
@@ -126,7 +140,7 @@ public:
 
         const auto data = buffer.data();
         const auto length = static_cast<length_t>(buffer.size());
-        if (std::memcmp(data, BeginString, sizeof(BeginString) - 1) != 0)
+        if (std::memcmp(data, m_protocol, m_protocolLength) != 0)
         {
             return { 8, Result::InvalidBeginString };
         }

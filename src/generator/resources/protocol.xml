@@ -3,10 +3,6 @@
     <types>
         <type name="String8" primitiveType="char" length="8"/>
 
-        <enum name="Protocol">
-            <element name="FIX_1_1" value="FIXT.1.1"/>
-        </enum>
-
         <enum name="Encryption">
             <element name="None" value="0"/>
         </enum>

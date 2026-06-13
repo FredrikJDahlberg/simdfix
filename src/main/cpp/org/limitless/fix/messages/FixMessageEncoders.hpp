@@ -19,6 +19,11 @@ struct NestedGroupEncoder : GroupEncoder
     {
     }
 
+    NestedGroupEncoder(const NestedGroupEncoder&) = delete;
+    NestedGroupEncoder& operator=(const NestedGroupEncoder&) = delete;
+    NestedGroupEncoder(NestedGroupEncoder&&) = delete;
+    NestedGroupEncoder& operator=(NestedGroupEncoder&&) = delete;
+
     std::string_view& name(const char& value)
     {
         m_encoder.setString<501, false, ParentType::Group>(value);
@@ -50,6 +55,11 @@ public:
         m_nestedGroup{encoder}
     {
     }
+
+    HopsEncoder(const HopsEncoder&) = delete;
+    HopsEncoder& operator=(const HopsEncoder&) = delete;
+    HopsEncoder(HopsEncoder&&) = delete;
+    HopsEncoder& operator=(HopsEncoder&&) = delete;
 
     std::string_view& hopCompID(const char& value)
     {
@@ -87,13 +97,12 @@ public:
     {
     }
 
-    static constexpr uint16_t MessageId = 'A';
+    LogonEncoder(const LogonEncoder&) = delete;
+    LogonEncoder& operator=(const LogonEncoder&) = delete;
+    LogonEncoder(LogonEncoder&&) = delete;
+    LogonEncoder& operator=(LogonEncoder&&) = delete;
 
-    Protocol& beginString(const Protocol& value)
-    {
-        m_encoder.setEnum<8, false, Protocol, ParentType::Message>(value);
-        return *this;
-    }
+    static constexpr uint16_t MessageId = 'A';
 
     std::uint32_t& bodyLength(const uint32& value)
     {
@@ -161,13 +170,12 @@ public:
     {
     }
 
-    static constexpr uint16_t MessageId = '5';
+    LogoutEncoder(const LogoutEncoder&) = delete;
+    LogoutEncoder& operator=(const LogoutEncoder&) = delete;
+    LogoutEncoder(LogoutEncoder&&) = delete;
+    LogoutEncoder& operator=(LogoutEncoder&&) = delete;
 
-    Protocol& beginString(const Protocol& value)
-    {
-        m_encoder.setEnum<8, false, Protocol, ParentType::Message>(value);
-        return *this;
-    }
+    static constexpr uint16_t MessageId = '5';
 
     std::uint32_t& bodyLength(const uint32& value)
     {
@@ -229,13 +237,12 @@ public:
     {
     }
 
-    static constexpr uint16_t MessageId = '0';
+    HeartbeatEncoder(const HeartbeatEncoder&) = delete;
+    HeartbeatEncoder& operator=(const HeartbeatEncoder&) = delete;
+    HeartbeatEncoder(HeartbeatEncoder&&) = delete;
+    HeartbeatEncoder& operator=(HeartbeatEncoder&&) = delete;
 
-    Protocol& beginString(const Protocol& value)
-    {
-        m_encoder.setEnum<8, false, Protocol, ParentType::Message>(value);
-        return *this;
-    }
+    static constexpr uint16_t MessageId = '0';
 
     std::uint32_t& bodyLength(const uint32& value)
     {
@@ -297,13 +304,12 @@ public:
     {
     }
 
-    static constexpr uint16_t MessageId = '1';
+    TestRequestEncoder(const TestRequestEncoder&) = delete;
+    TestRequestEncoder& operator=(const TestRequestEncoder&) = delete;
+    TestRequestEncoder(TestRequestEncoder&&) = delete;
+    TestRequestEncoder& operator=(TestRequestEncoder&&) = delete;
 
-    Protocol& beginString(const Protocol& value)
-    {
-        m_encoder.setEnum<8, false, Protocol, ParentType::Message>(value);
-        return *this;
-    }
+    static constexpr uint16_t MessageId = '1';
 
     std::uint32_t& bodyLength(const uint32& value)
     {

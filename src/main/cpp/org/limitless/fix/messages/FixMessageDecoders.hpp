@@ -19,6 +19,11 @@ struct NestedGroupDecoder : GroupDecoder
     {
     }
 
+    NestedGroupDecoder(const NestedGroupDecoder&) = delete;
+    NestedGroupDecoder& operator=(const NestedGroupDecoder&) = delete;
+    NestedGroupDecoder(NestedGroupDecoder&&) = delete;
+    NestedGroupDecoder& operator=(NestedGroupDecoder&&) = delete;
+
     NestedGroupDecoder& wrap()
     {
         GroupDecoder::wrap(500);
@@ -59,6 +64,11 @@ public:
         m_nestedGroup{decoder}
     {
     }
+
+    HopsDecoder(const HopsDecoder&) = delete;
+    HopsDecoder& operator=(const HopsDecoder&) = delete;
+    HopsDecoder(HopsDecoder&&) = delete;
+    HopsDecoder& operator=(HopsDecoder&&) = delete;
 
     HopsDecoder& wrap()
     {
@@ -105,6 +115,11 @@ public:
     {
     }
 
+    LogonDecoder(const LogonDecoder&) = delete;
+    LogonDecoder& operator=(const LogonDecoder&) = delete;
+    LogonDecoder(LogonDecoder&&) = delete;
+    LogonDecoder& operator=(LogonDecoder&&) = delete;
+
     static constexpr uint16_t MessageId = 'A';
 
     LogonDecoder& wrap(const std::span<const uint8_t> data,
@@ -121,18 +136,12 @@ public:
         MessageDecoder::context(context);
     }
 
-// m_decoder.context(Message);
-    [[nodiscard]] std::expected<Protocol, Result::Values> beginString() const
-    {
-        return m_decoder.getEnum<8, false, Protocol, ParentType::Message>();
-    }
-
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
         return m_decoder.getUint32<9, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
         return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
     }
@@ -157,7 +166,7 @@ public:
         return m_decoder.getTimestamp<52, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<Encryption, Result::Values> encryptMethod() const
+    [[nodiscard]] std::expected<Encryption::Values, Result::Values> encryptMethod() const
     {
         return m_decoder.getEnum<98, false, Encryption, ParentType::Message>();
     }
@@ -185,6 +194,11 @@ public:
     {
     }
 
+    LogoutDecoder(const LogoutDecoder&) = delete;
+    LogoutDecoder& operator=(const LogoutDecoder&) = delete;
+    LogoutDecoder(LogoutDecoder&&) = delete;
+    LogoutDecoder& operator=(LogoutDecoder&&) = delete;
+
     static constexpr uint16_t MessageId = '5';
 
     LogoutDecoder& wrap(const std::span<const uint8_t> data,
@@ -201,18 +215,12 @@ public:
         MessageDecoder::context(context);
     }
 
-// m_decoder.context(Message);
-    [[nodiscard]] std::expected<Protocol, Result::Values> beginString() const
-    {
-        return m_decoder.getEnum<8, false, Protocol, ParentType::Message>();
-    }
-
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
         return m_decoder.getUint32<9, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
         return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
     }
@@ -260,6 +268,11 @@ public:
     {
     }
 
+    HeartbeatDecoder(const HeartbeatDecoder&) = delete;
+    HeartbeatDecoder& operator=(const HeartbeatDecoder&) = delete;
+    HeartbeatDecoder(HeartbeatDecoder&&) = delete;
+    HeartbeatDecoder& operator=(HeartbeatDecoder&&) = delete;
+
     static constexpr uint16_t MessageId = '0';
 
     HeartbeatDecoder& wrap(const std::span<const uint8_t> data,
@@ -276,18 +289,12 @@ public:
         MessageDecoder::context(context);
     }
 
-// m_decoder.context(Message);
-    [[nodiscard]] std::expected<Protocol, Result::Values> beginString() const
-    {
-        return m_decoder.getEnum<8, false, Protocol, ParentType::Message>();
-    }
-
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
         return m_decoder.getUint32<9, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
         return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
     }
@@ -335,6 +342,11 @@ public:
     {
     }
 
+    TestRequestDecoder(const TestRequestDecoder&) = delete;
+    TestRequestDecoder& operator=(const TestRequestDecoder&) = delete;
+    TestRequestDecoder(TestRequestDecoder&&) = delete;
+    TestRequestDecoder& operator=(TestRequestDecoder&&) = delete;
+
     static constexpr uint16_t MessageId = '1';
 
     TestRequestDecoder& wrap(const std::span<const uint8_t> data,
@@ -351,18 +363,12 @@ public:
         MessageDecoder::context(context);
     }
 
-// m_decoder.context(Message);
-    [[nodiscard]] std::expected<Protocol, Result::Values> beginString() const
-    {
-        return m_decoder.getEnum<8, false, Protocol, ParentType::Message>();
-    }
-
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
         return m_decoder.getUint32<9, false, ParentType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
         return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
     }

@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
-#include <cstring>
 #include <memory>
 #include <string_view>
 
@@ -15,6 +14,8 @@
 #include "org/limitless/fix/messages/FixMessageHandler.hpp"
 
 #define SOH "\x01"
+
+using namespace org::limitless::fix;
 
 static constexpr std::uint8_t LOGIN[] =
     "8=FIXT.1.1" SOH
@@ -111,7 +112,7 @@ struct LogonGetterHandler : org::limitless::fix::messages::MessageHandler<LogonG
         sink += target.size();
         sink += logon.sequenceNumber().value_or(0);
         sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
-        sink += logon.encryptMethod().value_or(Encryption{}).m_value;
+        sink += logon.encryptMethod().value_or(Encryption::None);
         sink += logon.heartbeatInterval().value_or(0);
         return org::limitless::fix::Result::Success;
     }
@@ -136,7 +137,7 @@ struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<L
         sink += target.size();
         sink += logon.sequenceNumber().value_or(0);
         sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
-        sink += logon.encryptMethod().value_or(Encryption{}).m_value;
+        sink += logon.encryptMethod().value_or(Encryption::None);
         sink += logon.heartbeatInterval().value_or(0);
 
         auto& hops = logon.hops();
@@ -154,7 +155,7 @@ struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<L
 // COLD: 1 GB buffer — data comes from DRAM for most of the run.
 static void benchColdCache()
 {
-    org::limitless::fix::decoder::PayloadDecoder decoder;
+    decoder::PayloadDecoder decoder{org::limitless::fix::Protocol::FIXT_1_1};
 
     constexpr size_t COLD_SIZE = 1024ULL * 1024 * 1024;
     auto coldBuf = std::make_unique<uint8_t[]>(COLD_SIZE);
@@ -175,7 +176,7 @@ static void benchColdCache()
 // HOT: 256 KB buffer — fits in L2, measures pure compute throughput.
 static void benchHotCache()
 {
-    org::limitless::fix::decoder::PayloadDecoder decoder;
+    decoder::PayloadDecoder decoder{Protocol::FIXT_1_1};
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -213,7 +214,7 @@ static void benchHotCache()
 // GETTERS: parse + apply every LogonDecoder getter to the message.
 static void benchGetters()
 {
-    org::limitless::fix::decoder::PayloadDecoder decoder;
+    decoder::PayloadDecoder decoder{Protocol::FIXT_1_1};
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -244,7 +245,7 @@ static void benchGetters()
 // repeating group, to the message.
 static void benchGroups()
 {
-    org::limitless::fix::decoder::PayloadDecoder decoder;
+    decoder::PayloadDecoder decoder{Protocol::FIXT_1_1};
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
