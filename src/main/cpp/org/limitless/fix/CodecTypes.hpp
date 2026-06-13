@@ -104,35 +104,14 @@ struct Category
         "Message"
     };
 
-    constexpr Category() : m_value{Null} {}
-    constexpr Category(const Values value) : m_value{value} {}
-
-    explicit constexpr Category(const std::string_view name) : m_value{Null}
+    [[nodiscard]] static constexpr std::string_view name(const Values value)
     {
-        constexpr auto end = Names + std::size(Names);
-        const auto found = std::find(Names, end, name);
-        m_value = found != end ? static_cast<Values>(found - Names) : Null;
+        return Names[value];
     }
-
-    [[nodiscard]] constexpr std::string_view name() const
+    [[nodiscard]] static constexpr std::string_view type(const Values value)
     {
-        return Names[m_value];
+        return Types[value];
     }
-    [[nodiscard]] constexpr std::string_view type() const
-    {
-        return Types[m_value];
-    }
-
-    [[nodiscard]] constexpr bool operator==(const Values value) const
-    {
-        return m_value == value;
-    }
-    [[nodiscard]] constexpr bool operator!=(const Values value) const
-    {
-        return m_value != value;
-    }
-
-    Values m_value;
 };
 
 // Per-session expectations checked by MessageDecoder::checkRequired.
@@ -152,20 +131,7 @@ struct ParentType
         "Null", "Message", "Component", "Group", "Enum"
     };
 
-    constexpr ParentType() : m_value{Null} {}
-    constexpr ParentType(const Values value) : m_value{value} {}
-    constexpr ParentType(const std::string_view name) : m_value{Null}
-    {
-        constexpr auto end = Names + std::size(Names);
-        const auto found = std::find(Names, end, name);
-        m_value = found != end ? static_cast<Values>(found - Names) : Null;
-    }
-
-    [[nodiscard]] constexpr std::string_view name() const { return Names[m_value]; }
-    constexpr bool operator==(const Values value) const { return m_value == value; }
-    constexpr bool operator!=(const Values value) const { return m_value != value; }
-
-    Values m_value;
+    [[nodiscard]] static constexpr std::string_view name(const Values value) { return Names[value]; }
 };
 
 struct Presence
@@ -175,23 +141,17 @@ struct Presence
     static constexpr std::string_view Strings[] = { "NUll", "constant", "optional", "required" };
     static constexpr std::string_view Names[] = { "Null", "Constant", "Optional", "Required" };
 
-    constexpr Presence() : m_value{Null} {}
+    [[nodiscard]] static constexpr std::string_view name(const Values value)
+    {
+        return Names[value];
+    }
 
-    constexpr Presence(const Values value) : m_value{value} {}
-
-    explicit constexpr Presence(const std::string_view name) : m_value{Required}
+    [[nodiscard]] static constexpr Values parse(const std::string_view name)
     {
         constexpr auto end = Strings + std::size(Strings);
         const auto found = std::find(Strings, end, name);
-        m_value = found != end ? static_cast<Values>(found - Strings) : Null;
+        return found != end ? static_cast<Values>(found - Strings) : Null;
     }
-
-    [[nodiscard]] constexpr std::string_view name() const
-    {
-        return Names[m_value];
-    }
-
-    Values m_value;
 };
 
 struct Result

@@ -24,9 +24,9 @@ struct Type
     std::string m_name;
     int32_t m_size;
     int32_t m_length;
-    Category m_type;
+    Category::Values m_type;
 
-    Type(std::string name, const int32_t size, const int32_t length, const Category type = Category::Null)
+    Type(std::string name, const int32_t size, const int32_t length, const Category::Values type = Category::Null)
         : m_name(std::move(name)), m_size(size), m_length(length), m_type{type}
     {
     }
@@ -38,13 +38,13 @@ struct Field
     std::string m_name;
     std::string m_type;
     int32_t m_length{};
-    Category m_category{Category::Null};
-    ParentType m_parent{};
-    Presence m_presence{Presence::Required};
+    Category::Values m_category{Category::Null};
+    ParentType::Values m_parent{};
+    Presence::Values m_presence{Presence::Required};
 
     Field() = default;
     Field(const int32_t tag, std::string  name, std::string type,
-          const int32_t length, const Presence presence, const Category category, const ParentType parent) :
+          const int32_t length, const Presence::Values presence, const Category::Values category, const ParentType::Values parent) :
         m_tag(tag), m_name(std::move(name)), m_type(std::move(type)), m_length(length),
         m_category(category), m_parent(parent), m_presence{presence}
     {
@@ -60,19 +60,19 @@ struct Record
 {
     std::string m_name{};
     std::string m_id{};
-    ParentType m_parent{};
+    ParentType::Values m_parent{};
     std::vector<Field> m_fields{};
     std::vector<Field> m_records{};
     uint32_t m_tag;
 
     Record() = default;
 
-    Record(std::string name, std::string id, const ParentType parent)
+    Record(std::string name, std::string id, const ParentType::Values parent)
         : m_name(std::move(name)), m_id(std::move(id)), m_parent(parent), m_tag{0}
     {
     }
 
-    Record(std::string name, std::string id, const ParentType type, const std::vector<Field>& fields)
+    Record(std::string name, std::string id, const ParentType::Values type, const std::vector<Field>& fields)
         : m_name(std::move(name)), m_id(std::move(id)), m_parent(type), m_fields{fields}, m_tag{0}
     {
     }
@@ -140,7 +140,7 @@ struct DataModel
     }
 
     void processFields(const pugi::xml_object_range<pugi::xml_node_iterator>& nodes,
-                       const ParentType parent,
+                       const ParentType::Values parent,
                        Record& record)
     {
         for (const auto& field : nodes)
@@ -152,7 +152,7 @@ struct DataModel
             const std::string_view primitive = field.attribute("primitiveType").as_string();
             const auto resolvedType = std::string{type.empty() ? primitive : type};
             const std::string_view presenceAttr = field.attribute("presence").as_string();
-            Presence presence{presenceAttr};
+            const auto presence = Presence::parse(presenceAttr);
             auto refType = m_types.find(resolvedType);
             if (nodeType == "group")
             {
@@ -195,7 +195,7 @@ struct DataModel
         }
     }
 
-    void processRecords(const pugi::xpath_node_set& records, const ParentType parent)
+    void processRecords(const pugi::xpath_node_set& records, const ParentType::Values parent)
     {
         for (const auto& recordNode : records)
         {

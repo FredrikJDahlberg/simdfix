@@ -269,7 +269,7 @@ static void generateDecoderConstructors(std::ostream& out, const Record& record,
     if (record.m_parent == ParentType::Component || record.m_parent == ParentType::Group)
     {
         out << std::format("        {}{}{{{}}}{}\n",
-                           record.m_parent.name(), codec, uncap(codec),
+                           ParentType::name(record.m_parent), codec, uncap(codec),
                            record.m_records.empty() ? "" : ",");
     }
     if (!record.m_records.empty())
@@ -342,7 +342,7 @@ static void generateWrapNext(std::ostream& out, const Record& record)
 
 static void generateGetters(std::ostream& out, const Record& record)
 {
-    auto parent = record.m_parent.name();
+    auto parent = ParentType::name(record.m_parent);
     for (const auto& field: record.m_fields)
     {
         auto methodName = field.m_name;
@@ -351,13 +351,13 @@ static void generateGetters(std::ostream& out, const Record& record)
         if (field.m_category != Category::Counter && field.m_category != Category::Struct)
         {
             const auto isEnum = field.m_category == Category::Enum;
-            const auto mandatory = std::string{field.m_presence.m_value == Presence::Required ? "true" : "false"};
+            const auto mandatory = std::string{field.m_presence == Presence::Required ? "true" : "false"};
             out << std::format("    [[nodiscard]] std::expected<{}, Result::Values> {}() const\n",
-                               isEnum ? std::format("{}::Values", field.m_type) : category.type(), methodName);
+                               isEnum ? std::format("{}::Values", field.m_type) : Category::type(category), methodName);
             out << "    {\n";
             std::string arg = isEnum ? std::format(", {}", field.m_type) : "";
             out << std::format("        return m_decoder.get{}<{}, {}{}, ParentType::{}>();\n",
-                               category.name(), field.m_tag, mandatory, arg, parent);
+                               Category::name(category), field.m_tag, mandatory, arg, parent);
             out << "    }\n\n";
         }
     }
@@ -377,7 +377,7 @@ static void generateGetters(std::ostream& out, const Record& record)
 
 static void generateSetters(std::ostream& out, const Record& record)
 {
-    auto parent = record.m_parent.name();
+    auto parent = ParentType::name(record.m_parent);
     for (const auto& field: record.m_fields)
     {
         auto methodName = field.m_name;
@@ -386,13 +386,13 @@ static void generateSetters(std::ostream& out, const Record& record)
         if (field.m_category != Category::Counter && field.m_category != Category::Struct)
         {
             const auto isEnum = field.m_category == Category::Enum;
-            const auto mandatory = std::string{field.m_presence.m_value == Presence::Required ? "true" : "false"};
+            const auto mandatory = std::string{field.m_presence == Presence::Required ? "true" : "false"};
             out << std::format("    {}& {}(const {}& value)\n",
-                               isEnum ? field.m_type : category.type(), methodName, field.m_type);
+                               isEnum ? field.m_type : Category::type(category), methodName, field.m_type);
             out << "    {\n";
             std::string arg = isEnum ? std::format(", {}", field.m_type) : "";
             out << std::format("        m_encoder.set{}<{}, {}{}, ParentType::{}>(value);\n",
-                               category.name(), field.m_tag, mandatory, arg, parent);
+                               Category::name(category), field.m_tag, mandatory, arg, parent);
             out << "        return *this;\n";
             out << "    }\n\n";
         }
@@ -414,7 +414,7 @@ static void generateSetters(std::ostream& out, const Record& record)
 static void generateRecordDecoders(std::ostream& out, const Record& record)
 {
     out << std::format("struct {}Decoder : ", record.m_name);
-    out << std::format("{}Decoder\n{{\n", record.m_parent.name());
+    out << std::format("{}Decoder\n{{\n", ParentType::name(record.m_parent));
 
     generateStructFields(out, record, "Decoder");
     generateDecoderConstructors(out, record, "Decoder");
@@ -430,7 +430,7 @@ static void generateRecordDecoders(std::ostream& out, const Record& record)
 static void generateRecordEncoders(std::ostream& out, const Record& record)
 {
     out << std::format("struct {}Encoder : ", record.m_name);
-    out << std::format("{}Encoder\n{{\n", record.m_parent.name());
+    out << std::format("{}Encoder\n{{\n", ParentType::name(record.m_parent));
 
     generateStructFields(out, record, "Encoder");
     generateDecoderConstructors(out, record, "Encoder");
