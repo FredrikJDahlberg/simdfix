@@ -32,6 +32,16 @@ class FieldEncoder
     std::span<uint8_t> m_data{};
     size_t m_offset{};
 
+    template<std::size_t N>
+    struct FixedString {
+        char value[N];
+
+        // Constexpr constructor allows compilation-time string parsing
+        constexpr FixedString(const char (&str)[N]) {
+            std::copy_n(str, N, value);
+        }
+    };
+
     template <int32_t Tag, ParentType::Values Parent, typename ValueType>
     static constexpr size_t getEncodedSize() noexcept
     {
@@ -68,7 +78,7 @@ public:
         m_data = data;
     }
 
-    template <int32_t Tag, bool Required, ParentType::Values Parent, typename ValueType>
+    template <FixedString Tag, bool Required, ParentType::Values Parent, typename ValueType>
     requires EncodableInteger<ValueType>
     void encode(const ValueType value)
     {
@@ -76,21 +86,26 @@ public:
         {
             // check null value
         }
-        m_offset += utils::uint32ToAscii(Tag, m_data, m_offset);
-        m_data[m_offset ++] = '=';
+        auto size = sizeof(Tag);
+        std::memcpy(m_data.data() + m_offset, Tag.value, size);
+        m_offset += size;
+        m_data[m_offset] = '=';
+        ++m_offset;
         m_offset += utils::uint32ToAscii(value, m_data, m_offset);
-        m_data[m_offset++] = 1;
+        m_data[m_offset] = 1;
+        ++m_offset;
     }
 
-    template <int32_t Tag, bool Required, ParentType::Values Parent, typename ValueType>
+    template <FixedString Tag, bool Required, ParentType::Values Parent, typename ValueType>
     size_t encode(const ValueType value)
     {
-        constexpr size_t encoded_bytes = getEncodedSize<Tag, Parent, ValueType>();
-        encode(value, encoded_bytes);
-        return encoded_bytes;
+        //constexpr size_t encoded_bytes = getEncodedSize<Tag, Parent, ValueType>();
+        //encode(value, encoded_bytes);
+        //return encoded_bytes;
+        return 0;
     }
 
-    template <int32_t Tag, bool Required, ParentType::Values Parent, typename ValueType>
+    template <FixedString Tag, bool Required, ParentType::Values Parent, typename ValueType>
     size_t encode(const std::optional<ValueType> value)
     {
         if (!value.has_value())

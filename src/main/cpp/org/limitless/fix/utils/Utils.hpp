@@ -9,6 +9,8 @@
 #include <string_view>
 #include <chrono>
 #include <span>
+#include <bit>
+#include <print>
 
 namespace org::limitless::fix::utils {
 
@@ -167,32 +169,27 @@ template<size_t N>
     return bytes;
 }
 
-constexpr uint64_t littleEndianUint64(const std::string_view str)
+template <uint32_t Divisor>
+[[nodiscard]] uint32_t fastDivide(const uint32_t number)
 {
-    const size_t n = std::min(8zu, str.size());
-    uint64_t result = 0;
-    for (size_t i = 0; i < n; ++i)
+    static_assert(Divisor == 10 || Divisor == 100 || Divisor == 1'000 || Divisor == 10'000,
+                  "fastDivide only supports compile-time divisors of 10 or 100.");
+    if constexpr (Divisor == 10)
     {
-        result |= static_cast<uint64_t>(static_cast<uint8_t>(str[i])) << (i * 8);
+        return static_cast<uint32_t>(number * 0x1999999AULL >> 32);
     }
-    return result;
-}
-
-[[nodiscard]] inline uint32_t fastDivide100(const uint32_t number) {
-    return static_cast<uint32_t>(number * 0x51EB851FULL >> 37);
-}
-
-[[nodiscard]] inline uint32_t fastModulo100(const uint32_t number)
-{
-    return number - fastDivide100(number) * 100;
-}
-
-[[nodiscard]] inline uint32_t fastDivide10000(const uint32_t number) {
-    return static_cast<uint32_t>(number * 0xD1B71759ULL >> 45);
-}
-
-[[nodiscard]] inline uint32_t fastModulo10000(const uint32_t number) {
-    return number - fastDivide10000(number) * 10000;
+    else if constexpr (Divisor == 100)
+    {
+        return static_cast<uint32_t>(number * 0x51EB851FULL >> 37);
+    }
+    else if constexpr (Divisor == 1000)
+    {
+        return static_cast<uint32_t>((number * 0x20C49BA6ULL) >> 39);
+    }
+    else if constexpr (Divisor == 10000)
+    {
+        return static_cast<uint32_t>(number * 0xD1B71759ULL >> 45);
+    }
 }
 
 [[nodiscard]] inline int64_t daysSince1970(int year, int month, int day) noexcept
@@ -202,13 +199,10 @@ constexpr uint64_t littleEndianUint64(const std::string_view str)
     // making the leap year distribution perfectly linear without if/else blocks.
     year -= (month <= 2) ? 1 : 0;
 
-    // Calculate historical leap days using the standard formula layout
-    const int64_t era = fastDivide100 (year >= 0 ? year : year - 399) >> 2;
+    const int64_t era = fastDivide<100>(year >= 0 ? year : year - 399) >> 2;
     const int64_t yoe = static_cast<uint32_t>(year - era * 400);            // Year of era
     const int64_t doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1; // Day of year
-    const int64_t doe = yoe * 365 + yoe / 4 - fastDivide100(yoe) + doy;              // Day of era
-
-    // Subtract the exact day count offset for January 1st, 1970
+    const int64_t doe = yoe * 365 + yoe / 4 - fastDivide<100>(yoe) + doy;              // Day of era
     return era * 146097 + doe - 719468;
 }
 
@@ -220,9 +214,9 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
         return -1;
     }
     const uint64_t date = asciiToUint64(data, 8, true);
-    const auto years = fastDivide10000(date);
-    const auto month = fastDivide100(fastModulo10000(date));
-    const auto day = fastModulo100(date);
+    const auto years = fastDivide<10000>(date);
+    const auto month = fastDivide<100>(date - 10000 * fastDivide<10000>(date));
+    const auto day = date - 100 * fastDivide<100>(date);
     const auto days = daysSince1970(years, month, day);
 
     uint64_t time = 0;
@@ -247,26 +241,53 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     return -1;
 }
 
-inline size_t uint32ToAscii(const uint32_t value, std::span<uint8_t> dest, const size_t offset)
+inline size_t uint32ToAscii(const uint32_t value, std::span<uint8_t> data, const size_t offset)
 {
     if (value == 0)
     {
-        dest[offset] = '0';
+        data[offset] = '0';
         return 1;
     }
 
-    const uint64_t high4 = (static_cast<uint64_t>(value) * 0x51EB851F) >> 37; // val / 10000
-    const uint64_t low4  = value - (high4 * 10000);                          // val % 10000
-    const uint64_t packed_digits = (high4 << 32) | low4;
-    const uint64_t tens = ((packed_digits * 0x147AE148ULL) >> 35) & 0x00FF00FF00FF00FFULL;
-    const uint64_t ones = packed_digits - (tens * 100);
-    uint64_t ascii = tens | (ones << 8);
-    ascii |= 0x3030303030303030ULL;
-    const uint64_t reversed = __builtin_bswap64(ascii);
-    size_t leading_zeros = std::countl_zero(reversed ^ 0x3030303030303030ULL) / 8;
-    const size_t length = 8 - leading_zeros;
-    const char* src_start = reinterpret_cast<const char*>(&ascii) + leading_zeros;
-    std::memcpy(dest.data() + offset, src_start, length);
+    uint8_t buffer[10];
+    if (value < 100000)
+    {
+        const uint32_t d4 = fastDivide<10000>(value);
+        uint32_t reminder = value - d4 * 10000;
+        const uint32_t d3 = fastDivide<1000>(reminder);
+        reminder = reminder - d3 * 1000;
+        const uint32_t d2 = fastDivide<100>(reminder);
+        reminder = reminder - d2 * 100;
+        const uint32_t d1 = fastDivide<10>(reminder);
+        const uint32_t d0 = reminder - d1 * 10;
+
+        buffer[offset] = static_cast<uint8_t>(d4 + '0');
+        buffer[offset + 1] = static_cast<uint8_t>(d3 + '0');
+        buffer[offset + 2] = static_cast<uint8_t>(d2 + '0');
+        buffer[offset + 3] = static_cast<uint8_t>(d1 + '0');
+        buffer[offset + 4] = static_cast<uint8_t>(d0 + '0');
+
+        size_t index = 0;
+        while (index < 4 && buffer[index + offset] == '0')
+        {
+            index++;
+        }
+
+        const size_t length = 5 - index;
+        std::memcpy(data.data() + offset, &buffer[index + offset], length);
+        return length;
+    }
+
+    uint32_t temp = value;
+    size_t index = 10;
+    while (temp > 0)
+    {
+        uint32_t q = fastDivide<10>(temp);
+        buffer[--index] = static_cast<uint8_t>((temp - (q * 10)) + '0');
+        temp = q;
+    }
+    const size_t length = 10 - index;
+    std::memcpy(data.data() + offset, &buffer[index], length);
     return length;
 }
 

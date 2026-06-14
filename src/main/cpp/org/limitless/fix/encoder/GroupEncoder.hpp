@@ -13,7 +13,7 @@ class GroupEncoder
 {
 public:
 
-    GroupEncoder() = default;
+    GroupEncoder() = delete;
 
     GroupEncoder(FieldEncoder& encoder) : m_encoder{encoder}
     {

@@ -403,9 +403,17 @@ static void generateGetters(std::ostream& out, const Record& record)
 static void generateFieldEncoder(std::ostream& out, const Record& record)
 {
     auto parent = ParentType::name(record.m_parent);
+    /*
+    if (record.m_parent == ParentType::Message)
+    {
+        out << "    // skipped tags 8, 9, 10, 35, 49, 56\n\n";
+    }
+    */
     for (const auto& field: record.m_fields)
     {
-        if (field.m_category != Category::Counter && field.m_category != Category::Struct)
+        if (// field.m_tag != 8 && field.m_tag != 9 && field.m_tag != 10 &&
+            // field.m_tag != 35 && field.m_tag != 49 && field.m_tag != 56 &&
+            field.m_category != Category::Counter && field.m_category != Category::Struct)
         {
             const auto required = field.m_presence == Presence::Required;
             const auto category = field.m_category == Category::Enum ?
@@ -414,7 +422,7 @@ static void generateFieldEncoder(std::ostream& out, const Record& record)
             out << std::format("    {}Encoder& {}(const {} value)\n",
                                record.m_name, uncap(field.m_name), category);
             out << "    {\n";
-            out << std::format("        m_encoder.encode<{}, {}, ParentType::{}>(value);\n",
+            out << std::format("        m_encoder.encode<\"{}\", {}, ParentType::{}>(value);\n",
                                field.m_tag, required, parent);
             out << "        return *this;\n";
             out << "    }\n\n";

@@ -2,6 +2,7 @@
 // Created by Fredrik Dahlberg on 2026-04-27.
 //
 
+#include <array>
 #include <iostream>
 #include <string_view>
 #include <chrono>
@@ -115,6 +116,42 @@ TEST(Time, DateTimeToEpochUTCInvalidLength)
 {
     EXPECT_EQ(-1, utils::dateTimeToEpochUTC("").count());
     EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260607-12:34:56.12").count()); // one char short, 20 chars
+}
+
+TEST(Encode, Uint32ToAscii)
+{
+    const auto check = [](const uint32_t value, const std::string_view expected)
+    {
+        std::array<uint8_t, 16> buffer{};
+        const auto length = utils::uint32ToAscii(value, buffer, 0);
+        ASSERT_EQ(expected.size(), length) << "value=" << value << " expecged = " << expected;
+        EXPECT_EQ(expected, (std::string_view{reinterpret_cast<const char*>(buffer.data()), length})) << "value=" << value;
+    };
+
+    check(0, "0");
+    check(1, "1");
+    check(9, "9");
+    check(10, "10");
+    check(99, "99");
+    check(100, "100");
+    check(999, "999");
+    check(1000, "1000");
+    check(9999, "9999");
+    check(10000, "10000");
+    check(99999, "99999");
+    check(100000, "100000");
+    check(123456789, "123456789");
+    check(4294967294, "4294967294");
+    check(4294967295, "4294967295");
+}
+
+TEST(Encode, Uint32ToAsciiOffset)
+{
+    std::array<uint8_t, 16> buffer{};
+    buffer[0] = 'X';
+    const auto length = utils::uint32ToAscii(42, buffer, 1);
+    ASSERT_EQ(2, length);
+    EXPECT_EQ((std::string_view{reinterpret_cast<const char*>(buffer.data()), 3}), "X42");
 }
 
 }
