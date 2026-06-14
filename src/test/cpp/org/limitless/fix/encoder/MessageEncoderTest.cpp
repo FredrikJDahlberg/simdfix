@@ -28,7 +28,7 @@ TEST(MessageEncoder, Logon)
     const auto length = logon.encodedLength();
     const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
 
-    EXPECT_EQ("35=A" SOH "49=SENDER" SOH "56=TARGET" SOH "34=1" SOH "52=1781378773959" SOH
+    EXPECT_EQ("35=A" SOH "49=SENDER" SOH "56=TARGET" SOH "34=1" SOH "52=20260613-19:26:13.959" SOH
               "98=0" SOH "108=30" SOH, encoded);
 }
 

@@ -5,6 +5,7 @@
 #ifndef SIMD_FIX_FIELD_ENCODER_HPP
 #define SIMD_FIX_FIELD_ENCODER_HPP
 
+#include <array>
 #include <cstddef>
 #include <span>
 #include <string_view>
@@ -41,6 +42,8 @@ class FieldEncoder
     std::span<uint8_t> m_data{};
     size_t m_offset{};
     size_t m_encodedLength{};
+    int64_t m_cachedDayStartMillis{-1};
+    std::array<uint8_t, 9> m_datePrefix{};
 
     template<std::size_t N>
     struct FixedString {
@@ -60,6 +63,22 @@ class FieldEncoder
         m_encodedLength += size;
         m_data[m_offset + m_encodedLength] = '=';
         ++m_encodedLength;
+    }
+
+    // Writes a FIX UTCTimestamp ("YYYYMMDD-HH:MM:SS.sss", 21 bytes). The "YYYYMMDD-" prefix
+    // is cached and only recomputed when millis falls outside the cached day.
+    void encodeTimestamp(const int64_t millis)
+    {
+        if (millis < m_cachedDayStartMillis || millis >= m_cachedDayStartMillis + utils::MillisPerDay)
+        {
+            const auto days = millis / utils::MillisPerDay;
+            m_cachedDayStartMillis = days * utils::MillisPerDay;
+            utils::writeDatePrefix(days, m_datePrefix.data());
+        }
+        auto* dst = m_data.data() + m_offset + m_encodedLength;
+        std::memcpy(dst, m_datePrefix.data(), m_datePrefix.size());
+        utils::writeTimeOfDay(static_cast<uint32_t>(millis - m_cachedDayStartMillis), dst + m_datePrefix.size());
+        m_encodedLength += 21;
     }
 
 public:
@@ -134,8 +153,15 @@ public:
         requires EncodableDuration<DurationType>
     void encode(const DurationType duration)
     {
-        auto ticks = duration.count();
-        encode<Tag, Required, decltype(ticks)>(ticks);
+        if constexpr (Required)
+        {
+            // check null value
+        }
+        encode<Tag>();
+        const auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+        encodeTimestamp(millis);
+        m_data[m_offset + m_encodedLength] = 1;
+        ++m_encodedLength;
     }
 
     template <FixedString Tag, bool Required, typename WrapperType>

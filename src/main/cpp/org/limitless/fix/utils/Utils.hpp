@@ -366,6 +366,55 @@ inline size_t int64ToAscii(const int64_t value, std::span<uint8_t> data, const s
     return uint64ToAscii(static_cast<uint64_t>(value), data, offset);
 }
 
+inline constexpr int64_t MillisPerDay = 24 * 60 * 60 * 1'000;
+
+template <int Width>
+inline void writeFixedDigits(uint32_t value, uint8_t* dst)
+{
+    for (int i = Width - 1; i >= 0; --i)
+    {
+        const uint32_t next = fastDivide<10>(value);
+        dst[i] = static_cast<uint8_t>('0' + (value - next * 10));
+        value = next;
+    }
+}
+
+/**
+ * Writes "YYYYMMDD-" (9 bytes) for the given day number (days since 1970-01-01),
+ * the inverse of daysSince1970.
+ */
+inline void writeDatePrefix(const int64_t days, uint8_t* dst)
+{
+    const int64_t z = days + 719468;
+    const int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+    const uint64_t doe = static_cast<uint64_t>(z - era * 146097);
+    const uint64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    const uint64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    const uint64_t mp = (5 * doy + 2) / 153;
+    const uint64_t day = doy - (153 * mp + 2) / 5 + 1;
+    const uint64_t month = mp + (mp < 10 ? 3 : -9);
+    const int64_t year = static_cast<int64_t>(yoe) + era * 400 + (month <= 2 ? 1 : 0);
+
+    writeFixedDigits<4>(static_cast<uint32_t>(year), dst);
+    writeFixedDigits<2>(static_cast<uint32_t>(month), dst + 4);
+    writeFixedDigits<2>(static_cast<uint32_t>(day), dst + 6);
+    dst[8] = '-';
+}
+
+/**
+ * Writes "HH:MM:SS.sss" (12 bytes) for the given time of day in milliseconds.
+ */
+inline void writeTimeOfDay(const uint32_t msOfDay, uint8_t* dst)
+{
+    writeFixedDigits<2>(msOfDay / 3'600'000, dst);
+    dst[2] = ':';
+    writeFixedDigits<2>(msOfDay / 60'000 % 60, dst + 3);
+    dst[5] = ':';
+    writeFixedDigits<2>(msOfDay / 1'000 % 60, dst + 6);
+    dst[8] = '.';
+    writeFixedDigits<3>(msOfDay % 1'000, dst + 9);
+}
+
 inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateTime)
 {
     const auto data = reinterpret_cast<const uint8_t*>(dateTime.data());
