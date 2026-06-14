@@ -85,6 +85,26 @@ TEST(Parse, BinaryToDecimal)
     }
 }
 
+TEST(Parse, AsciiToInt32)
+{
+    const auto check = [](const std::string_view text, const int32_t expected)
+    {
+        ASSERT_EQ(expected, utils::asciiToInt32(reinterpret_cast<const uint8_t*>(text.data()), text.size())) << "text=" << text;
+    };
+
+    check("0\0\0\0\0\0\0\0", 0);
+    check("1\0\0\0\0\0\0\0", 1);
+    check("9\0\0\0\0\0\0\0", 9);
+    check("10\0\0\0\0\0\0", 10);
+    check("12345678", 12345678);
+    check("2147483647", 2147483647);
+    check("-1\0\0\0\0\0\0", -1);
+    check("-9\0\0\0\0\0\0", -9);
+    check("-10\0\0\0\0\0", -10);
+    check("-12345678", -12345678);
+    check("-2147483648", -2147483648);
+}
+
 TEST(Time, DateTimeToEpochUTC)
 {
     // epoch reference point
@@ -124,7 +144,7 @@ TEST(Encode, Uint32ToAscii)
     {
         std::array<uint8_t, 16> buffer{};
         const auto length = utils::uint32ToAscii(value, buffer, 0);
-        ASSERT_EQ(expected.size(), length) << "value=" << value << " expecged = " << expected;
+        ASSERT_EQ(expected.size(), length) << "value=" << value << " expected = " << expected;
         EXPECT_EQ(expected, (std::string_view{reinterpret_cast<const char*>(buffer.data()), length})) << "value=" << value;
     };
 
@@ -150,8 +170,116 @@ TEST(Encode, Uint32ToAsciiOffset)
     std::array<uint8_t, 16> buffer{};
     buffer[0] = 'X';
     const auto length = utils::uint32ToAscii(42, buffer, 1);
-    ASSERT_EQ(2, length);
+    ASSERT_EQ(2U, length);
     EXPECT_EQ((std::string_view{reinterpret_cast<const char*>(buffer.data()), 3}), "X42");
+}
+
+TEST(Encode, Int32ToAscii)
+{
+    const auto check = [](const int32_t value, const std::string_view expected)
+    {
+        std::array<uint8_t, 16> buffer{};
+        const auto length = utils::int32ToAscii(value, buffer, 0);
+        ASSERT_EQ(expected.size(), length) << "value=" << value << " expected = " << expected;
+        EXPECT_EQ(expected, (std::string_view{reinterpret_cast<const char*>(buffer.data()), length})) << "value=" << value;
+    };
+
+    check(0, "0");
+    check(1, "1");
+    check(9, "9");
+    check(10, "10");
+    check(99999, "99999");
+    check(100000, "100000");
+    check(2147483647, "2147483647");
+    check(-1, "-1");
+    check(-9, "-9");
+    check(-10, "-10");
+    check(-99999, "-99999");
+    check(-100000, "-100000");
+    check(-2147483647, "-2147483647");
+    check(-2147483648, "-2147483648");
+}
+
+TEST(Encode, Int32ToAsciiOffset)
+{
+    std::array<uint8_t, 16> buffer{};
+    buffer[0] = 'X';
+    const auto length = utils::int32ToAscii(-42, buffer, 1);
+    ASSERT_EQ(3U, length);
+    EXPECT_EQ((std::string_view{reinterpret_cast<const char*>(buffer.data()), 4}), "X-42");
+}
+
+TEST(Encode, Uint64ToAscii)
+{
+    const auto check = [](const uint64_t value, const std::string_view expected)
+    {
+        std::array<uint8_t, 24> buffer{};
+        const auto length = utils::uint64ToAscii(value, buffer, 0);
+        ASSERT_EQ(expected.size(), length) << "value=" << value << " expected = " << expected;
+        EXPECT_EQ(expected, (std::string_view{reinterpret_cast<const char*>(buffer.data()), length})) << "value=" << value;
+    };
+
+    check(0, "0");
+    check(1, "1");
+    check(9, "9");
+    check(10, "10");
+    check(99, "99");
+    check(100, "100");
+    check(999, "999");
+    check(9999, "9999");
+    check(99999, "99999");
+    check(123456789, "123456789");
+    check(4294967294, "4294967294");
+    check(4294967295, "4294967295");
+    check(4294967296, "4294967296");
+    check(999999999999999999ULL, "999999999999999999");
+    check(1000000000000000000ULL, "1000000000000000000");
+    check(18446744073709551614ULL, "18446744073709551614");
+    check(18446744073709551615ULL, "18446744073709551615");
+}
+
+TEST(Encode, Uint64ToAsciiOffset)
+{
+    std::array<uint8_t, 24> buffer{};
+    buffer[0] = 'X';
+    const auto length = utils::uint64ToAscii(42, buffer, 1);
+    ASSERT_EQ(2U, length);
+    EXPECT_EQ((std::string_view{reinterpret_cast<const char*>(buffer.data()), 3}), "X42");
+}
+
+TEST(Encode, Int64ToAscii)
+{
+    const auto check = [](const int64_t value, const std::string_view expected)
+    {
+        std::array<uint8_t, 24> buffer{};
+        const auto length = utils::int64ToAscii(value, buffer, 0);
+        ASSERT_EQ(expected.size(), length) << "value=" << value << " expected = " << expected;
+        EXPECT_EQ(expected, (std::string_view{reinterpret_cast<const char*>(buffer.data()), length})) << "value=" << value;
+    };
+
+    check(0, "0");
+    check(1, "1");
+    check(9, "9");
+    check(10, "10");
+    check(99999, "99999");
+    check(100000, "100000");
+    check(9223372036854775807LL, "9223372036854775807");
+    check(-1, "-1");
+    check(-9, "-9");
+    check(-10, "-10");
+    check(-99999, "-99999");
+    check(-100000, "-100000");
+    check(-9223372036854775807LL, "-9223372036854775807");
+    check(-9223372036854775807LL - 1, "-9223372036854775808");
+}
+
+TEST(Encode, Int64ToAsciiOffset)
+{
+    std::array<uint8_t, 24> buffer{};
+    buffer[0] = 'X';
+    const auto length = utils::int64ToAscii(-42, buffer, 1);
+    ASSERT_EQ(3U, length);
+    EXPECT_EQ((std::string_view{reinterpret_cast<const char*>(buffer.data()), 4}), "X-42");
 }
 
 }

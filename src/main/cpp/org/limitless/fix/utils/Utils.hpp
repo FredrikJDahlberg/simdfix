@@ -10,6 +10,7 @@
 #include <chrono>
 #include <span>
 #include <bit>
+#include <algorithm>
 #include <print>
 
 namespace org::limitless::fix::utils {
@@ -155,6 +156,22 @@ template <typename T>
     return scale(value, length) + asciiToUint64(digits, length, padded);
 }
 
+/**
+ * Parses ASCII digits with an optional leading '-' as a signed 32-bit integer.
+ * @param digits ASCII digits, optionally preceded by '-'
+ * @param length total length, including the leading '-' if present
+ * @return parsed value
+ */
+[[nodiscard]] inline int32_t asciiToInt32(const uint8_t* digits, const uint32_t length)
+{
+    if (length != 0 && digits[0] == '-')
+    {
+        const uint64_t magnitude = asciiToUint64(digits + 1, length - 1, false);
+        return static_cast<int32_t>(-static_cast<int64_t>(magnitude));
+    }
+    return static_cast<int32_t>(asciiToUint64(digits, length, false));
+}
+
 template<size_t N>
 [[nodiscard]] constexpr auto makeSpan(const char (& str)[N]) noexcept
 {
@@ -176,7 +193,7 @@ template <uint32_t Divisor>
                   "fastDivide only supports compile-time divisors of 10 or 100.");
     if constexpr (Divisor == 10)
     {
-        return static_cast<uint32_t>(number * 0x1999999AULL >> 32);
+        return static_cast<uint32_t>(number * 0xCCCCCCCDULL >> 35);
     }
     else if constexpr (Divisor == 100)
     {
@@ -268,12 +285,12 @@ inline size_t uint32ToAscii(const uint32_t value, std::span<uint8_t> data, const
                                 static_cast<uint64_t>(d4) |
                                 0xFFFFFF0000000000ULL; // Sentinel high bits
         packedDigits |= 0x0000003030303030ULL;
-        size_t skippedZeros = std::countr_zero(packedDigits) >> 2;
+        size_t skippedZeros = std::countr_zero(packedDigits ^ 0x0000003030303030ULL) >> 3;
         if (skippedZeros > 4) [[unlikely]]
         {
             skippedZeros = 4;
         }
-        packedDigits >>= skippedZeros << 2;
+        packedDigits >>= skippedZeros << 3;
         const size_t length = 5 - skippedZeros;
         std::memcpy(data.data() + offset, &packedDigits, length);
         return length;
@@ -290,6 +307,63 @@ inline size_t uint32ToAscii(const uint32_t value, std::span<uint8_t> data, const
     const size_t length = 10 - index;
     std::memcpy(data.data() + offset, &buffer[index], length);
     return length;
+}
+
+inline size_t int32ToAscii(const int32_t value, std::span<uint8_t> data, const size_t offset)
+{
+    if (value < 0)
+    {
+        data[offset] = '-';
+        const uint32_t magnitude = static_cast<uint32_t>(-static_cast<int64_t>(value));
+        return 1 + uint32ToAscii(magnitude, data, offset + 1);
+    }
+    return uint32ToAscii(static_cast<uint32_t>(value), data, offset);
+}
+
+inline size_t uint64ToAscii(const uint64_t value, std::span<uint8_t> data, const size_t offset)
+{
+    // Always materialize all 20 decimal digits, no data-dependent early exit.
+    uint8_t digits[24];
+    uint64_t temp = value;
+    for (int i = 19; i >= 0; --i)
+    {
+        digits[i] = static_cast<uint8_t>('0' + (temp % 10));
+        temp /= 10;
+    }
+    digits[20] = digits[21] = digits[22] = digits[23] = '1'; // non-zero sentinel
+
+    uint64_t chunk0, chunk1, chunk2;
+    std::memcpy(&chunk0, digits + 0, 8);
+    std::memcpy(&chunk1, digits + 8, 8);
+    std::memcpy(&chunk2, digits + 16, 8); // digits[16..19] + sentinel[20..23]
+
+    constexpr uint64_t Mask8 = 0x3030303030303030ULL;
+    const auto leadingZeroBytes = [](const uint64_t chunk)
+    {
+        return static_cast<size_t>(std::countl_zero(std::byteswap(chunk ^ Mask8)) >> 3);
+    };
+
+    const size_t skip0 = leadingZeroBytes(chunk0);
+    const size_t skip1 = leadingZeroBytes(chunk1);
+    const size_t skip2 = leadingZeroBytes(chunk2);
+
+    size_t skipped = skip0 < 8 ? skip0 : 8 + (skip1 < 8 ? skip1 : 8 + skip2);
+    skipped = std::min(skipped, size_t{19}); // keep at least one digit for value == 0
+
+    const size_t length = 20 - skipped;
+    std::memcpy(data.data() + offset, digits + skipped, length);
+    return length;
+}
+
+inline size_t int64ToAscii(const int64_t value, std::span<uint8_t> data, const size_t offset)
+{
+    if (value < 0)
+    {
+        data[offset] = '-';
+        const uint64_t magnitude = uint64_t{0} - static_cast<uint64_t>(value);
+        return 1 + uint64ToAscii(magnitude, data, offset + 1);
+    }
+    return uint64ToAscii(static_cast<uint64_t>(value), data, offset);
 }
 
 inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateTime)

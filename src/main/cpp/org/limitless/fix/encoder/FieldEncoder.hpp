@@ -5,11 +5,9 @@
 #ifndef SIMD_FIX_FIELD_ENCODER_HPP
 #define SIMD_FIX_FIELD_ENCODER_HPP
 
-#include <cstdint>
 #include <cstddef>
 #include <span>
 #include <string_view>
-#include <cstring>
 #include <concepts>
 
 #include "org/limitless/fix/utils/Utils.hpp"
@@ -18,7 +16,12 @@ namespace org::limitless::fix::encoder {
 
 template <typename ValueType>
 concept EncodableInteger = std::same_as<ValueType, uint32_t> ||
-                           std::same_as<ValueType, int64_t>;
+                           std::same_as<ValueType, int32_t>;
+
+template <typename ValueType>
+concept EncodableLongInteger = std::same_as<ValueType, uint64_t> ||
+                                std::same_as<ValueType, int64_t>;
+
 template <typename T>
 concept EncodableDuration = requires
 {
@@ -83,7 +86,35 @@ public:
             // check null value
         }
         encode<Tag>();
-        m_offset += utils::uint32ToAscii(value, m_data, m_offset);
+        if constexpr (std::is_signed_v<ValueType>)
+        {
+            m_offset += utils::int32ToAscii(value, m_data, m_offset);
+        }
+        else
+        {
+            m_offset += utils::uint32ToAscii(value, m_data, m_offset);
+        }
+        m_data[m_offset] = 1;
+        ++m_offset;
+    }
+
+    template <FixedString Tag, bool Required, typename ValueType>
+    requires EncodableLongInteger<ValueType>
+    void encode(const ValueType value)
+    {
+        if constexpr (Required)
+        {
+            // check null value
+        }
+        encode<Tag>();
+        if constexpr (std::is_signed_v<ValueType>)
+        {
+            m_offset += utils::int64ToAscii(value, m_data, m_offset);
+        }
+        else
+        {
+            m_offset += utils::uint64ToAscii(value, m_data, m_offset);
+        }
         m_data[m_offset] = 1;
         ++m_offset;
     }
@@ -92,14 +123,13 @@ public:
         requires EncodableDuration<DurationType>
     void encode(const DurationType duration)
     {
-        encode<Tag>();
         auto ticks = duration.count();
         encode<Tag, Required, decltype(ticks)>(ticks);
     }
 
     template <FixedString Tag, bool Required, typename WrapperType>
         requires EncodableEnumWrapper<WrapperType>
-    void encode(const typename WrapperType::Values value)
+    void encode(const WrapperType::Values value)
     {
         using UnderlyingType = std::underlying_type_t<typename WrapperType::Values>;
         encode<Tag, Required, UnderlyingType>(static_cast<UnderlyingType>(value));

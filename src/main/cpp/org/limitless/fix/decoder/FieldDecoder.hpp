@@ -123,6 +123,17 @@ public:
     }
 
     /**
+     * Parses the ASCII digits of a token, with an optional leading '-', as a
+     * signed 32-bit integer.
+     * @param token token whose bytes are the digits to convert
+     * @return parsed value
+     */
+    [[nodiscard]] constexpr int32_t convertToInt32(const Token* token) const
+    {
+        return utils::asciiToInt32(m_data.data() + token->m_position, token->m_length);
+    }
+
+    /**
      * @param index token index
      * @return the token at index
      */
@@ -250,6 +261,25 @@ public:
         if (index >= 0)
         {
             return convertToUint32(&m_tokens[index]);
+        }
+        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+    }
+
+    /**
+     * Looks up Tag and parses its value, with an optional leading '-', as a
+     * signed 32-bit integer.
+     * @tparam Tag tag number to read
+     * @tparam Required whether a missing field is an error
+     * @tparam Parent context the tag is being looked up in
+     * @return field value, or Result::RequiredFieldMissing/Success if absent
+     */
+    template <int32_t Tag, bool Required, ParentType::Values Parent>
+    [[nodiscard]] constexpr Int32Result getInt32() const
+    {
+        const auto index = findIndex<Tag, Parent>();
+        if (index >= 0)
+        {
+            return convertToInt32(&m_tokens[index]);
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }

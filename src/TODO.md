@@ -29,10 +29,6 @@ items 1–4 above:
    (comment "encode TAG = VALUE"), `next()` only increments `m_count`.
 2. `src/main/cpp/org/limitless/fix/encoder/PayloadEncoder.hpp` — constructor only, no encode API yet.
 
-Open issues in FieldDecoder
------
-1. Signed types
-
 Open issues in FieldEncoder
 -----
 
@@ -40,5 +36,3 @@ Open issues in FieldEncoder
 
 1. The `std::string_view` `encode` overload (line ~104) is a stub that returns 0 and does
    not write anything.
-
-2. Signed types 
