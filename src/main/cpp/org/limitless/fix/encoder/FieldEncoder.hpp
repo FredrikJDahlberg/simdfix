@@ -40,6 +40,7 @@ class FieldEncoder
 {
     std::span<uint8_t> m_data{};
     size_t m_offset{};
+    size_t m_encodedLength{};
 
     template<std::size_t N>
     struct FixedString {
@@ -54,11 +55,11 @@ class FieldEncoder
     template <FixedString Tag>
     void encode()
     {
-        const auto size = sizeof(Tag);
-        std::memcpy(m_data.data() + m_offset, Tag.value, size);
-        m_offset += size;
-        m_data[m_offset] = '=';
-        ++m_offset;
+        const auto size = sizeof(Tag.value) - 1; // exclude the string literal's null terminator
+        std::memcpy(m_data.data() + m_offset + m_encodedLength, Tag.value, size);
+        m_encodedLength += size;
+        m_data[m_offset + m_encodedLength] = '=';
+        ++m_encodedLength;
     }
 
 public:
@@ -72,9 +73,19 @@ public:
     {
     }
 
-    void wrap(const std::span<uint8_t> data)
+    void wrap(const std::span<uint8_t> data, const size_t offset)
     {
         m_data = data;
+        m_offset = offset;
+        m_encodedLength = 0;
+    }
+
+    /**
+     * @return the number of bytes written since the last wrap()
+     */
+    [[nodiscard]] size_t encodedLength() const
+    {
+        return m_encodedLength;
     }
 
     template <FixedString Tag, bool Required, typename ValueType>
@@ -88,14 +99,14 @@ public:
         encode<Tag>();
         if constexpr (std::is_signed_v<ValueType>)
         {
-            m_offset += utils::int32ToAscii(value, m_data, m_offset);
+            m_encodedLength += utils::int32ToAscii(value, m_data, m_encodedLength + m_offset);
         }
         else
         {
-            m_offset += utils::uint32ToAscii(value, m_data, m_offset);
+            m_encodedLength += utils::uint32ToAscii(value, m_data, m_encodedLength + m_offset);
         }
-        m_data[m_offset] = 1;
-        ++m_offset;
+        m_data[m_offset + m_encodedLength] = 1;
+        ++m_encodedLength;
     }
 
     template <FixedString Tag, bool Required, typename ValueType>
@@ -109,14 +120,14 @@ public:
         encode<Tag>();
         if constexpr (std::is_signed_v<ValueType>)
         {
-            m_offset += utils::int64ToAscii(value, m_data, m_offset);
+            m_encodedLength += utils::int64ToAscii(value, m_data, m_offset + m_encodedLength);
         }
         else
         {
-            m_offset += utils::uint64ToAscii(value, m_data, m_offset);
+            m_encodedLength += utils::uint64ToAscii(value, m_data, m_offset + m_encodedLength);
         }
-        m_data[m_offset] = 1;
-        ++m_offset;
+        m_data[m_offset + m_encodedLength] = 1;
+        ++m_encodedLength;
     }
 
     template <FixedString Tag, bool Required, typename DurationType>
@@ -131,18 +142,22 @@ public:
         requires EncodableEnumWrapper<WrapperType>
     void encode(const WrapperType::Values value)
     {
-        using UnderlyingType = std::underlying_type_t<typename WrapperType::Values>;
-        encode<Tag, Required, UnderlyingType>(static_cast<UnderlyingType>(value));
+        encode<Tag, Required, std::string_view>(WrapperType::Codes[static_cast<size_t>(value)]);
     }
 
     template <FixedString Tag, bool Required, typename ValueType>
-    size_t encode(const std::string_view value)
+    void encode(const std::string_view value)
     {
+        if constexpr (Required)
+        {
+            // FIXME
+        }
         encode<Tag>();
-        memcpy(m_data.data() + m_offset, value.data(), value.size());
-        m_data[m_offset] = 1;
-        ++m_offset;
-        return 0;
+        const auto size = value.size();
+        memcpy(m_data.data() + m_offset + m_encodedLength, value.data(), size);
+        m_encodedLength += size;
+        m_data[m_offset + m_encodedLength] = 1;
+        ++m_encodedLength;
     }
 
 };

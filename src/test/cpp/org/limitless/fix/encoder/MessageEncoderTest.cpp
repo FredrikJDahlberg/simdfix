@@ -4,25 +4,32 @@
 
 #include <gtest/gtest.h>
 
-#include "org/limitless/fix/utils/Utils.hpp"
 #include "org/limitless/fix/messages/FixMessageEncoders.hpp"
 
 namespace org::limitless::fix::encoder {
 
 using namespace fix::messages;
 
+#define SOH "\x01"
+
 TEST(MessageEncoder, Logon)
 {
-    uint8_t buffer[256];
+    std::array<uint8_t, 256> buffer{};
     LogonEncoder logon{};
     logon.wrap(buffer)
-            .sequenceNumber(1).encryptMethod(Encryption::None)
+            .msgType(MessageType::Logon)
+            .sender("SENDER")
+            .target("TARGET")
+            .sequenceNumber(1)
             .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
-//            .hops(2)
-//            .next().hopCompID("hepp").hopRefID(2)
-//            .next().hopCompID("hopp");
-    ;
-    utils::print(std::size(buffer), buffer);
+            .encryptMethod(Encryption::None)
+            .heartbeatInterval(30);
+
+    const auto length = logon.encodedLength();
+    const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
+
+    EXPECT_EQ("35=A" SOH "49=SENDER" SOH "56=TARGET" SOH "34=1" SOH "52=1781378773959" SOH
+              "98=0" SOH "108=30" SOH, encoded);
 }
 
 }

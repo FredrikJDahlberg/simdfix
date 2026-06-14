@@ -18,9 +18,17 @@ protected:
 public:
     MessageEncoder() = default;
 
-    void wrap(const std::span<uint8_t> data)
+    void wrap(const std::span<uint8_t> data, const size_t offset = 0)
     {
-        m_encoder.wrap(data);
+        m_encoder.wrap(data, offset);
+    }
+
+    /**
+     * @return the number of bytes written since the last wrap()
+     */
+    [[nodiscard]] size_t encodedLength() const
+    {
+        return m_encoder.encodedLength();
     }
 };
 

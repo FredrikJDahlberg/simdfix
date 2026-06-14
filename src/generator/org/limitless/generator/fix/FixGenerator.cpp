@@ -343,9 +343,9 @@ static void generateWrapNextEncoders(std::ostream& out, const Record& record)
 {
     if (record.m_parent == ParentType::Message)
     {
-        out << std::format("    {}Encoder& wrap(const std::span<uint8_t> data)\n", record.m_name);
+        out << std::format("    {}Encoder& wrap(const std::span<uint8_t> data, const size_t offset = 0)\n", record.m_name);
         out << "    {\n";
-        out << "        MessageEncoder::wrap(data);\n";
+        out << "        MessageEncoder::wrap(data, offset);\n";
         out << "        return *this;\n";
         out << "    }\n\n";
     }

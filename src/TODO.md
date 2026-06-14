@@ -34,5 +34,6 @@ Open issues in FieldEncoder
 
 `src/main/cpp/org/limitless/fix/encoder/FieldEncoder.hpp`:
 
-1. The `std::string_view` `encode` overload (line ~104) is a stub that returns 0 and does
-   not write anything.
+1. The `EncodableDuration` `encode` overload writes the raw tick count (e.g. milliseconds
+   since epoch as a plain integer, "1781378773959") instead of formatting it as a FIX
+   `UTCTimestamp` ("YYYYMMDD-HH:MM:SS.sss").

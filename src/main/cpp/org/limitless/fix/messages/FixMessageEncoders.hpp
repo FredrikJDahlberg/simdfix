@@ -126,9 +126,9 @@ public:
 
     static constexpr uint16_t MessageId = 'A';
 
-    LogonEncoder& wrap(const std::span<uint8_t> data)
+    LogonEncoder& wrap(const std::span<uint8_t> data, const size_t offset = 0)
     {
-        MessageEncoder::wrap(data);
+        MessageEncoder::wrap(data, offset);
         return *this;
     }
 
@@ -205,9 +205,9 @@ public:
 
     static constexpr uint16_t MessageId = '5';
 
-    LogoutEncoder& wrap(const std::span<uint8_t> data)
+    LogoutEncoder& wrap(const std::span<uint8_t> data, const size_t offset = 0)
     {
-        MessageEncoder::wrap(data);
+        MessageEncoder::wrap(data, offset);
         return *this;
     }
 
@@ -278,9 +278,9 @@ public:
 
     static constexpr uint16_t MessageId = '0';
 
-    HeartbeatEncoder& wrap(const std::span<uint8_t> data)
+    HeartbeatEncoder& wrap(const std::span<uint8_t> data, const size_t offset = 0)
     {
-        MessageEncoder::wrap(data);
+        MessageEncoder::wrap(data, offset);
         return *this;
     }
 
@@ -351,9 +351,9 @@ public:
 
     static constexpr uint16_t MessageId = '1';
 
-    TestRequestEncoder& wrap(const std::span<uint8_t> data)
+    TestRequestEncoder& wrap(const std::span<uint8_t> data, const size_t offset = 0)
     {
-        MessageEncoder::wrap(data);
+        MessageEncoder::wrap(data, offset);
         return *this;
     }
 
