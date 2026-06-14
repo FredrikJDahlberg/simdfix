@@ -261,20 +261,21 @@ inline size_t uint32ToAscii(const uint32_t value, std::span<uint8_t> data, const
         const uint32_t d1 = fastDivide<10>(reminder);
         const uint32_t d0 = reminder - d1 * 10;
 
-        buffer[offset] = static_cast<uint8_t>(d4 + '0');
-        buffer[offset + 1] = static_cast<uint8_t>(d3 + '0');
-        buffer[offset + 2] = static_cast<uint8_t>(d2 + '0');
-        buffer[offset + 3] = static_cast<uint8_t>(d1 + '0');
-        buffer[offset + 4] = static_cast<uint8_t>(d0 + '0');
-
-        size_t index = 0;
-        while (index < 4 && buffer[index + offset] == '0')
+        uint64_t packedDigits = static_cast<uint64_t>(d0) << 32 |
+                                static_cast<uint64_t>(d1) << 24 |
+                                static_cast<uint64_t>(d2) << 16 |
+                                static_cast<uint64_t>(d3) << 8  |
+                                static_cast<uint64_t>(d4) |
+                                0xFFFFFF0000000000ULL; // Sentinel high bits
+        packedDigits |= 0x0000003030303030ULL;
+        size_t skippedZeros = std::countr_zero(packedDigits) >> 2;
+        if (skippedZeros > 4) [[unlikely]]
         {
-            index++;
+            skippedZeros = 4;
         }
-
-        const size_t length = 5 - index;
-        std::memcpy(data.data() + offset, &buffer[index + offset], length);
+        packedDigits >>= skippedZeros << 2;
+        const size_t length = 5 - skippedZeros;
+        std::memcpy(data.data() + offset, &packedDigits, length);
         return length;
     }
 

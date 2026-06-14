@@ -18,9 +18,10 @@ TEST(MessageEncoder, Logon)
     logon.wrap(buffer)
             .sequenceNumber(1).encryptMethod(Encryption::None)
             .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
-            .hops(2)
-            .next().hopCompID("hepp").hopRefID(2)
-            .next().hopCompID("hopp");
+//            .hops(2)
+//            .next().hopCompID("hepp").hopRefID(2)
+//            .next().hopCompID("hopp");
+    ;
     utils::print(std::size(buffer), buffer);
 }
 

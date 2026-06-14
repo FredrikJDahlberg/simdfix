@@ -400,7 +400,7 @@ static void generateGetters(std::ostream& out, const Record& record)
     }
 }
 
-static void generateFieldEncoder(std::ostream& out, const Record& record)
+static void generateFieldEncoders(std::ostream& out, const Record& record)
 {
     auto parent = ParentType::name(record.m_parent);
     /*
@@ -422,8 +422,9 @@ static void generateFieldEncoder(std::ostream& out, const Record& record)
             out << std::format("    {}Encoder& {}(const {} value)\n",
                                record.m_name, uncap(field.m_name), category);
             out << "    {\n";
-            out << std::format("        m_encoder.encode<\"{}\", {}, ParentType::{}>(value);\n",
-                               field.m_tag, required, parent);
+            out << std::format("        m_encoder.encode<\"{}\", {}, {}>(value);\n",
+                               field.m_tag, required,
+                               field.m_category == Category::Enum ? field.m_type : Category::type(field.m_category));
             out << "        return *this;\n";
             out << "    }\n\n";
         }
@@ -475,6 +476,6 @@ static void generateRecordEncoders(std::ostream& out, const Record& record)
         out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
     }
     generateWrapNextEncoders(out, record);
-    generateFieldEncoder(out, record);
+    generateFieldEncoders(out, record);
     out << "};\n\n";
 }

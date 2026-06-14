@@ -32,11 +32,11 @@
         <field name="SequenceNumber" tag="34" primitiveType="uint32"/>
         <field name="SendingTime" tag="52" primitiveType="timestamp"/>
         <group name="Hops" tag="627" counter="NoHops" presence="optional" primitiveType="uint32">
-            <field name="HopCompID" tag="628" primitiveType="char" length="8" presence="optional"/>
+            <field name="HopCompID" tag="628" primitiveType="string" length="8" presence="optional"/>
             <field name="HopSendingTime" tag="629" primitiveType="timestamp" presence="optional"/>
             <field name="HopRefID" tag="630" primitiveType="uint32" presence="optional"/>
             <group name="NestedGroup" tag="500" counter="NoTests" presence="optional" primitiveType="uint32">
-                <field name="Name" tag="501" primitiveType="char" length="10"/>
+                <field name="Name" tag="501" primitiveType="string" length="10"/>
                 <field name="Comp" type="NestedComp"/>
             </group>
         </group>

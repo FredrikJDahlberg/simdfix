@@ -5,28 +5,34 @@
 #ifndef SIMD_FIX_FIELD_ENCODER_HPP
 #define SIMD_FIX_FIELD_ENCODER_HPP
 
-#include "org/limitless/fix/CodecTypes.hpp"
-
 #include <cstdint>
 #include <cstddef>
 #include <span>
 #include <string_view>
-#include <stdexcept>
 #include <cstring>
-#include <optional>
 #include <concepts>
-#include <stdexcept>
 
 #include "org/limitless/fix/utils/Utils.hpp"
 
 namespace org::limitless::fix::encoder {
 
-
 template <typename ValueType>
-concept EncodableInteger = std::same_as<ValueType, int32_t> ||
-                           std::same_as<ValueType, uint32_t> ||
-                           std::same_as<ValueType, uint64_t> ||
+concept EncodableInteger = std::same_as<ValueType, uint32_t> ||
                            std::same_as<ValueType, int64_t>;
+template <typename T>
+concept EncodableDuration = requires
+{
+    typename T::rep;
+    typename T::period;
+} && std::same_as<T, std::chrono::duration<typename T::rep, typename T::period>>;
+
+template <typename T>
+concept EncodableEnumWrapper = requires
+{
+    typename T::Values;
+    T::Codes;
+} && std::is_enum_v<typename T::Values>;
+
 class FieldEncoder
 {
     std::span<uint8_t> m_data{};
@@ -36,33 +42,23 @@ class FieldEncoder
     struct FixedString {
         char value[N];
 
-        // Constexpr constructor allows compilation-time string parsing
-        constexpr FixedString(const char (&str)[N]) {
+        constexpr FixedString(const char (&str)[N])
+        {
             std::copy_n(str, N, value);
         }
     };
 
-    template <int32_t Tag, ParentType::Values Parent, typename ValueType>
-    static constexpr size_t getEncodedSize() noexcept
+    template <FixedString Tag>
+    void encode()
     {
-        return sizeof(ValueType);
-    }
-
-    template <typename ValueType>
-    void encode(const ValueType value, const size_t size)
-    {
-        if (m_offset + size > m_data.size()) [[unlikely]]
-        {
-            throw std::runtime_error("Buffer overflow");
-        }
-        // FIXME
-        // std::span<uint8_t> target = m_data.subspan(m_offset, size);
-        // std::memcpy(target.data(), &value, size);
+        const auto size = sizeof(Tag);
+        std::memcpy(m_data.data() + m_offset, Tag.value, size);
         m_offset += size;
+        m_data[m_offset] = '=';
+        ++m_offset;
     }
 
 public:
-
     FieldEncoder() = default;
 
     /**
@@ -78,7 +74,7 @@ public:
         m_data = data;
     }
 
-    template <FixedString Tag, bool Required, ParentType::Values Parent, typename ValueType>
+    template <FixedString Tag, bool Required, typename ValueType>
     requires EncodableInteger<ValueType>
     void encode(const ValueType value)
     {
@@ -86,37 +82,37 @@ public:
         {
             // check null value
         }
-        auto size = sizeof(Tag);
-        std::memcpy(m_data.data() + m_offset, Tag.value, size);
-        m_offset += size;
-        m_data[m_offset] = '=';
-        ++m_offset;
+        encode<Tag>();
         m_offset += utils::uint32ToAscii(value, m_data, m_offset);
         m_data[m_offset] = 1;
         ++m_offset;
     }
 
-    template <FixedString Tag, bool Required, ParentType::Values Parent, typename ValueType>
-    size_t encode(const ValueType value)
+    template <FixedString Tag, bool Required, typename DurationType>
+        requires EncodableDuration<DurationType>
+    void encode(const DurationType duration)
     {
-        //constexpr size_t encoded_bytes = getEncodedSize<Tag, Parent, ValueType>();
-        //encode(value, encoded_bytes);
-        //return encoded_bytes;
-        return 0;
+        encode<Tag>();
+        auto ticks = duration.count();
+        encode<Tag, Required, decltype(ticks)>(ticks);
     }
 
-    template <FixedString Tag, bool Required, ParentType::Values Parent, typename ValueType>
-    size_t encode(const std::optional<ValueType> value)
+    template <FixedString Tag, bool Required, typename WrapperType>
+        requires EncodableEnumWrapper<WrapperType>
+    void encode(const typename WrapperType::Values value)
     {
-        if (!value.has_value())
-        {
-            if constexpr (Required)
-            {
-                throw std::invalid_argument("Required tag cannot be empty");
-            }
-            return 0;
-        }
-        return encode<Tag, Required, Parent>(*value);
+        using UnderlyingType = std::underlying_type_t<typename WrapperType::Values>;
+        encode<Tag, Required, UnderlyingType>(static_cast<UnderlyingType>(value));
+    }
+
+    template <FixedString Tag, bool Required, typename ValueType>
+    size_t encode(const std::string_view value)
+    {
+        encode<Tag>();
+        memcpy(m_data.data() + m_offset, value.data(), value.size());
+        m_data[m_offset] = 1;
+        ++m_offset;
+        return 0;
     }
 
 };

@@ -121,6 +121,7 @@ struct SessionContext
     std::span<const uint8_t> m_protocol;
     std::span<const uint8_t> m_expectedSenderCompId{}; // tag 49 of incoming messages, the counterparty's CompID
     std::span<const uint8_t> m_expectedTargetCompId{}; // tag 56 of incoming messages, our own CompID
+    std::string m_senderPrefix{}; // 8=FIXT.1.1\001 9=  56=RECEIVER\001 49=SENDER\001
 };
 
 struct ParentType

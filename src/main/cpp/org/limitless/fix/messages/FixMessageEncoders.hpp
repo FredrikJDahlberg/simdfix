@@ -36,19 +36,19 @@ struct NestedGroupEncoder : GroupEncoder
 
     NestedGroupEncoder& name(const std::string_view value)
     {
-        m_encoder.encode<"501", false, ParentType::Group>(value);
+        m_encoder.encode<"501", false, std::string_view>(value);
         return *this;
     }
 
     NestedGroupEncoder& nestedOne(const std::uint32_t value)
     {
-        m_encoder.encode<"601", false, ParentType::Group>(value);
+        m_encoder.encode<"601", false, std::uint32_t>(value);
         return *this;
     }
 
     NestedGroupEncoder& nestedTwo(const std::uint32_t value)
     {
-        m_encoder.encode<"602", false, ParentType::Group>(value);
+        m_encoder.encode<"602", false, std::uint32_t>(value);
         return *this;
     }
 
@@ -85,19 +85,19 @@ public:
 
     HopsEncoder& hopCompID(const std::string_view value)
     {
-        m_encoder.encode<"628", false, ParentType::Group>(value);
+        m_encoder.encode<"628", false, std::string_view>(value);
         return *this;
     }
 
     HopsEncoder& hopSendingTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"629", false, ParentType::Group>(value);
+        m_encoder.encode<"629", false, std::chrono::milliseconds>(value);
         return *this;
     }
 
     HopsEncoder& hopRefID(const std::uint32_t value)
     {
-        m_encoder.encode<"630", false, ParentType::Group>(value);
+        m_encoder.encode<"630", false, std::uint32_t>(value);
         return *this;
     }
 
@@ -134,49 +134,49 @@ public:
 
     LogonEncoder& bodyLength(const std::uint32_t value)
     {
-        m_encoder.encode<"9", false, ParentType::Message>(value);
+        m_encoder.encode<"9", false, std::uint32_t>(value);
         return *this;
     }
 
     LogonEncoder& msgType(const MessageType::Values value)
     {
-        m_encoder.encode<"35", false, ParentType::Message>(value);
+        m_encoder.encode<"35", false, MessageType>(value);
         return *this;
     }
 
     LogonEncoder& sender(const std::string_view value)
     {
-        m_encoder.encode<"49", false, ParentType::Message>(value);
+        m_encoder.encode<"49", false, std::string_view>(value);
         return *this;
     }
 
     LogonEncoder& target(const std::string_view value)
     {
-        m_encoder.encode<"56", false, ParentType::Message>(value);
+        m_encoder.encode<"56", false, std::string_view>(value);
         return *this;
     }
 
     LogonEncoder& sequenceNumber(const std::uint32_t value)
     {
-        m_encoder.encode<"34", false, ParentType::Message>(value);
+        m_encoder.encode<"34", false, std::uint32_t>(value);
         return *this;
     }
 
     LogonEncoder& sendingTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"52", false, ParentType::Message>(value);
+        m_encoder.encode<"52", false, std::chrono::milliseconds>(value);
         return *this;
     }
 
     LogonEncoder& encryptMethod(const Encryption::Values value)
     {
-        m_encoder.encode<"98", false, ParentType::Message>(value);
+        m_encoder.encode<"98", false, Encryption>(value);
         return *this;
     }
 
     LogonEncoder& heartbeatInterval(const std::uint32_t value)
     {
-        m_encoder.encode<"108", false, ParentType::Message>(value);
+        m_encoder.encode<"108", false, std::uint32_t>(value);
         return *this;
     }
 
@@ -213,43 +213,43 @@ public:
 
     LogoutEncoder& bodyLength(const std::uint32_t value)
     {
-        m_encoder.encode<"9", false, ParentType::Message>(value);
+        m_encoder.encode<"9", false, std::uint32_t>(value);
         return *this;
     }
 
     LogoutEncoder& msgType(const MessageType::Values value)
     {
-        m_encoder.encode<"35", false, ParentType::Message>(value);
+        m_encoder.encode<"35", false, MessageType>(value);
         return *this;
     }
 
     LogoutEncoder& sender(const std::string_view value)
     {
-        m_encoder.encode<"49", false, ParentType::Message>(value);
+        m_encoder.encode<"49", false, std::string_view>(value);
         return *this;
     }
 
     LogoutEncoder& target(const std::string_view value)
     {
-        m_encoder.encode<"56", false, ParentType::Message>(value);
+        m_encoder.encode<"56", false, std::string_view>(value);
         return *this;
     }
 
     LogoutEncoder& sequenceNumber(const std::uint32_t value)
     {
-        m_encoder.encode<"34", false, ParentType::Message>(value);
+        m_encoder.encode<"34", false, std::uint32_t>(value);
         return *this;
     }
 
     LogoutEncoder& sendingTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"52", false, ParentType::Message>(value);
+        m_encoder.encode<"52", false, std::chrono::milliseconds>(value);
         return *this;
     }
 
     LogoutEncoder& text(const std::string_view value)
     {
-        m_encoder.encode<"58", false, ParentType::Message>(value);
+        m_encoder.encode<"58", false, std::string_view>(value);
         return *this;
     }
 
@@ -286,43 +286,43 @@ public:
 
     HeartbeatEncoder& bodyLength(const std::uint32_t value)
     {
-        m_encoder.encode<"9", false, ParentType::Message>(value);
+        m_encoder.encode<"9", false, std::uint32_t>(value);
         return *this;
     }
 
     HeartbeatEncoder& msgType(const MessageType::Values value)
     {
-        m_encoder.encode<"35", false, ParentType::Message>(value);
+        m_encoder.encode<"35", false, MessageType>(value);
         return *this;
     }
 
     HeartbeatEncoder& sender(const std::string_view value)
     {
-        m_encoder.encode<"49", false, ParentType::Message>(value);
+        m_encoder.encode<"49", false, std::string_view>(value);
         return *this;
     }
 
     HeartbeatEncoder& target(const std::string_view value)
     {
-        m_encoder.encode<"56", false, ParentType::Message>(value);
+        m_encoder.encode<"56", false, std::string_view>(value);
         return *this;
     }
 
     HeartbeatEncoder& sequenceNumber(const std::uint32_t value)
     {
-        m_encoder.encode<"34", false, ParentType::Message>(value);
+        m_encoder.encode<"34", false, std::uint32_t>(value);
         return *this;
     }
 
     HeartbeatEncoder& sendingTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"52", false, ParentType::Message>(value);
+        m_encoder.encode<"52", false, std::chrono::milliseconds>(value);
         return *this;
     }
 
     HeartbeatEncoder& testReqID(const std::string_view value)
     {
-        m_encoder.encode<"112", false, ParentType::Message>(value);
+        m_encoder.encode<"112", false, std::string_view>(value);
         return *this;
     }
 
@@ -359,43 +359,43 @@ public:
 
     TestRequestEncoder& bodyLength(const std::uint32_t value)
     {
-        m_encoder.encode<"9", false, ParentType::Message>(value);
+        m_encoder.encode<"9", false, std::uint32_t>(value);
         return *this;
     }
 
     TestRequestEncoder& msgType(const MessageType::Values value)
     {
-        m_encoder.encode<"35", false, ParentType::Message>(value);
+        m_encoder.encode<"35", false, MessageType>(value);
         return *this;
     }
 
     TestRequestEncoder& sender(const std::string_view value)
     {
-        m_encoder.encode<"49", false, ParentType::Message>(value);
+        m_encoder.encode<"49", false, std::string_view>(value);
         return *this;
     }
 
     TestRequestEncoder& target(const std::string_view value)
     {
-        m_encoder.encode<"56", false, ParentType::Message>(value);
+        m_encoder.encode<"56", false, std::string_view>(value);
         return *this;
     }
 
     TestRequestEncoder& sequenceNumber(const std::uint32_t value)
     {
-        m_encoder.encode<"34", false, ParentType::Message>(value);
+        m_encoder.encode<"34", false, std::uint32_t>(value);
         return *this;
     }
 
     TestRequestEncoder& sendingTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"52", false, ParentType::Message>(value);
+        m_encoder.encode<"52", false, std::chrono::milliseconds>(value);
         return *this;
     }
 
     TestRequestEncoder& testReqID(const std::string_view value)
     {
-        m_encoder.encode<"112", false, ParentType::Message>(value);
+        m_encoder.encode<"112", false, std::string_view>(value);
         return *this;
     }
 
