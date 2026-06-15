@@ -89,4 +89,5 @@ Raw FIX bytes
 - **`constexpr`**: applied to methods that can be evaluated at compile time, especially field accessors.
 - **Error handling**: no exceptions in the parsing/decoding path — fallible operations return `std::expected<T, Result::Values>`. (`std::invalid_argument` thrown from `GroupDecoder::wrap` on a missing tag is a known exception to this rule.)
 - **Encapsulation**: keep raw buffers/spans (`m_data`, `m_tokens`, `m_tags`) private; expose narrow accessors (`tokenAt`, `indexOf`, `byteAt`) instead of the underlying containers.
+- **Doc comments**: use Doxygen-style `/** ... */` blocks with `@tparam`, `@param`, `@return`, and `@throws` as applicable, as in `FieldDecoder.hpp`. Apply to public/template methods on encoder and decoder classes.
 - **Generated code**: never hand-edit files produced by `Generator` (e.g. `FixMessageDecoders.hpp`, `FixMessageHandler.hpp`, `Grammar.hpp`); change `protocol.xml` or the generator templates instead.
