@@ -11,6 +11,7 @@
 
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
 #include "org/limitless/fix/messages/FixMessageDecoders.hpp"
+#include "org/limitless/fix/messages/FixMessageEncoders.hpp"
 #include "org/limitless/fix/messages/FixMessageHandler.hpp"
 
 #define SOH "\x01"
@@ -278,6 +279,41 @@ static void benchGroups()
     report("GROUPS", duration, hotMsgs, LOGIN_GROUP_LENGTH);
 }
 
+// ENCODE: encode a Logon message (with a 3-entry HopsRepeatingGroup) repeatedly.
+static void benchEncode()
+{
+    using namespace org::limitless::fix::messages;
+
+    constexpr size_t HOT_COUNT = 1'000'000;
+    std::array<uint8_t, 256> buffer{};
+
+    size_t encodedLength = 0;
+    const auto duration = timer([&]
+    {
+        for (size_t i = 0; i < HOT_COUNT; ++i)
+        {
+            FixPayloadEncoder<"FIXT.1.1", "SellSide_1", "Buyer"> encoder{};
+            encoder.wrap(0, buffer);
+
+            LogonEncoder logon{};
+            encoder.wrapMessage(logon)
+                    .sequenceNumber(1)
+                    .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+                    .encryptMethod(Encryption::None)
+                    .heartbeatInterval(30);
+
+            logon
+                    .hops(3)
+                    .next().hopCompID("HOP1").hopSendingTime(std::chrono::milliseconds{1'781'378'773'959}).hopRefID(1)
+                    .next().hopCompID("HOP2").hopSendingTime(std::chrono::milliseconds{1'781'378'773'959}).hopRefID(2)
+                    .next().hopCompID("HOP3").hopSendingTime(std::chrono::milliseconds{1'781'378'773'959}).hopRefID(3);
+
+            encodedLength = encoder.encode(logon);
+        }
+    });
+    report("ENCODE", duration, HOT_COUNT, encodedLength);
+}
+
 struct Benchmark
 {
     std::string_view name;
@@ -289,6 +325,7 @@ static constexpr Benchmark BENCHMARKS[] = {
     {"hot",     benchHotCache},
     {"getters", benchGetters},
     {"groups",  benchGroups},
+    {"encode",  benchEncode},
 };
 
 static void printUsage(const char* program)
