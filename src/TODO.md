@@ -20,6 +20,25 @@ FIXMEs/TODOs in source
 
 Collected from the source tree 2026-06-12. None remaining.
 
+Unsupported FIX data types
+-----
+
+`DataModel.hpp` (`m_types`) currently maps `protocol.xml` primitive types to
+`char`, `uint8`, `int32`, `uint32`, `int64`, `uint64`, `timestamp`, and
+`string`. The following standard FIX data types have no mapping/`Category`
+and cannot yet be used in `protocol.xml`:
+
+- `float` / `Qty` / `Price` / `PriceOffset` / `Amt` / `Percentage` — decimal
+  (fixed/floating point) numbers; only integers are supported.
+- `Boolean` — single-character 'Y'/'N'; would need a bool `Category` (currently
+  falls back to `char`/`String`).
+- `data` / `XMLData` / `Length`-prefixed raw bytes.
+- `UTCTimeOnly`, `UTCDateOnly`, `LocalMktDate`, `MonthYear`, `TZTimeOnly`,
+  `TZTimestamp`, `Tenor` — only the full `UTCTimestamp` (21-byte) format is
+  supported via `Category::Timestamp`.
+- `MultipleCharValue`, `MultipleStringValue` — space-delimited multi-value
+  fields.
+
 Open issues in FieldEncoder
 -----
 
