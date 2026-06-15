@@ -13,6 +13,8 @@ TODO
                .next().time(20).string("hepp")
 4. ~~configure decoder/encoder with protocol constants.~~ done via
    `PayloadEncoder<Protocol, Target, Sender>` / `FixPayloadEncoder`.
+5. implement fixed decimal type for internal use (`float` / `Qty` / `Price` /
+   `PriceOffset` / `Amt` / `Percentage` decoding/encoding without floating point).
 
 
 FIXMEs/TODOs in source
