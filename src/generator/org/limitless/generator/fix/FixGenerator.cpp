@@ -177,6 +177,12 @@ static void generateEncoders(const std::string& fileName,
     out << "        return m_encoder.offset();\n";
     out << "    }\n\n";
 
+    out << "    template <typename MessageEncoderType>\n";
+    out << "    MessageEncoderType& wrapMessage(MessageEncoderType& message) const\n";
+    out << "    {\n";
+    out << "        return m_encoder.wrapMessage(message);\n";
+    out << "    }\n\n";
+
     out << "    template <EncodableMessage Message>\n";
     out << "    uint32_t encode(const Message& message)\n";
     out << "    {\n";

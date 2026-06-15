@@ -88,6 +88,15 @@ public:
         return m_offset + HeaderLength;
     }
 
+    // Wraps a message encoder around the buffer at the position where the
+    // message body should be encoded.
+    template <typename MessageEncoderType>
+    MessageEncoderType& wrapMessage(MessageEncoderType& message) const
+    {
+        message.wrap(m_buffer, offset());
+        return message;
+    }
+
     // Fills in MsgType and BodyLength, and appends the CheckSum field after the
     // already-encoded message body.
     template <EncodableMessage Message>

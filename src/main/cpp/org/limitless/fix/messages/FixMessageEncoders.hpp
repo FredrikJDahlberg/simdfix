@@ -349,6 +349,12 @@ public:
         return m_encoder.offset();
     }
 
+    template <typename MessageEncoderType>
+    MessageEncoderType& wrapMessage(MessageEncoderType& message) const
+    {
+        return m_encoder.wrapMessage(message);
+    }
+
     template <EncodableMessage Message>
     uint32_t encode(const Message& message)
     {
