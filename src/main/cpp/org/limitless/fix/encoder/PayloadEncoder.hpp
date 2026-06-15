@@ -42,6 +42,14 @@ class PayloadEncoder
 public:
     PayloadEncoder() = default;
 
+    /**
+     * Rebinds the encoder to a destination buffer and writes the FIX header
+     * fields preceding the message body (BeginString, a placeholder BodyLength,
+     * a placeholder MsgType, SenderCompID, TargetCompID).
+     * @param offset byte offset within buffer at which the header begins
+     * @param buffer destination buffer
+     * @return *this, for chaining
+     */
     PayloadEncoder& wrap(const uint32_t offset, const std::span<uint8_t> buffer)
     {
         m_offset = offset;
@@ -82,14 +90,21 @@ public:
         return *this;
     }
 
-    // Offset at which the message body should be encoded.
+    /**
+     * @return the offset at which the message body should be encoded
+     */
     [[nodiscard]] uint32_t offset() const
     {
         return m_offset + HeaderLength;
     }
 
-    // Wraps a message encoder around the buffer at the position where the
-    // message body should be encoded.
+    /**
+     * Wraps a message encoder around the buffer at the position where the
+     * message body should be encoded.
+     * @tparam MessageEncoderType message encoder type, e.g. LogonEncoder
+     * @param message message encoder to wrap
+     * @return message, for chaining
+     */
     template <typename MessageEncoderType>
     MessageEncoderType& wrapMessage(MessageEncoderType& message) const
     {
@@ -97,8 +112,13 @@ public:
         return message;
     }
 
-    // Fills in MsgType and BodyLength, and appends the CheckSum field after the
-    // already-encoded message body.
+    /**
+     * Fills in MsgType and BodyLength, and appends the CheckSum field after the
+     * already-encoded message body.
+     * @tparam Message message encoder type, e.g. LogonEncoder
+     * @param message message whose body has already been encoded at offset()
+     * @return the total number of bytes written, including header and trailer
+     */
     template <EncodableMessage Message>
     uint32_t encode(const Message& message)
     {
@@ -126,6 +146,10 @@ public:
         return m_encodedLength;
     }
 
+    /**
+     * @return the total number of bytes written by the last wrap()/encode(),
+     *         including header and trailer
+     */
     [[nodiscard]] uint32_t encodedLength() const
     {
         return m_encodedLength;

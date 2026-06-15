@@ -9,6 +9,9 @@
 
 namespace org::limitless::fix::encoder {
 
+// Base class for generated message encoders (e.g. LogonEncoder, HeartbeatEncoder).
+// Owns the FieldEncoder used to write the message body and tracks how many bytes
+// have been encoded since wrap().
 class MessageEncoder
 {
 protected:
@@ -17,6 +20,11 @@ protected:
 public:
     MessageEncoder() = default;
 
+    /**
+     * Rebinds the encoder to begin writing the message body into data at offset.
+     * @param data destination buffer
+     * @param offset byte offset within data at which the message body begins
+     */
     void wrap(const std::span<uint8_t> data, const size_t offset = 0)
     {
         m_encoder.wrap(data, offset);

@@ -77,8 +77,9 @@ public:
     }
 
     /**
-     *  Set session context
-     * @param context
+     * Sets the session context used by checkRequired() to validate SenderCompID
+     * and TargetCompID.
+     * @param context expected CompIDs for this session
      */
     void context(SessionContext& context)
     {

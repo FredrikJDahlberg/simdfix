@@ -15,6 +15,12 @@
 
 namespace org::limitless::fix::utils {
 
+/**
+ * Debug helper: prints length bytes from buffer, one per column, with
+ * non-printable bytes shown as '?' and SOH (0x01) shown as '|'.
+ * @param length number of bytes to print
+ * @param buffer bytes to print
+ */
 inline void print(const uint32_t length, const uint8_t* buffer)
 {
     for (uint32_t i = 0; i < length; ++i)
@@ -26,10 +32,10 @@ inline void print(const uint32_t length, const uint8_t* buffer)
 }
 
 /**
- * Scale int32 value by power of 10
- * @param value
- * @param power
- * @return
+ * Multiplies value by 10^power.
+ * @param value value to scale
+ * @param power power of ten, 0-9; values outside this range return value unchanged
+ * @return value * 10^power
  */
 [[nodiscard]] inline uint32_t scale(const uint32_t value, const uint32_t power)
 {
@@ -50,10 +56,10 @@ inline void print(const uint32_t length, const uint8_t* buffer)
 }
 
 /**
- * Scale int64_t value by power of 10
- * @param value
- * @param power
- * @return
+ * Multiplies value by 10^power.
+ * @param value value to scale
+ * @param power power of ten, 0-19; values outside this range return value unchanged
+ * @return value * 10^power
  */
 [[nodiscard]] inline uint64_t scale(const uint64_t value, const uint32_t power)
 {
@@ -88,13 +94,15 @@ inline constexpr uint64_t SwarFactor1 = 0x000F424000000064; // 100 + (1000000ULL
 inline constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 32)
 
 /**
- * FIXME
+ * Parses up to 8 ASCII digits using SWAR digit parsing and adds the result to
+ * value * 10^length.
  * See https://lemire.me/blog/2022/01/21/swar-explained-parsing-eight-digits/
- * @param value
- * @param digits must have at least sizeof(uint64_t) readable bytes; bytes beyond
- *               are shifted out and do not affect the result.
- * @param length
- * @return uint32
+ * @param value accumulator the parsed digits are added to, scaled by 10^length
+ * @param digits ASCII digits; must have at least sizeof(uint64_t) readable
+ *               bytes, bytes beyond length are shifted out and do not affect
+ *               the result
+ * @param length number of digits to parse, 0-8
+ * @return value * 10^length + the value of the parsed digits
  */
 [[nodiscard]] inline uint32_t asciiToUin32(const uint32_t value, const uint8_t* digits, const uint32_t length)
 {
@@ -112,12 +120,16 @@ inline constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 
 inline constexpr uint64_t AsciiZeros = 0x3030303030303030ULL;
 
 /**
- * FIXME
- * @tparam CharType
- * @param digits must have at least sizeof(uint64_t) readable bytes; bytes beyond
- * @param length are shifted out and do not affect the result.
- * @param padded
- * @return
+ * Parses ASCII digits as an unsigned 64-bit integer, using SWAR digit parsing
+ * for the first 8 digits when padded.
+ * @tparam CharType 1-byte character type
+ * @param digits ASCII digits; if padded, must have at least sizeof(uint64_t)
+ *               readable bytes, bytes beyond length are shifted out and do
+ *               not affect the result
+ * @param length number of digits to parse
+ * @param padded true to use the SWAR fast path (digits has at least 8
+ *               readable bytes), false to parse digit-by-digit
+ * @return parsed value, or 0 if length is 0
  */
 template <typename CharType>
 [[nodiscard]] uint64_t asciiToUint64(const CharType* digits, const uint32_t length, const bool padded)
@@ -150,6 +162,19 @@ template <typename CharType>
     return number;
 }
 
+/**
+ * Parses ASCII digits as an unsigned 64-bit integer and adds the result to
+ * value * 10^length.
+ * @tparam T 1-byte character type
+ * @param value accumulator the parsed digits are added to, scaled by 10^length
+ * @param digits ASCII digits; if padded, must have at least sizeof(uint64_t)
+ *               readable bytes, bytes beyond length are shifted out and do
+ *               not affect the result
+ * @param length number of digits to parse
+ * @param padded true to use the SWAR fast path (digits has at least 8
+ *               readable bytes), false to parse digit-by-digit
+ * @return value * 10^length + the value of the parsed digits
+ */
 template <typename T>
 [[nodiscard]] uint64_t asciiToUint64(const uint64_t value, const T* digits, const uint32_t length, const bool padded)
 {
@@ -172,12 +197,26 @@ template <typename T>
     return static_cast<int32_t>(asciiToUint64(digits, length, false));
 }
 
+/**
+ * Wraps a string literal as a span of bytes, excluding the terminating
+ * null character.
+ * @tparam N size of the string literal, including the null terminator
+ * @param str string literal to view
+ * @return span over the literal's N - 1 characters
+ */
 template<size_t N>
 [[nodiscard]] constexpr auto makeSpan(const char (& str)[N]) noexcept
 {
     return std::span<const uint8_t, N - 1>(reinterpret_cast<const uint8_t*>(str), N - 1);
 }
 
+/**
+ * SWAR search for a byte value within a little-endian-packed uint64_t.
+ * @param value byte value to find
+ * @param bytes 8 bytes packed into a uint64_t
+ * @return for each matching byte, the high bit of that byte's lane is set;
+ *         all other bits are 0
+ */
 [[nodiscard]] inline uint64_t findByte(const uint8_t value, uint64_t bytes)
 {
     const uint64_t mask = 0x01010101'01010101ULL * value;
@@ -186,6 +225,13 @@ template<size_t N>
     return bytes;
 }
 
+/**
+ * Divides number by a compile-time constant divisor using a multiply-and-shift
+ * approximation, avoiding a hardware division instruction.
+ * @tparam Divisor compile-time divisor; must be 10, 100, 1'000, or 10'000
+ * @param number value to divide
+ * @return number / Divisor
+ */
 template <uint32_t Divisor>
 [[nodiscard]] uint32_t fastDivide(const uint32_t number)
 {
@@ -209,6 +255,14 @@ template <uint32_t Divisor>
     }
 }
 
+/**
+ * Converts a Gregorian calendar date to a day count relative to the Unix
+ * epoch (1970-01-01), using Howard Hinnant's days-from-civil algorithm.
+ * @param year calendar year, e.g. 2026
+ * @param month calendar month, 1-12
+ * @param day day of month, 1-31
+ * @return days since 1970-01-01 (negative for earlier dates)
+ */
 [[nodiscard]] inline int64_t daysSince1970(int year, int month, int day) noexcept
 {
     // Shift the calendar so that March is the first month of the "built-in" year.
@@ -223,6 +277,14 @@ template <uint32_t Divisor>
     return era * 146097 + doe - 719468;
 }
 
+/**
+ * Parses a FIX UTCTimestamp ("YYYYMMDD-HH:MM:SS" or "YYYYMMDD-HH:MM:SS.sss")
+ * into milliseconds since the Unix epoch.
+ * @param data UTCTimestamp bytes; must have at least sizeof(uint64_t)
+ *             readable bytes beyond the first 8 (for the SWAR date parse)
+ * @param length 17 (no milliseconds) or 21 (with milliseconds)
+ * @return milliseconds since the Unix epoch, or -1 if length is neither 17 nor 21
+ */
 inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
 {
     static constexpr uint64_t MillisPerDay = 24 * 60 * 60 * 1'000;
@@ -258,6 +320,14 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     return -1;
 }
 
+/**
+ * Writes the decimal ASCII representation of value (no leading zeros, "0" for
+ * zero) into data starting at offset.
+ * @param value value to convert
+ * @param data destination buffer
+ * @param offset byte offset within data at which to write
+ * @return number of digits written
+ */
 inline size_t uint32ToAscii(const uint32_t value, std::span<uint8_t> data, const size_t offset)
 {
     if (value == 0)
@@ -309,6 +379,14 @@ inline size_t uint32ToAscii(const uint32_t value, std::span<uint8_t> data, const
     return length;
 }
 
+/**
+ * Writes the decimal ASCII representation of value into data starting at
+ * offset, with a leading '-' for negative values.
+ * @param value value to convert
+ * @param data destination buffer
+ * @param offset byte offset within data at which to write
+ * @return number of bytes written, including the leading '-' if present
+ */
 inline size_t int32ToAscii(const int32_t value, std::span<uint8_t> data, const size_t offset)
 {
     if (value < 0)
@@ -320,6 +398,14 @@ inline size_t int32ToAscii(const int32_t value, std::span<uint8_t> data, const s
     return uint32ToAscii(static_cast<uint32_t>(value), data, offset);
 }
 
+/**
+ * Writes the decimal ASCII representation of value (no leading zeros, "0" for
+ * zero) into data starting at offset.
+ * @param value value to convert
+ * @param data destination buffer
+ * @param offset byte offset within data at which to write
+ * @return number of digits written
+ */
 inline size_t uint64ToAscii(const uint64_t value, std::span<uint8_t> data, const size_t offset)
 {
     // Always materialize all 20 decimal digits, no data-dependent early exit.
@@ -355,6 +441,14 @@ inline size_t uint64ToAscii(const uint64_t value, std::span<uint8_t> data, const
     return length;
 }
 
+/**
+ * Writes the decimal ASCII representation of value into data starting at
+ * offset, with a leading '-' for negative values.
+ * @param value value to convert
+ * @param data destination buffer
+ * @param offset byte offset within data at which to write
+ * @return number of bytes written, including the leading '-' if present
+ */
 inline size_t int64ToAscii(const int64_t value, std::span<uint8_t> data, const size_t offset)
 {
     if (value < 0)
@@ -368,6 +462,13 @@ inline size_t int64ToAscii(const int64_t value, std::span<uint8_t> data, const s
 
 inline constexpr int64_t MillisPerDay = 24 * 60 * 60 * 1'000;
 
+/**
+ * Writes value as exactly Width decimal digits, zero-padded, e.g.
+ * writeFixedDigits<4>(7, dst) writes "0007".
+ * @tparam Width number of digits to write
+ * @param value value to convert; truncated to its low Width decimal digits
+ * @param dst destination buffer, must have Width writable bytes
+ */
 template <int Width>
 inline void writeFixedDigits(uint32_t value, uint8_t* dst)
 {
@@ -382,6 +483,8 @@ inline void writeFixedDigits(uint32_t value, uint8_t* dst)
 /**
  * Writes "YYYYMMDD-" (9 bytes) for the given day number (days since 1970-01-01),
  * the inverse of daysSince1970.
+ * @param days days since 1970-01-01
+ * @param dst destination buffer, must have 9 writable bytes
  */
 inline void writeDatePrefix(const int64_t days, uint8_t* dst)
 {
@@ -403,6 +506,8 @@ inline void writeDatePrefix(const int64_t days, uint8_t* dst)
 
 /**
  * Writes "HH:MM:SS.sss" (12 bytes) for the given time of day in milliseconds.
+ * @param msOfDay milliseconds since midnight, 0-86'399'999
+ * @param dst destination buffer, must have 12 writable bytes
  */
 inline void writeTimeOfDay(const uint32_t msOfDay, uint8_t* dst)
 {
@@ -415,12 +520,25 @@ inline void writeTimeOfDay(const uint32_t msOfDay, uint8_t* dst)
     writeFixedDigits<3>(msOfDay % 1'000, dst + 9);
 }
 
+/**
+ * Parses a FIX UTCTimestamp ("YYYYMMDD-HH:MM:SS" or "YYYYMMDD-HH:MM:SS.sss").
+ * @param dateTime UTCTimestamp string
+ * @return time since the Unix epoch, or -1ms if dateTime has an unsupported length
+ */
 inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateTime)
 {
     const auto data = reinterpret_cast<const uint8_t*>(dateTime.data());
     return std::chrono::milliseconds{dateTimeToEpochUTC(data, dateTime.length())};
 }
 
+/**
+ * Maps a FIX field's string code to the corresponding enum value via
+ * Enum::Codes.
+ * @tparam Enum enum wrapper type exposing a Codes array and a Values enum,
+ *              including Values::Null
+ * @param code string code to look up
+ * @return the matching enum value, or Enum::Values::Null if code is not found
+ */
 template <typename Enum>
 Enum::Values find(const std::string_view code)
 {

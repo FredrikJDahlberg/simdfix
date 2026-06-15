@@ -16,6 +16,9 @@
 
 namespace org::limitless::fix::encoder {
 
+// Encodes individual FIX fields ("TAG=VALUE" followed by SOH) into a buffer.
+// The lowest-level building block in the encoder stack; MessageEncoder and
+// GroupEncoder both hold a reference to one and delegate field encoding to it.
 class FieldEncoder
 {
     std::span<uint8_t> m_data{};
@@ -24,6 +27,10 @@ class FieldEncoder
     int64_t m_cachedDayStartMillis{-1};
     std::array<uint8_t, 9> m_datePrefix{};
 
+    /**
+     * Writes "TAG=" for the given tag, leaving the value to be appended by the caller.
+     * @tparam Tag tag number to write
+     */
     template <FixedString Tag>
     void encode()
     {
@@ -34,8 +41,11 @@ class FieldEncoder
         ++m_encodedLength;
     }
 
-    // Writes a FIX UTCTimestamp ("YYYYMMDD-HH:MM:SS.sss", 21 bytes). The "YYYYMMDD-" prefix
-    // is cached and only recomputed when millis falls outside the cached day.
+    /**
+     * Writes a FIX UTCTimestamp ("YYYYMMDD-HH:MM:SS.sss", 21 bytes). The "YYYYMMDD-" prefix
+     * is cached and only recomputed when millis falls outside the cached day.
+     * @param millis milliseconds since the Unix epoch
+     */
     void encodeTimestamp(const int64_t millis)
     {
         if (millis < m_cachedDayStartMillis || millis >= m_cachedDayStartMillis + utils::MillisPerDay)
@@ -54,9 +64,10 @@ public:
     FieldEncoder() = default;
 
     /**
-     * Constructs an encoder over a destination buffer.
+     * Rebinds the encoder to a destination buffer, resetting encodedLength() to 0.
+     * @param data destination buffer
+     * @param offset byte offset within data at which encoding begins
      */
-
     void wrap(const std::span<uint8_t> data, const size_t offset)
     {
         m_data = data;
@@ -73,6 +84,8 @@ public:
 
     /**
      * Writes "TAG=VALUE" followed by SOH, e.g. for a repeating group's counter field.
+     * @param tag tag number to write
+     * @param value value to write
      */
     void encodeField(const uint32_t tag, const uint32_t value)
     {
@@ -84,6 +97,13 @@ public:
         ++m_encodedLength;
     }
 
+    /**
+     * Writes "TAG=VALUE" followed by SOH for 32-bit (or smaller) signed/unsigned integers.
+     * @tparam Tag tag number to write
+     * @tparam Required whether a null value must be encoded specially
+     * @tparam ValueType integer type of value
+     * @param value value to write
+     */
     template <FixedString Tag, bool Required, typename ValueType>
     requires EncodableInteger<ValueType>
     void encode(const ValueType value)
@@ -105,6 +125,13 @@ public:
         ++m_encodedLength;
     }
 
+    /**
+     * Writes "TAG=VALUE" followed by SOH for 64-bit signed/unsigned integers.
+     * @tparam Tag tag number to write
+     * @tparam Required whether a null value must be encoded specially
+     * @tparam ValueType integer type of value
+     * @param value value to write
+     */
     template <FixedString Tag, bool Required, typename ValueType>
     requires EncodableLongInteger<ValueType>
     void encode(const ValueType value)
@@ -126,6 +153,14 @@ public:
         ++m_encodedLength;
     }
 
+    /**
+     * Writes "TAG=VALUE" followed by SOH, where VALUE is a FIX UTCTimestamp
+     * derived from the given duration (see encodeTimestamp()).
+     * @tparam Tag tag number to write
+     * @tparam Required whether a null value must be encoded specially
+     * @tparam DurationType std::chrono::duration type of duration
+     * @param duration time since the Unix epoch
+     */
     template <FixedString Tag, bool Required, typename DurationType>
         requires EncodableDuration<DurationType>
     void encode(const DurationType duration)
@@ -141,6 +176,14 @@ public:
         ++m_encodedLength;
     }
 
+    /**
+     * Writes "TAG=VALUE" followed by SOH, where VALUE is the FIX string code
+     * for the given enum value, looked up in WrapperType::Codes.
+     * @tparam Tag tag number to write
+     * @tparam Required whether a null value must be encoded specially
+     * @tparam WrapperType enum wrapper type whose Codes table is used for the mapping
+     * @param value enum value to write
+     */
     template <FixedString Tag, bool Required, typename WrapperType>
         requires EncodableEnumWrapper<WrapperType>
     void encode(const WrapperType::Values value)
@@ -148,6 +191,13 @@ public:
         encode<Tag, Required, std::string_view>(WrapperType::Codes[static_cast<size_t>(value)]);
     }
 
+    /**
+     * Writes "TAG=VALUE" followed by SOH for string-valued fields.
+     * @tparam Tag tag number to write
+     * @tparam Required whether a null value must be encoded specially
+     * @tparam ValueType unused; present for symmetry with the other encode() overloads
+     * @param value value to write
+     */
     template <FixedString Tag, bool Required, typename ValueType>
     void encode(const std::string_view value)
     {
