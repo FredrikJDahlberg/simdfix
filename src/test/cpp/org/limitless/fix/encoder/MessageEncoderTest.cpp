@@ -19,7 +19,7 @@ TEST(MessageEncoder, Logon)
     encoder.wrap(0, buffer);
 
     LogonEncoder logon{};
-    logon.wrap(buffer, encoder.bodyOffset())
+    logon.wrap(buffer, encoder.offset())
             .sequenceNumber(1)
             .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
             .encryptMethod(Encryption::None)
@@ -39,7 +39,7 @@ TEST(MessageEncoder, HeartbeatWithHops)
     encoder.wrap(0, buffer);
 
     HeartbeatEncoder heartbeat{};
-    heartbeat.wrap(buffer, encoder.bodyOffset())
+    heartbeat.wrap(buffer, encoder.offset())
             .sequenceNumber(1)
             .sendingTime(std::chrono::milliseconds{1'781'378'773'959});
 

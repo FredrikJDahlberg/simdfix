@@ -344,9 +344,9 @@ public:
         return *this;
     }
 
-    [[nodiscard]] uint32_t bodyOffset() const
+    [[nodiscard]] uint32_t offset() const
     {
-        return m_encoder.bodyOffset();
+        return m_encoder.offset();
     }
 
     template <EncodableMessage Message>

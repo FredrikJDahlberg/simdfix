@@ -83,7 +83,7 @@ public:
     }
 
     // Offset at which the message body should be encoded.
-    [[nodiscard]] uint32_t bodyOffset() const
+    [[nodiscard]] uint32_t offset() const
     {
         return m_offset + HeaderLength;
     }

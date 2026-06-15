@@ -172,9 +172,9 @@ static void generateEncoders(const std::string& fileName,
     out << "        return *this;\n";
     out << "    }\n\n";
 
-    out << "    [[nodiscard]] uint32_t bodyOffset() const\n";
+    out << "    [[nodiscard]] uint32_t offset() const\n";
     out << "    {\n";
-    out << "        return m_encoder.bodyOffset();\n";
+    out << "        return m_encoder.offset();\n";
     out << "    }\n\n";
 
     out << "    template <EncodableMessage Message>\n";
