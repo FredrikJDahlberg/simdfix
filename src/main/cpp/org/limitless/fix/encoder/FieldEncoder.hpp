@@ -11,31 +11,10 @@
 #include <string_view>
 #include <concepts>
 
+#include "org/limitless/fix/CodecTypes.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
 namespace org::limitless::fix::encoder {
-
-template <typename ValueType>
-concept EncodableInteger = std::same_as<ValueType, uint32_t> ||
-                           std::same_as<ValueType, int32_t>;
-
-template <typename ValueType>
-concept EncodableLongInteger = std::same_as<ValueType, uint64_t> ||
-                                std::same_as<ValueType, int64_t>;
-
-template <typename T>
-concept EncodableDuration = requires
-{
-    typename T::rep;
-    typename T::period;
-} && std::same_as<T, std::chrono::duration<typename T::rep, typename T::period>>;
-
-template <typename T>
-concept EncodableEnumWrapper = requires
-{
-    typename T::Values;
-    T::Codes;
-} && std::is_enum_v<typename T::Values>;
 
 class FieldEncoder
 {
@@ -44,16 +23,6 @@ class FieldEncoder
     size_t m_encodedLength{};
     int64_t m_cachedDayStartMillis{-1};
     std::array<uint8_t, 9> m_datePrefix{};
-
-    template<std::size_t N>
-    struct FixedString {
-        char value[N];
-
-        constexpr FixedString(const char (&str)[N])
-        {
-            std::copy_n(str, N, value);
-        }
-    };
 
     template <FixedString Tag>
     void encode()
@@ -86,17 +55,12 @@ public:
 
     /**
      * Constructs an encoder over a destination buffer.
-     * @param data destination message bytes
      */
-    explicit FieldEncoder(const std::span<uint8_t> data) : m_data{data}
-    {
-    }
 
     void wrap(const std::span<uint8_t> data, const size_t offset)
     {
         m_data = data;
         m_offset = offset;
-        m_encodedLength = 0;
     }
 
     /**
@@ -107,13 +71,26 @@ public:
         return m_encodedLength;
     }
 
+    /**
+     * Writes "TAG=VALUE" followed by SOH, e.g. for a repeating group's counter field.
+     */
+    void encodeField(const uint32_t tag, const uint32_t value)
+    {
+        m_encodedLength += utils::uint32ToAscii(tag, m_data, m_offset + m_encodedLength);
+        m_data[m_offset + m_encodedLength] = '=';
+        ++m_encodedLength;
+        m_encodedLength += utils::uint32ToAscii(value, m_data, m_offset + m_encodedLength);
+        m_data[m_offset + m_encodedLength] = FieldEnd;
+        ++m_encodedLength;
+    }
+
     template <FixedString Tag, bool Required, typename ValueType>
     requires EncodableInteger<ValueType>
     void encode(const ValueType value)
     {
         if constexpr (Required)
         {
-            // check null value
+            // FIXME handle null value
         }
         encode<Tag>();
         if constexpr (std::is_signed_v<ValueType>)
@@ -124,7 +101,7 @@ public:
         {
             m_encodedLength += utils::uint32ToAscii(value, m_data, m_encodedLength + m_offset);
         }
-        m_data[m_offset + m_encodedLength] = 1;
+        m_data[m_offset + m_encodedLength] = FieldEnd;
         ++m_encodedLength;
     }
 
@@ -134,7 +111,7 @@ public:
     {
         if constexpr (Required)
         {
-            // check null value
+            // FIXME handle null value
         }
         encode<Tag>();
         if constexpr (std::is_signed_v<ValueType>)
@@ -145,7 +122,7 @@ public:
         {
             m_encodedLength += utils::uint64ToAscii(value, m_data, m_offset + m_encodedLength);
         }
-        m_data[m_offset + m_encodedLength] = 1;
+        m_data[m_offset + m_encodedLength] = FieldEnd;
         ++m_encodedLength;
     }
 
@@ -155,12 +132,12 @@ public:
     {
         if constexpr (Required)
         {
-            // check null value
+            // FIXME handle null value
         }
         encode<Tag>();
         const auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
         encodeTimestamp(millis);
-        m_data[m_offset + m_encodedLength] = 1;
+        m_data[m_offset + m_encodedLength] = FieldEnd;
         ++m_encodedLength;
     }
 
@@ -182,7 +159,7 @@ public:
         const auto size = value.size();
         memcpy(m_data.data() + m_offset + m_encodedLength, value.data(), size);
         m_encodedLength += size;
-        m_data[m_offset + m_encodedLength] = 1;
+        m_data[m_offset + m_encodedLength] = FieldEnd;
         ++m_encodedLength;
     }
 

@@ -41,8 +41,8 @@ TEST(GroupDecoder, ScopesFieldLookupToCurrentRepeat)
     ASSERT_TRUE(group.hasNext());
     group.next();
     {
-        const auto sendingTime = field.getUint32<629, false, ParentType::Group>().value_or(0);
-        const auto compID = field.getString<628, false, ParentType::Group>().value_or(Empty);
+        const auto sendingTime = field.getUint32<629, false, RecordType::Group>().value_or(0);
+        const auto compID = field.getString<628, false, RecordType::Group>().value_or(Empty);
         EXPECT_EQ(10u, sendingTime);
         EXPECT_EQ("12", compID);
     }
@@ -50,8 +50,8 @@ TEST(GroupDecoder, ScopesFieldLookupToCurrentRepeat)
     ASSERT_TRUE(group.hasNext());
     group.next();
     {
-        const auto sendingTime = field.getUint32<629, false, ParentType::Group>().value_or(0);
-        const auto compID = field.getString<628, false, ParentType::Group>().value_or(Empty);
+        const auto sendingTime = field.getUint32<629, false, RecordType::Group>().value_or(0);
+        const auto compID = field.getString<628, false, RecordType::Group>().value_or(Empty);
         EXPECT_EQ(37u, sendingTime);
         EXPECT_EQ("20", compID);
     }
@@ -60,7 +60,7 @@ TEST(GroupDecoder, ScopesFieldLookupToCurrentRepeat)
     group.clear();
 
     // Outside any group scope, lookups search the whole message again.
-    const auto firstSendingTime = field.getUint32<629, false, ParentType::Message>().value_or(0);
+    const auto firstSendingTime = field.getUint32<629, false, RecordType::Message>().value_or(0);
     EXPECT_EQ(10u, firstSendingTime);
 }
 
@@ -97,8 +97,8 @@ TEST(GroupDecoder, RewrapWithoutClearDoesNotLeakScopeDepth)
         ASSERT_TRUE(group.hasNext());
         group.next();
         {
-            const auto sendingTime = field.getUint32<629, false, ParentType::Group>().value_or(0);
-            const auto compID = field.getString<628, false, ParentType::Group>().value_or(Empty);
+            const auto sendingTime = field.getUint32<629, false, RecordType::Group>().value_or(0);
+            const auto compID = field.getString<628, false, RecordType::Group>().value_or(Empty);
             EXPECT_EQ(10u, sendingTime);
             EXPECT_EQ("12", compID);
         }
@@ -106,8 +106,8 @@ TEST(GroupDecoder, RewrapWithoutClearDoesNotLeakScopeDepth)
         ASSERT_TRUE(group.hasNext());
         group.next();
         {
-            const auto sendingTime = field.getUint32<629, false, ParentType::Group>().value_or(0);
-            const auto compID = field.getString<628, false, ParentType::Group>().value_or(Empty);
+            const auto sendingTime = field.getUint32<629, false, RecordType::Group>().value_or(0);
+            const auto compID = field.getString<628, false, RecordType::Group>().value_or(Empty);
             EXPECT_EQ(37u, sendingTime);
             EXPECT_EQ("20", compID);
         }

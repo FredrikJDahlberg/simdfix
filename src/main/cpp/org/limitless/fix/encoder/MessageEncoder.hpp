@@ -11,9 +11,8 @@ namespace org::limitless::fix::encoder {
 
 class MessageEncoder
 {
-
 protected:
-    FieldEncoder m_encoder{};
+    FieldEncoder m_encoder;
 
 public:
     MessageEncoder() = default;

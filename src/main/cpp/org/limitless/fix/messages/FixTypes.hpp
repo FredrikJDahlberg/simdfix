@@ -3,6 +3,7 @@
 #define SIMD_FIX_TYPES_HPP
 
 #include <cstdint>
+#include <string_view>
 
 namespace org::limitless::fix::messages {
 

@@ -6,16 +6,69 @@
 #define SIMD_FIX_DICTIONARY_HPP
 
 #include <algorithm>
+#include <concepts>
 #include <cstdint>
 #include <span>
 #include <string_view>
 #include <expected>
 #include <chrono>
-#include "org/limitless/fix/simd/Uint8x16.hpp"
 
 namespace org::limitless::fix {
 
 inline constexpr int32_t MaxGroupDepth = 8;
+
+static constexpr uint32_t CheckSumTag = 10;
+static constexpr uint32_t BodyLengthTag = 9;
+static constexpr uint32_t MessageTypeTag = 35;
+
+inline constexpr uint8_t TagEnd = '=';
+inline constexpr uint8_t FieldEnd = 0x01;
+
+template<std::size_t N>
+struct FixedString
+{
+    static constexpr uint32_t Size = N;
+
+    char value[N];
+
+    constexpr FixedString(const char (&str)[N])
+    {
+        std::copy_n(str, N, value);
+    }
+};
+
+template <typename ValueType>
+concept EncodableInteger = std::same_as<ValueType, uint32_t> ||
+                           std::same_as<ValueType, int32_t>;
+
+template <typename ValueType>
+concept EncodableLongInteger = std::same_as<ValueType, uint64_t> ||
+                                std::same_as<ValueType, int64_t>;
+
+template <typename T>
+concept EncodableDuration = requires
+{
+    typename T::rep;
+    typename T::period;
+} && std::same_as<T, std::chrono::duration<typename T::rep, typename T::period>>;
+
+template <typename T>
+concept EncodableEnumWrapper = requires
+{
+    typename T::Values;
+    T::Codes;
+} && std::is_enum_v<typename T::Values>;
+
+// Matches generated message encoders (e.g. LogonEncoder, HeartbeatEncoder)
+// from FixMessageEncoders.hpp: a MessageEncoder subclass identified by a
+// MsgType code, wrappable over a destination buffer.
+template <typename T>
+concept EncodableMessage = requires(T message, std::span<uint8_t> data)
+{
+    { message.type() } -> std::convertible_to<std::string_view>;
+    { message.wrap(data) };
+    { message.encodedLength() } -> std::convertible_to<std::size_t>;
+};
 
 struct Protocol
 {
@@ -118,13 +171,19 @@ struct Category
 // Non-owning: the spans must remain valid for the lifetime of the session.
 struct SessionContext
 {
-    std::span<const uint8_t> m_protocol;
-    std::span<const uint8_t> m_expectedSenderCompId{}; // tag 49 of incoming messages, the counterparty's CompID
-    std::span<const uint8_t> m_expectedTargetCompId{}; // tag 56 of incoming messages, our own CompID
-    std::string m_senderPrefix{}; // 8=FIXT.1.1\001 9=  56=RECEIVER\001 49=SENDER\001
+    std::string_view m_protocol;
+    std::string_view m_senderCompId{}; // tag 49 of incoming messages, the counterparty's CompID
+    std::string_view m_targetCompId{}; // tag 56 of incoming messages, our own CompID
+
+    SessionContext(const std::string_view protocol,
+                   const std::string_view senderCompId,
+                   const std::string_view targetCompId) :
+        m_protocol(protocol), m_senderCompId(senderCompId), m_targetCompId(targetCompId)
+    {
+    }
 };
 
-struct ParentType
+struct RecordType
 {
     enum Values { Null, Message, Component, Group, Enum };
 
@@ -206,7 +265,7 @@ struct Result
     }
 
     static constexpr std::string_view Names[] = {
-        "NullValue"
+        "NullValue",
         "Success",
         "MessageFragment",
         "InvalidBeginString",

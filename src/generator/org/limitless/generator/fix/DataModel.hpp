@@ -15,7 +15,7 @@
 namespace org::limitless::generator::fix {
 
 using limitless::fix::Category;
-using limitless::fix::ParentType;
+using limitless::fix::RecordType;
 using limitless::fix::Presence;
 using limitless::fix::MaxGroupDepth;
 
@@ -39,12 +39,12 @@ struct Field
     std::string m_type;
     int32_t m_length{};
     Category::Values m_category{Category::Null};
-    ParentType::Values m_parent{};
+    RecordType::Values m_parent{};
     Presence::Values m_presence{Presence::Required};
 
     Field() = default;
     Field(const int32_t tag, std::string  name, std::string type,
-          const int32_t length, const Presence::Values presence, const Category::Values category, const ParentType::Values parent) :
+          const int32_t length, const Presence::Values presence, const Category::Values category, const RecordType::Values parent) :
         m_tag(tag), m_name(std::move(name)), m_type(std::move(type)), m_length(length),
         m_category(category), m_parent(parent), m_presence{presence}
     {
@@ -60,19 +60,19 @@ struct Record
 {
     std::string m_name{};
     std::string m_id{};
-    ParentType::Values m_parent{};
+    RecordType::Values m_parent{};
     std::vector<Field> m_fields{};
     std::vector<Field> m_records{};
     uint32_t m_tag;
 
     Record() = default;
 
-    Record(std::string name, std::string id, const ParentType::Values parent)
+    Record(std::string name, std::string id, const RecordType::Values parent)
         : m_name(std::move(name)), m_id(std::move(id)), m_parent(parent), m_tag{0}
     {
     }
 
-    Record(std::string name, std::string id, const ParentType::Values type, const std::vector<Field>& fields)
+    Record(std::string name, std::string id, const RecordType::Values type, const std::vector<Field>& fields)
         : m_name(std::move(name)), m_id(std::move(id)), m_parent(type), m_fields{fields}, m_tag{0}
     {
     }
@@ -109,15 +109,15 @@ struct DataModel
             auto refType = m_types.find(std::string{type});
             if (std::strncmp(typeNode.name(), "enum", 4) == 0)
             {
-                Record record{name, std::string{}, ParentType::Enum};
+                Record record{name, std::string{}, RecordType::Enum};
                 record.m_fields.emplace_back(0, "Null", "?", 1, Presence::Null,
-                                             Category::Enum, ParentType::Enum);
+                                             Category::Enum, RecordType::Enum);
                 for (auto element : typeNode.children())
                 {
                     const auto fieldName = std::string{element.attribute("name").as_string()};
                     const auto fieldValue = std::string{element.attribute("value").as_string()};
                     record.m_fields.emplace_back(0, fieldName, fieldValue,1, Presence::Null,
-                                                 Category::Enum, ParentType::Enum);
+                                                 Category::Enum, RecordType::Enum);
                 }
                 m_types.try_emplace(name, name, 1, 1, Category::Enum);
                 m_enums.emplace_back(record);
@@ -140,7 +140,7 @@ struct DataModel
     }
 
     void processFields(const pugi::xml_object_range<pugi::xml_node_iterator>& nodes,
-                       const ParentType::Values parent,
+                       const RecordType::Values parent,
                        Record& record)
     {
         for (const auto& field : nodes)
@@ -195,14 +195,14 @@ struct DataModel
         }
     }
 
-    void processRecords(const pugi::xpath_node_set& records, const ParentType::Values parent)
+    void processRecords(const pugi::xpath_node_set& records, const RecordType::Values parent)
     {
         for (const auto& recordNode : records)
         {
             const auto node = recordNode.node();
-            processRecords(node.select_nodes("group"), ParentType::Group);
+            processRecords(node.select_nodes("group"), RecordType::Group);
 
-            if (parent == ParentType::Group && node.select_nodes("ancestor::group").size() >= MaxGroupDepth)
+            if (parent == RecordType::Group && node.select_nodes("ancestor::group").size() >= MaxGroupDepth)
             {
                 throw std::invalid_argument(std::format("Group nesting cannot exceed {}", MaxGroupDepth));
             }
@@ -211,11 +211,11 @@ struct DataModel
             std::vector<Field> fields{};
             Record record{std::string{name}, std::string{}, parent, fields};
             processFields(node.children(), parent, record);
-            if (parent == ParentType::Message)
+            if (parent == RecordType::Message)
             {
                 record.m_id = node.attribute("id").as_string();
             }
-            if (parent == ParentType::Group)
+            if (parent == RecordType::Group)
             {
                 record.m_tag = node.attribute("tag").as_int();
             }
@@ -229,7 +229,7 @@ struct DataModel
             auto [old, success] = m_recordsByType.try_emplace(std::string{name}, record);
             if (success)
             {
-                if (record.m_parent != ParentType::Component)
+                if (record.m_parent != RecordType::Component)
                 {
                     m_records.emplace_back(record);
                 }
@@ -241,9 +241,9 @@ struct DataModel
     {
         const pugi::xml_node protocol = doc.child("protocol");
         processTypes(protocol.child("types").children());
-        processRecords(protocol.select_nodes(".//component"), ParentType::Component);
-        processRecords(protocol.select_nodes(".//group"), ParentType::Group);
-        processRecords(protocol.select_nodes(".//message"), ParentType::Message);
+        processRecords(protocol.select_nodes(".//component"), RecordType::Component);
+        processRecords(protocol.select_nodes(".//group"), RecordType::Group);
+        processRecords(protocol.select_nodes(".//message"), RecordType::Message);
     }
 };
 }

@@ -11,23 +11,14 @@ TODO
                .next().time(10).string("hepp")
                .next().time(20)
                .next().time(20).string("hepp")
-4. configure decoder/encoder with protocol constants.
+4. ~~configure decoder/encoder with protocol constants.~~ done via
+   `PayloadEncoder<Protocol, Target, Sender>` / `FixPayloadEncoder`.
 
 
 FIXMEs/TODOs in source
 -----
 
 Collected from the source tree 2026-06-12. None remaining.
-
-Empty classes
------
-
-Encoder stubs with empty bodies, placeholders for the encoder work in
-items 1–4 above:
-
-1. `src/main/cpp/org/limitless/fix/encoder/GroupEncoder.hpp` — `GroupEncoder::wrap` is a stub
-   (comment "encode TAG = VALUE"), `next()` only increments `m_count`.
-2. `src/main/cpp/org/limitless/fix/encoder/PayloadEncoder.hpp` — constructor only, no encode API yet.
 
 Open issues in FieldEncoder
 -----

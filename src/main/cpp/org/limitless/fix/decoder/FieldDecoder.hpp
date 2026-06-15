@@ -211,10 +211,10 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return token/tag index, or -1 if not found
      */
-    template <int32_t Tag, ParentType::Values Parent>
+    template <int32_t Tag, RecordType::Values Parent>
     [[nodiscard]] int32_t findIndex() const
     {
-        if constexpr (Parent == ParentType::Group)
+        if constexpr (Parent == RecordType::Group)
         {
             const auto [begin, end] = groupScope();
             const auto index = simd::find(m_tags.data() + begin, end - begin, Tag);
@@ -234,7 +234,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <int32_t Tag, bool Required, ParentType::Values Parent>
+    template <int32_t Tag, bool Required, RecordType::Values Parent>
     [[nodiscard]] constexpr StringResult getString() const
     {
         const auto index = findIndex<Tag, Parent>();
@@ -254,7 +254,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <int32_t Tag, bool Required, ParentType::Values Parent>
+    template <int32_t Tag, bool Required, RecordType::Values Parent>
     [[nodiscard]] constexpr Uint32Result getUint32() const
     {
         const auto index = findIndex<Tag, Parent>();
@@ -273,7 +273,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <int32_t Tag, bool Required, ParentType::Values Parent>
+    template <int32_t Tag, bool Required, RecordType::Values Parent>
     [[nodiscard]] constexpr Int32Result getInt32() const
     {
         const auto index = findIndex<Tag, Parent>();
@@ -292,7 +292,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <uint32_t Tag, bool Required, ParentType::Values Parent>
+    template <uint32_t Tag, bool Required, RecordType::Values Parent>
     [[nodiscard]] constexpr TimestampResult getTimestamp() const
     {
         const auto index = findIndex<Tag, Parent>();
@@ -313,7 +313,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <int32_t Tag, bool Required, typename Enum, ParentType::Values Parent>
+    template <int32_t Tag, bool Required, typename Enum, RecordType::Values Parent>
     [[nodiscard]] constexpr std::expected<typename Enum::Values, Result::Values> getEnum() const
     {
         const auto index = findIndex<Tag, Parent>();

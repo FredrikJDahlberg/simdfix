@@ -21,7 +21,7 @@ public:
 
     void wrap(const uint32_t tag, const uint32_t count)
     {
-        // encode  TAG = VALUE
+        m_encoder.encodeField(tag, count);
         m_count = 0;
     }
 

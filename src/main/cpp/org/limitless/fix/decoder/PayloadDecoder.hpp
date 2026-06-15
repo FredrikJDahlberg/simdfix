@@ -43,13 +43,6 @@ class PayloadDecoder
     static constexpr uint32_t BodyLengthPosition = 1;
     static constexpr uint32_t MessageTypePosition = 2;
 
-    static constexpr uint32_t CheckSumTag = 10;
-    static constexpr uint32_t BodyLengthTag = 9;
-    static constexpr uint32_t MessageTypeTag = 35;
-
-    static constexpr uint8_t TagEnd = '=';
-    static constexpr uint8_t FieldEnd = 0x01;
-
     Token m_tokens[MaxSize]{};
     uint16_t m_tags[MaxSize]{};
 

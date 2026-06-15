@@ -38,17 +38,17 @@ struct NestedGroupDecoder : GroupDecoder
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> name() const
     {
-        return m_decoder.getString<501, false, ParentType::Group>();
+        return m_decoder.getString<501, false, RecordType::Group>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> nestedOne() const
     {
-        return m_decoder.getUint32<601, false, ParentType::Group>();
+        return m_decoder.getUint32<601, false, RecordType::Group>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> nestedTwo() const
     {
-        return m_decoder.getUint32<602, false, ParentType::Group>();
+        return m_decoder.getUint32<602, false, RecordType::Group>();
     }
 
 };
@@ -84,17 +84,17 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> hopCompID() const
     {
-        return m_decoder.getString<628, false, ParentType::Group>();
+        return m_decoder.getString<628, false, RecordType::Group>();
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> hopSendingTime() const
     {
-        return m_decoder.getTimestamp<629, false, ParentType::Group>();
+        return m_decoder.getTimestamp<629, false, RecordType::Group>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> hopRefID() const
     {
-        return m_decoder.getUint32<630, false, ParentType::Group>();
+        return m_decoder.getUint32<630, false, RecordType::Group>();
     }
 
     NestedGroupDecoder& nestedGroup()
@@ -120,7 +120,7 @@ public:
     LogonDecoder(LogonDecoder&&) = delete;
     LogonDecoder& operator=(LogonDecoder&&) = delete;
 
-    static constexpr uint16_t MessageId = 'A';
+    static constexpr uint8_t MessageId = 'A';
 
     LogonDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
@@ -138,42 +138,42 @@ public:
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
-        return m_decoder.getUint32<9, false, ParentType::Message>();
+        return m_decoder.getUint32<9, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
-        return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
+        return m_decoder.getEnum<35, false, MessageType, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, false, ParentType::Message>();
+        return m_decoder.getString<49, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, false, ParentType::Message>();
+        return m_decoder.getString<56, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, false, ParentType::Message>();
+        return m_decoder.getUint32<34, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, false, ParentType::Message>();
+        return m_decoder.getTimestamp<52, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<Encryption::Values, Result::Values> encryptMethod() const
     {
-        return m_decoder.getEnum<98, false, Encryption, ParentType::Message>();
+        return m_decoder.getEnum<98, false, Encryption, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> heartbeatInterval() const
     {
-        return m_decoder.getUint32<108, false, ParentType::Message>();
+        return m_decoder.getUint32<108, false, RecordType::Message>();
     }
 
     HopsDecoder& hops()
@@ -199,7 +199,7 @@ public:
     LogoutDecoder(LogoutDecoder&&) = delete;
     LogoutDecoder& operator=(LogoutDecoder&&) = delete;
 
-    static constexpr uint16_t MessageId = '5';
+    static constexpr uint8_t MessageId = '5';
 
     LogoutDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
@@ -217,37 +217,37 @@ public:
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
-        return m_decoder.getUint32<9, false, ParentType::Message>();
+        return m_decoder.getUint32<9, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
-        return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
+        return m_decoder.getEnum<35, false, MessageType, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, false, ParentType::Message>();
+        return m_decoder.getString<49, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, false, ParentType::Message>();
+        return m_decoder.getString<56, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, false, ParentType::Message>();
+        return m_decoder.getUint32<34, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, false, ParentType::Message>();
+        return m_decoder.getTimestamp<52, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
     {
-        return m_decoder.getString<58, false, ParentType::Message>();
+        return m_decoder.getString<58, false, RecordType::Message>();
     }
 
     HopsDecoder& hops()
@@ -273,7 +273,7 @@ public:
     HeartbeatDecoder(HeartbeatDecoder&&) = delete;
     HeartbeatDecoder& operator=(HeartbeatDecoder&&) = delete;
 
-    static constexpr uint16_t MessageId = '0';
+    static constexpr uint8_t MessageId = '0';
 
     HeartbeatDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
@@ -291,37 +291,37 @@ public:
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
-        return m_decoder.getUint32<9, false, ParentType::Message>();
+        return m_decoder.getUint32<9, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
-        return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
+        return m_decoder.getEnum<35, false, MessageType, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, false, ParentType::Message>();
+        return m_decoder.getString<49, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, false, ParentType::Message>();
+        return m_decoder.getString<56, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, false, ParentType::Message>();
+        return m_decoder.getUint32<34, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, false, ParentType::Message>();
+        return m_decoder.getTimestamp<52, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> testReqID() const
     {
-        return m_decoder.getString<112, false, ParentType::Message>();
+        return m_decoder.getString<112, false, RecordType::Message>();
     }
 
     HopsDecoder& hops()
@@ -347,7 +347,7 @@ public:
     TestRequestDecoder(TestRequestDecoder&&) = delete;
     TestRequestDecoder& operator=(TestRequestDecoder&&) = delete;
 
-    static constexpr uint16_t MessageId = '1';
+    static constexpr uint8_t MessageId = '1';
 
     TestRequestDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
@@ -365,37 +365,37 @@ public:
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
-        return m_decoder.getUint32<9, false, ParentType::Message>();
+        return m_decoder.getUint32<9, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
-        return m_decoder.getEnum<35, false, MessageType, ParentType::Message>();
+        return m_decoder.getEnum<35, false, MessageType, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, false, ParentType::Message>();
+        return m_decoder.getString<49, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, false, ParentType::Message>();
+        return m_decoder.getString<56, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, false, ParentType::Message>();
+        return m_decoder.getUint32<34, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, false, ParentType::Message>();
+        return m_decoder.getTimestamp<52, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> testReqID() const
     {
-        return m_decoder.getString<112, false, ParentType::Message>();
+        return m_decoder.getString<112, false, RecordType::Message>();
     }
 
     HopsDecoder& hops()

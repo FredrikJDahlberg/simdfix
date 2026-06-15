@@ -31,8 +31,8 @@ TEST(FieldDecoder, GetInt32)
 
     FieldDecoder field{logout, tokens, tags, static_cast<int32_t>(tokens.size())};
 
-    const auto negative = field.getInt32<9999, false, ParentType::Message>().value_or(0);
-    const auto positive = field.getInt32<34, false, ParentType::Message>().value_or(0);
+    const auto negative = field.getInt32<9999, false, RecordType::Message>().value_or(0);
+    const auto positive = field.getInt32<34, false, RecordType::Message>().value_or(0);
     EXPECT_EQ(-12345, negative);
     EXPECT_EQ(100101, positive);
 }
@@ -56,8 +56,8 @@ TEST(FieldDecoder, GetInt32MissingField)
 
     FieldDecoder field{logout, tokens, tags, static_cast<int32_t>(tokens.size())};
 
-    const auto optional = field.getInt32<9999, false, ParentType::Message>();
-    const auto required = field.getInt32<9999, true, ParentType::Message>();
+    const auto optional = field.getInt32<9999, false, RecordType::Message>();
+    const auto required = field.getInt32<9999, true, RecordType::Message>();
     EXPECT_FALSE(optional.has_value());
     EXPECT_EQ(Result::RequiredFieldMissing, required.error());
 }

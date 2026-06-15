@@ -4,6 +4,7 @@
 
 #include "org/limitless/fix/encoder/GroupEncoder.hpp"
 #include "org/limitless/fix/encoder/MessageEncoder.hpp"
+#include "org/limitless/fix/encoder/PayloadEncoder.hpp"
 #include "org/limitless/fix/messages/FixTypes.hpp"
 
 namespace org::limitless::fix::messages {
@@ -124,7 +125,7 @@ public:
     LogonEncoder(LogonEncoder&&) = delete;
     LogonEncoder& operator=(LogonEncoder&&) = delete;
 
-    static constexpr uint16_t MessageId = 'A';
+    static constexpr std::string_view MessageId = "A";
 
     LogonEncoder& wrap(const std::span<uint8_t> data, const size_t offset = 0)
     {
@@ -132,28 +133,9 @@ public:
         return *this;
     }
 
-    LogonEncoder& bodyLength(const std::uint32_t value)
+    [[nodiscard]] std::string_view type() const
     {
-        m_encoder.encode<"9", false, std::uint32_t>(value);
-        return *this;
-    }
-
-    LogonEncoder& msgType(const MessageType::Values value)
-    {
-        m_encoder.encode<"35", false, MessageType>(value);
-        return *this;
-    }
-
-    LogonEncoder& sender(const std::string_view value)
-    {
-        m_encoder.encode<"49", false, std::string_view>(value);
-        return *this;
-    }
-
-    LogonEncoder& target(const std::string_view value)
-    {
-        m_encoder.encode<"56", false, std::string_view>(value);
-        return *this;
+        return MessageId;
     }
 
     LogonEncoder& sequenceNumber(const std::uint32_t value)
@@ -203,7 +185,7 @@ public:
     LogoutEncoder(LogoutEncoder&&) = delete;
     LogoutEncoder& operator=(LogoutEncoder&&) = delete;
 
-    static constexpr uint16_t MessageId = '5';
+    static constexpr std::string_view MessageId = "5";
 
     LogoutEncoder& wrap(const std::span<uint8_t> data, const size_t offset = 0)
     {
@@ -211,28 +193,9 @@ public:
         return *this;
     }
 
-    LogoutEncoder& bodyLength(const std::uint32_t value)
+    [[nodiscard]] std::string_view type() const
     {
-        m_encoder.encode<"9", false, std::uint32_t>(value);
-        return *this;
-    }
-
-    LogoutEncoder& msgType(const MessageType::Values value)
-    {
-        m_encoder.encode<"35", false, MessageType>(value);
-        return *this;
-    }
-
-    LogoutEncoder& sender(const std::string_view value)
-    {
-        m_encoder.encode<"49", false, std::string_view>(value);
-        return *this;
-    }
-
-    LogoutEncoder& target(const std::string_view value)
-    {
-        m_encoder.encode<"56", false, std::string_view>(value);
-        return *this;
+        return MessageId;
     }
 
     LogoutEncoder& sequenceNumber(const std::uint32_t value)
@@ -276,7 +239,7 @@ public:
     HeartbeatEncoder(HeartbeatEncoder&&) = delete;
     HeartbeatEncoder& operator=(HeartbeatEncoder&&) = delete;
 
-    static constexpr uint16_t MessageId = '0';
+    static constexpr std::string_view MessageId = "0";
 
     HeartbeatEncoder& wrap(const std::span<uint8_t> data, const size_t offset = 0)
     {
@@ -284,28 +247,9 @@ public:
         return *this;
     }
 
-    HeartbeatEncoder& bodyLength(const std::uint32_t value)
+    [[nodiscard]] std::string_view type() const
     {
-        m_encoder.encode<"9", false, std::uint32_t>(value);
-        return *this;
-    }
-
-    HeartbeatEncoder& msgType(const MessageType::Values value)
-    {
-        m_encoder.encode<"35", false, MessageType>(value);
-        return *this;
-    }
-
-    HeartbeatEncoder& sender(const std::string_view value)
-    {
-        m_encoder.encode<"49", false, std::string_view>(value);
-        return *this;
-    }
-
-    HeartbeatEncoder& target(const std::string_view value)
-    {
-        m_encoder.encode<"56", false, std::string_view>(value);
-        return *this;
+        return MessageId;
     }
 
     HeartbeatEncoder& sequenceNumber(const std::uint32_t value)
@@ -349,7 +293,7 @@ public:
     TestRequestEncoder(TestRequestEncoder&&) = delete;
     TestRequestEncoder& operator=(TestRequestEncoder&&) = delete;
 
-    static constexpr uint16_t MessageId = '1';
+    static constexpr std::string_view MessageId = "1";
 
     TestRequestEncoder& wrap(const std::span<uint8_t> data, const size_t offset = 0)
     {
@@ -357,28 +301,9 @@ public:
         return *this;
     }
 
-    TestRequestEncoder& bodyLength(const std::uint32_t value)
+    [[nodiscard]] std::string_view type() const
     {
-        m_encoder.encode<"9", false, std::uint32_t>(value);
-        return *this;
-    }
-
-    TestRequestEncoder& msgType(const MessageType::Values value)
-    {
-        m_encoder.encode<"35", false, MessageType>(value);
-        return *this;
-    }
-
-    TestRequestEncoder& sender(const std::string_view value)
-    {
-        m_encoder.encode<"49", false, std::string_view>(value);
-        return *this;
-    }
-
-    TestRequestEncoder& target(const std::string_view value)
-    {
-        m_encoder.encode<"56", false, std::string_view>(value);
-        return *this;
+        return MessageId;
     }
 
     TestRequestEncoder& sequenceNumber(const std::uint32_t value)
@@ -406,6 +331,36 @@ public:
 
 };
 
-} // namespace org::limitless::fix::encoder
+template <FixedString Protocol, FixedString Target, FixedString Sender>
+class FixPayloadEncoder
+{
+    PayloadEncoder<Protocol, Target, Sender> m_encoder;
+public:
+    FixPayloadEncoder() = default;
+
+    FixPayloadEncoder& wrap(const uint32_t offset, const std::span<uint8_t> data)
+    {
+        m_encoder.wrap(offset, data);
+        return *this;
+    }
+
+    [[nodiscard]] uint32_t bodyOffset() const
+    {
+        return m_encoder.bodyOffset();
+    }
+
+    template <EncodableMessage Message>
+    uint32_t encode(const Message& message)
+    {
+        return m_encoder.encode(message);
+    }
+
+    [[nodiscard]] uint32_t encodedLength() const
+    {
+        return m_encoder.encodedLength();
+    }
+};
+
+} // namespace org::limitless::fix::messages
 
 #endif //SIMD_FIX_MESSAGE_ENCODERS_HPP

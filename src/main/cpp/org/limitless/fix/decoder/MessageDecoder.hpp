@@ -94,27 +94,27 @@ public:
      */
     [[nodiscard]] Result::Values checkRequired()
     {
-        const auto sender = m_decoder.getString<49, true, ParentType::Component>();
+        const auto sender = m_decoder.getString<49, true, RecordType::Component>();
         if (!sender || (m_context != nullptr &&
-                        !std::ranges::equal(sender.value(), m_context->m_expectedSenderCompId)))
+                        !std::ranges::equal(sender.value(), m_context->m_senderCompId)))
         {
             return Result::InvalidSenderCompId;
         }
 
-        const auto target = m_decoder.getString<56, true, ParentType::Component>();
+        const auto target = m_decoder.getString<56, true, RecordType::Component>();
         if (!target || (m_context != nullptr &&
-                        !std::ranges::equal(target.value(), m_context->m_expectedTargetCompId)))
+                        !std::ranges::equal(target.value(), m_context->m_targetCompId)))
         {
             return Result::InvalidTargetCompId;
         }
 
-        const auto sequenceNumber = m_decoder.getUint32<34, true, ParentType::Component>();
+        const auto sequenceNumber = m_decoder.getUint32<34, true, RecordType::Component>();
         if (!sequenceNumber)
         {
             return Result::InvalidSequenceNumber;
         }
 
-        const auto sendingTime = m_decoder.getTimestamp<52, true, ParentType::Component>();
+        const auto sendingTime = m_decoder.getTimestamp<52, true, RecordType::Component>();
         if (!sendingTime)
         {
             return Result::InvalidSendingTime;
