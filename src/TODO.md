@@ -1,9 +1,9 @@
 TODO
 -----
 
-1. keep decoder/encoder types separate
+1. FIXED keep decoder/encoder types separate
 2. move decoding functions from utils to decoder
-3. decide on API
+3. FIXED decide on API
 
        encoder.wrap(buffer)
            .one(1).two(2).three(3)
@@ -13,8 +13,19 @@ TODO
                .next().time(20).string("hepp")
 4. ~~configure decoder/encoder with protocol constants.~~ done via
    `PayloadEncoder<Protocol, Target, Sender>` / `FixPayloadEncoder`.
-5. implement fixed decimal type for internal use (`float` / `Qty` / `Price` /
-   `PriceOffset` / `Amt` / `Percentage` decoding/encoding without floating point).
+5. ~~implement fixed decimal type for internal use (`float` / `Qty` / `Price` /
+   `PriceOffset` / `Amt` / `Percentage` decoding/encoding without floating point).~~
+   done via `FixedDecimal` (`utils/FixedDecimal.hpp`); still need
+   decoding/encoding integration for the affected FIX data types.
+6. add `FieldDecoder`/`FieldEncoder` support for `FixedDecimal`:
+   - `FieldDecoder`: parse an ASCII decimal string (optional leading '-',
+     optional '.' with fractional digits) into a `FixedDecimal`
+     (mantissa/exponent from the digit string and fractional digit count).
+   - `FieldEncoder`: write a `FixedDecimal` back to ASCII (sign, digits,
+     '.' placement from the exponent).
+   - add a `Category` for decimal types and map `float` / `Qty` / `Price` /
+     `PriceOffset` / `Amt` / `Percentage` to it in `DataModel.hpp` so they can
+     be used in `protocol.xml`.
 
 
 FIXMEs/TODOs in source
