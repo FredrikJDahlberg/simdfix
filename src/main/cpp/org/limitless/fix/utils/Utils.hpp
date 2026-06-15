@@ -460,6 +460,69 @@ inline size_t int64ToAscii(const int64_t value, std::span<uint8_t> data, const s
     return uint64ToAscii(static_cast<uint64_t>(value), data, offset);
 }
 
+/**
+ * Writes the decimal ASCII representation of mantissa * 10^exponent into data
+ * starting at offset, with a leading '-' for negative mantissas and a '.'
+ * inserted according to exponent (e.g. mantissa=12345, exponent=-2 writes
+ * "123.45"; mantissa=1, exponent=-3 writes "0.001"; mantissa=123, exponent=2
+ * writes "12300").
+ * @param mantissa signed mantissa
+ * @param exponent power-of-ten exponent, <= 0 inserts a decimal point,
+ *                  > 0 appends trailing zeros
+ * @param data destination buffer
+ * @param offset byte offset within data at which to write
+ * @return number of bytes written
+ */
+inline size_t fixedDecimalToAscii(const int64_t mantissa, const int32_t exponent, std::span<uint8_t> data, const size_t offset)
+{
+    size_t pos = offset;
+    uint64_t magnitude = static_cast<uint64_t>(mantissa);
+    if (mantissa < 0)
+    {
+        data[pos++] = '-';
+        magnitude = uint64_t{0} - static_cast<uint64_t>(mantissa);
+    }
+    if (magnitude == 0)
+    {
+        data[pos++] = '0';
+        return pos - offset;
+    }
+
+    uint8_t digits[20];
+    const size_t digitCount = uint64ToAscii(magnitude, digits, 0);
+
+    if (exponent >= 0)
+    {
+        std::memcpy(data.data() + pos, digits, digitCount);
+        pos += digitCount;
+        std::memset(data.data() + pos, '0', static_cast<size_t>(exponent));
+        pos += static_cast<size_t>(exponent);
+        return pos - offset;
+    }
+
+    const size_t fracDigits = static_cast<size_t>(-exponent);
+    if (digitCount > fracDigits)
+    {
+        const size_t intDigits = digitCount - fracDigits;
+        std::memcpy(data.data() + pos, digits, intDigits);
+        pos += intDigits;
+        data[pos++] = '.';
+        std::memcpy(data.data() + pos, digits + intDigits, fracDigits);
+        pos += fracDigits;
+    }
+    else
+    {
+        data[pos++] = '0';
+        data[pos++] = '.';
+        const size_t leadingZeros = fracDigits - digitCount;
+        std::memset(data.data() + pos, '0', leadingZeros);
+        pos += leadingZeros;
+        std::memcpy(data.data() + pos, digits, digitCount);
+        pos += digitCount;
+    }
+    return pos - offset;
+}
+
 inline constexpr int64_t MillisPerDay = 24 * 60 * 60 * 1'000;
 
 /**

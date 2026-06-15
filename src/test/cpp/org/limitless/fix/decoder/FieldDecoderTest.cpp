@@ -37,6 +37,31 @@ TEST(FieldDecoder, GetInt32)
     EXPECT_EQ(100101, positive);
 }
 
+TEST(FieldDecoder, GetFixedDecimal)
+{
+    const auto logout = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=73" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
+        "9999=123.45" SOH "9998=-0.01" SOH "10=020" SOH);
+
+    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    auto [processed, status] = decoder.parse(logout);
+    ASSERT_EQ(Result::Success, status);
+
+    const auto tokens = decoder.tokens();
+    std::vector<uint16_t> tags(tokens.size());
+    for (size_t i = 0; i < tokens.size(); ++i)
+    {
+        tags[i] = tokens[i].m_tag;
+    }
+
+    FieldDecoder field{logout, tokens, tags, static_cast<int32_t>(tokens.size())};
+
+    const auto positive = field.getFixedDecimal<9999, false, RecordType::Message>().value_or(utils::FixedDecimal{});
+    const auto negative = field.getFixedDecimal<9998, false, RecordType::Message>().value_or(utils::FixedDecimal{});
+    EXPECT_EQ(utils::FixedDecimal(12345, -2), positive);
+    EXPECT_EQ(utils::FixedDecimal(-1, -2), negative);
+}
+
 TEST(FieldDecoder, GetInt32MissingField)
 {
     const auto logout = utils::makeSpan(

@@ -17,12 +17,18 @@ TODO
    `PriceOffset` / `Amt` / `Percentage` decoding/encoding without floating point).~~
    done via `FixedDecimal` (`utils/FixedDecimal.hpp`); still need
    decoding/encoding integration for the affected FIX data types.
-6. add `FieldDecoder`/`FieldEncoder` support for `FixedDecimal`:
+6. ~~add `FieldDecoder`/`FieldEncoder` support for `FixedDecimal`:
    - `FieldDecoder`: parse an ASCII decimal string (optional leading '-',
      optional '.' with fractional digits) into a `FixedDecimal`
      (mantissa/exponent from the digit string and fractional digit count).
    - `FieldEncoder`: write a `FixedDecimal` back to ASCII (sign, digits,
-     '.' placement from the exponent).
+     '.' placement from the exponent).~~
+   done via `FieldDecoder::convertToFixedDecimal` / `getFixedDecimal` and
+   `FieldEncoder::encode<Tag, Required>(FixedDecimal)` /
+   `utils::fixedDecimalToAscii`. Still need a `Category` for decimal types
+   and a `protocol.xml` mapping for `float` / `Qty` / `Price` /
+   `PriceOffset` / `Amt` / `Percentage` (see "Unsupported FIX data types"
+   below).
    - add a `Category` for decimal types and map `float` / `Qty` / `Price` /
      `PriceOffset` / `Amt` / `Percentage` to it in `DataModel.hpp` so they can
      be used in `protocol.xml`.

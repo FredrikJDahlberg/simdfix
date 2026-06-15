@@ -282,4 +282,27 @@ TEST(Encode, Int64ToAsciiOffset)
     EXPECT_EQ((std::string_view{reinterpret_cast<const char*>(buffer.data()), 4}), "X-42");
 }
 
+TEST(Encode, FixedDecimalToAscii)
+{
+    const auto check = [](const int64_t mantissa, const int32_t exponent, const std::string_view expected)
+    {
+        std::array<uint8_t, 24> buffer{};
+        const auto length = utils::fixedDecimalToAscii(mantissa, exponent, buffer, 0);
+        ASSERT_EQ(expected.size(), length) << "mantissa=" << mantissa << " exponent=" << exponent;
+        EXPECT_EQ(expected, (std::string_view{reinterpret_cast<const char*>(buffer.data()), length}))
+            << "mantissa=" << mantissa << " exponent=" << exponent;
+    };
+
+    check(0, 0, "0");
+    check(0, -2, "0");
+    check(123, 0, "123");
+    check(123, 2, "12300");
+    check(12345, -2, "123.45");
+    check(1, -3, "0.001");
+    check(100, -2, "1.00");
+    check(-12345, -2, "-123.45");
+    check(-1, -3, "-0.001");
+    check(-100, -2, "-1.00");
+}
+
 }

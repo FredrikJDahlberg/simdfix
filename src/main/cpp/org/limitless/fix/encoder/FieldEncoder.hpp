@@ -154,6 +154,26 @@ public:
     }
 
     /**
+     * Writes "TAG=VALUE" followed by SOH, where VALUE is the decimal ASCII
+     * representation of a FixedDecimal (see utils::fixedDecimalToAscii).
+     * @tparam Tag tag number to write
+     * @tparam Required whether a null value must be encoded specially
+     * @param value value to write
+     */
+    template <FixedString Tag, bool Required>
+    void encode(const utils::FixedDecimal value)
+    {
+        if constexpr (Required)
+        {
+            // FIXME handle null value
+        }
+        encode<Tag>();
+        m_encodedLength += utils::fixedDecimalToAscii(value.mantissa(), value.exponent(), m_data, m_offset + m_encodedLength);
+        m_data[m_offset + m_encodedLength] = FieldEnd;
+        ++m_encodedLength;
+    }
+
+    /**
      * Writes "TAG=VALUE" followed by SOH, where VALUE is a FIX UTCTimestamp
      * derived from the given duration (see encodeTimestamp()).
      * @tparam Tag tag number to write

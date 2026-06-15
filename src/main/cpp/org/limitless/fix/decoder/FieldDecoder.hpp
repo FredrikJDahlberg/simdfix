@@ -134,6 +134,38 @@ public:
     }
 
     /**
+     * Parses the ASCII digits of a token, with an optional leading '-' and an
+     * optional decimal point, as a FixedDecimal.
+     * @param token token whose bytes are the digits to convert
+     * @return parsed value
+     */
+    [[nodiscard]] constexpr utils::FixedDecimal convertToFixedDecimal(const Token* token) const
+    {
+        const uint8_t* digits = m_data.data() + token->m_position;
+        uint32_t offset = 0;
+        bool negative = false;
+        if (token->m_length != 0 && digits[0] == '-')
+        {
+            negative = true;
+            offset = 1;
+        }
+
+        int64_t mantissa = 0;
+        int32_t exponent = 0;
+        for (; offset < token->m_length; ++offset)
+        {
+            const uint8_t ch = digits[offset];
+            if (ch == '.')
+            {
+                exponent = -static_cast<int32_t>(token->m_length - offset - 1);
+                continue;
+            }
+            mantissa = mantissa * 10 + (ch - '0');
+        }
+        return utils::FixedDecimal{negative ? -mantissa : mantissa, exponent};
+    }
+
+    /**
      * @param index token index
      * @return the token at index
      */
@@ -280,6 +312,25 @@ public:
         if (index >= 0)
         {
             return convertToInt32(&m_tokens[index]);
+        }
+        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+    }
+
+    /**
+     * Looks up Tag and parses its value, with an optional leading '-' and an
+     * optional decimal point, as a FixedDecimal.
+     * @tparam Tag tag number to read
+     * @tparam Required whether a missing field is an error
+     * @tparam Parent context the tag is being looked up in
+     * @return field value, or Result::RequiredFieldMissing/Success if absent
+     */
+    template <int32_t Tag, bool Required, RecordType::Values Parent>
+    [[nodiscard]] constexpr FixedDecimalResult getFixedDecimal() const
+    {
+        const auto index = findIndex<Tag, Parent>();
+        if (index >= 0)
+        {
+            return convertToFixedDecimal(&m_tokens[index]);
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
