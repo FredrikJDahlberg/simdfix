@@ -34,8 +34,8 @@ class FieldEncoder
     template <FixedString Tag>
     void encode()
     {
-        const auto size = sizeof(Tag.value) - 1; // exclude the string literal's null terminator
-        std::memcpy(m_data.data() + m_offset + m_encodedLength, Tag.value, size);
+        const auto size = sizeof(Tag) - 1; // exclude the string literal's null terminator
+        std::memcpy(m_data.data() + m_offset + m_encodedLength, Tag, size);
         m_encodedLength += size;
         m_data[m_offset + m_encodedLength] = '=';
         ++m_encodedLength;
@@ -105,7 +105,7 @@ public:
      * @param value value to write
      */
     template <FixedString Tag, bool Required, typename ValueType>
-    requires EncodableInteger<ValueType>
+        requires EncodableInteger<ValueType>
     void encode(const ValueType value)
     {
         if constexpr (Required)
@@ -133,7 +133,7 @@ public:
      * @param value value to write
      */
     template <FixedString Tag, bool Required, typename ValueType>
-    requires EncodableLongInteger<ValueType>
+        requires EncodableLongInteger<ValueType>
     void encode(const ValueType value)
     {
         if constexpr (Required)
@@ -231,6 +231,20 @@ public:
         m_encodedLength += size;
         m_data[m_offset + m_encodedLength] = FieldEnd;
         ++m_encodedLength;
+    }
+
+    template <FixedString Tag, FixedString Value>
+    static uint32_t encode(const uint32_t offset, std::span<uint8_t> buffer)
+    {
+        uint32_t encodedLength = sizeof(Tag) - 1;
+        std::memcpy(buffer.data() + offset, Tag, encodedLength);
+        buffer[offset + encodedLength] = '=';
+        ++encodedLength;
+        std::memcpy(buffer.data() + offset + encodedLength, Value, sizeof(Value) - 1);
+        encodedLength += sizeof(Value) - 1;
+        buffer[offset + encodedLength] = FieldEnd;
+        ++encodedLength;
+        return encodedLength;
     }
 
 };

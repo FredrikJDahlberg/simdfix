@@ -19,9 +19,9 @@ namespace org::limitless::fix {
 
 inline constexpr int32_t MaxGroupDepth = 8;
 
-static constexpr uint32_t CheckSumTag = 10;
-static constexpr uint32_t BodyLengthTag = 9;
-static constexpr uint32_t MessageTypeTag = 35;
+inline constexpr uint32_t CheckSumTag = 10;
+inline constexpr uint32_t BodyLengthTag = 9;
+inline constexpr uint32_t MessageTypeTag = 35;
 
 inline constexpr uint8_t TagEnd = '=';
 inline constexpr uint8_t FieldEnd = 0x01;
@@ -30,13 +30,14 @@ template<std::size_t N>
 struct FixedString
 {
     static constexpr uint32_t Size = N;
-
-    char value[N];
+    char Value[N];
 
     constexpr FixedString(const char (&str)[N])
     {
-        std::copy_n(str, N, value);
+        std::copy_n(str, N, Value);
     }
+
+    constexpr operator const char*() const { return Value; }
 };
 
 template <typename ValueType>

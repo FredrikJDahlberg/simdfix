@@ -10,6 +10,7 @@
 #include <span>
 
 #include "org/limitless/fix/CodecTypes.hpp"
+#include "org/limitless/fix/encoder/FieldEncoder.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
 namespace org::limitless::fix::encoder {
@@ -54,39 +55,11 @@ public:
     {
         m_offset = offset;
         m_buffer = buffer;
-
-        auto* dst = m_buffer.data() + m_offset;
-        std::size_t pos = 0;
-
-        dst[pos++] = '8';
-        dst[pos++] = '=';
-        std::memcpy(dst + pos, Protocol.value, ProtocolLength);
-        pos += ProtocolLength;
-        dst[pos++] = FieldEnd;
-
-        std::memcpy(dst + pos, "9=0000", 6);
-        pos += 6;
-        dst[pos++] = FieldEnd;
-
-        std::memcpy(dst + pos, "35=?", 4);
-        pos += 4;
-        dst[pos++] = FieldEnd;
-
-        dst[pos++] = '4';
-        dst[pos++] = '9';
-        dst[pos++] = '=';
-        std::memcpy(dst + pos, Sender.value, SenderLength);
-        pos += SenderLength;
-        dst[pos++] = FieldEnd;
-
-        dst[pos++] = '5';
-        dst[pos++] = '6';
-        dst[pos++] = '=';
-        std::memcpy(dst + pos, Target.value, TargetLength);
-        pos += TargetLength;
-        dst[pos++] = FieldEnd;
-
-        m_encodedLength = static_cast<uint32_t>(pos);
+        m_encodedLength =  FieldEncoder::encode<"8", Protocol>(m_offset, m_buffer);
+        m_encodedLength += FieldEncoder::encode<"9", "0000">(m_offset + m_encodedLength, m_buffer);
+        m_encodedLength += FieldEncoder::encode<"35", "?">(m_offset + m_encodedLength, m_buffer);
+        m_encodedLength += FieldEncoder::encode<"49", Sender>(m_offset + m_encodedLength, m_buffer);
+        m_encodedLength += FieldEncoder::encode<"56", Target>(m_offset + m_encodedLength, m_buffer);
         return *this;
     }
 
