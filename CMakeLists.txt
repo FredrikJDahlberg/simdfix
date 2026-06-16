@@ -114,13 +114,14 @@ add_fix_test(FieldDecoderTest "${TEST_PATH}/decoder/FieldDecoderTest.cpp")
 add_fix_test(UtilsTest       "${TEST_PATH}/utils/UtilsTest.cpp")
 add_fix_test(BitSetTest      "${TEST_PATH}/utils/BitSetTest.cpp")
 add_fix_test(FixedDecimalTest "${TEST_PATH}/utils/FixedDecimalTest.cpp")
-add_fix_test(Uint8x16Test    "${TEST_PATH}/simd/Uint8x16Test.cpp")
+add_fix_test(Uint8x16Test       "${TEST_PATH}/simd/Uint8x16Test.cpp")
+add_fix_test(LinearSearchTest  "${TEST_PATH}/simd/LinearSearchTest.cpp")
 
 set(FIX_TEST_TARGETS
         PayloadDecoderTest
         MessageDecoderTest MessageEncoderTest
-        GroupDecoderTest
-        UtilsTest BitSetTest FixedDecimalTest Uint8x16Test)
+        GroupDecoderTest FieldDecoderTest
+        UtilsTest BitSetTest FixedDecimalTest Uint8x16Test LinearSearchTest)
 
 add_custom_target(AllTests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
@@ -129,6 +130,53 @@ add_custom_target(AllTests
         COMMENT "Building and running all test suites"
         USES_TERMINAL
 )
+
+find_program(XCRUN xcrun)
+if(XCRUN)
+    set(COVERAGE_DIR ${CMAKE_BINARY_DIR}/coverage)
+
+    # Build per-binary run commands and profraw path list
+    set(_PROFRAW_FILES "")
+    set(_RUN_COMMANDS "")
+    foreach(_tgt IN LISTS FIX_TEST_TARGETS)
+        list(APPEND _PROFRAW_FILES ${COVERAGE_DIR}/${_tgt}.profraw)
+    endforeach()
+
+    # First target is the primary binary for llvm-cov; the rest use -object
+    list(GET FIX_TEST_TARGETS 0 _PRIMARY)
+    set(_COV_OBJECTS "")
+    foreach(_tgt IN LISTS FIX_TEST_TARGETS)
+        if(NOT _tgt STREQUAL _PRIMARY)
+            list(APPEND _COV_OBJECTS -object $<TARGET_FILE:${_tgt}>)
+        endif()
+    endforeach()
+
+    set(_IGNORE_REGEX "--ignore-filename-regex=(test|gtest|GoogleTest|benchmark)")
+    add_custom_target(Coverage
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${COVERAGE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/PayloadDecoderTest.profraw"   $<TARGET_FILE:PayloadDecoderTest>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/MessageDecoderTest.profraw"   $<TARGET_FILE:MessageDecoderTest>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/MessageEncoderTest.profraw"   $<TARGET_FILE:MessageEncoderTest>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/GroupDecoderTest.profraw"     $<TARGET_FILE:GroupDecoderTest>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/FieldDecoderTest.profraw"     $<TARGET_FILE:FieldDecoderTest>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/UtilsTest.profraw"            $<TARGET_FILE:UtilsTest>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/BitSetTest.profraw"           $<TARGET_FILE:BitSetTest>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/FixedDecimalTest.profraw"     $<TARGET_FILE:FixedDecimalTest>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/Uint8x16Test.profraw"         $<TARGET_FILE:Uint8x16Test>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/LinearSearchTest.profraw"    $<TARGET_FILE:LinearSearchTest>
+        COMMAND ${XCRUN} llvm-profdata merge -sparse ${_PROFRAW_FILES} -o ${COVERAGE_DIR}/coverage.profdata
+        COMMAND ${XCRUN} llvm-cov report
+            $<TARGET_FILE:${_PRIMARY}>
+            ${_COV_OBJECTS}
+            -instr-profile=${COVERAGE_DIR}/coverage.profdata
+            ${_IGNORE_REGEX}
+        DEPENDS ${FIX_TEST_TARGETS}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Collecting coverage from all test suites"
+        USES_TERMINAL
+        VERBATIM
+    )
+endif()
 
 # Dynamically create an executable or library treating headers as source items
 # Using set_source_files_properties forces CMake/Compilers to attempt compilation

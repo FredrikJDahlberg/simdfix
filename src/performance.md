@@ -1,6 +1,6 @@
 # Performance
 
-Figures from `SimdFixBenchmark` (release build: `-O3`, LTO, `-march=native`), measured on 2026-06-11.
+Figures from `SimdFixBenchmark` (release build: `-O3`, LTO, `-march=native`), measured on 2026-06-16.
 
 ## Test environment
 
@@ -22,11 +22,11 @@ before parsing).
 
 | Benchmark | Message | ns/msg | GB/s | Instructions/msg | Cycles/msg | IPC |
 |-----------|---------|-------:|-----:|-----------------:|-----------:|----:|
-| COLD CACHE | Logon, 142 B | 83.6 | 1.70 | ~1,610 | ~340 | 4.7 |
-| HOT CACHE | Logon, 142 B | 84.2 | 1.69 | ~1,510 | ~268 | 5.6 |
-| GETTERS | Logon, 142 B | 122.9 | 1.16 | ~2,295 | ~392 | 5.9 |
-| GROUPS | Logon + 3 hops, 253 B | 218.6 | 1.16 | ~4,080 | ~698 | 5.8 |
-| ENCODE | Logon + 3 hops, ~224 B | 125.0 | 1.78 | ~815 | ~400 | 2.0 |
+| COLD CACHE | Logon, 142 B | 85.2 | 1.67 | ~1,632 | ~324 | 5.0 |
+| HOT CACHE | Logon, 142 B | 85.6 | 1.66 | ~1,542 | ~272 | 5.7 |
+| GETTERS | Logon, 142 B | 121.3 | 1.17 | ~2,332 | ~388 | 6.0 |
+| GROUPS | Logon + 3 hops, 253 B | 218.2 | 1.16 | ~4,135 | ~696 | 5.9 |
+| ENCODE | Logon + 3 hops, ~224 B | 119.2 | 1.88 | ~867 | ~378 | 2.3 |
 
 ## What each benchmark measures
 
@@ -38,18 +38,20 @@ before parsing).
 
 ## Observations
 
-- Parsing costs ~10.6 instructions per byte (HOT CACHE), and cold vs. hot
+- Parsing costs ~10.9 instructions per byte (HOT CACHE), and cold vs. hot
   throughput is nearly identical — the parser is compute-bound, not
   memory-bound, even when streaming from DRAM.
-- IPC of 5.6–5.9 is close to the M1 performance core's retire width, so
+- IPC of 5.7–6.0 is close to the M1 performance core's retire width, so
   per-message cost scales with instruction count rather than stalls.
-- Field access (GETTERS) adds ~785 instructions (~124 cycles) per message on
+- Field access (GETTERS) adds ~790 instructions (~116 cycles) per message on
   top of parsing.
 - The 3-entry repeating group roughly doubles per-message cost versus GETTERS
   (longer message plus group iteration), while byte throughput stays the same.
-- ENCODE's IPC (~2.0) is much lower than the decode paths (5.6-5.9) — encoding
-  is less parallel SIMD-wise, but at ~815 instructions/msg it's still cheaper
-  than GETTERS (~2,295 instructions/msg).
+- ENCODE improved from 125 ns/msg to 119 ns/msg (−4.8%) versus the 2026-06-11
+  baseline. The checksum loop was vectorised with NEON (`vaddlvq_u8`, 16
+  bytes/iteration): instruction count rose slightly (~815 → ~867) but cycles
+  fell from ~400 to ~378 (−5.5%) and IPC rose from 2.0 to 2.3, reflecting
+  improved pipelining.
 
 ## Reproducing
 

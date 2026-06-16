@@ -9,7 +9,6 @@
 #include <cstddef>
 #include <span>
 #include <string_view>
-#include <concepts>
 
 #include "org/limitless/fix/CodecTypes.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
@@ -22,8 +21,8 @@ namespace org::limitless::fix::encoder {
 class FieldEncoder
 {
     std::span<uint8_t> m_data{};
-    size_t m_offset{};
-    size_t m_encodedLength{};
+    uint32_t m_offset{};
+    uint32_t m_encodedLength{};
     int64_t m_cachedDayStartMillis{-1};
     std::array<uint8_t, 9> m_datePrefix{};
 
@@ -68,16 +67,17 @@ public:
      * @param data destination buffer
      * @param offset byte offset within data at which encoding begins
      */
-    void wrap(const std::span<uint8_t> data, const size_t offset)
+    void wrap(const std::span<uint8_t> data, const uint32_t offset)
     {
         m_data = data;
         m_offset = offset;
+        m_encodedLength = 0;
     }
 
     /**
      * @return the number of bytes written since the last wrap()
      */
-    [[nodiscard]] size_t encodedLength() const
+    [[nodiscard]] uint32_t encodedLength() const
     {
         return m_encodedLength;
     }

@@ -25,7 +25,7 @@ public:
      * @param data destination buffer
      * @param offset byte offset within data at which the message body begins
      */
-    void wrap(const std::span<uint8_t> data, const size_t offset = 0)
+    void wrap(const std::span<uint8_t> data, const uint32_t offset = 0)
     {
         m_encoder.wrap(data, offset);
     }
@@ -33,7 +33,7 @@ public:
     /**
      * @return the number of bytes written since the last wrap()
      */
-    [[nodiscard]] size_t encodedLength() const
+    [[nodiscard]] uint32_t encodedLength() const
     {
         return m_encoder.encodedLength();
     }

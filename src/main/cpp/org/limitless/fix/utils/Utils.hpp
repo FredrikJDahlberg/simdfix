@@ -408,6 +408,11 @@ inline size_t int32ToAscii(const int32_t value, std::span<uint8_t> data, const s
  */
 inline size_t uint64ToAscii(const uint64_t value, std::span<uint8_t> data, const size_t offset)
 {
+    if (value <= UINT32_MAX)
+    {
+        return uint32ToAscii(static_cast<uint32_t>(value), data, offset);
+    }
+
     // Always materialize all 20 decimal digits, no data-dependent early exit.
     uint8_t digits[24];
     uint64_t temp = value;

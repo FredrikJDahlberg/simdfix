@@ -11,6 +11,7 @@
 
 #include "org/limitless/fix/CodecTypes.hpp"
 #include "org/limitless/fix/encoder/FieldEncoder.hpp"
+#include "org/limitless/fix/simd/Uint8x16.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
 namespace org::limitless::fix::encoder {
@@ -102,11 +103,18 @@ public:
         m_encodedLength = HeaderLength + static_cast<uint32_t>(message.encodedLength());
 
         uint32_t checksum = 0;
-        for (uint32_t i = 0; i < m_encodedLength; ++i)
+        uint32_t i = 0;
+        for (; i + simd::Uint8x16::Size <= m_encodedLength; i += simd::Uint8x16::Size)
+        {
+            simd::Uint8x16 v;
+            v.load(m_buffer.data() + m_offset + i);
+            checksum += static_cast<uint32_t>(v.sum());
+        }
+        for (; i < m_encodedLength; ++i)
         {
             checksum += m_buffer[m_offset + i];
         }
-        checksum %= 256;
+        checksum &= 0xFF;
 
         auto* trailer = m_buffer.data() + m_offset + m_encodedLength;
         trailer[0] = '1';

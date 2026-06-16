@@ -3,15 +3,13 @@
 //
 
 #include <array>
-#include <iostream>
 #include <string_view>
 #include <chrono>
 
 #include <gtest/gtest.h>
 
 #include "org/limitless/fix/utils/Utils.hpp"
-#include "org/limitless/fix/simd/QuadSearch.hpp"
-#include "org/limitless/fix/simd/LinearSearch.hpp"
+#include "org/limitless/fix/unused/QuadSearch.hpp"
 
 namespace org::limitless::fix::decoder {
 
@@ -34,24 +32,6 @@ TEST(QuadSearch, Sorted)
         ASSERT_EQ(10, simd::quadSearch(values, std::size(values), 34));
         ASSERT_EQ(11, simd::quadSearch(values, std::size(values), 35));
         ASSERT_EQ(16, simd::quadSearch(values, std::size(values), 1128));
-    }
-}
-
-TEST(Find, Basics)
-{
-    {
-        constexpr uint16_t values[] = {  1, 49, 4711, 10  };
-        ASSERT_EQ(2, simd::find(values, std::size(values), 4711));
-        ASSERT_EQ(3, simd::find(values, std::size(values), 10));
-    }
-    {
-        const uint16_t values[] = {
-            31, 32, 33, 34, 35, 36,37, 38, 39,
-            20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-            11, 12, 13, 14, 15, 16, 17, 18, 19,
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10
-        };
-        ASSERT_EQ(37, simd::find(values, std::size(values), 10));
     }
 }
 
