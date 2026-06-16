@@ -273,8 +273,7 @@ public:
         if (index >= 0)
         {
             const auto& token = m_tokens[index];
-            auto subspan = m_data.subspan(token.m_position, token.m_length);
-            return std::string_view{reinterpret_cast<const char*>(subspan.data()), subspan.size()};
+            return std::string_view{reinterpret_cast<const char*>(m_data.data() + token.m_position), token.m_length};
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
@@ -349,7 +348,7 @@ public:
         const auto index = findIndex<Tag, Parent>();
         if (index >= 0)
         {
-            const auto token = m_tokens[index];
+            const auto& token = m_tokens[index];
             return std::chrono::milliseconds{utils::dateTimeToEpochUTC(m_data.data() + token.m_position, token.m_length)};
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
@@ -370,7 +369,7 @@ public:
         const auto index = findIndex<Tag, Parent>();
         if (index >= 0)
         {
-            const auto token = m_tokens[index];
+            const auto& token = m_tokens[index];
             const auto code = std::string_view{reinterpret_cast<const char*>(m_data.data() + token.m_position), token.m_length};
             return utils::find<Enum>(code);
         }

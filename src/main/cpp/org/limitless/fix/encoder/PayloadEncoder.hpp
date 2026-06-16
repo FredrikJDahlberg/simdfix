@@ -99,22 +99,21 @@ public:
         const auto bodyLength = HeaderBodyLength + static_cast<uint32_t>(message.encodedLength());
         m_buffer[m_offset + MessageTypeOffset] = static_cast<uint8_t>(message.type().front());
         utils::writeFixedDigits<BodyLengthDigits>(bodyLength, m_buffer.data() + m_offset + BodyLengthOffset);
-
         m_encodedLength = HeaderLength + static_cast<uint32_t>(message.encodedLength());
 
         uint32_t checksum = 0;
-        uint32_t i = 0;
-        for (; i + simd::Uint8x16::Size <= m_encodedLength; i += simd::Uint8x16::Size)
+        uint32_t position = 0;
+        simd::Uint8x16 value;
+        for (; position + simd::Uint8x16::Size <= m_encodedLength; position += simd::Uint8x16::Size)
         {
-            simd::Uint8x16 v;
-            v.load(m_buffer.data() + m_offset + i);
-            checksum += static_cast<uint32_t>(v.sum());
+            value.load(m_buffer.data() + m_offset + position);
+            checksum += static_cast<uint32_t>(value.sum());
         }
-        for (; i < m_encodedLength; ++i)
+        for (; position < m_encodedLength; ++position)
         {
-            checksum += m_buffer[m_offset + i];
+            checksum += m_buffer[m_offset + position];
         }
-        checksum &= 0xFF;
+        checksum &= 0xff;
 
         auto* trailer = m_buffer.data() + m_offset + m_encodedLength;
         trailer[0] = '1';
@@ -123,7 +122,6 @@ public:
         utils::writeFixedDigits<3>(checksum, trailer + 3);
         trailer[6] = FieldEnd;
         m_encodedLength += 7;
-
         return m_encodedLength;
     }
 

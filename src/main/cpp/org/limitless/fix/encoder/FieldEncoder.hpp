@@ -33,7 +33,7 @@ class FieldEncoder
     template <FixedString Tag>
     void encode()
     {
-        const auto size = sizeof(Tag) - 1; // exclude the string literal's null terminator
+        constexpr auto size = sizeof(Tag) - 1; // exclude the string literal's null terminator
         std::memcpy(m_data.data() + m_offset + m_encodedLength, Tag, size);
         m_encodedLength += size;
         m_data[m_offset + m_encodedLength] = '=';
@@ -54,9 +54,9 @@ class FieldEncoder
             utils::writeDatePrefix(days, m_datePrefix.data());
         }
         auto* dst = m_data.data() + m_offset + m_encodedLength;
-        std::memcpy(dst, m_datePrefix.data(), m_datePrefix.size());
-        utils::writeTimeOfDay(static_cast<uint32_t>(millis - m_cachedDayStartMillis), dst + m_datePrefix.size());
-        m_encodedLength += 21;
+        std::memcpy(dst, m_datePrefix.data(), sizeof(m_datePrefix));
+        utils::writeTimeOfDay(static_cast<uint32_t>(millis - m_cachedDayStartMillis), dst + sizeof(m_datePrefix));
+        m_encodedLength += utils::UTCTimestampLength;
     }
 
 public:
@@ -227,7 +227,7 @@ public:
         }
         encode<Tag>();
         const auto size = value.size();
-        memcpy(m_data.data() + m_offset + m_encodedLength, value.data(), size);
+        std::memcpy(m_data.data() + m_offset + m_encodedLength, value.data(), size);
         m_encodedLength += size;
         m_data[m_offset + m_encodedLength] = FieldEnd;
         ++m_encodedLength;
@@ -236,8 +236,9 @@ public:
     template <FixedString Tag, FixedString Value>
     static uint32_t encode(const uint32_t offset, std::span<uint8_t> buffer)
     {
-        uint32_t encodedLength = sizeof(Tag) - 1;
-        std::memcpy(buffer.data() + offset, Tag, encodedLength);
+        constexpr uint32_t TagLength = sizeof(Tag) - 1;
+        std::memcpy(buffer.data() + offset, Tag, TagLength);
+        uint32_t encodedLength = TagLength;
         buffer[offset + encodedLength] = '=';
         ++encodedLength;
         std::memcpy(buffer.data() + offset + encodedLength, Value, sizeof(Value) - 1);

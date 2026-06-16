@@ -89,6 +89,11 @@ inline void print(const uint32_t length, const uint8_t* buffer)
     }
 }
 
+inline constexpr int64_t MillisPerDay = 24 * 60 * 60 * 1'000;
+
+inline constexpr uint32_t UTCTimestampShortLength = 17; // "YYYYMMDD-HH:MM:SS"
+inline constexpr uint32_t UTCTimestampLength = 21;      // "YYYYMMDD-HH:MM:SS.sss"
+
 inline constexpr uint64_t SwarMask = 0x000000FF000000FF;
 inline constexpr uint64_t SwarFactor1 = 0x000F424000000064; // 100 + (1000000ULL << 32)
 inline constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 32)
@@ -109,7 +114,7 @@ inline constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 
     uint64_t number = 0;
     if (length != 0)
     {
-        memcpy(&number, digits, sizeof(uint64_t));
+        std::memcpy(&number, digits, sizeof(uint64_t));
         number <<= (sizeof(uint64_t) - length) * 8;
     }
     number = number * 10 + (number >> 8); // val = (val * 2561) >> 8;
@@ -145,7 +150,7 @@ template <typename CharType>
     {
         const uint32_t shift = (sizeof(uint64_t) - std::min(length, 8U)) * 8;
         uint64_t raw;
-        memcpy(&raw, digits, sizeof(raw));
+        std::memcpy(&raw, digits, sizeof(raw));
         number = (raw << shift) | (AsciiZeros & ((1ULL << shift) - 1));
         number -= AsciiZeros;
         number = number * 10 + (number >> 8); // val = (val * 2561) >> 8;
@@ -287,8 +292,7 @@ template <uint32_t Divisor>
  */
 inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
 {
-    static constexpr uint64_t MillisPerDay = 24 * 60 * 60 * 1'000;
-    if (length < 17)
+    if (length < UTCTimestampShortLength)
     {
         return -1;
     }
@@ -299,20 +303,20 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     const auto days = daysSince1970(years, month, day);
 
     uint64_t time = 0;
-    memcpy(&time, data + 9, sizeof(time));
+    std::memcpy(&time, data + 9, sizeof(time));
     time -= 0x30303a30303a3030ull;
     const auto hours = (time & 0xff) * 10 + ((time >> 8) & 0xff);
     const auto mins  = (time >> 24 & 0xff) * 10 + (time >> 32 & 0xff);
     const auto secs  = (time >> 48 & 0xff) * 10 + (time >> 56);
-    uint64_t millis = days * MillisPerDay + (hours * 3'600 + mins * 60 + secs) * 1000;
-    if (length == 17)
+    uint64_t millis = days * static_cast<uint64_t>(MillisPerDay) + (hours * 3'600 + mins * 60 + secs) * 1000;
+    if (length == UTCTimestampShortLength)
     {
         return millis;
     }
-    if (length == 21)
+    if (length == UTCTimestampLength)
     {
         time = 0;
-        memcpy(&time, data + 17, 4);
+        std::memcpy(&time, data + UTCTimestampShortLength, 4);
         time -= 0x3030302e;
         millis += (time >> 24) + (time >> 16 & 0xff) * 10 + (time >> 8 & 0xff) * 100;
         return millis;
@@ -528,8 +532,6 @@ inline size_t fixedDecimalToAscii(const int64_t mantissa, const int32_t exponent
     return pos - offset;
 }
 
-inline constexpr int64_t MillisPerDay = 24 * 60 * 60 * 1'000;
-
 /**
  * Writes value as exactly Width decimal digits, zero-padded, e.g.
  * writeFixedDigits<4>(7, dst) writes "0007".
@@ -538,7 +540,7 @@ inline constexpr int64_t MillisPerDay = 24 * 60 * 60 * 1'000;
  * @param dst destination buffer, must have Width writable bytes
  */
 template <int Width>
-inline void writeFixedDigits(uint32_t value, uint8_t* dst)
+void writeFixedDigits(uint32_t value, uint8_t* dst)
 {
     for (int i = Width - 1; i >= 0; --i)
     {

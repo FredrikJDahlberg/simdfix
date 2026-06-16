@@ -23,8 +23,14 @@ inline constexpr uint32_t CheckSumTag = 10;
 inline constexpr uint32_t BodyLengthTag = 9;
 inline constexpr uint32_t MessageTypeTag = 35;
 
+inline constexpr uint32_t CheckSumValueLength = 3;  // checksum is always 3 zero-padded decimal digits
+
 inline constexpr uint8_t TagEnd = '=';
 inline constexpr uint8_t FieldEnd = 0x01;
+
+inline constexpr uint32_t BeginStringPosition = 0;
+inline constexpr uint32_t BodyLengthPosition = 1;
+inline constexpr uint32_t MessageTypePosition = 2;
 
 template<std::size_t N>
 struct FixedString

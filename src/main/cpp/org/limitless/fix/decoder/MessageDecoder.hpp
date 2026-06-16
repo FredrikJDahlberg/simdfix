@@ -66,12 +66,12 @@ public:
      */
     [[nodiscard]] uint16_t type() const noexcept
     {
-        const auto token = m_decoder.tokenAt(2);
+        const auto& token = m_decoder.tokenAt(MessageTypePosition);
         const auto position = token.m_position;
         uint16_t type = m_decoder.byteAt(position);
         if (token.m_length == 2)
         {
-            type = type + m_decoder.byteAt(position + 1) * 256;
+            type = static_cast<uint16_t>(type + (m_decoder.byteAt(position + 1) << 8));
         }
         return type;
     }

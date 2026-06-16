@@ -39,10 +39,6 @@ class PayloadDecoder
     static inline const simd::Uint8x16 ZerosBlock{'0'};
     static inline const simd::Uint8x16 NineMask{9};
 
-    static constexpr uint32_t BeginStringPosition = 0;
-    static constexpr uint32_t BodyLengthPosition = 1;
-    static constexpr uint32_t MessageTypePosition = 2;
-
     Token m_tokens[MaxSize]{};
     uint16_t m_tags[MaxSize]{};
 
@@ -352,7 +348,7 @@ private:
                                    const position_t blockEnd) const
     {
         uint64_t checks = 0;
-        memcpy(&checks, data + m_tokens[m_count - 1].m_position - 4, sizeof(uint64_t));
+        std::memcpy(&checks, data + m_tokens[m_count - 1].m_position - 4, sizeof(uint64_t));
         const auto& checkSumToken = m_tokens[m_count - 1];
         if ((checks & CheckSumMask) != CheckSumMask)
         {
@@ -399,8 +395,8 @@ private:
         const size_t remaining = buffer.size() - offset;
         uint64_t bytes = 0;
         if (remaining >= sizeof(uint64_t))
-        { // fixed size so the compiler inlines the copy to a single load
-            memcpy(&bytes, data, sizeof(uint64_t));
+        {
+            std::memcpy(&bytes, data, sizeof(uint64_t));
         }
         else
         {
@@ -449,10 +445,11 @@ private:
         }
         if (position < remaining)
         { // checked by decoder
+            constexpr uint32_t checkSumPrefixLen = 3; // "10="
             last = &m_tokens[m_count++];
-            last->m_tag = 10;
-            last->m_position = offset + position + 3;
-            last->m_length = 3;
+            last->m_tag = CheckSumTag;
+            last->m_position = offset + position + checkSumPrefixLen;
+            last->m_length = CheckSumValueLength;
         }
     }
 };
