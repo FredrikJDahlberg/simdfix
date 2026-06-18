@@ -29,15 +29,99 @@ struct MessageType
         Logon,
         Logout,
         TestRequest,
-        Heartbeat
+        Heartbeat,
+        NewOrderSingle
     };
-    static constexpr std::string_view Codes[5]  =
+    static constexpr std::string_view Codes[6]  =
     {
         "?",
         "A",
         "5",
         "1",
-        "0"
+        "0",
+        "D"
+    };
+};
+
+struct Side
+{
+    enum Values
+    {
+        Null,
+        Buy,
+        Sell,
+        BuyMinus,
+        SellPlus,
+        SellShort
+    };
+    static constexpr std::string_view Codes[6]  =
+    {
+        "?",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+    };
+};
+
+struct OrdType
+{
+    enum Values
+    {
+        Null,
+        Market,
+        Limit,
+        Stop,
+        StopLimit
+    };
+    static constexpr std::string_view Codes[5]  =
+    {
+        "?",
+        "1",
+        "2",
+        "3",
+        "4"
+    };
+};
+
+struct TimeInForce
+{
+    enum Values
+    {
+        Null,
+        Day,
+        GoodTillCancel,
+        AtTheOpening,
+        ImmediateOrCancel,
+        FillOrKill
+    };
+    static constexpr std::string_view Codes[6]  =
+    {
+        "?",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4"
+    };
+};
+
+struct HandlInst
+{
+    enum Values
+    {
+        Null,
+        AutoPrivate,
+        AutoPublic,
+        Manual
+    };
+    static constexpr std::string_view Codes[4]  =
+    {
+        "?",
+        "1",
+        "2",
+        "3"
     };
 };
 

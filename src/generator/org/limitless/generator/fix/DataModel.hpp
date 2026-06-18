@@ -100,6 +100,9 @@ struct DataModel
         m_types.try_emplace("uint64", "uint64_t", 4, 1, Category::Uint64);
         m_types.try_emplace("timestamp", "std::chrono::millis", 8, 1, Category::Timestamp);
         m_types.try_emplace("string", "std::string_view", 1, 1, Category::String);
+        // Protocol is defined in CodecTypes.hpp as an enum struct; register it so
+        // that type="Protocol" in the XML resolves without a warning.
+        m_types.try_emplace("Protocol", "Protocol", 1, 1, Category::Enum);
         for (auto typeNode : types)
         {
             const auto name = std::string{typeNode.attribute("name").as_string()};

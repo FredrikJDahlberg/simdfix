@@ -162,7 +162,7 @@ public:
             }
             mantissa = mantissa * 10 + (ch - '0');
         }
-        return utils::FixedDecimal{negative ? -mantissa : mantissa, exponent};
+        return utils::FixedDecimal{negative ? -mantissa : mantissa, static_cast<int8_t>(exponent)};
     }
 
     /**

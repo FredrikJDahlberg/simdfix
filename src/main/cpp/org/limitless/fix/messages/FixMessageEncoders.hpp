@@ -331,6 +331,120 @@ public:
 
 };
 
+struct NewOrderSingleEncoder : MessageEncoder
+{
+private:
+    HopsEncoder m_hops;
+
+public:
+    NewOrderSingleEncoder() : 
+        m_hops{m_encoder}
+    {
+    }
+
+    NewOrderSingleEncoder(const NewOrderSingleEncoder&) = delete;
+    NewOrderSingleEncoder& operator=(const NewOrderSingleEncoder&) = delete;
+    NewOrderSingleEncoder(NewOrderSingleEncoder&&) = delete;
+    NewOrderSingleEncoder& operator=(NewOrderSingleEncoder&&) = delete;
+
+    static constexpr std::string_view MessageId = "D";
+
+    NewOrderSingleEncoder& wrap(const std::span<uint8_t> data, const uint32_t offset = 0)
+    {
+        MessageEncoder::wrap(data, offset);
+        return *this;
+    }
+
+    [[nodiscard]] std::string_view type() const
+    {
+        return MessageId;
+    }
+
+    NewOrderSingleEncoder& sequenceNumber(const std::uint32_t value)
+    {
+        m_encoder.encode<"34", false, std::uint32_t>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& sendingTime(const std::chrono::milliseconds value)
+    {
+        m_encoder.encode<"52", false, std::chrono::milliseconds>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& account(const std::string_view value)
+    {
+        m_encoder.encode<"1", false, std::string_view>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& clOrdID(const std::string_view value)
+    {
+        m_encoder.encode<"11", false, std::string_view>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& handlInst(const HandlInst::Values value)
+    {
+        m_encoder.encode<"21", false, HandlInst>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& symbol(const std::string_view value)
+    {
+        m_encoder.encode<"55", false, std::string_view>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& side(const Side::Values value)
+    {
+        m_encoder.encode<"54", false, Side>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& transactTime(const std::chrono::milliseconds value)
+    {
+        m_encoder.encode<"60", false, std::chrono::milliseconds>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& orderQty(const std::uint32_t value)
+    {
+        m_encoder.encode<"38", false, std::uint32_t>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& ordType(const OrdType::Values value)
+    {
+        m_encoder.encode<"40", false, OrdType>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& price(const std::uint32_t value)
+    {
+        m_encoder.encode<"44", false, std::uint32_t>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& timeInForce(const TimeInForce::Values value)
+    {
+        m_encoder.encode<"59", false, TimeInForce>(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& text(const std::string_view value)
+    {
+        m_encoder.encode<"58", false, std::string_view>(value);
+        return *this;
+    }
+
+    HopsEncoder& hops(const uint32_t count)
+    {
+        return m_hops.wrap(count);
+    }
+
+};
+
 template <FixedString Protocol, FixedString Target, FixedString Sender>
 class FixPayloadEncoder
 {

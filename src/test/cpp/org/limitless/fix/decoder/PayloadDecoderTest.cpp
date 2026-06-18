@@ -100,6 +100,36 @@ TEST(PayloadDecoder, Fragment)
     ASSERT_EQ(0UL, processed);
 }
 
+TEST(PayloadDecoder, TrailerSplitValue)
+{
+    // Regression test for processTrailer's split-value branch.
+    //
+    // The field value "15000" (tag 44) has its first three bytes ('1','5','0')
+    // at the end of the last 16-byte NEON block and the remaining two ('0','0')
+    // plus the SOH in the tail.  The tail's first SOH therefore precedes the
+    // tail's first '=', triggering the split-value branch.
+    //
+    // Before the fix the branch computed fieldEndPos-tagEndPos-1 = 2 instead of
+    // (offset-token.m_position)+fieldEndPos = 5, silently truncating the value.
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0129" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
+        "38=100" SOH "40=2" SOH "44=15000" SOH "10=126" SOH);
+    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_EQ(message.size(), processed);
+
+    // Token 14 is tag 44 (Price); its value "15000" crosses the block→tail
+    // boundary.  Verify the full five-digit length is reported, not the
+    // truncated two-digit length produced by the pre-fix formula.
+    const auto tokens = decoder.tokens();
+    ASSERT_EQ(44, tokens[14].m_tag);
+    ASSERT_EQ(141, tokens[14].m_position);
+    ASSERT_EQ(5, tokens[14].m_length);
+}
+
 TEST(PayloadDecoder, HopGroup)
 {
     const auto logout = utils::makeSpan(

@@ -61,4 +61,32 @@ TEST(MessageEncoder, HeartbeatWithHops)
               "10=141" SOH, encoded);
 }
 
+TEST(MessageEncoder, NewOrderSingle)
+{
+    std::array<uint8_t, 256> buffer{};
+    FixPayloadEncoder<"FIXT.1.1", "TARGET", "SENDER"> encoder{};
+    encoder.wrap(0, buffer);
+
+    NewOrderSingleEncoder order{};
+    encoder.wrapMessage(order)
+            .sequenceNumber(1)
+            .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+            .clOrdID("ORDER1")
+            .handlInst(HandlInst::AutoPrivate)
+            .symbol("AAPL")
+            .side(Side::Buy)
+            .transactTime(std::chrono::milliseconds{1'781'378'773'959})
+            .orderQty(100)
+            .ordType(OrdType::Limit)
+            .price(15000);
+
+    const auto length = encoder.encode(order);
+    const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
+
+    EXPECT_EQ("8=FIXT.1.1" SOH "9=0129" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+              "34=1" SOH "52=20260613-19:26:13.959" SOH
+              "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
+              "38=100" SOH "40=2" SOH "44=15000" SOH "10=126" SOH, encoded);
+}
+
 }

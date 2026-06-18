@@ -136,6 +136,11 @@ public:
         MessageDecoder::context(context);
     }
 
+    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, false, Protocol, RecordType::Message>();
+    }
+
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
         return m_decoder.getUint32<9, false, RecordType::Message>();
@@ -215,6 +220,11 @@ public:
         MessageDecoder::context(context);
     }
 
+    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, false, Protocol, RecordType::Message>();
+    }
+
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
         return m_decoder.getUint32<9, false, RecordType::Message>();
@@ -287,6 +297,11 @@ public:
     void context(SessionContext& context)
     {
         MessageDecoder::context(context);
+    }
+
+    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, false, Protocol, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
@@ -363,6 +378,11 @@ public:
         MessageDecoder::context(context);
     }
 
+    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, false, Protocol, RecordType::Message>();
+    }
+
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
         return m_decoder.getUint32<9, false, RecordType::Message>();
@@ -396,6 +416,135 @@ public:
     [[nodiscard]] std::expected<std::string_view, Result::Values> testReqID() const
     {
         return m_decoder.getString<112, false, RecordType::Message>();
+    }
+
+    HopsDecoder& hops()
+    {
+        return m_hops.wrap();
+    }
+
+};
+
+struct NewOrderSingleDecoder : MessageDecoder
+{
+private:
+    HopsDecoder m_hops;
+
+public:
+    NewOrderSingleDecoder() : 
+        m_hops{m_decoder}
+    {
+    }
+
+    NewOrderSingleDecoder(const NewOrderSingleDecoder&) = delete;
+    NewOrderSingleDecoder& operator=(const NewOrderSingleDecoder&) = delete;
+    NewOrderSingleDecoder(NewOrderSingleDecoder&&) = delete;
+    NewOrderSingleDecoder& operator=(NewOrderSingleDecoder&&) = delete;
+
+    static constexpr uint8_t MessageId = 'D';
+
+    NewOrderSingleDecoder& wrap(const std::span<const uint8_t> data,
+            const std::span<Token> tokens,
+            const std::span<uint16_t> tags,
+            const uint32_t count)
+    {
+        m_decoder.wrap(data, tokens, tags, count);
+        return *this;
+    }
+
+    void context(SessionContext& context)
+    {
+        MessageDecoder::context(context);
+    }
+
+    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, false, Protocol, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    {
+        return m_decoder.getUint32<9, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    {
+        return m_decoder.getEnum<35, false, MessageType, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    {
+        return m_decoder.getString<49, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    {
+        return m_decoder.getString<56, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    {
+        return m_decoder.getUint32<34, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    {
+        return m_decoder.getTimestamp<52, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> account() const
+    {
+        return m_decoder.getString<1, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> clOrdID() const
+    {
+        return m_decoder.getString<11, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<HandlInst::Values, Result::Values> handlInst() const
+    {
+        return m_decoder.getEnum<21, false, HandlInst, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> symbol() const
+    {
+        return m_decoder.getString<55, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<Side::Values, Result::Values> side() const
+    {
+        return m_decoder.getEnum<54, false, Side, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> transactTime() const
+    {
+        return m_decoder.getTimestamp<60, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> orderQty() const
+    {
+        return m_decoder.getUint32<38, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<OrdType::Values, Result::Values> ordType() const
+    {
+        return m_decoder.getEnum<40, false, OrdType, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> price() const
+    {
+        return m_decoder.getUint32<44, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<TimeInForce::Values, Result::Values> timeInForce() const
+    {
+        return m_decoder.getEnum<59, false, TimeInForce, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
+    {
+        return m_decoder.getString<58, false, RecordType::Message>();
     }
 
     HopsDecoder& hops()

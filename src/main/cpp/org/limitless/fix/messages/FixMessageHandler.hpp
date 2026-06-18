@@ -16,6 +16,7 @@ class MessageHandler
     LogoutDecoder m_logout;
     HeartbeatDecoder m_heartbeat;
     TestRequestDecoder m_testRequest;
+    NewOrderSingleDecoder m_newOrderSingle;
 
 public:
     template <typename Event>
@@ -30,6 +31,7 @@ public:
         m_logout.context(&context);
         m_heartbeat.context(&context);
         m_testRequest.context(&context);
+        m_newOrderSingle.context(&context);
     }
 
     Result::Values handle(const std::span<const uint8_t> data,
@@ -73,6 +75,14 @@ public:
                     status = receive(m_testRequest);
                 }
                 break;
+            case NewOrderSingleDecoder::MessageId:
+                m_newOrderSingle.wrap(data, tokens, tags, count);
+                status = m_newOrderSingle.checkRequired();
+                if (status == Result::Success)
+                {
+                    status = receive(m_newOrderSingle);
+                }
+                break;
             default:
                 break;
         }
@@ -84,6 +94,7 @@ protected:
     Result::Values handle(LogoutDecoder&) { return Result::Success; }
     Result::Values handle(HeartbeatDecoder&) { return Result::Success; }
     Result::Values handle(TestRequestDecoder&) { return Result::Success; }
+    Result::Values handle(NewOrderSingleDecoder&) { return Result::Success; }
 };
 
 } // namespace org::limitless::fix::messages

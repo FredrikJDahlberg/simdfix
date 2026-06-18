@@ -12,6 +12,36 @@
             <element name="Logout" value="5"/>
             <element name="TestRequest" value="1"/>
             <element name="Heartbeat" value="0"/>
+            <element name="NewOrderSingle" value="D"/>
+        </enum>
+
+        <enum name="Side">
+            <element name="Buy" value="1"/>
+            <element name="Sell" value="2"/>
+            <element name="BuyMinus" value="3"/>
+            <element name="SellPlus" value="4"/>
+            <element name="SellShort" value="5"/>
+        </enum>
+
+        <enum name="OrdType">
+            <element name="Market" value="1"/>
+            <element name="Limit" value="2"/>
+            <element name="Stop" value="3"/>
+            <element name="StopLimit" value="4"/>
+        </enum>
+
+        <enum name="TimeInForce">
+            <element name="Day" value="0"/>
+            <element name="GoodTillCancel" value="1"/>
+            <element name="AtTheOpening" value="2"/>
+            <element name="ImmediateOrCancel" value="3"/>
+            <element name="FillOrKill" value="4"/>
+        </enum>
+
+        <enum name="HandlInst">
+            <element name="AutoPrivate" value="1"/>
+            <element name="AutoPublic" value="2"/>
+            <element name="Manual" value="3"/>
         </enum>
 
     </types>
@@ -61,6 +91,21 @@
     <message name="TestRequest" id="1">
         <field name="Header" type="StandardHeader"/>
         <field name="TestReqID" tag="112" primitiveType="char" length="32" presence="optional"/>
+    </message>
+
+    <message name="NewOrderSingle" id="D">
+        <field name="Header" type="StandardHeader"/>
+        <field name="Account" tag="1" primitiveType="string" length="8" presence="optional"/>
+        <field name="ClOrdID" tag="11" primitiveType="string" length="20"/>
+        <field name="HandlInst" tag="21" type="HandlInst"/>
+        <field name="Symbol" tag="55" primitiveType="string" length="8"/>
+        <field name="Side" tag="54" type="Side"/>
+        <field name="TransactTime" tag="60" primitiveType="timestamp"/>
+        <field name="OrderQty" tag="38" primitiveType="uint32"/>
+        <field name="OrdType" tag="40" type="OrdType"/>
+        <field name="Price" tag="44" primitiveType="uint32" presence="optional"/>
+        <field name="TimeInForce" tag="59" type="TimeInForce" presence="optional"/>
+        <field name="Text" tag="58" primitiveType="string" length="64" presence="optional"/>
     </message>
 
 </protocol>

@@ -482,7 +482,10 @@ inline size_t int64ToAscii(const int64_t value, std::span<uint8_t> data, const s
  * @param offset byte offset within data at which to write
  * @return number of bytes written
  */
-inline size_t fixedDecimalToAscii(const int64_t mantissa, const int32_t exponent, std::span<uint8_t> data, const size_t offset)
+inline size_t fixedDecimalToAscii(const int64_t mantissa,
+                                  const int32_t exponent,
+                                  std::span<uint8_t> data,
+                                  const size_t offset)
 {
     size_t pos = offset;
     uint64_t magnitude = static_cast<uint64_t>(mantissa);

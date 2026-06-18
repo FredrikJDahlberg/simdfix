@@ -423,10 +423,13 @@ private:
             m_tag = 0;
         }
         else if (fieldEndPos < tagEndPos)
-        { // handle split value
+        { // handle split value: bytes from last->m_position to offset came from
+          // the preceding block; fieldEndPos tail bytes complete the value.
+            last->m_length = static_cast<int16_t>(offset - last->m_position + fieldEndPos);
             position = fieldEndPos + 1;
-            fieldEndPos = fieldEnds.clear(fieldEndBit).zerosRight() / 8;
-            last->m_length += fieldEndPos - tagEndPos - 1;
+            fieldEnds.clear(fieldEndBit);
+            fieldEndBit = fieldEnds.zerosRight();
+            fieldEndPos = fieldEndBit / 8;
             last = &m_tokens[m_count++];
         }
         while (position + 7 < remaining)
