@@ -168,8 +168,7 @@ public:
             // FIXME handle null value
         }
         encode<Tag>();
-        m_encodedLength += utils::fixedDecimalToAscii(value.mantissa(), -8, m_data,
-                                                      m_offset + m_encodedLength);
+        m_encodedLength += utils::fixedDecimalToAscii(value.mantissa(), -8, m_data, m_offset + m_encodedLength);
         m_data[m_offset + m_encodedLength] = FieldEnd;
         ++m_encodedLength;
     }

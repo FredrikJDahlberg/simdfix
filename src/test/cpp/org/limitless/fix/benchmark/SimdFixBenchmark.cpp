@@ -66,6 +66,26 @@ static constexpr std::uint8_t LOGIN_GROUP[] =
 // Actual message length, excluding the C-string null terminator.
 static constexpr size_t LOGIN_GROUP_LENGTH = sizeof(LOGIN_GROUP) - 1;
 
+static constexpr std::uint8_t NEW_ORDER_SINGLE[] =
+    "8=FIXT.1.1" SOH
+    "9=0129" SOH
+    "35=D" SOH
+    "49=SENDER" SOH
+    "56=TARGET" SOH
+    "34=1" SOH
+    "52=20260613-19:26:13.959" SOH
+    "11=ORDER1" SOH
+    "21=1" SOH
+    "55=AAPL" SOH
+    "54=1" SOH
+    "60=20260613-19:26:13.959" SOH
+    "38=100" SOH
+    "40=2" SOH
+    "44=15000" SOH
+    "10=126" SOH;
+
+static constexpr size_t NEW_ORDER_SINGLE_LENGTH = sizeof(NEW_ORDER_SINGLE) - 1;
+
 using namespace std::chrono;
 
 template <typename Handler>
@@ -279,6 +299,140 @@ static void benchGroups()
     report("GROUPS", duration, hotMsgs, LOGIN_GROUP_LENGTH);
 }
 
+// NOS_HOT: hot-cache decode of NewOrderSingle (tokenization only, no getters).
+static void benchNewOrderSingleHot()
+{
+    decoder::PayloadDecoder decoder{Protocol::FIXT_1_1};
+
+    constexpr size_t HOT_SIZE  = 256 * 1024;
+    constexpr size_t HOT_COUNT = 4096;
+    auto hotBuf = std::make_unique<uint8_t[]>(HOT_SIZE);
+
+    size_t i = 0;
+    for (; i + NEW_ORDER_SINGLE_LENGTH <= HOT_SIZE; i += NEW_ORDER_SINGLE_LENGTH)
+    {
+        std::memcpy(&hotBuf[i], NEW_ORDER_SINGLE, NEW_ORDER_SINGLE_LENGTH);
+    }
+    std::memset(&hotBuf[i], ' ', HOT_SIZE - i);
+
+    constexpr size_t msgsPerPass = HOT_SIZE / NEW_ORDER_SINGLE_LENGTH;
+
+    for (int w = 0; w < 4; ++w)
+    {
+        for (size_t j = 0; j < msgsPerPass; ++j)
+        {
+            const std::span<const uint8_t> bytes(&hotBuf[j * NEW_ORDER_SINGLE_LENGTH], NEW_ORDER_SINGLE_LENGTH);
+            (void) decoder.parse(bytes);
+        }
+    }
+
+    constexpr size_t hotMsgs = msgsPerPass * HOT_COUNT;
+    const auto duration = timer([&]
+    {
+        for (size_t iter = 0; iter < HOT_COUNT; ++iter)
+        {
+            for (size_t j = 0; j < msgsPerPass; ++j)
+            {
+                const std::span<const uint8_t> bytes(&hotBuf[j * NEW_ORDER_SINGLE_LENGTH], NEW_ORDER_SINGLE_LENGTH);
+                (void) decoder.parse(bytes);
+            }
+        }
+    });
+    report("NOS HOT", duration, hotMsgs, NEW_ORDER_SINGLE_LENGTH);
+}
+
+// NOS_GETTERS: parse + apply every NewOrderSingleDecoder getter.
+struct NewOrderSingleGetterHandler : org::limitless::fix::messages::MessageHandler<NewOrderSingleGetterHandler>
+{
+    using MessageHandler::handle;
+
+    uint64_t sink = 0;
+
+    org::limitless::fix::Result::Values handle(org::limitless::fix::messages::NewOrderSingleDecoder& order)
+    {
+        using namespace org::limitless::fix::messages;
+
+        sink += order.clOrdID().value_or(std::string_view{}).size();
+        sink += static_cast<uint64_t>(order.handlInst().value_or(HandlInst::AutoPrivate));
+        sink += order.symbol().value_or(std::string_view{}).size();
+        sink += static_cast<uint64_t>(order.side().value_or(Side::Buy));
+        sink += static_cast<uint64_t>(order.transactTime().value_or(std::chrono::milliseconds{0}).count());
+        sink += order.orderQty().value_or(0);
+        sink += static_cast<uint64_t>(order.ordType().value_or(OrdType::Limit));
+        sink += order.price().value_or(0);
+        return org::limitless::fix::Result::Success;
+    }
+};
+
+static void benchNewOrderSingleGetters()
+{
+    decoder::PayloadDecoder decoder{Protocol::FIXT_1_1};
+
+    constexpr size_t HOT_SIZE  = 256 * 1024;
+    constexpr size_t HOT_COUNT = 4096;
+    auto hotBuf = std::make_unique<uint8_t[]>(HOT_SIZE);
+
+    size_t i = 0;
+    for (; i + NEW_ORDER_SINGLE_LENGTH <= HOT_SIZE; i += NEW_ORDER_SINGLE_LENGTH)
+    {
+        std::memcpy(&hotBuf[i], NEW_ORDER_SINGLE, NEW_ORDER_SINGLE_LENGTH);
+    }
+    std::memset(&hotBuf[i], ' ', HOT_SIZE - i);
+
+    constexpr size_t msgsPerPass = HOT_SIZE / NEW_ORDER_SINGLE_LENGTH;
+    constexpr size_t hotMsgs = msgsPerPass * HOT_COUNT;
+
+    NewOrderSingleGetterHandler handler{};
+    const auto duration = timer([&]
+    {
+        for (size_t iter = 0; iter < HOT_COUNT; ++iter)
+        {
+            for (size_t j = 0; j < msgsPerPass; ++j)
+            {
+                const std::span<const uint8_t> bytes(&hotBuf[j * NEW_ORDER_SINGLE_LENGTH], NEW_ORDER_SINGLE_LENGTH);
+                (void) decoder.parse(bytes, handler);
+            }
+        }
+    });
+    std::printf("sink = %llu\n", static_cast<unsigned long long>(handler.sink));
+    report("NOS GETTERS", duration, hotMsgs, NEW_ORDER_SINGLE_LENGTH);
+}
+
+// NOS_ENCODE: encode a NewOrderSingle message repeatedly.
+static void benchNewOrderSingleEncode()
+{
+    using namespace org::limitless::fix::messages;
+
+    constexpr size_t HOT_COUNT = 1'000'000;
+    std::array<uint8_t, 256> buffer{};
+
+    size_t encodedLength = 0;
+    const auto duration = timer([&]
+    {
+        for (size_t i = 0; i < HOT_COUNT; ++i)
+        {
+            FixPayloadEncoder<"FIXT.1.1", "TARGET", "SENDER"> encoder{};
+            encoder.wrap(0, buffer);
+
+            NewOrderSingleEncoder order{};
+            encoder.wrapMessage(order)
+                    .sequenceNumber(1)
+                    .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+                    .clOrdID("ORDER1")
+                    .handlInst(HandlInst::AutoPrivate)
+                    .symbol("AAPL")
+                    .side(Side::Buy)
+                    .transactTime(std::chrono::milliseconds{1'781'378'773'959})
+                    .orderQty(100)
+                    .ordType(OrdType::Limit)
+                    .price(15000);
+
+            encodedLength = encoder.encode(order);
+        }
+    });
+    report("NOS ENCODE", duration, HOT_COUNT, encodedLength);
+}
+
 // ENCODE: encode a Logon message (with a 3-entry HopsRepeatingGroup) repeatedly.
 static void benchEncode()
 {
@@ -321,11 +475,14 @@ struct Benchmark
 };
 
 static constexpr Benchmark BENCHMARKS[] = {
-    {"cold",    benchColdCache},
-    {"hot",     benchHotCache},
-    {"getters", benchGetters},
-    {"groups",  benchGroups},
-    {"encode",  benchEncode},
+    {"cold",        benchColdCache},
+    {"hot",         benchHotCache},
+    {"getters",     benchGetters},
+    {"groups",      benchGroups},
+    {"encode",      benchEncode},
+    {"nos-hot",     benchNewOrderSingleHot},
+    {"nos-getters", benchNewOrderSingleGetters},
+    {"nos-encode",  benchNewOrderSingleEncode},
 };
 
 static void printUsage(const char* program)
@@ -340,7 +497,8 @@ static void printUsage(const char* program)
 
 int main(const int argc, char** argv)
 {
-    std::printf("Message length = %zu bytes\n\n", LOGIN_LENGTH);
+    std::printf("Logon message length         = %zu bytes\n", LOGIN_LENGTH);
+    std::printf("NewOrderSingle message length = %zu bytes\n\n", NEW_ORDER_SINGLE_LENGTH);
 
     if (argc < 2)
     {
