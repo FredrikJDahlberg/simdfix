@@ -133,6 +133,7 @@ public:
             return { 8, Result::InvalidBeginString };
         }
         m_tokens[BeginStringPosition] = { 2, 8, 8 };
+        m_tags[BeginStringPosition] = 8;
         m_count = 1;
 
         // Padded so binaryToDecimal can always read 8 bytes from any digits[0..15] start.
@@ -191,10 +192,6 @@ public:
         else if (offset < buffer.size())
         {
             processTrailer(offset, buffer);
-        }
-        for (size_t i = 0; i < m_count; ++i)
-        {
-            m_tags[i] = m_tokens[i].m_tag;
         }
         return checkRequiredFields(data, blockSum, offset);
     }
@@ -289,6 +286,7 @@ private:
             ++m_count;
             ++token;
             token->m_tag = m_tag;
+            m_tags[token - m_tokens] = m_tag;
             token->m_position = offset + 1;
             m_position = 0;
             m_tag = 0;
@@ -296,7 +294,7 @@ private:
         token->m_length = m_position;
 
         uint64_t remainingDigitFlags = tagDigitFlags & ~0ull >> std::max(4, trailingCount);
-        while (remainingDigitFlags > 0 && token->m_tag != CheckSumTag)
+        while (remainingDigitFlags > 0 && token->m_tag != CheckSumTag) [[likely]]
         {
             const int32_t nonTagCount = std::countr_zero(remainingDigitFlags);
             nonTagBitPos += nonTagCount;
@@ -316,6 +314,7 @@ private:
                 m_tag = 0;
             }
             token->m_tag = utils::asciiToUin32(value, digit, count);
+            m_tags[token - m_tokens] = token->m_tag;
             token->m_position = offset + tagPos + count + 1;
             remainingDigitFlags >>= digitBits;
             nonTagBitPos += digitBits;
@@ -416,6 +415,7 @@ private:
             last->m_length = offset + m_position - 1 - last->m_position;
             last = &m_tokens[m_count++];
             last->m_tag = utils::asciiToUint64(m_tag, data, tagEndPos, false);
+            m_tags[last - m_tokens] = last->m_tag;
             last->m_position = offset + tagEndPos + 1;
             last->m_length = fieldEndPos - tagEndPos - 1;
             position = fieldEndPos + 1;
@@ -434,6 +434,7 @@ private:
         while (position + 7 < remaining)
         {
             last->m_tag = utils::asciiToUint64(0, data + position, tagEndPos - position, false);
+            m_tags[last - m_tokens] = last->m_tag;
             position += tagEndPos - position + 1;
             last->m_position = position + offset;
             last->m_length = fieldEndPos - position;
@@ -451,6 +452,7 @@ private:
             constexpr uint32_t checkSumPrefixLen = 3; // "10="
             last = &m_tokens[m_count++];
             last->m_tag = CheckSumTag;
+            m_tags[last - m_tokens] = CheckSumTag;
             last->m_position = offset + position + checkSumPrefixLen;
             last->m_length = CheckSumValueLength;
         }

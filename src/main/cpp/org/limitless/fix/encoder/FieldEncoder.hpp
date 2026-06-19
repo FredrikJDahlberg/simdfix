@@ -34,11 +34,19 @@ class FieldEncoder
     template <FixedString Tag>
     void encode()
     {
-        constexpr auto size = sizeof(Tag) - 1; // exclude the string literal's null terminator
-        std::memcpy(m_data.data() + m_offset + m_encodedLength, Tag, size);
-        m_encodedLength += size;
-        m_data[m_offset + m_encodedLength] = '=';
-        ++m_encodedLength;
+        constexpr auto TagPrefix = []
+        {
+            constexpr auto N = sizeof(Tag) - 1;
+            std::array<char, N + 1> buffer{};
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                buffer[i] = Tag.Value[i];
+            }
+            buffer[N] = '=';
+            return buffer;
+        }();
+        std::memcpy(m_data.data() + m_offset + m_encodedLength, TagPrefix.data(), TagPrefix.size());
+        m_encodedLength += TagPrefix.size();
     }
 
     /**

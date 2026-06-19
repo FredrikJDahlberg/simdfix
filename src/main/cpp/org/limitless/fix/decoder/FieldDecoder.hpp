@@ -142,22 +142,49 @@ public:
     [[nodiscard]] constexpr utils::FixedDecimal convertToFixedDecimal(const Token* token) const
     {
         const uint8_t* digits = m_data.data() + token->m_position;
-        uint32_t offset = 0;
+        uint32_t start = 0;
         bool negative = false;
         if (token->m_length != 0 && digits[0] == '-')
         {
             negative = true;
-            offset = 1;
+            start = 1;
+        }
+
+        const uint32_t len = token->m_length - start;
+        const bool padded = m_data.size() >= token->m_position + start + sizeof(uint64_t);
+        if (!std::is_constant_evaluated() && padded && len <= 8)
+        {
+            uint64_t raw;
+            std::memcpy(&raw, digits + start, sizeof(uint64_t));
+            const uint64_t dotMask = utils::findByte('.', raw);
+            int32_t exponent = 0;
+            uint32_t digitCount = len;
+            if (dotMask != 0)
+            {
+                const uint32_t dotPos = std::countr_zero(dotMask) / 8;
+                exponent = -static_cast<int32_t>(len - dotPos - 1);
+                const uint64_t lowerMask = (1ULL << (dotPos * 8)) - 1;
+                raw = (raw & lowerMask) | ((raw >> 8) & ~lowerMask);
+                --digitCount;
+            }
+            const uint32_t shift = (sizeof(uint64_t) - digitCount) * 8;
+            raw = (raw << shift) | (utils::AsciiZeros & ((1ULL << shift) - 1));
+            raw -= utils::AsciiZeros;
+            raw = raw * 10 + (raw >> 8);
+            int64_t mantissa = static_cast<int64_t>(
+                ((raw & utils::SwarMask) * utils::SwarFactor1 +
+                 (raw >> 16 & utils::SwarMask) * utils::SwarFactor2) >> 32);
+            return utils::FixedDecimal{negative ? -mantissa : mantissa, exponent};
         }
 
         int64_t mantissa = 0;
         int32_t exponent = 0;
-        for (; offset < token->m_length; ++offset)
+        for (uint32_t i = start; i < token->m_length; ++i)
         {
-            const uint8_t ch = digits[offset];
+            const uint8_t ch = digits[i];
             if (ch == '.')
             {
-                exponent = -static_cast<int32_t>(token->m_length - offset - 1);
+                exponent = -static_cast<int32_t>(token->m_length - i - 1);
                 continue;
             }
             mantissa = mantissa * 10 + (ch - '0');

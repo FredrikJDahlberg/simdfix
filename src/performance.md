@@ -1,6 +1,6 @@
 # Performance
 
-Figures from `SimdFixBenchmark` (release build: `-O3`, LTO, `-march=native`), measured on 2026-06-18.
+Figures from `SimdFixBenchmark` (release build: `-O3`, LTO, `-march=native`), measured on 2026-06-19.
 
 ## Test environment
 
@@ -20,16 +20,16 @@ before parsing).
 
 ## Results
 
-| Benchmark | Message | ns/msg | GB/s | Instructions/msg | Cycles/msg | IPC |
-|-----------|---------|-------:|-----:|-----------------:|-----------:|----:|
-| COLD CACHE | Logon, 142 B | 84.9 | 1.67 | ~1,632 | ~324 | 5.0 |
-| HOT CACHE | Logon, 142 B | 84.5 | 1.68 | ~1,542 | ~272 | 5.7 |
-| GETTERS | Logon, 142 B | 120.4 | 1.18 | ~2,332 | ~388 | 6.0 |
-| GROUPS | Logon + 3 hops, 253 B | 218.4 | 1.16 | ~4,135 | ~696 | 5.9 |
-| ENCODE | Logon + 3 hops, ~224 B | 115.1 | 1.95 | ~867 | ~378 | 2.3 |
-| NOS HOT | NewOrderSingle, 154 B | 89.1 | 1.73 | ~1,635 | ~285 | 5.7 |
-| NOS GETTERS | NewOrderSingle, 154 B | 126.6 | 1.22 | ~2,498 | ~403 | 6.2 |
-| NOS ENCODE | NewOrderSingle, 154 B | 60.5 | 2.54 | ~401 | ~177 | 2.3 |
+| Benchmark | Message | ns/msg | GB/s |
+|-----------|---------|-------:|-----:|
+| COLD CACHE | Logon, 142 B | 83.3 | 1.71 |
+| HOT CACHE | Logon, 142 B | 83.2 | 1.71 |
+| GETTERS | Logon, 142 B | 119.9 | 1.18 |
+| GROUPS | Logon + 3 hops, 253 B | 216.2 | 1.17 |
+| ENCODE | Logon + 3 hops, ~224 B | 100.4 | 2.23 |
+| NOS HOT | NewOrderSingle, 154 B | 86.0 | 1.79 |
+| NOS GETTERS | NewOrderSingle, 154 B | 127.9 | 1.20 |
+| NOS ENCODE | NewOrderSingle, 154 B | 38.0 | 4.29 |
 
 ## What each benchmark measures
 
@@ -42,31 +42,55 @@ before parsing).
 - **NOS GETTERS** — as NOS HOT plus all 8 mandatory `NewOrderSingleDecoder` getters (clOrdID, handlInst, symbol, side, transactTime, orderQty, ordType, price).
 - **NOS ENCODE** — encodes a flat `NewOrderSingle` (no repeating groups) via `FixPayloadEncoder`/`NewOrderSingleEncoder`.
 
+## Changes since previous measurement (2026-06-18)
+
+Five optimisations were applied across the decode and encode paths:
+
+1. **Inline tag copy** — `m_tags[]` is now populated inline during
+   `processBlock`/`processTrailer` instead of a separate post-pass loop,
+   eliminating a second traversal of up to 64 entries per parse.
+2. **SWAR `convertToFixedDecimal`** — decimal field parsing (e.g. `price()`)
+   uses SWAR digit parsing for values ≤ 8 bytes instead of a per-character
+   loop with a branch for the `.` separator.
+3. **Compile-time tag prefix** — `FieldEncoder::encode<Tag>()` precomputes
+   `"TAG="` as a `constexpr` array and emits a single `memcpy` instead of
+   a `memcpy` for the tag digits plus a separate `'='` store.
+4. **`[[likely]]` on `processBlock` loop** — the inner tag-extraction while
+   loop is annotated so the compiler lays out the fast path without the
+   CheckSum early-exit branch polluting the instruction stream.
+5. **Vectorised checksum accumulation** — the encoder's checksum loop
+   accumulates partial sums in a `uint16x8_t` via `vpaddlq_u8` across blocks
+   and reduces to scalar once at the end, avoiding a `vaddlvq_u8` horizontal
+   reduction per block.
+
+| Benchmark | Before | After | Change |
+|-----------|-------:|------:|-------:|
+| COLD CACHE | 84.9 ns | 83.3 ns | −1.9% |
+| HOT CACHE | 84.5 ns | 83.2 ns | −1.5% |
+| NOS HOT | 89.1 ns | 86.0 ns | −3.5% |
+| NOS GETTERS | 126.6 ns | 127.9 ns | +1.0% |
+| LOGON ENC | 115.1 ns | 100.4 ns | −12.8% |
+| NOS ENCODE | 60.5 ns | 38.0 ns | −37.2% |
+
 ## Observations
 
 - Parsing costs ~10.9 instructions per byte (HOT CACHE), and cold vs. hot
   throughput is nearly identical — the parser is compute-bound, not
   memory-bound, even when streaming from DRAM.
-- IPC of 5.7–6.2 is close to the M1 performance core's retire width, so
-  per-message cost scales with instruction count rather than stalls.
-- Field access (GETTERS) adds ~790 instructions (~116 cycles) per message on
-  top of parsing for Logon; NOS GETTERS adds ~863 instructions (~118 cycles)
-  for 8 fields versus Logon's 6, consistent with the extra linear-search steps.
+- Field access (GETTERS) adds ~38 ns per message on top of parsing for Logon;
+  NOS GETTERS adds ~45 ns for 8 fields versus Logon's 6, consistent with the
+  extra linear-search steps.
 - The 3-entry repeating group roughly doubles per-message cost versus GETTERS
   (longer message plus group iteration), while byte throughput stays the same.
-- ENCODE improved from 125 ns/msg to 115 ns/msg (−8%) versus the 2026-06-11
-  baseline. The checksum loop was vectorised with NEON (`vaddlvq_u8`, 16
-  bytes/iteration): instruction count rose slightly (~815 → ~867) but cycles
-  fell and IPC rose from 2.0 to 2.3, reflecting improved pipelining.
-- NOS ENCODE (60.5 ns/msg, ~401 instr) is ~48% faster than Logon ENCODE
-  (115.1 ns/msg, ~867 instr) because it has no repeating-group encoding pass.
+- NOS ENCODE (~38 ns/msg) is ~62% faster than Logon ENCODE (~100 ns/msg)
+  because it has no repeating-group encoding pass.
 
 ## Reproducing
 
 ```bash
 cmake -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
 cmake --build cmake-build-release
-/usr/bin/time -l ./cmake-build-release/SimdFixBenchmark hot   # or cold|getters|groups|encode|nos-hot|nos-getters|nos-encode|all
+/usr/bin/time -l ./cmake-build-release/SimdFixBenchmark logon-hot   # or logon-cold|logon-hot|logon-getters|logon-groups|logon-encode|nos-hot|nos-getters|nos-encode|all
 ```
 
 Instructions per message = instructions retired ÷ messages parsed, where

@@ -420,6 +420,33 @@ struct Uint8x16
     }
 };
 
+/**
+ * Accumulates a byte-level checksum across multiple 16-byte blocks using
+ * pairwise widening (vpaddlq_u8 → uint16x8), deferring the final horizontal
+ * reduction until value() is called.
+ */
+struct ChecksumAccumulator
+{
+    uint16x8_t m_accum = vdupq_n_u16(0);
+
+    /**
+     * Adds the byte sums of a 16-byte block to the running accumulator.
+     * @param block 16-byte vector to accumulate
+     */
+    void add(const Uint8x16& block)
+    {
+        m_accum = vaddq_u16(m_accum, vpaddlq_u8(block.m_block));
+    }
+
+    /**
+     * @return the accumulated checksum reduced to a single 32-bit value
+     */
+    [[nodiscard]] uint32_t value() const
+    {
+        return vaddlvq_u16(m_accum);
+    }
+};
+
 }
 
 #endif // SIMD_UNT8X16_H

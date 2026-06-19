@@ -101,14 +101,15 @@ public:
         utils::writeFixedDigits<BodyLengthDigits>(bodyLength, m_buffer.data() + m_offset + BodyLengthOffset);
         m_encodedLength = HeaderLength + static_cast<uint32_t>(message.encodedLength());
 
-        uint32_t checksum = 0;
         uint32_t position = 0;
-        simd::Uint8x16 value;
+        simd::ChecksumAccumulator accum;
+        simd::Uint8x16 block;
         for (; position + simd::Uint8x16::Size <= m_encodedLength; position += simd::Uint8x16::Size)
         {
-            value.load(m_buffer.data() + m_offset + position);
-            checksum += static_cast<uint32_t>(value.sum());
+            block.load(m_buffer.data() + m_offset + position);
+            accum.add(block);
         }
+        uint32_t checksum = accum.value();
         for (; position < m_encodedLength; ++position)
         {
             checksum += m_buffer[m_offset + position];
