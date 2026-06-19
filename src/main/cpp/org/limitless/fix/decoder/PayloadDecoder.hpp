@@ -64,7 +64,7 @@ public:
         const auto code = Protocol::code(protocol);
         const auto size = code.size();
         std::memcpy(m_protocol + 2, code.data(), size);
-        m_protocol[2 + size] = '\001'; // FIXME
+        m_protocol[2 + size] = FieldEnd;
         m_protocolLength = size + 2;
     }
 
