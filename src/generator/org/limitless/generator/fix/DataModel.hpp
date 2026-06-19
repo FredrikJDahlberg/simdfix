@@ -177,7 +177,9 @@ struct DataModel
                 const int32_t lengthTag = field.attribute("lengthTag").as_int();
                 record.m_fields.emplace_back(lengthTag, counterName, dataName, 0, presence,
                                              Category::Counter, parent);
-                record.m_records.emplace_back(tag, dataName, "Data", lengthTag, presence,
+                const auto dataField = field.child("field");
+                const int32_t dataTag = dataField.attribute("tag").as_int();
+                record.m_records.emplace_back(dataTag, dataName, "Data", lengthTag, presence,
                                               Category::Data, parent);
             }
             else

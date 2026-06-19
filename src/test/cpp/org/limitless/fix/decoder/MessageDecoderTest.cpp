@@ -316,7 +316,7 @@ TEST(MessageDecoder, LogonWithXmlData)
         {
             EXPECT_EQ(Encryption::None, logon.encryptMethod().value());
             EXPECT_EQ(30U, logon.heartbeatInterval().value());
-            const auto data = logon.xmlData();
+            const auto data = logon.xmlData().get();
             EXPECT_TRUE(data.has_value());
             EXPECT_EQ(11U, data.value().size());
             EXPECT_EQ(std::string_view("<root/>test"),
@@ -334,6 +334,94 @@ TEST(MessageDecoder, LogonWithXmlData)
     auto [processed, status] = decoder.parse(message, app);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
+}
+
+TEST(MessageDecoder, LogonWithXmlDataEmbeddedSoh)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(LogonDecoder& logon)
+        {
+            EXPECT_EQ(Encryption::None, logon.encryptMethod().value());
+            EXPECT_EQ(30U, logon.heartbeatInterval().value());
+            const auto data = logon.xmlData().get();
+            EXPECT_TRUE(data.has_value());
+            EXPECT_EQ(12U, data.value().size());
+            const std::array<uint8_t, 12> expected =
+            {
+                '<', 'r', 'o', 'o', 't', 0x01, '/', '>', 't', 'e', 's', 't'
+            };
+            EXPECT_TRUE(std::ranges::equal(data.value(), expected));
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
+        "212=12" SOH "213=<root" SOH "/>test" SOH "10=127" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
+TEST(MessageDecoder, LogonWithXmlDataInlineSkip)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(LogonDecoder& logon)
+        {
+            EXPECT_EQ(Encryption::None, logon.encryptMethod().value());
+            EXPECT_EQ(30U, logon.heartbeatInterval().value());
+            const auto data = logon.xmlData().get();
+            EXPECT_TRUE(data.has_value());
+            EXPECT_EQ(12U, data.value().size());
+            const std::array<uint8_t, 12> expected =
+            {
+                '<', 'r', 'o', 'o', 't', 0x01, '/', '>', 't', 'e', 's', 't'
+            };
+            EXPECT_TRUE(std::ranges::equal(data.value(), expected));
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    struct DataFields
+    {
+        static constexpr int32_t dataTag(const uint16_t tag)
+        {
+            if (tag == 212) return 213;
+            return -1;
+        }
+    };
+    PayloadDecoder<DataFields> decoder{Protocol::FIXT_1_1};
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
+        "212=12" SOH "213=<root" SOH "/>test" SOH "10=127" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+
+    const auto tokens = decoder.tokens();
+    for (size_t i = 0; i < tokens.size(); ++i)
+    {
+        if (tokens[i].m_tag == 213)
+        {
+            EXPECT_EQ(12U, tokens[i].m_length);
+            break;
+        }
+    }
 }
 
 TEST(MessageDecoder, InvalidMandatoryFields)

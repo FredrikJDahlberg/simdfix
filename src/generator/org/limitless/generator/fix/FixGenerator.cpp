@@ -368,7 +368,7 @@ static void generateWrapNextDecoders(std::ostream& out, const Record& record)
     {
         out << std::format("    {}Decoder& wrap()\n", record.m_name);
         out << "    {\n";
-        out << std::format("        GroupDecoder::wrap({});\n", record.m_tag);
+        out << std::format("        GroupDecoder::wrap<{}>();\n", record.m_tag);
         out << "        return *this;\n";
         out << "    }\n\n";
 
@@ -437,15 +437,14 @@ static void generateGetters(std::ostream& out, const Record& record)
         auto fieldName = uncap(comp.m_name);
         if (comp.m_category == Category::Data)
         {
-            const auto mandatory = std::string{comp.m_presence == Presence::Required ? "true" : "false"};
-            out << std::format("    [[nodiscard]] DataResult {}() const\n    {{\n", fieldName);
-            out << std::format("        return m_{}.get<{}, {}, {}, RecordType::{}>();\n",
-                               fieldName, comp.m_length, comp.m_tag, mandatory, parent);
+            out << std::format("    [[nodiscard]] DataDecoder& {}()\n    {{\n", fieldName);
+            out << std::format("        return m_{}.wrap<{}, {}>();\n",
+                               fieldName, comp.m_length, comp.m_tag);
             out << std::format("    }}\n\n");
         }
         else
         {
-            out << std::format("    {}Decoder& {}()\n    {{\n", comp.m_type, fieldName);
+            out << std::format("    [[nodiscard]] {}Decoder& {}()\n    {{\n", comp.m_type, fieldName);
             out << std::format("        return m_{}", fieldName);
             if (comp.m_tag != 0)
             {

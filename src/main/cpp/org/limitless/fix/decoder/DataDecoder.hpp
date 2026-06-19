@@ -19,6 +19,7 @@ namespace org::limitless::fix::decoder {
 class DataDecoder
 {
     FieldDecoder& m_decoder;
+    DataResult m_result{std::unexpected{Result::Success}};
 
 public:
     explicit DataDecoder(FieldDecoder& decoder) : m_decoder(decoder)
@@ -31,31 +32,39 @@ public:
     DataDecoder& operator=(DataDecoder&&) = delete;
 
     /**
-     * Looks up the length tag, parses its value, then returns a span of
-     * that many raw bytes starting at the data tag's value position.
+     * Locates the length and data tag pair and caches the raw byte span.
      * @tparam LengthTag tag number of the length field (e.g. 212)
      * @tparam DataTag tag number of the data field (e.g. 213)
-     * @tparam Required whether missing fields are an error
-     * @tparam Parent record type context for tag lookup
-     * @return raw byte span, or error if either tag is missing
+     * @return this decoder
      */
-    template <int32_t LengthTag, int32_t DataTag, bool Required, RecordType::Values Parent>
+    template <uint32_t LengthTag, uint32_t DataTag>
+    DataDecoder& wrap()
+    {
+        const auto* lengthToken = m_decoder.nextField(LengthTag);
+        if (lengthToken == nullptr)
+        {
+            m_result = std::unexpected{Result::Success};
+            return *this;
+        }
+        const auto length = m_decoder.convertToUint32(lengthToken);
+
+        const auto* dataToken = m_decoder.nextField(DataTag);
+        if (dataToken == nullptr)
+        {
+            m_result = std::unexpected{Result::Success};
+            return *this;
+        }
+        m_result = m_decoder.bufferAt(dataToken->m_position, length);
+        return *this;
+    }
+
+    /**
+     * @return the raw byte span from the most recent wrap(), or an error
+     *         if either tag was missing
+     */
     [[nodiscard]] DataResult get() const
     {
-        const auto lengthIndex = m_decoder.findIndex<LengthTag, Parent>();
-        if (lengthIndex < 0)
-        {
-            return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
-        }
-        const auto length = m_decoder.convertToUint32(&m_decoder.tokenAt(lengthIndex));
-
-        const auto dataIndex = m_decoder.findIndex<DataTag, Parent>();
-        if (dataIndex < 0)
-        {
-            return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
-        }
-        const auto& token = m_decoder.tokenAt(dataIndex);
-        return m_decoder.bufferAt(token.m_position, length);
+        return m_result;
     }
 };
 

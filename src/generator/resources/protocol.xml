@@ -81,7 +81,9 @@
         <field name="Header" type="StandardHeader"/>
         <field name="EncryptMethod" tag="98" type="Encryption" presence="optional"/>
         <field name="HeartbeatInterval" tag="108" primitiveType="uint32"/>
-        <data name="XmlData" tag="213" counter="XmlDataLen" lengthTag="212" presence="optional"/>
+        <data name="XmlData" tag="212" counter="XmlDataLen" lengthTag="212" presence="optional">
+            <field name="Xml" tag="213" primitiveType="char"/>
+        </data>
     </message>
 
     <message name="Logout" id="5">

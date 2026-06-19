@@ -11,16 +11,13 @@ TEST(FixedDecimal, Construction)
 {
     constexpr FixedDecimal value(12345, -2);
     ASSERT_EQ(12345'000000, value.mantissa());
-    //ASSERT_EQ(-8, value.exponent());
 }
 
-TEST(FixedDecimal, DISABLED_Equality)
+TEST(FixedDecimal, Equality)
 {
-/*
-    ASSERT_EQ(FixedDecimal(1234500000000, -2), FixedDecimal(123450, -3));
+    ASSERT_EQ(FixedDecimal(12345, -2), FixedDecimal(1234500, -4));
     ASSERT_EQ(FixedDecimal(0, 3), FixedDecimal(0, -5));
     ASSERT_NE(FixedDecimal(1, 0), FixedDecimal(10, -2));
-*/
 }
 
 TEST(FixedDecimal, Ordering)

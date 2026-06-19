@@ -40,16 +40,17 @@ public:
     GroupDecoder& operator=(GroupDecoder&&) = delete;
 
     /**
-     * Locates the NumInGroup count field for tag and resets iteration. The
+     * Locates the NumInGroup count field for Tag and resets iteration. The
      * tag immediately following it is taken as the group's delimiter
      * (first field of each repeating entry).
-     * @param tag NumInGroup tag number for this group
+     * @tparam Tag NumInGroup tag number for this group
      * @return this decoder
-     * @throws std::invalid_argument if tag is not found
+     * @throws std::invalid_argument if Tag is not found
      */
-    GroupDecoder& wrap(const uint32_t tag)
+    template <uint32_t Tag>
+    GroupDecoder& wrap()
     {
-        const Token* token = m_decoder.nextField(tag);
+        const Token* token = m_decoder.nextField(Tag);
         if (token != nullptr)
         {
             if (m_repeat > 0)

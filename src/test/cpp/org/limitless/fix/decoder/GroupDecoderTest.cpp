@@ -35,7 +35,7 @@ TEST(GroupDecoder, ScopesFieldLookupToCurrentRepeat)
 
     FieldDecoder field{logout, tokens, tags, static_cast<int32_t>(tokens.size())};
     GroupDecoder group{field};
-    group.wrap(627);
+    group.wrap<627>();
     ASSERT_EQ(2u, group.count());
 
     ASSERT_TRUE(group.hasNext());
@@ -91,7 +91,7 @@ TEST(GroupDecoder, RewrapWithoutClearDoesNotLeakScopeDepth)
     // wrap() pops the leftover scope from the previous iteration.
     for (int i = 0; i < 16; ++i)
     {
-        group.wrap(627);
+        group.wrap<627>();
         ASSERT_EQ(2u, group.count());
 
         ASSERT_TRUE(group.hasNext());

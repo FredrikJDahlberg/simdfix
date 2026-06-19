@@ -38,6 +38,28 @@ static constexpr std::uint8_t LOGIN[] =
 // Actual message length, excluding the C-string null terminator.
 static constexpr size_t LOGIN_LENGTH = sizeof(LOGIN) - 1;
 
+// Logon message with a 12-byte XmlData payload containing an embedded SOH.
+static constexpr std::uint8_t LOGIN_DATA[] =
+    "8=FIXT.1.1" SOH
+    "9=142" SOH
+    "35=A" SOH
+    "49=Buyer" SOH
+    "56=SellSide_1" SOH
+    "34=1" SOH
+    "52=20190605-11:51:27.84800" SOH
+    "1128=9" SOH
+    "98=0" SOH
+    "108=30" SOH
+    "141=Y" SOH
+    "553=Username" SOH
+    "554=Password" SOH
+    "1137=9" SOH
+    "212=12" SOH
+    "213=<root" SOH "/>test" SOH
+    "10=200" SOH;
+
+static constexpr size_t LOGIN_DATA_LENGTH = sizeof(LOGIN_DATA) - 1;
+
 // Logon message with a 3-entry HopsRepeatingGroup (tags 627/628/629).
 static constexpr std::uint8_t LOGIN_GROUP[] =
     "8=FIXT.1.1" SOH
@@ -173,6 +195,31 @@ struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<L
     }
 };
 
+struct LogonDataGetterHandler : org::limitless::fix::messages::MessageHandler<LogonDataGetterHandler>
+{
+    using MessageHandler::handle;
+
+    uint64_t sink = 0;
+
+    org::limitless::fix::Result::Values handle(org::limitless::fix::messages::LogonDecoder& logon)
+    {
+        using org::limitless::fix::messages::Encryption;
+
+        sink += logon.sender().value_or(std::string_view{}).size();
+        sink += logon.target().value_or(std::string_view{}).size();
+        sink += logon.sequenceNumber().value_or(0);
+        sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
+        sink += logon.encryptMethod().value_or(Encryption::None);
+        sink += logon.heartbeatInterval().value_or(0);
+        const auto data = logon.xmlData().get();
+        if (data.has_value())
+        {
+            sink += data.value().size();
+        }
+        return org::limitless::fix::Result::Success;
+    }
+};
+
 // COLD: 1 GB buffer — data comes from DRAM for most of the run.
 static void benchColdCache()
 {
@@ -297,6 +344,50 @@ static void benchGroups()
     });
     std::printf("sink = %llu\n", static_cast<unsigned long long>(handler.sink));
     report("LOGON GRP", duration, hotMsgs, LOGIN_GROUP_LENGTH);
+}
+
+// LOGON_DATA: hot-cache decode + getters of Logon with XmlData (inline skip path).
+static void benchLogonData()
+{
+    struct DataFields
+    {
+        static constexpr int32_t dataTag(const uint16_t tag)
+        {
+            if (tag == 212) return 213;
+            return -1;
+        }
+    };
+    decoder::PayloadDecoder<DataFields> decoder{Protocol::FIXT_1_1};
+
+    constexpr size_t HOT_SIZE  = 256 * 1024;
+    constexpr size_t HOT_COUNT = 4096;
+    auto hotBuf = std::make_unique<uint8_t[]>(HOT_SIZE);
+
+    size_t i = 0;
+    for (; i + LOGIN_DATA_LENGTH <= HOT_SIZE; i += LOGIN_DATA_LENGTH)
+    {
+        std::memcpy(&hotBuf[i], LOGIN_DATA, LOGIN_DATA_LENGTH);
+    }
+    std::memset(&hotBuf[i], ' ', HOT_SIZE - i);
+
+    constexpr size_t msgsPerPass = HOT_SIZE / LOGIN_DATA_LENGTH;
+    constexpr size_t hotMsgs = msgsPerPass * HOT_COUNT;
+
+    LogonDataGetterHandler handler{};
+    const auto duration = timer([&]
+    {
+        for (size_t iter = 0; iter < HOT_COUNT; ++iter)
+        {
+            for (size_t j = 0; j < msgsPerPass; ++j)
+            {
+                const std::span<const uint8_t> bytes(&hotBuf[j * LOGIN_DATA_LENGTH], LOGIN_DATA_LENGTH);
+                const auto result = decoder.parse(bytes, handler);
+                (void) result;
+            }
+        }
+    });
+    std::printf("sink = %llu\n", static_cast<unsigned long long>(handler.sink));
+    report("LOGON DATA", duration, hotMsgs, LOGIN_DATA_LENGTH);
 }
 
 // NOS_HOT: hot-cache decode of NewOrderSingle (tokenization only, no getters).
@@ -479,6 +570,7 @@ static constexpr Benchmark BENCHMARKS[] = {
     {"logon-hot",     benchHotCache},
     {"logon-getters", benchGetters},
     {"logon-groups",  benchGroups},
+    {"logon-data",    benchLogonData},
     {"logon-encode",  benchEncode},
     {"nos-hot",       benchNewOrderSingleHot},
     {"nos-getters",   benchNewOrderSingleGetters},
@@ -498,6 +590,7 @@ static void printUsage(const char* program)
 int main(const int argc, char** argv)
 {
     std::printf("Logon message length         = %zu bytes\n", LOGIN_LENGTH);
+    std::printf("Logon+data message length    = %zu bytes\n", LOGIN_DATA_LENGTH);
     std::printf("NewOrderSingle message length = %zu bytes\n\n", NEW_ORDER_SINGLE_LENGTH);
 
     if (argc < 2)

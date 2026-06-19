@@ -27,7 +27,7 @@ struct NestedGroupDecoder : GroupDecoder
 
     NestedGroupDecoder& wrap()
     {
-        GroupDecoder::wrap(500);
+        GroupDecoder::wrap<500>();
         return *this;
     }
 
@@ -73,7 +73,7 @@ public:
 
     HopsDecoder& wrap()
     {
-        GroupDecoder::wrap(627);
+        GroupDecoder::wrap<627>();
         return *this;
     }
 
@@ -98,7 +98,7 @@ public:
         return m_decoder.getUint32<630, false, RecordType::Group>();
     }
 
-    NestedGroupDecoder& nestedGroup()
+    [[nodiscard]] NestedGroupDecoder& nestedGroup()
     {
         return m_nestedGroup.wrap();
     }
@@ -185,14 +185,14 @@ public:
         return m_decoder.getUint32<108, false, RecordType::Message>();
     }
 
-    HopsDecoder& hops()
+    [[nodiscard]] HopsDecoder& hops()
     {
         return m_hops.wrap();
     }
 
-    [[nodiscard]] DataResult xmlData() const
+    [[nodiscard]] DataDecoder& xmlData()
     {
-        return m_xmlData.get<212, 213, false, RecordType::Message>();
+        return m_xmlData.wrap<212, 213>();
     }
 
 };
@@ -269,7 +269,7 @@ public:
         return m_decoder.getString<58, false, RecordType::Message>();
     }
 
-    HopsDecoder& hops()
+    [[nodiscard]] HopsDecoder& hops()
     {
         return m_hops.wrap();
     }
@@ -348,7 +348,7 @@ public:
         return m_decoder.getString<112, false, RecordType::Message>();
     }
 
-    HopsDecoder& hops()
+    [[nodiscard]] HopsDecoder& hops()
     {
         return m_hops.wrap();
     }
@@ -427,7 +427,7 @@ public:
         return m_decoder.getString<112, false, RecordType::Message>();
     }
 
-    HopsDecoder& hops()
+    [[nodiscard]] HopsDecoder& hops()
     {
         return m_hops.wrap();
     }
@@ -556,7 +556,7 @@ public:
         return m_decoder.getString<58, false, RecordType::Message>();
     }
 
-    HopsDecoder& hops()
+    [[nodiscard]] HopsDecoder& hops()
     {
         return m_hops.wrap();
     }

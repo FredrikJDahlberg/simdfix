@@ -23,8 +23,8 @@ private:
     static constexpr int64_t MaxSafeDiv = INT64_MAX / Scale;
 
     static constexpr int64_t Max64BitProductLimit = 3037000499LL;
-    static constexpr int64_t SignedReciprocal64 = 184467440737LL; // floor(2^64 / 10^8) + 1
-    static constexpr __int128_t SignedReciprocal128 = (static_cast<__int128_t>(0x2A5A0) << 48) | 0x58FC29FEE7FFULL;
+    static constexpr int64_t SignedReciprocal64 = 184467440738LL;
+    static constexpr __int128_t SignedReciprocal128 = (static_cast<__int128_t>(0x2AF31D) << 48) | 0xC4611873BF40ULL;
     static constexpr uint64_t Reciprocal = 184467440737ULL;
 
     /**

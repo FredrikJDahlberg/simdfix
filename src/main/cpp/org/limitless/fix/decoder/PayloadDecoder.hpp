@@ -16,6 +16,11 @@
 
 namespace org::limitless::fix::decoder {
 
+struct NoDataFields
+{
+    static constexpr int32_t dataTag(const uint16_t) { return -1; }
+};
+
 /**
  * SIMD tokenizer for raw FIX message bytes. Scans the buffer 16 bytes at a
  * time with NEON to locate tag/value boundaries ('=' and SOH), filling a
@@ -23,7 +28,11 @@ namespace org::limitless::fix::decoder {
  * parallel tag array. Also validates BeginString, BodyLength, and the
  * trailing CheckSum. Handles messages that are fragmented across chunk
  * boundaries, including tags split across a 16-byte block boundary.
+ *
+ * @tparam DataFields compile-time schema providing dataTag(uint16_t) for
+ *         binary-safe data field skipping; defaults to NoDataFields (no skip)
  */
+template <typename DataFields = NoDataFields>
 class PayloadDecoder
 {
     static constexpr size_t MaxSize = 64;
@@ -45,6 +54,7 @@ class PayloadDecoder
     uint32_t m_tag{};
     int32_t m_position{};
     size_t m_count{};
+    uint32_t m_skipEnd{};
 
     uint8_t m_protocol[16];
     uint32_t m_protocolLength;
@@ -125,6 +135,7 @@ public:
         }
         m_count = 0;
         m_tag = 0;
+        m_skipEnd = 0;
 
         const auto data = buffer.data();
         const auto length = static_cast<length_t>(buffer.size());
@@ -182,8 +193,29 @@ public:
             }
             std::printf("\n");
 #endif
-            complete = processBlock(offset, tagDigits, digits, bits);
+            complete = processBlock(offset, tagDigits, digits, bits, data);
             bits = 0;
+            if (m_skipEnd > 0)
+            {
+                const position_t blockEnd = offset + Uint8x16::Size;
+                if (m_skipEnd > blockEnd)
+                {
+                    const position_t sumEnd = std::min(m_skipEnd, static_cast<position_t>(length));
+                    for (position_t i = blockEnd; i < sumEnd; ++i)
+                    {
+                        blockSum += data[i];
+                    }
+                }
+                else
+                {
+                    for (position_t i = m_skipEnd; i < blockEnd; ++i)
+                    {
+                        blockSum -= data[i];
+                    }
+                }
+                offset = m_skipEnd - Uint8x16::Size;
+                m_skipEnd = 0;
+            }
         }
         if (complete)
         {
@@ -275,7 +307,8 @@ private:
     bool processBlock(const position_t offset,
                       const uint64_t tagDigitFlags,
                       const data_t* digits,
-                      position_t nonTagBitPos)
+                      position_t nonTagBitPos,
+                      const data_t* data)
     {
         const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
         const auto trailingCount = std::countl_one(trailingTagFlags);
@@ -283,6 +316,10 @@ private:
         if (m_tag != 0 && digits[0] == 0)
         {  // split tag ending in first position of next block
             token->m_length = static_cast<int16_t>(m_position + offset - 1 - token->m_position);
+            if (emitDataSkip(data, token))
+            {
+                return false;
+            }
             ++m_count;
             ++token;
             token->m_tag = m_tag;
@@ -303,6 +340,12 @@ private:
             const position_t digitBits = std::countr_one(remainingDigitFlags);
             const position_t tagPos = nonTagBitPos >> 2;
             token->m_length += offset + tagPos - token->m_position - 1;
+
+            if (emitDataSkip(data, token))
+            {
+                return false;
+            }
+
             token = &m_tokens[m_count++];
 
             const position_t count = digitBits >> 2;
@@ -328,6 +371,41 @@ private:
             m_position = -count;
         }
         return m_tokens[m_count - 1].m_tag == 10;
+    }
+
+    /**
+     * If the just-completed token is a length tag for a data field, parses its
+     * value, emits a synthetic token for the data field, and sets m_skipEnd so
+     * parse() skips past the data payload.
+     * @param data raw message bytes
+     * @param token the just-completed length tag token
+     * @return true if a data skip was emitted
+     */
+    bool emitDataSkip(const data_t* data, const Token* token)
+    {
+        const auto dataTagNum = DataFields::dataTag(token->m_tag);
+        if (dataTagNum < 0)
+        {
+            return false;
+        }
+        const auto lengthValue = static_cast<uint32_t>(
+            utils::asciiToUint64(data + token->m_position, token->m_length, token->m_length <= 8));
+
+        // Scan past the SOH after the length value, then past the data tag's "NNN=" prefix
+        auto pos = static_cast<position_t>(token->m_position + token->m_length + 1);
+        while (data[pos] != TagEnd) ++pos;
+        ++pos;
+
+        auto* dataToken = &m_tokens[m_count++];
+        dataToken->m_tag = static_cast<uint16_t>(dataTagNum);
+        m_tags[dataToken - m_tokens] = dataToken->m_tag;
+        dataToken->m_position = pos;
+        dataToken->m_length = static_cast<int16_t>(lengthValue);
+
+        m_skipEnd = pos + lengthValue + 1;
+        m_tag = 0;
+        m_position = 0;
+        return true;
     }
 
     /**
@@ -458,6 +536,9 @@ private:
         }
     }
 };
+
+PayloadDecoder(Protocol::Values) -> PayloadDecoder<NoDataFields>;
+
 }
 
 #endif //SIMD_FIX_DECODER_H
