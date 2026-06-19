@@ -65,8 +65,7 @@ TEST(FixedDecimal, Division)
 
     const FixedDecimal c(10, 0);
     const FixedDecimal d(3, 0);
-    const auto result = c / d; // 3.333333... rounded to the smallest representable exponent
-    // ASSERT_EQ(FixedDecimal::ExponentMin, result.exponent());
+    const auto result = c / d;
     ASSERT_EQ(333333333, result.mantissa()); // 3.33333333
 }
 
@@ -93,32 +92,15 @@ TEST(FixedDecimal, CompoundAssignment)
     ASSERT_EQ(FixedDecimal(500, -2), value);
 }
 
-TEST(FixedDecimal, DISABLED_RangeLimits)
+TEST(FixedDecimal, RangeLimits)
 {
-/*
-    ASSERT_EQ(FixedDecimal::MantissaMax, FixedDecimal(FixedDecimal::MantissaMax, 0).mantissa());
-    ASSERT_EQ(FixedDecimal::MantissaMin, FixedDecimal(FixedDecimal::MantissaMin, 0).mantissa());
-    ASSERT_EQ(FixedDecimal::ExponentMax, FixedDecimal(1, FixedDecimal::ExponentMax).exponent());
-    ASSERT_EQ(FixedDecimal::ExponentMin, FixedDecimal(1, FixedDecimal::ExponentMin).exponent());
-*/
-}
-TEST(FixedDecimal, DISABLED_OverflowSaturates)
-{
-/*
-    const auto result = FixedDecimal(FixedDecimal::MantissaMax, FixedDecimal::ExponentMax) +
-                         FixedDecimal(FixedDecimal::MantissaMax, FixedDecimal::ExponentMax);
-    ASSERT_EQ(FixedDecimal::ExponentMax, result.exponent());
-    ASSERT_EQ(FixedDecimal::MantissaMax, result.mantissa());
-*/
+    ASSERT_EQ(FixedDecimal::MantissaMax, FixedDecimal(FixedDecimal::MantissaMax).mantissa());
+    ASSERT_EQ(FixedDecimal::MantissaMin, FixedDecimal(FixedDecimal::MantissaMin).mantissa());
 }
 
-TEST(FixedDecimal, DISABLED_OutOfRangeExponentIsNormalized)
+TEST(FixedDecimal, ExponentNormalization)
 {
-/*
-    // exponent 10 is out of range; mantissa is scaled up to compensate.
     const FixedDecimal value(1, 10);
-    ASSERT_LE(value.exponent(), FixedDecimal::ExponentMax);
     ASSERT_EQ(FixedDecimal(10'000'000'000LL, 0), value);
-    */
 }
 }
