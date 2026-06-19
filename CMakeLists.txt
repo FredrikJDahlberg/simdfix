@@ -21,7 +21,7 @@ set(GENERATED_HEADERS
         ${GENERATED_DIR}/FixTypes.hpp ${GENERATED_DIR}/FixMessageDecoders.hpp
         ${GENERATED_DIR}/FixMessageEncoders.hpp ${GENERATED_DIR}/FixMessageHandler.hpp)
 set(FIX_HEADERS
-        ${MAIN_PATH}/utils/Utils.hpp ${MAIN_PATH}/utils/BitSet64.hpp ${MAIN_PATH}/utils/FixedDecimal.hpp ${MAIN_PATH}/utils/NullableInt.hpp
+        ${MAIN_PATH}/utils/Utils.hpp ${MAIN_PATH}/utils/FixedDecimal.hpp ${MAIN_PATH}/utils/NullableInt.hpp
         ${MAIN_PATH}/decoder/PayloadDecoder.hpp ${MAIN_PATH}/decoder/MessageDecoder.hpp
         ${MAIN_PATH}/CodecTypes.hpp ${MAIN_PATH}/decoder/FieldDecoder.hpp
         ${MAIN_PATH}/decoder/GroupDecoder.hpp ${MAIN_PATH}/simd/Uint8x16.hpp
@@ -112,7 +112,6 @@ add_fix_test(MessageEncoderTest      "${TEST_PATH}/encoder/MessageEncoderTest.cp
 add_fix_test(GroupDecoderTest "${TEST_PATH}/decoder/GroupDecoderTest.cpp")
 add_fix_test(FieldDecoderTest "${TEST_PATH}/decoder/FieldDecoderTest.cpp")
 add_fix_test(UtilsTest       "${TEST_PATH}/utils/UtilsTest.cpp")
-add_fix_test(BitSetTest      "${TEST_PATH}/utils/BitSetTest.cpp")
 add_fix_test(FixedDecimalTest "${TEST_PATH}/utils/FixedDecimalTest.cpp")
 add_fix_test(NullableIntTest  "${TEST_PATH}/utils/NullableIntTest.cpp")
 add_fix_test(Uint8x16Test       "${TEST_PATH}/simd/Uint8x16Test.cpp")
@@ -122,7 +121,7 @@ set(FIX_TEST_TARGETS
         PayloadDecoderTest
         MessageDecoderTest MessageEncoderTest
         GroupDecoderTest FieldDecoderTest
-        UtilsTest BitSetTest FixedDecimalTest NullableIntTest Uint8x16Test LinearSearchTest)
+        UtilsTest FixedDecimalTest NullableIntTest Uint8x16Test LinearSearchTest)
 
 add_custom_target(AllTests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
@@ -161,7 +160,6 @@ if(XCRUN)
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/GroupDecoderTest.profraw"     $<TARGET_FILE:GroupDecoderTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/FieldDecoderTest.profraw"     $<TARGET_FILE:FieldDecoderTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/UtilsTest.profraw"            $<TARGET_FILE:UtilsTest>
-        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/BitSetTest.profraw"           $<TARGET_FILE:BitSetTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/FixedDecimalTest.profraw"     $<TARGET_FILE:FixedDecimalTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/Uint8x16Test.profraw"         $<TARGET_FILE:Uint8x16Test>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/LinearSearchTest.profraw"    $<TARGET_FILE:LinearSearchTest>

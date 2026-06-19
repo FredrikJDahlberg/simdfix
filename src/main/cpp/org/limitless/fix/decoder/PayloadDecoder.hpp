@@ -12,7 +12,6 @@
 
 #include "org/limitless/fix/CodecTypes.hpp"
 #include "org/limitless/fix/simd/Uint8x16.hpp"
-#include "org/limitless/fix/utils/BitSet64.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
 namespace org::limitless::fix::decoder {
@@ -378,7 +377,7 @@ private:
 
     /**
      * Tokenizes the final, less-than-16-byte tail of the message. Loads the
-     * remaining bytes into a single uint64_t and uses BitSet64 masks of
+     * remaining bytes into a single uint64_t and uses bitmasks of
      * TagEnd ('=') and FieldEnd (SOH) byte positions to walk the remaining
      * tag=value pairs, handling a tag or value split across the previous
      * block boundary and finally emitting the CheckSum token (tag 10).
@@ -405,11 +404,11 @@ private:
                 bytes |= static_cast<uint64_t>(data[i]) << (i * 8);
             }
         }
-        auto tagEnds = BitSet64{utils::findByte(TagEnd, bytes)};
-        auto fieldEnds = BitSet64{utils::findByte(FieldEnd, bytes)};
-        uint32_t tagEndBit = tagEnds.zerosRight();
+        uint64_t tagEnds = utils::findByte(TagEnd, bytes);
+        uint64_t fieldEnds = utils::findByte(FieldEnd, bytes);
+        uint32_t tagEndBit = std::countr_zero(tagEnds);
         uint32_t tagEndPos = tagEndBit / 8;
-        uint32_t fieldEndBit = fieldEnds.zerosRight();
+        uint32_t fieldEndBit = std::countr_zero(fieldEnds);
         uint32_t fieldEndPos = fieldEndBit / 8;
         uint32_t position = 0;
         if (m_tag != 0)
@@ -427,8 +426,8 @@ private:
           // the preceding block; fieldEndPos tail bytes complete the value.
             last->m_length = static_cast<int16_t>(offset - last->m_position + fieldEndPos);
             position = fieldEndPos + 1;
-            fieldEnds.clear(fieldEndBit);
-            fieldEndBit = fieldEnds.zerosRight();
+            fieldEnds &= ~(1ULL << fieldEndBit);
+            fieldEndBit = std::countr_zero(fieldEnds);
             fieldEndPos = fieldEndBit / 8;
             last = &m_tokens[m_count++];
         }
@@ -440,11 +439,12 @@ private:
             last->m_length = fieldEndPos - position;
             position += last->m_length + 1;
             last = &m_tokens[m_count++];
-            tagEndBit = tagEnds.clear(tagEndBit).zerosRight();
+            tagEnds &= ~(1ULL << tagEndBit);
+            tagEndBit = std::countr_zero(tagEnds);
             tagEndPos = tagEndBit / 8;
-            fieldEndBit = fieldEnds.zerosRight();
+            fieldEndBit = std::countr_zero(fieldEnds);
             fieldEndPos = fieldEndBit / 8;
-            fieldEnds.clear(fieldEndBit);
+            fieldEnds &= ~(1ULL << fieldEndBit);
         }
         if (position < remaining)
         { // checked by decoder
