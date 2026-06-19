@@ -6,6 +6,7 @@
 #define SIMD_FIX_FIELD_ENCODER_HPP
 
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <span>
 #include <string_view>
@@ -178,15 +179,25 @@ public:
 
     /**
      * Writes "TAG=VALUE" followed by SOH, where VALUE is the FIX string code
-     * for the given enum value, looked up in WrapperType::Codes.
+     * for the given enum value, looked up in WrapperType::Codes. Null values
+     * are skipped for optional fields; required fields assert non-null.
      * @tparam Tag tag number to write
+     * @tparam Required whether a null value is a programming error
      * @tparam WrapperType enum wrapper type whose Codes table is used for the mapping
      * @param value enum value to write
      */
-    template <FixedString Tag, typename WrapperType>
+    template <FixedString Tag, bool Required, typename WrapperType>
         requires EncodableEnumWrapper<WrapperType>
-    void encode(const WrapperType::Values value)
+    void encode(const typename WrapperType::Values value)
     {
+        if (value == static_cast<typename WrapperType::Values>(0))
+        {
+            if constexpr (Required)
+            {
+                assert(false && "Required enum field has null value");
+            }
+            return;
+        }
         encode<Tag, std::string_view>(WrapperType::Codes[static_cast<size_t>(value)]);
     }
 

@@ -32,6 +32,26 @@ TEST(MessageEncoder, Logon)
               "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=074" SOH, encoded);
 }
 
+TEST(MessageEncoder, LogonNullEncryption)
+{
+    std::array<uint8_t, 256> buffer{};
+    FixPayloadEncoder<"FIXT.1.1", "TARGET", "SENDER"> encoder{};
+    encoder.wrap(0, buffer);
+
+    LogonEncoder logon{};
+    encoder.wrapMessage(logon)
+            .sequenceNumber(1)
+            .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+            .encryptMethod(Encryption::Null)
+            .heartbeatInterval(30);
+
+    const auto length = encoder.encode(logon);
+    const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
+
+    EXPECT_EQ("8=FIXT.1.1" SOH "9=0062" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+              "34=1" SOH "52=20260613-19:26:13.959" SOH "108=30" SOH "10=102" SOH, encoded);
+}
+
 TEST(MessageEncoder, HeartbeatWithHops)
 {
     std::array<uint8_t, 256> buffer{};

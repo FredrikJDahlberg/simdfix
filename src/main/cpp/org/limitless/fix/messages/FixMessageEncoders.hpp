@@ -152,7 +152,7 @@ public:
 
     LogonEncoder& encryptMethod(const Encryption::Values value)
     {
-        m_encoder.encode<"98", Encryption>(value);
+        m_encoder.encode<"98", false, Encryption>(value);
         return *this;
     }
 
@@ -386,7 +386,7 @@ public:
 
     NewOrderSingleEncoder& handlInst(const HandlInst::Values value)
     {
-        m_encoder.encode<"21", HandlInst>(value);
+        m_encoder.encode<"21", false, HandlInst>(value);
         return *this;
     }
 
@@ -398,7 +398,7 @@ public:
 
     NewOrderSingleEncoder& side(const Side::Values value)
     {
-        m_encoder.encode<"54", Side>(value);
+        m_encoder.encode<"54", false, Side>(value);
         return *this;
     }
 
@@ -416,7 +416,7 @@ public:
 
     NewOrderSingleEncoder& ordType(const OrdType::Values value)
     {
-        m_encoder.encode<"40", OrdType>(value);
+        m_encoder.encode<"40", false, OrdType>(value);
         return *this;
     }
 
@@ -428,7 +428,7 @@ public:
 
     NewOrderSingleEncoder& timeInForce(const TimeInForce::Values value)
     {
-        m_encoder.encode<"59", TimeInForce>(value);
+        m_encoder.encode<"59", false, TimeInForce>(value);
         return *this;
     }
 
