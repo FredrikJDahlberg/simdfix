@@ -12,6 +12,7 @@
 #include <string_view>
 #include <expected>
 #include <chrono>
+#include <type_traits>
 
 #include "org/limitless/fix/utils/FixedDecimal.hpp"
 
@@ -46,27 +47,52 @@ struct FixedString
     constexpr operator const char*() const { return Value; }
 };
 
-template <typename ValueType>
-concept EncodableInteger = std::same_as<ValueType, uint32_t> ||
-                           std::same_as<ValueType, int32_t>;
+template <typename T>
+concept Nullable = requires(const T t)
+{
+    { t.hasValue() } -> std::same_as<bool>;
+    { t.value() };
+};
 
 template <typename ValueType>
-concept EncodableLongInteger = std::same_as<ValueType, uint64_t> ||
-                                std::same_as<ValueType, int64_t>;
+concept EncodableInteger = !Nullable<ValueType> &&
+    (std::same_as<ValueType, uint32_t> || std::same_as<ValueType, int32_t>);
+
+template <typename ValueType>
+concept EncodableLongInteger = !Nullable<ValueType> &&
+    (std::same_as<ValueType, uint64_t> || std::same_as<ValueType, int64_t>);
 
 template <typename T>
-concept EncodableDuration = requires
+concept EncodableDuration = !Nullable<T> && requires
 {
     typename T::rep;
     typename T::period;
 } && std::same_as<T, std::chrono::duration<typename T::rep, typename T::period>>;
 
 template <typename T>
-concept EncodableEnumWrapper = requires
+concept EncodableEnumWrapper = !Nullable<T> && requires
 {
     typename T::Values;
     T::Codes;
 } && std::is_enum_v<typename T::Values>;
+
+template <typename T>
+concept EncodableNullableInteger = Nullable<T> &&
+    (std::same_as<std::remove_cvref_t<decltype(std::declval<const T>().value())>, uint32_t> ||
+     std::same_as<std::remove_cvref_t<decltype(std::declval<const T>().value())>, int32_t>);
+
+template <typename T>
+concept EncodableNullableLongInteger = Nullable<T> &&
+    (std::same_as<std::remove_cvref_t<decltype(std::declval<const T>().value())>, uint64_t> ||
+     std::same_as<std::remove_cvref_t<decltype(std::declval<const T>().value())>, int64_t>);
+
+template <typename T>
+concept EncodableNullableString = Nullable<T> &&
+    std::convertible_to<decltype(std::declval<const T>().value()), std::string_view>;
+
+template <typename T>
+concept EncodableNullableFixedDecimal = Nullable<T> &&
+    std::same_as<std::remove_cvref_t<decltype(std::declval<const T>().value())>, utils::FixedDecimal>;
 
 // Matches generated message encoders (e.g. LogonEncoder, HeartbeatEncoder)
 // from FixMessageEncoders.hpp: a MessageEncoder subclass identified by a

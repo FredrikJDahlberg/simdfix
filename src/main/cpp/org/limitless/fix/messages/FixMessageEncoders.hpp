@@ -37,19 +37,19 @@ struct NestedGroupEncoder : GroupEncoder
 
     NestedGroupEncoder& name(const std::string_view value)
     {
-        m_encoder.encode<"501", false, std::string_view>(value);
+        m_encoder.encode<"501", std::string_view>(value);
         return *this;
     }
 
     NestedGroupEncoder& nestedOne(const std::uint32_t value)
     {
-        m_encoder.encode<"601", false, std::uint32_t>(value);
+        m_encoder.encode<"601", std::uint32_t>(value);
         return *this;
     }
 
     NestedGroupEncoder& nestedTwo(const std::uint32_t value)
     {
-        m_encoder.encode<"602", false, std::uint32_t>(value);
+        m_encoder.encode<"602", std::uint32_t>(value);
         return *this;
     }
 
@@ -86,19 +86,19 @@ public:
 
     HopsEncoder& hopCompID(const std::string_view value)
     {
-        m_encoder.encode<"628", false, std::string_view>(value);
+        m_encoder.encode<"628", std::string_view>(value);
         return *this;
     }
 
     HopsEncoder& hopSendingTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"629", false, std::chrono::milliseconds>(value);
+        m_encoder.encode<"629", std::chrono::milliseconds>(value);
         return *this;
     }
 
     HopsEncoder& hopRefID(const std::uint32_t value)
     {
-        m_encoder.encode<"630", false, std::uint32_t>(value);
+        m_encoder.encode<"630", std::uint32_t>(value);
         return *this;
     }
 
@@ -140,25 +140,25 @@ public:
 
     LogonEncoder& sequenceNumber(const std::uint32_t value)
     {
-        m_encoder.encode<"34", false, std::uint32_t>(value);
+        m_encoder.encode<"34", std::uint32_t>(value);
         return *this;
     }
 
     LogonEncoder& sendingTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"52", false, std::chrono::milliseconds>(value);
+        m_encoder.encode<"52", std::chrono::milliseconds>(value);
         return *this;
     }
 
     LogonEncoder& encryptMethod(const Encryption::Values value)
     {
-        m_encoder.encode<"98", false, Encryption>(value);
+        m_encoder.encode<"98", Encryption>(value);
         return *this;
     }
 
     LogonEncoder& heartbeatInterval(const std::uint32_t value)
     {
-        m_encoder.encode<"108", false, std::uint32_t>(value);
+        m_encoder.encode<"108", std::uint32_t>(value);
         return *this;
     }
 
@@ -200,19 +200,19 @@ public:
 
     LogoutEncoder& sequenceNumber(const std::uint32_t value)
     {
-        m_encoder.encode<"34", false, std::uint32_t>(value);
+        m_encoder.encode<"34", std::uint32_t>(value);
         return *this;
     }
 
     LogoutEncoder& sendingTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"52", false, std::chrono::milliseconds>(value);
+        m_encoder.encode<"52", std::chrono::milliseconds>(value);
         return *this;
     }
 
     LogoutEncoder& text(const std::string_view value)
     {
-        m_encoder.encode<"58", false, std::string_view>(value);
+        m_encoder.encode<"58", std::string_view>(value);
         return *this;
     }
 
@@ -254,19 +254,19 @@ public:
 
     HeartbeatEncoder& sequenceNumber(const std::uint32_t value)
     {
-        m_encoder.encode<"34", false, std::uint32_t>(value);
+        m_encoder.encode<"34", std::uint32_t>(value);
         return *this;
     }
 
     HeartbeatEncoder& sendingTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"52", false, std::chrono::milliseconds>(value);
+        m_encoder.encode<"52", std::chrono::milliseconds>(value);
         return *this;
     }
 
     HeartbeatEncoder& testReqID(const std::string_view value)
     {
-        m_encoder.encode<"112", false, std::string_view>(value);
+        m_encoder.encode<"112", std::string_view>(value);
         return *this;
     }
 
@@ -308,19 +308,19 @@ public:
 
     TestRequestEncoder& sequenceNumber(const std::uint32_t value)
     {
-        m_encoder.encode<"34", false, std::uint32_t>(value);
+        m_encoder.encode<"34", std::uint32_t>(value);
         return *this;
     }
 
     TestRequestEncoder& sendingTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"52", false, std::chrono::milliseconds>(value);
+        m_encoder.encode<"52", std::chrono::milliseconds>(value);
         return *this;
     }
 
     TestRequestEncoder& testReqID(const std::string_view value)
     {
-        m_encoder.encode<"112", false, std::string_view>(value);
+        m_encoder.encode<"112", std::string_view>(value);
         return *this;
     }
 
@@ -362,79 +362,79 @@ public:
 
     NewOrderSingleEncoder& sequenceNumber(const std::uint32_t value)
     {
-        m_encoder.encode<"34", false, std::uint32_t>(value);
+        m_encoder.encode<"34", std::uint32_t>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& sendingTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"52", false, std::chrono::milliseconds>(value);
+        m_encoder.encode<"52", std::chrono::milliseconds>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& account(const std::string_view value)
     {
-        m_encoder.encode<"1", false, std::string_view>(value);
+        m_encoder.encode<"1", std::string_view>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& clOrdID(const std::string_view value)
     {
-        m_encoder.encode<"11", false, std::string_view>(value);
+        m_encoder.encode<"11", std::string_view>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& handlInst(const HandlInst::Values value)
     {
-        m_encoder.encode<"21", false, HandlInst>(value);
+        m_encoder.encode<"21", HandlInst>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& symbol(const std::string_view value)
     {
-        m_encoder.encode<"55", false, std::string_view>(value);
+        m_encoder.encode<"55", std::string_view>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& side(const Side::Values value)
     {
-        m_encoder.encode<"54", false, Side>(value);
+        m_encoder.encode<"54", Side>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& transactTime(const std::chrono::milliseconds value)
     {
-        m_encoder.encode<"60", false, std::chrono::milliseconds>(value);
+        m_encoder.encode<"60", std::chrono::milliseconds>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& orderQty(const std::uint32_t value)
     {
-        m_encoder.encode<"38", false, std::uint32_t>(value);
+        m_encoder.encode<"38", std::uint32_t>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& ordType(const OrdType::Values value)
     {
-        m_encoder.encode<"40", false, OrdType>(value);
+        m_encoder.encode<"40", OrdType>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& price(const std::uint32_t value)
     {
-        m_encoder.encode<"44", false, std::uint32_t>(value);
+        m_encoder.encode<"44", std::uint32_t>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& timeInForce(const TimeInForce::Values value)
     {
-        m_encoder.encode<"59", false, TimeInForce>(value);
+        m_encoder.encode<"59", TimeInForce>(value);
         return *this;
     }
 
     NewOrderSingleEncoder& text(const std::string_view value)
     {
-        m_encoder.encode<"58", false, std::string_view>(value);
+        m_encoder.encode<"58", std::string_view>(value);
         return *this;
     }
 

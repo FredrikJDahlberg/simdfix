@@ -452,15 +452,14 @@ static void generateFieldEncoders(std::ostream& out, const Record& record)
             field.m_tag != 35 && field.m_tag != 49 && field.m_tag != 56 &&
             field.m_category != Category::Counter && field.m_category != Category::Struct)
         {
-            const auto required = field.m_presence == Presence::Required;
             const auto category = field.m_category == Category::Enum ?
                                       std::format("{}::Values", field.m_type) :
                                       std::string{Category::type(field.m_category)};
             out << std::format("    {}Encoder& {}(const {} value)\n",
                                record.m_name, uncap(field.m_name), category);
             out << "    {\n";
-            out << std::format("        m_encoder.encode<\"{}\", {}, {}>(value);\n",
-                               field.m_tag, required,
+            out << std::format("        m_encoder.encode<\"{}\", {}>(value);\n",
+                               field.m_tag,
                                field.m_category == Category::Enum ? field.m_type : Category::type(field.m_category));
             out << "        return *this;\n";
             out << "    }\n\n";

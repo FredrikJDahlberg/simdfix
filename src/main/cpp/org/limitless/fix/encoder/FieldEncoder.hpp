@@ -100,18 +100,13 @@ public:
     /**
      * Writes "TAG=VALUE" followed by SOH for 32-bit (or smaller) signed/unsigned integers.
      * @tparam Tag tag number to write
-     * @tparam Required whether a null value must be encoded specially
      * @tparam ValueType integer type of value
      * @param value value to write
      */
-    template <FixedString Tag, bool Required, typename ValueType>
+    template <FixedString Tag, typename ValueType>
         requires EncodableInteger<ValueType>
     void encode(const ValueType value)
     {
-        if constexpr (Required)
-        {
-            // FIXME handle null value
-        }
         encode<Tag>();
         if constexpr (std::is_signed_v<ValueType>)
         {
@@ -128,18 +123,13 @@ public:
     /**
      * Writes "TAG=VALUE" followed by SOH for 64-bit signed/unsigned integers.
      * @tparam Tag tag number to write
-     * @tparam Required whether a null value must be encoded specially
      * @tparam ValueType integer type of value
      * @param value value to write
      */
-    template <FixedString Tag, bool Required, typename ValueType>
+    template <FixedString Tag, typename ValueType>
         requires EncodableLongInteger<ValueType>
     void encode(const ValueType value)
     {
-        if constexpr (Required)
-        {
-            // FIXME handle null value
-        }
         encode<Tag>();
         if constexpr (std::is_signed_v<ValueType>)
         {
@@ -157,16 +147,11 @@ public:
      * Writes "TAG=VALUE" followed by SOH, where VALUE is the decimal ASCII
      * representation of a FixedDecimal (see utils::fixedDecimalToAscii).
      * @tparam Tag tag number to write
-     * @tparam Required whether a null value must be encoded specially
      * @param value value to write
      */
-    template <FixedString Tag, bool Required>
+    template <FixedString Tag>
     void encode(const utils::FixedDecimal value)
     {
-        if constexpr (Required)
-        {
-            // FIXME handle null value
-        }
         encode<Tag>();
         m_encodedLength += utils::fixedDecimalToAscii(value.mantissa(), -8, m_data, m_offset + m_encodedLength);
         m_data[m_offset + m_encodedLength] = FieldEnd;
@@ -177,18 +162,13 @@ public:
      * Writes "TAG=VALUE" followed by SOH, where VALUE is a FIX UTCTimestamp
      * derived from the given duration (see encodeTimestamp()).
      * @tparam Tag tag number to write
-     * @tparam Required whether a null value must be encoded specially
      * @tparam DurationType std::chrono::duration type of duration
      * @param duration time since the Unix epoch
      */
-    template <FixedString Tag, bool Required, typename DurationType>
+    template <FixedString Tag, typename DurationType>
         requires EncodableDuration<DurationType>
     void encode(const DurationType duration)
     {
-        if constexpr (Required)
-        {
-            // FIXME handle null value
-        }
         encode<Tag>();
         const auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
         encodeTimestamp(millis);
@@ -200,37 +180,99 @@ public:
      * Writes "TAG=VALUE" followed by SOH, where VALUE is the FIX string code
      * for the given enum value, looked up in WrapperType::Codes.
      * @tparam Tag tag number to write
-     * @tparam Required whether a null value must be encoded specially
      * @tparam WrapperType enum wrapper type whose Codes table is used for the mapping
      * @param value enum value to write
      */
-    template <FixedString Tag, bool Required, typename WrapperType>
+    template <FixedString Tag, typename WrapperType>
         requires EncodableEnumWrapper<WrapperType>
     void encode(const WrapperType::Values value)
     {
-        encode<Tag, Required, std::string_view>(WrapperType::Codes[static_cast<size_t>(value)]);
+        encode<Tag, std::string_view>(WrapperType::Codes[static_cast<size_t>(value)]);
     }
 
     /**
      * Writes "TAG=VALUE" followed by SOH for string-valued fields.
      * @tparam Tag tag number to write
-     * @tparam Required whether a null value must be encoded specially
      * @tparam ValueType unused; present for symmetry with the other encode() overloads
      * @param value value to write
      */
-    template <FixedString Tag, bool Required, typename ValueType>
+    template <FixedString Tag, typename ValueType>
     void encode(const std::string_view value)
     {
-        if constexpr (Required)
-        {
-            // FIXME
-        }
         encode<Tag>();
         const auto size = value.size();
         std::memcpy(m_data.data() + m_offset + m_encodedLength, value.data(), size);
         m_encodedLength += size;
         m_data[m_offset + m_encodedLength] = FieldEnd;
         ++m_encodedLength;
+    }
+
+    /**
+     * Writes "TAG=VALUE" followed by SOH for a nullable 32-bit integer.
+     * Skips encoding entirely when the value is null.
+     * @tparam Tag tag number to write
+     * @tparam NullableType nullable integer type
+     * @param value nullable value to write
+     */
+    template <FixedString Tag, typename NullableType>
+        requires EncodableNullableInteger<NullableType>
+    void encode(const NullableType& value)
+    {
+        if (value.hasValue())
+        {
+            encode<Tag>(value.value());
+        }
+    }
+
+    /**
+     * Writes "TAG=VALUE" followed by SOH for a nullable 64-bit integer.
+     * Skips encoding entirely when the value is null.
+     * @tparam Tag tag number to write
+     * @tparam NullableType nullable long integer type
+     * @param value nullable value to write
+     */
+    template <FixedString Tag, typename NullableType>
+        requires EncodableNullableLongInteger<NullableType>
+    void encode(const NullableType& value)
+    {
+        if (value.hasValue())
+        {
+            encode<Tag>(value.value());
+        }
+    }
+
+    /**
+     * Writes "TAG=VALUE" followed by SOH for a nullable string.
+     * Skips encoding entirely when the value is null.
+     * @tparam Tag tag number to write
+     * @tparam NullableType nullable string type
+     * @param value nullable value to write
+     */
+    template <FixedString Tag, typename NullableType>
+        requires EncodableNullableString<NullableType>
+    void encode(const NullableType& value)
+    {
+        if (value.hasValue())
+        {
+            encode<Tag, std::string_view>(value.value());
+        }
+    }
+
+    /**
+     * Writes "TAG=VALUE" followed by SOH for a nullable FixedDecimal.
+     * Skips encoding entirely when the value is null.
+     * @tparam Tag tag number to write
+     * @tparam NullableType nullable FixedDecimal type
+     * @param value nullable value to write
+     */
+    template <FixedString Tag, typename NullableType>
+        requires EncodableNullableFixedDecimal<NullableType>
+    void encode(const NullableType& value)
+    {
+        if (value.hasValue())
+        {
+            encode<Tag>(value.value());
+        }
     }
 
     template <FixedString Tag, FixedString Value>
