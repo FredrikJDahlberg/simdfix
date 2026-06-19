@@ -3,6 +3,10 @@
 // Included by Uint8x16.hpp — do not include directly.
 //
 
+#if !defined(__x86_64__) && !defined(_M_X64)
+#error "Uint8x16_sse.inl requires x86-64 with SSE4.1"
+#endif
+
 #include <concepts>
 #include <cstring>
 #include <print>

@@ -3,6 +3,10 @@
 // Included by Uint8x16.hpp — do not include directly.
 //
 
+#if !defined(__aarch64__) && !defined(_M_ARM64)
+#error "Uint8x16_neon.inl requires ARM NEON (aarch64)"
+#endif
+
 #include <concepts>
 #include <print>
 
@@ -33,25 +37,19 @@ struct Uint8x16
         m_block = block.m_block;
     }
 
+    /// Wraps an existing NEON 128-bit register value.
     explicit Uint8x16(const value_type block) : m_block(block)
     {
     }
 
-    /**
-     * Broadcasts a single byte across all 16 lanes.
-     * @param filler byte
-     */
+    /// Broadcasts a single byte across all 16 lanes (vdupq_n_u8).
     explicit Uint8x16(const uint8_t filler)
     {
         m_block = vdupq_n_u8(filler);
     }
 
-    /**
-     * Broadcasts a 16-bit value across all 8 lanes. Constrained to exact
-     * uint16_t arguments so int/char literals keep selecting the byte-broadcast
-     * constructor.
-     * @param filler 16-bit value
-     */
+    /// Broadcasts a 16-bit value across all 8 lanes (vdupq_n_u16).
+    /// Constrained to exact uint16_t so int/char literals select the byte constructor.
     explicit Uint8x16(const std::same_as<uint16_t> auto filler)
     {
         m_block = vreinterpretq_u8_u16(vdupq_n_u16(filler));
