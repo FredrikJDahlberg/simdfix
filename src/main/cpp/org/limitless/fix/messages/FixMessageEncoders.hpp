@@ -2,6 +2,7 @@
 #ifndef SIMD_FIX_MESSAGE_ENCODERS_HPP
 #define SIMD_FIX_MESSAGE_ENCODERS_HPP
 
+#include "org/limitless/fix/encoder/DataEncoder.hpp"
 #include "org/limitless/fix/encoder/GroupEncoder.hpp"
 #include "org/limitless/fix/encoder/MessageEncoder.hpp"
 #include "org/limitless/fix/encoder/PayloadEncoder.hpp"
@@ -114,9 +115,12 @@ struct LogonEncoder : MessageEncoder
 private:
     HopsEncoder m_hops;
 
+    DataEncoder m_xmlData;
+
 public:
     LogonEncoder() : 
-        m_hops{m_encoder}
+        m_hops{m_encoder},
+        m_xmlData{m_encoder}
     {
     }
 
@@ -165,6 +169,12 @@ public:
     HopsEncoder& hops(const uint32_t count)
     {
         return m_hops.wrap(count);
+    }
+
+    LogonEncoder& xmlData(const std::span<const uint8_t> data)
+    {
+        m_xmlData.encode<"212", "213">(data);
+        return *this;
     }
 
 };

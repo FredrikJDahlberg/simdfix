@@ -4,6 +4,7 @@
 
 #include <expected>
 
+#include "org/limitless/fix/decoder/DataDecoder.hpp"
 #include "org/limitless/fix/decoder/GroupDecoder.hpp"
 #include "org/limitless/fix/decoder/MessageDecoder.hpp"
 #include "org/limitless/fix/messages/FixTypes.hpp"
@@ -109,9 +110,12 @@ struct LogonDecoder : MessageDecoder
 private:
     HopsDecoder m_hops;
 
+    DataDecoder m_xmlData;
+
 public:
     LogonDecoder() : 
-        m_hops{m_decoder}
+        m_hops{m_decoder},
+        m_xmlData{m_decoder}
     {
     }
 
@@ -184,6 +188,11 @@ public:
     HopsDecoder& hops()
     {
         return m_hops.wrap();
+    }
+
+    [[nodiscard]] DataResult xmlData() const
+    {
+        return m_xmlData.get<212, 213, false, RecordType::Message>();
     }
 
 };

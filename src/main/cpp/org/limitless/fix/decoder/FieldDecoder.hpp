@@ -221,6 +221,16 @@ public:
     }
 
     /**
+     * @param position byte offset into the message
+     * @param length number of bytes
+     * @return a span over length raw bytes starting at position
+     */
+    [[nodiscard]] Buffer bufferAt(const uint32_t position, const uint32_t length) const
+    {
+        return m_data.subspan(position, length);
+    }
+
+    /**
      * A [begin, end) range of token/tag indices for one repeating-group
      * entry.
      */

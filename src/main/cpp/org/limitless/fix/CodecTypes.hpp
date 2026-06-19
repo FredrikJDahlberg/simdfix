@@ -147,6 +147,7 @@ struct Category
         Int64,
         Uint64,
         Decimal,
+        Data,
         String,
         Timestamp,
         Counter,
@@ -166,6 +167,7 @@ struct Category
         "Int64",
         "Uint64",
         "FixedDecimal",
+        "Data",
         "String",
         "Timestamp",
         "Counter",
@@ -185,6 +187,7 @@ struct Category
         "std::int64_t",
         "std::uint64_t",
         "utils::FixedDecimal",
+        "std::span<const uint8_t>",
         "std::string_view",
         "std::chrono::milliseconds",
         "std::uint32_t",
@@ -335,6 +338,7 @@ using Int64Result = std::expected<int64_t, Result::Values>;
 using Uint64Result = std::expected<uint64_t, Result::Values>;
 using TimestampResult = std::expected<std::chrono::milliseconds, Result::Values>;
 using FixedDecimalResult = std::expected<utils::FixedDecimal, Result::Values>;
+using DataResult = std::expected<Buffer, Result::Values>;
 using TokenSpan = std::span<Token>;
 using TagSpan = std::span<uint16_t>;
 

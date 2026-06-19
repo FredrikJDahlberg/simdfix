@@ -125,6 +125,22 @@ struct HandlInst
     };
 };
 
+struct Boolean
+{
+    enum Values
+    {
+        Null,
+        Yes,
+        No
+    };
+    static constexpr std::string_view Codes[3]  =
+    {
+        "?",
+        "Y",
+        "N"
+    };
+};
+
 } // namespace org::limitless::fix::messages
 
 #endif //SIMD_FIX_TYPES_HPP

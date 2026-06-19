@@ -304,6 +304,38 @@ TEST(MessageDecoder, NewOrderSingle)
     ASSERT_TRUE(app.found);
 }
 
+TEST(MessageDecoder, LogonWithXmlData)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(LogonDecoder& logon)
+        {
+            EXPECT_EQ(Encryption::None, logon.encryptMethod().value());
+            EXPECT_EQ(30U, logon.heartbeatInterval().value());
+            const auto data = logon.xmlData();
+            EXPECT_TRUE(data.has_value());
+            EXPECT_EQ(11U, data.value().size());
+            EXPECT_EQ(std::string_view("<root/>test"),
+                      std::string_view(reinterpret_cast<const char*>(data.value().data()), data.value().size()));
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0090" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
+        "212=11" SOH "213=<root/>test" SOH "10=124" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
 TEST(MessageDecoder, InvalidMandatoryFields)
 {
     PayloadDecoder decoder{Protocol::FIXT_1_1};

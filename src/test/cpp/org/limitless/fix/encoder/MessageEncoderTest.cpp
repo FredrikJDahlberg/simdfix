@@ -109,4 +109,28 @@ TEST(MessageEncoder, NewOrderSingle)
               "38=100" SOH "40=2" SOH "44=120.00000000" SOH "10=199" SOH, encoded);
 }
 
+TEST(MessageEncoder, LogonWithXmlData)
+{
+    std::array<uint8_t, 512> buffer{};
+    FixPayloadEncoder<"FIXT.1.1", "TARGET", "SENDER"> encoder{};
+    encoder.wrap(0, buffer);
+
+    const std::array<uint8_t, 11> xml = {'<', 'r', 'o', 'o', 't', '/', '>', 't', 'e', 's', 't'};
+
+    LogonEncoder logon{};
+    encoder.wrapMessage(logon)
+            .sequenceNumber(1)
+            .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+            .encryptMethod(Encryption::None)
+            .heartbeatInterval(30)
+            .xmlData(xml);
+
+    const auto length = encoder.encode(logon);
+    const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
+
+    EXPECT_EQ("8=FIXT.1.1" SOH "9=0090" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+              "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
+              "212=11" SOH "213=<root/>test" SOH "10=124" SOH, encoded);
+}
+
 }

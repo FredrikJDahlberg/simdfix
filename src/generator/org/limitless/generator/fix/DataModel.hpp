@@ -170,6 +170,16 @@ struct DataModel
                 record.m_records.emplace_back(tag, groupName, groupName, 0, presence,
                                               Category::Group, parent);
             }
+            else if (nodeType == "data")
+            {
+                const auto dataName = std::string{field.attribute("name").as_string()};
+                const auto counterName = std::string{field.attribute("counter").as_string()};
+                const int32_t lengthTag = field.attribute("lengthTag").as_int();
+                record.m_fields.emplace_back(lengthTag, counterName, dataName, 0, presence,
+                                             Category::Counter, parent);
+                record.m_records.emplace_back(tag, dataName, "Data", lengthTag, presence,
+                                              Category::Data, parent);
+            }
             else
             {
                 if (refType == m_types.end())

@@ -44,6 +44,11 @@
             <element name="Manual" value="3"/>
         </enum>
 
+        <enum name="Boolean">
+            <element name="Yes" value="Y"/>
+            <element name="No" value="N"/>
+        </enum>
+
     </types>
 
     <component name="NestedComp">
@@ -76,6 +81,7 @@
         <field name="Header" type="StandardHeader"/>
         <field name="EncryptMethod" tag="98" type="Encryption" presence="optional"/>
         <field name="HeartbeatInterval" tag="108" primitiveType="uint32"/>
+        <data name="XmlData" tag="213" counter="XmlDataLen" lengthTag="212" presence="optional"/>
     </message>
 
     <message name="Logout" id="5">

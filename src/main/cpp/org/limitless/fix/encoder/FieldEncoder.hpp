@@ -19,8 +19,12 @@ namespace org::limitless::fix::encoder {
 // Encodes individual FIX fields ("TAG=VALUE" followed by SOH) into a buffer.
 // The lowest-level building block in the encoder stack; MessageEncoder and
 // GroupEncoder both hold a reference to one and delegate field encoding to it.
+class DataEncoder;
+
 class FieldEncoder
 {
+    friend class DataEncoder;
+
     std::span<uint8_t> m_data{};
     uint32_t m_offset{};
     uint32_t m_encodedLength{};
@@ -89,6 +93,19 @@ public:
     [[nodiscard]] uint32_t encodedLength() const
     {
         return m_encodedLength;
+    }
+
+    /**
+     * Writes raw bytes followed by SOH. Used by DataEncoder after writing
+     * the tag prefix via encode<Tag>().
+     * @param data raw bytes to write
+     */
+    void writeRaw(const std::span<const uint8_t> data)
+    {
+        std::memcpy(m_data.data() + m_offset + m_encodedLength, data.data(), data.size());
+        m_encodedLength += data.size();
+        m_data[m_offset + m_encodedLength] = FieldEnd;
+        ++m_encodedLength;
     }
 
     /**
