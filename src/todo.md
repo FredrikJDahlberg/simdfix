@@ -1,12 +1,6 @@
 TODO
 -----
 
-1. Move decoding functions from utils to decoder.
-2. Add price scaling support — `FixedDecimal` currently uses a fixed 10^-8
-   scale; encoding always produces 8 fractional digits (e.g. `120.00000000`).
-   Need configurable precision or trailing-zero stripping in
-   `fixedDecimalToAscii` so prices encode cleanly (e.g. `120` or `120.50`).
-
 Unsupported FIX data types
 -----
 
@@ -37,14 +31,3 @@ mapping/`Category` and cannot yet be used in `protocol.xml`:
 - `MultipleCharValue`, `MultipleStringValue` — space-delimited multi-value
   fields. Would need a container return type (e.g. small vector or
   iterator) rather than a single scalar.
-
-Tokenizer binary-safe data (inline skip)
------
-
-DONE — `PayloadDecoder<DataFields>` skips data payloads containing
-embedded SOH or `=` bytes. Generator emits `FixDataFields.hpp` mapping
-length tags to data tags from `<data>` elements in `protocol.xml`.
-`emitDataSkip()` in `processBlock` parses the length value, emits a
-synthetic data token, and advances the scan offset past the payload.
-CTAD deduction guide preserves `PayloadDecoder decoder{...}` for
-non-data-aware usage (deduces `NoDataFields`).
