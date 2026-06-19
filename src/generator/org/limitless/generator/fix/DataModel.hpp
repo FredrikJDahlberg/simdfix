@@ -96,8 +96,10 @@ struct DataModel
         m_types.try_emplace("uint8",  "uint8_t",  1, 1, Category::Uint8);
         m_types.try_emplace("int32",  "int32_t",  4, 1, Category::Int32);
         m_types.try_emplace("uint32", "uint32_t", 4, 1, Category::Uint32);
-        m_types.try_emplace("int64",  "int32_t",  4, 1, Category::Int64);
-        m_types.try_emplace("uint64", "uint64_t", 4, 1, Category::Uint64);
+        m_types.try_emplace("int64",  "int64_t",  8, 1, Category::Int64);
+        m_types.try_emplace("uint64", "uint64_t", 8, 1, Category::Uint64);
+
+        m_types.try_emplace("decimal", "FixedDecimal", 8, 1, Category::Decimal);
         m_types.try_emplace("timestamp", "std::chrono::millis", 8, 1, Category::Timestamp);
         m_types.try_emplace("string", "std::string_view", 1, 1, Category::String);
         // Protocol is defined in CodecTypes.hpp as an enum struct; register it so

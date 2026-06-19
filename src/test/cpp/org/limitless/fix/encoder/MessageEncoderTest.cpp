@@ -98,15 +98,15 @@ TEST(MessageEncoder, NewOrderSingle)
             .transactTime(std::chrono::milliseconds{1'781'378'773'959})
             .orderQty(100)
             .ordType(OrdType::Limit)
-            .price(15000);
+            .price(utils::FixedDecimal{120, 0});
 
     const auto length = encoder.encode(order);
     const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
 
-    EXPECT_EQ("8=FIXT.1.1" SOH "9=0129" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+    EXPECT_EQ("8=FIXT.1.1" SOH "9=0136" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
               "34=1" SOH "52=20260613-19:26:13.959" SOH
               "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
-              "38=100" SOH "40=2" SOH "44=15000" SOH "10=126" SOH, encoded);
+              "38=100" SOH "40=2" SOH "44=120.00000000" SOH "10=199" SOH, encoded);
 }
 
 }

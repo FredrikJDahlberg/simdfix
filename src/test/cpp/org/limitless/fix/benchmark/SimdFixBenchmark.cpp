@@ -191,7 +191,7 @@ static void benchColdCache()
             (void) decoder.parse(bytes);
         }
     });
-    report("COLD CACHE", coldDuration, coldMessages, LOGIN_LENGTH);
+    report("LOGON COLD", coldDuration, coldMessages, LOGIN_LENGTH);
 }
 
 // HOT: 256 KB buffer — fits in L2, measures pure compute throughput.
@@ -229,7 +229,7 @@ static void benchHotCache()
             }
         }
     });
-    report("HOT CACHE", hotDuration, hotMsgs, LOGIN_LENGTH);
+    report("LOGON HOT", hotDuration, hotMsgs, LOGIN_LENGTH);
 }
 
 // GETTERS: parse + apply every LogonDecoder getter to the message.
@@ -259,7 +259,7 @@ static void benchGetters()
         }
     });
     std::printf("sink = %llu\n", static_cast<unsigned long long>(handler.sink));
-    report("GETTERS", duration, hotMsgs, LOGIN_LENGTH);
+    report("LOGON GET", duration, hotMsgs, LOGIN_LENGTH);
 }
 
 // GROUPS: parse + apply every LogonDecoder getter, including a 3-entry hops
@@ -296,7 +296,7 @@ static void benchGroups()
         }
     });
     std::printf("sink = %llu\n", static_cast<unsigned long long>(handler.sink));
-    report("GROUPS", duration, hotMsgs, LOGIN_GROUP_LENGTH);
+    report("LOGON GRP", duration, hotMsgs, LOGIN_GROUP_LENGTH);
 }
 
 // NOS_HOT: hot-cache decode of NewOrderSingle (tokenization only, no getters).
@@ -359,7 +359,7 @@ struct NewOrderSingleGetterHandler : org::limitless::fix::messages::MessageHandl
         sink += static_cast<uint64_t>(order.transactTime().value_or(std::chrono::milliseconds{0}).count());
         sink += order.orderQty().value_or(0);
         sink += static_cast<uint64_t>(order.ordType().value_or(OrdType::Limit));
-        sink += order.price().value_or(0);
+        sink += order.price().value_or(utils::FixedDecimal{}).mantissa();
         return org::limitless::fix::Result::Success;
     }
 };
@@ -425,7 +425,7 @@ static void benchNewOrderSingleEncode()
                     .transactTime(std::chrono::milliseconds{1'781'378'773'959})
                     .orderQty(100)
                     .ordType(OrdType::Limit)
-                    .price(15000);
+                    .price(utils::FixedDecimal{15000, 0});
 
             encodedLength = encoder.encode(order);
         }
@@ -465,7 +465,7 @@ static void benchEncode()
             encodedLength = encoder.encode(logon);
         }
     });
-    report("ENCODE", duration, HOT_COUNT, encodedLength);
+    report("LOGON ENC", duration, HOT_COUNT, encodedLength);
 }
 
 struct Benchmark
@@ -475,14 +475,14 @@ struct Benchmark
 };
 
 static constexpr Benchmark BENCHMARKS[] = {
-    {"cold",        benchColdCache},
-    {"hot",         benchHotCache},
-    {"getters",     benchGetters},
-    {"groups",      benchGroups},
-    {"encode",      benchEncode},
-    {"nos-hot",     benchNewOrderSingleHot},
-    {"nos-getters", benchNewOrderSingleGetters},
-    {"nos-encode",  benchNewOrderSingleEncode},
+    {"logon-cold",    benchColdCache},
+    {"logon-hot",     benchHotCache},
+    {"logon-getters", benchGetters},
+    {"logon-groups",  benchGroups},
+    {"logon-encode",  benchEncode},
+    {"nos-hot",       benchNewOrderSingleHot},
+    {"nos-getters",   benchNewOrderSingleGetters},
+    {"nos-encode",    benchNewOrderSingleEncode},
 };
 
 static void printUsage(const char* program)

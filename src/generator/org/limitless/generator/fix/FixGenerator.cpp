@@ -452,15 +452,29 @@ static void generateFieldEncoders(std::ostream& out, const Record& record)
             field.m_tag != 35 && field.m_tag != 49 && field.m_tag != 56 &&
             field.m_category != Category::Counter && field.m_category != Category::Struct)
         {
-            const auto category = field.m_category == Category::Enum ?
+            const auto isEnum = field.m_category == Category::Enum;
+            const auto category = isEnum ?
                                       std::format("{}::Values", field.m_type) :
                                       std::string{Category::type(field.m_category)};
             out << std::format("    {}Encoder& {}(const {} value)\n",
                                record.m_name, uncap(field.m_name), category);
             out << "    {\n";
-            out << std::format("        m_encoder.encode<\"{}\", {}>(value);\n",
-                               field.m_tag,
-                               field.m_category == Category::Enum ? field.m_type : Category::type(field.m_category));
+            if (isEnum)
+            {
+                const auto required = field.m_presence == Presence::Required ? "true" : "false";
+                out << std::format("        m_encoder.encode<\"{}\", {}, {}>(value);\n",
+                                   field.m_tag, required, field.m_type);
+            }
+            else if (field.m_category == Category::Decimal)
+            {
+                out << std::format("        m_encoder.encode<\"{}\">(value);\n",
+                                   field.m_tag);
+            }
+            else
+            {
+                out << std::format("        m_encoder.encode<\"{}\", {}>(value);\n",
+                                   field.m_tag, Category::type(field.m_category));
+            }
             out << "        return *this;\n";
             out << "    }\n\n";
         }

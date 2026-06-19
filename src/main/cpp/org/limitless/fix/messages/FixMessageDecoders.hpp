@@ -532,9 +532,9 @@ public:
         return m_decoder.getEnum<40, false, OrdType, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> price() const
+    [[nodiscard]] std::expected<utils::FixedDecimal, Result::Values> price() const
     {
-        return m_decoder.getUint32<44, false, RecordType::Message>();
+        return m_decoder.getFixedDecimal<44, false, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<TimeInForce::Values, Result::Values> timeInForce() const

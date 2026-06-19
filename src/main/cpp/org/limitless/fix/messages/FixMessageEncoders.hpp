@@ -420,9 +420,9 @@ public:
         return *this;
     }
 
-    NewOrderSingleEncoder& price(const std::uint32_t value)
+    NewOrderSingleEncoder& price(const utils::FixedDecimal value)
     {
-        m_encoder.encode<"44", std::uint32_t>(value);
+        m_encoder.encode<"44">(value);
         return *this;
     }
 

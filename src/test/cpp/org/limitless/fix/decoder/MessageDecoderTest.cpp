@@ -287,7 +287,7 @@ TEST(MessageDecoder, NewOrderSingle)
             EXPECT_EQ(Side::Buy, order.side().value());
             EXPECT_EQ(100U, order.orderQty().value());
             EXPECT_EQ(OrdType::Limit, order.ordType().value());
-            EXPECT_EQ(15000U, order.price().value());
+            EXPECT_EQ(utils::FixedDecimal(15000, 0), order.price().value());
             found = true;
             return Result::Success;
         }

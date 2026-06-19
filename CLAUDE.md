@@ -36,7 +36,7 @@ cd cmake-build-debug && ctest
 
 # Run benchmark (always use the release build; debug build numbers are meaningless due to ASan/coverage overhead)
 ./cmake-build-release/SimdFixBenchmark
-./cmake-build-release/SimdFixBenchmark cold|hot|getters|all   # default is all
+./cmake-build-release/SimdFixBenchmark logon-cold|logon-hot|logon-getters|nos-hot|all   # default is all
 ```
 
 ## Architecture
