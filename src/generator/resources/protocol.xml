@@ -18,7 +18,30 @@
             <element name="Logout" value="5"/>
             <element name="TestRequest" value="1"/>
             <element name="Heartbeat" value="0"/>
+            <element name="ResendRequest" value="2"/>
+            <element name="Reject" value="3"/>
+            <element name="SequenceReset" value="4"/>
             <element name="NewOrderSingle" value="D"/>
+        </enum>
+
+        <enum name="SessionRejectReason">
+            <element name="InvalidTagNumber" value="0"/>
+            <element name="RequiredTagMissing" value="1"/>
+            <element name="TagNotDefinedForMessageType" value="2"/>
+            <element name="UndefinedTag" value="3"/>
+            <element name="TagSpecifiedWithoutValue" value="4"/>
+            <element name="ValueIsIncorrect" value="5"/>
+            <element name="IncorrectDataFormat" value="6"/>
+            <element name="DecryptionProblem" value="7"/>
+            <element name="SignatureProblem" value="8"/>
+            <element name="CompIDProblem" value="9"/>
+            <element name="SendingTimeAccuracyProblem" value="10"/>
+            <element name="InvalidMsgType" value="11"/>
+        </enum>
+
+        <enum name="GapFillFlag">
+            <element name="GapFillMessage" value="Y"/>
+            <element name="SequenceReset" value="N"/>
         </enum>
 
         <enum name="Side">
@@ -105,6 +128,27 @@
     <message name="TestRequest" id="1">
         <field name="Header" type="StandardHeader"/>
         <field name="TestReqID" tag="112" primitiveType="char" length="32" presence="optional"/>
+    </message>
+
+    <message name="ResendRequest" id="2">
+        <field name="Header" type="StandardHeader"/>
+        <field name="BeginSeqNo" tag="7" primitiveType="uint32"/>
+        <field name="EndSeqNo" tag="16" primitiveType="uint32"/>
+    </message>
+
+    <message name="Reject" id="3">
+        <field name="Header" type="StandardHeader"/>
+        <field name="RefSeqNum" tag="45" primitiveType="uint32"/>
+        <field name="RefTagID" tag="371" primitiveType="uint32" presence="optional"/>
+        <field name="RefMsgType" tag="372" type="MessageType" presence="optional"/>
+        <field name="SessionRejectReason" tag="373" type="SessionRejectReason" presence="optional"/>
+        <field name="Text" tag="58" primitiveType="string" length="64" presence="optional"/>
+    </message>
+
+    <message name="SequenceReset" id="4">
+        <field name="Header" type="StandardHeader"/>
+        <field name="GapFillFlag" tag="123" type="GapFillFlag" presence="optional"/>
+        <field name="NewSeqNo" tag="36" primitiveType="uint32"/>
     </message>
 
     <message name="NewOrderSingle" id="D">

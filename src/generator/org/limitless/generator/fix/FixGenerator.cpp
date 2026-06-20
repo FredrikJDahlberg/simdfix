@@ -106,7 +106,15 @@ static void generateProtocol(std::ostream& out, const Record& protocol)
     out << "        return value >= Null && value < Max ? Codes[value] : Codes[0];\n";
     out << "    }\n";
     out << "};\n\n";
-    out << "} // namespace org::limitless::fix\n\n";
+    for (const auto& field : protocol.m_fields)
+    {
+        if (field.m_name != "Null")
+        {
+            out << std::format("inline constexpr FixedString {} {{\"{}\"}};\n",
+                               field.m_name, field.m_type);
+        }
+    }
+    out << "\n} // namespace org::limitless::fix\n\n";
 }
 
 static void generateTypes(const std::string& fileName,
@@ -125,6 +133,7 @@ static void generateTypes(const std::string& fileName,
     out << "#define SIMD_FIX_TYPES_HPP\n\n";
     out << "#include <cstdint>\n";
     out << "#include <string_view>\n\n";
+    out << "#include \"org/limitless/fix/CodecTypes.hpp\"\n\n";
     generateProtocol(out, protocol);
     out << "namespace org::limitless::fix::messages {\n\n";
     for (const auto& type: enums)
