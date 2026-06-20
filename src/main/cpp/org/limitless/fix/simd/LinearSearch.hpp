@@ -13,28 +13,19 @@ namespace org::limitless::fix::simd {
 
 [[nodiscard]] inline int32_t find(const uint16_t* array, const int32_t cardinality, const uint16_t key)
 {
-    if (cardinality < 8)
-    {
-        for (int32_t i = 0; i < cardinality; ++i)
-        {
-            if (array[i] == key)
-            {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    const Uint8x16 keys{key};
     int32_t i = 0;
-    Uint8x16 values{};
-    for (; i <= cardinality - 8; i += 8)
+    if (cardinality >= 8)
     {
-        const auto remaining = (cardinality - i) * sizeof(uint16_t);
-        const uint64_t bits = values.put(array + i, remaining).equal(keys).toUint64();
-        if (bits != 0)
+        const Uint8x16 keys{key};
+        Uint8x16 values{};
+        for (; i <= cardinality - 8; i += 8)
         {
-            return i + (std::countr_zero(bits) >> 3);
+            const auto remaining = (cardinality - i) * sizeof(uint16_t);
+            const uint64_t bits = values.put(array + i, remaining).equal(keys).toUint64();
+            if (bits != 0)
+            {
+                return i + (std::countr_zero(bits) >> 3);
+            }
         }
     }
     for (; i < cardinality; ++i)
