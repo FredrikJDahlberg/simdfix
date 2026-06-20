@@ -4,24 +4,24 @@
 #include <gtest/gtest.h>
 #include <sstream>
 
-#include "../../../../../../main/cpp/org/limitless/fix/utils/NullableInt.hpp"
+#include "../../../../../../main/cpp/org/limitless/fix/utils/OptionalInt.hpp"
 
 namespace org::limitless::fix::utils {
 
-using NullInt32 = NullableInt<int32_t>;
-using NullUint32 = NullableInt<uint32_t>;
-using NullInt64 = NullableInt<int64_t>;
-using NullUint64 = NullableInt<uint64_t>;
+using NullInt32 = OptionalInt<int32_t>;
+using NullUint32 = OptionalInt<uint32_t>;
+using NullInt64 = OptionalInt<int64_t>;
+using NullUint64 = OptionalInt<uint64_t>;
 
 // --- Sentinel values ---
 
-TEST(NullableInt, SignedSentinelIsMin)
+TEST(OptionalInt, SignedSentinelIsMin)
 {
     static_assert(NullInt32::NullValue == std::numeric_limits<int32_t>::min());
     static_assert(NullInt64::NullValue == std::numeric_limits<int64_t>::min());
 }
 
-TEST(NullableInt, UnsignedSentinelIsMax)
+TEST(OptionalInt, UnsignedSentinelIsMax)
 {
     static_assert(NullUint32::NullValue == std::numeric_limits<uint32_t>::max());
     static_assert(NullUint64::NullValue == std::numeric_limits<uint64_t>::max());
@@ -29,33 +29,33 @@ TEST(NullableInt, UnsignedSentinelIsMax)
 
 // --- Construction and accessors ---
 
-TEST(NullableInt, DefaultIsNull)
+TEST(OptionalInt, DefaultIsNull)
 {
     constexpr NullInt32 value;
     ASSERT_FALSE(value.hasValue());
 }
 
-TEST(NullableInt, ValueConstruction)
+TEST(OptionalInt, ValueConstruction)
 {
     constexpr NullInt32 value{42};
     ASSERT_TRUE(value.hasValue());
     ASSERT_EQ(42, value.value());
 }
 
-TEST(NullableInt, ZeroIsNotNull)
+TEST(OptionalInt, ZeroIsNotNull)
 {
     constexpr NullInt32 value{0};
     ASSERT_TRUE(value.hasValue());
     ASSERT_EQ(0, value.value());
 }
 
-TEST(NullableInt, NullFactory)
+TEST(OptionalInt, NullFactory)
 {
     constexpr auto value = NullInt32::null();
     ASSERT_FALSE(value.hasValue());
 }
 
-TEST(NullableInt, ValueOr)
+TEST(OptionalInt, ValueOr)
 {
     constexpr NullInt32 present{10};
     constexpr NullInt32 absent;
@@ -63,7 +63,7 @@ TEST(NullableInt, ValueOr)
     ASSERT_EQ(99, absent.valueOr(99));
 }
 
-TEST(NullableInt, Reset)
+TEST(OptionalInt, Reset)
 {
     NullInt32 value{42};
     ASSERT_TRUE(value.hasValue());
@@ -73,7 +73,7 @@ TEST(NullableInt, Reset)
 
 // --- Unary operators ---
 
-TEST(NullableInt, UnaryMinus)
+TEST(OptionalInt, UnaryMinus)
 {
     constexpr NullInt32 a{7};
     ASSERT_EQ(-7, (-a).value());
@@ -83,13 +83,13 @@ TEST(NullableInt, UnaryMinus)
     ASSERT_FALSE(nullResult.hasValue());
 }
 
-TEST(NullableInt, UnaryPlus)
+TEST(OptionalInt, UnaryPlus)
 {
     constexpr NullInt32 a{7};
     ASSERT_EQ(a, +a);
 }
 
-TEST(NullableInt, BitwiseNot)
+TEST(OptionalInt, BitwiseNot)
 {
     constexpr NullUint32 a{0x0F};
     ASSERT_TRUE((~a).hasValue());
@@ -100,14 +100,14 @@ TEST(NullableInt, BitwiseNot)
 
 // --- Arithmetic operators ---
 
-TEST(NullableInt, Addition)
+TEST(OptionalInt, Addition)
 {
     constexpr NullInt32 a{10};
     constexpr NullInt32 b{20};
     ASSERT_EQ(30, (a + b).value());
 }
 
-TEST(NullableInt, AdditionNullPropagates)
+TEST(OptionalInt, AdditionNullPropagates)
 {
     constexpr NullInt32 a{10};
     constexpr NullInt32 n;
@@ -116,42 +116,42 @@ TEST(NullableInt, AdditionNullPropagates)
     ASSERT_FALSE((n + n).hasValue());
 }
 
-TEST(NullableInt, Subtraction)
+TEST(OptionalInt, Subtraction)
 {
     constexpr NullInt32 a{30};
     constexpr NullInt32 b{12};
     ASSERT_EQ(18, (a - b).value());
 }
 
-TEST(NullableInt, Multiplication)
+TEST(OptionalInt, Multiplication)
 {
     constexpr NullInt32 a{6};
     constexpr NullInt32 b{7};
     ASSERT_EQ(42, (a * b).value());
 }
 
-TEST(NullableInt, Division)
+TEST(OptionalInt, Division)
 {
     constexpr NullInt32 a{100};
     constexpr NullInt32 b{4};
     ASSERT_EQ(25, (a / b).value());
 }
 
-TEST(NullableInt, DivisionByZeroIsNull)
+TEST(OptionalInt, DivisionByZeroIsNull)
 {
     constexpr NullInt32 a{10};
     constexpr NullInt32 zero{0};
     ASSERT_FALSE((a / zero).hasValue());
 }
 
-TEST(NullableInt, Modulo)
+TEST(OptionalInt, Modulo)
 {
     constexpr NullInt32 a{17};
     constexpr NullInt32 b{5};
     ASSERT_EQ(2, (a % b).value());
 }
 
-TEST(NullableInt, ModuloByZeroIsNull)
+TEST(OptionalInt, ModuloByZeroIsNull)
 {
     constexpr NullInt32 a{10};
     constexpr NullInt32 zero{0};
@@ -160,7 +160,7 @@ TEST(NullableInt, ModuloByZeroIsNull)
 
 // --- Compound assignment ---
 
-TEST(NullableInt, CompoundAssignment)
+TEST(OptionalInt, CompoundAssignment)
 {
     NullInt32 value{100};
 
@@ -180,7 +180,7 @@ TEST(NullableInt, CompoundAssignment)
     ASSERT_EQ(1, value.value());
 }
 
-TEST(NullableInt, CompoundAssignmentNullPropagates)
+TEST(OptionalInt, CompoundAssignmentNullPropagates)
 {
     NullInt32 value{100};
     value += NullInt32::null();
@@ -189,42 +189,42 @@ TEST(NullableInt, CompoundAssignmentNullPropagates)
 
 // --- Bitwise operators ---
 
-TEST(NullableInt, BitwiseAnd)
+TEST(OptionalInt, BitwiseAnd)
 {
     constexpr NullUint32 a{0xFF};
     constexpr NullUint32 b{0x0F};
     ASSERT_EQ(0x0Fu, (a & b).value());
 }
 
-TEST(NullableInt, BitwiseOr)
+TEST(OptionalInt, BitwiseOr)
 {
     constexpr NullUint32 a{0xF0};
     constexpr NullUint32 b{0x0F};
     ASSERT_EQ(0xFFu, (a | b).value());
 }
 
-TEST(NullableInt, BitwiseXor)
+TEST(OptionalInt, BitwiseXor)
 {
     constexpr NullUint32 a{0xFF};
     constexpr NullUint32 b{0x0F};
     ASSERT_EQ(0xF0u, (a ^ b).value());
 }
 
-TEST(NullableInt, ShiftLeft)
+TEST(OptionalInt, ShiftLeft)
 {
     constexpr NullUint32 a{1};
     constexpr NullUint32 b{4};
     ASSERT_EQ(16u, (a << b).value());
 }
 
-TEST(NullableInt, ShiftRight)
+TEST(OptionalInt, ShiftRight)
 {
     constexpr NullUint32 a{16};
     constexpr NullUint32 b{4};
     ASSERT_EQ(1u, (a >> b).value());
 }
 
-TEST(NullableInt, BitwiseNullPropagates)
+TEST(OptionalInt, BitwiseNullPropagates)
 {
     constexpr NullUint32 a{0xFF};
     constexpr NullUint32 n;
@@ -235,7 +235,7 @@ TEST(NullableInt, BitwiseNullPropagates)
     ASSERT_FALSE((a >> n).hasValue());
 }
 
-TEST(NullableInt, BitwiseCompoundAssignment)
+TEST(OptionalInt, BitwiseCompoundAssignment)
 {
     NullUint32 value{0xFF};
 
@@ -257,7 +257,7 @@ TEST(NullableInt, BitwiseCompoundAssignment)
 
 // --- Relational operators ---
 
-TEST(NullableInt, Equality)
+TEST(OptionalInt, Equality)
 {
     constexpr NullInt32 a{42};
     constexpr NullInt32 b{42};
@@ -266,21 +266,21 @@ TEST(NullableInt, Equality)
     ASSERT_NE(a, c);
 }
 
-TEST(NullableInt, NullEqualsNull)
+TEST(OptionalInt, NullEqualsNull)
 {
     constexpr NullInt32 a;
     constexpr NullInt32 b;
     ASSERT_EQ(a, b);
 }
 
-TEST(NullableInt, NullNotEqualToValue)
+TEST(OptionalInt, NullNotEqualToValue)
 {
     constexpr NullInt32 a;
     constexpr NullInt32 b{0};
     ASSERT_NE(a, b);
 }
 
-TEST(NullableInt, Ordering)
+TEST(OptionalInt, Ordering)
 {
     constexpr NullInt32 a{10};
     constexpr NullInt32 b{20};
@@ -292,7 +292,7 @@ TEST(NullableInt, Ordering)
     ASSERT_GE(a, a);
 }
 
-TEST(NullableInt, NullSortsBeforeValue)
+TEST(OptionalInt, NullSortsBeforeValue)
 {
     constexpr NullInt32 n;
     constexpr NullInt32 v{0};
@@ -303,7 +303,7 @@ TEST(NullableInt, NullSortsBeforeValue)
 
 // --- Unsigned type ---
 
-TEST(NullableInt, UnsignedArithmetic)
+TEST(OptionalInt, UnsignedArithmetic)
 {
     constexpr NullUint32 a{100};
     constexpr NullUint32 b{30};
@@ -316,14 +316,14 @@ TEST(NullableInt, UnsignedArithmetic)
 
 // --- Stream operator ---
 
-TEST(NullableInt, StreamValue)
+TEST(OptionalInt, StreamValue)
 {
     std::ostringstream os;
     os << NullInt32{42};
     ASSERT_EQ("42", os.str());
 }
 
-TEST(NullableInt, StreamNull)
+TEST(OptionalInt, StreamNull)
 {
     std::ostringstream os;
     os << NullInt32::null();
@@ -332,14 +332,14 @@ TEST(NullableInt, StreamNull)
 
 // --- Implicit conversion from T ---
 
-TEST(NullableInt, ImplicitConversionFromLiteral)
+TEST(OptionalInt, ImplicitConversionFromLiteral)
 {
     NullInt32 value = 42;
     ASSERT_TRUE(value.hasValue());
     ASSERT_EQ(42, value.value());
 }
 
-TEST(NullableInt, MixedArithmeticWithLiteral)
+TEST(OptionalInt, MixedArithmeticWithLiteral)
 {
     constexpr NullInt32 a{10};
     constexpr auto result = a + NullInt32{5};
@@ -348,7 +348,7 @@ TEST(NullableInt, MixedArithmeticWithLiteral)
 
 // --- Constexpr verification ---
 
-TEST(NullableInt, ConstexprArithmetic)
+TEST(OptionalInt, ConstexprArithmetic)
 {
     static_assert((NullInt32{10} + NullInt32{20}).value() == 30);
     static_assert((NullInt32{10} * NullInt32{3}).value() == 30);

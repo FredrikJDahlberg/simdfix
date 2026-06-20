@@ -77,21 +77,21 @@ concept EncodableEnumWrapper = !Nullable<T> && requires
 } && std::is_enum_v<typename T::Values>;
 
 template <typename T>
-concept EncodableNullableInteger = Nullable<T> &&
+concept EncodableOptionalInteger = Nullable<T> &&
     (std::same_as<std::remove_cvref_t<decltype(std::declval<const T>().value())>, uint32_t> ||
      std::same_as<std::remove_cvref_t<decltype(std::declval<const T>().value())>, int32_t>);
 
 template <typename T>
-concept EncodableNullableLongInteger = Nullable<T> &&
+concept EncodableOptionalLongInteger = Nullable<T> &&
     (std::same_as<std::remove_cvref_t<decltype(std::declval<const T>().value())>, uint64_t> ||
      std::same_as<std::remove_cvref_t<decltype(std::declval<const T>().value())>, int64_t>);
 
 template <typename T>
-concept EncodableNullableString = Nullable<T> &&
+concept EncodableOptionalString = Nullable<T> &&
     std::convertible_to<decltype(std::declval<const T>().value()), std::string_view>;
 
 template <typename T>
-concept EncodableNullableFixedDecimal = Nullable<T> &&
+concept EncodableOptionalFixedDecimal = Nullable<T> &&
     std::same_as<std::remove_cvref_t<decltype(std::declval<const T>().value())>, utils::FixedDecimal>;
 
 // Matches generated message encoders (e.g. LogonEncoder, HeartbeatEncoder)

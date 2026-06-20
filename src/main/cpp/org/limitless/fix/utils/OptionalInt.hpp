@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-06-19.
 //
 
-#ifndef SIMD_FIX_NULLABLE_INT_HPP
-#define SIMD_FIX_NULLABLE_INT_HPP
+#ifndef SIMD_FIX_OPTIONAL_INT_HPP
+#define SIMD_FIX_OPTIONAL_INT_HPP
 
 #include <compare>
 #include <concepts>
@@ -21,7 +21,7 @@ namespace org::limitless::fix::utils {
  * @tparam T the underlying integer type
  */
 template <std::integral T>
-class NullableInt
+class OptionalInt
 {
 public:
     using ValueType = T;
@@ -30,18 +30,18 @@ public:
         ? std::numeric_limits<T>::min()
         : std::numeric_limits<T>::max();
 
-    constexpr NullableInt() = default;
+    constexpr OptionalInt() = default;
 
-    constexpr NullableInt(const T value) : m_value{value}
+    constexpr OptionalInt(const T value) : m_value{value}
     {
     }
 
     /**
      * @return a null instance
      */
-    [[nodiscard]] static constexpr NullableInt null()
+    [[nodiscard]] static constexpr OptionalInt null()
     {
-        return NullableInt{};
+        return OptionalInt{};
     }
 
     /**
@@ -79,95 +79,95 @@ public:
 
     // --- UNARY OPERATORS ---
 
-    constexpr NullableInt operator-() const
+    constexpr OptionalInt operator-() const
     {
-        return hasValue() ? NullableInt{static_cast<T>(-m_value)} : null();
+        return hasValue() ? OptionalInt{static_cast<T>(-m_value)} : null();
     }
 
-    constexpr NullableInt operator+() const
+    constexpr OptionalInt operator+() const
     {
         return *this;
     }
 
-    constexpr NullableInt operator~() const
+    constexpr OptionalInt operator~() const
     {
-        return hasValue() ? NullableInt{static_cast<T>(~m_value)} : null();
+        return hasValue() ? OptionalInt{static_cast<T>(~m_value)} : null();
     }
 
     // --- ARITHMETIC OPERATORS ---
 
-    constexpr NullableInt operator+(const NullableInt& other) const
+    constexpr OptionalInt operator+(const OptionalInt& other) const
     {
         if (!hasValue() || !other.hasValue())
         {
             return null();
         }
-        return NullableInt{static_cast<T>(m_value + other.m_value)};
+        return OptionalInt{static_cast<T>(m_value + other.m_value)};
     }
 
-    constexpr NullableInt operator-(const NullableInt& other) const
+    constexpr OptionalInt operator-(const OptionalInt& other) const
     {
         if (!hasValue() || !other.hasValue())
         {
             return null();
         }
-        return NullableInt{static_cast<T>(m_value - other.m_value)};
+        return OptionalInt{static_cast<T>(m_value - other.m_value)};
     }
 
-    constexpr NullableInt operator*(const NullableInt& other) const
+    constexpr OptionalInt operator*(const OptionalInt& other) const
     {
         if (!hasValue() || !other.hasValue())
         {
             return null();
         }
-        return NullableInt{static_cast<T>(m_value * other.m_value)};
+        return OptionalInt{static_cast<T>(m_value * other.m_value)};
     }
 
-    constexpr NullableInt operator/(const NullableInt& other) const
+    constexpr OptionalInt operator/(const OptionalInt& other) const
     {
         if (!hasValue() || !other.hasValue() || other.m_value == 0)
         {
             return null();
         }
-        return NullableInt{static_cast<T>(m_value / other.m_value)};
+        return OptionalInt{static_cast<T>(m_value / other.m_value)};
     }
 
-    constexpr NullableInt operator%(const NullableInt& other) const
+    constexpr OptionalInt operator%(const OptionalInt& other) const
     {
         if (!hasValue() || !other.hasValue() || other.m_value == 0)
         {
             return null();
         }
-        return NullableInt{static_cast<T>(m_value % other.m_value)};
+        return OptionalInt{static_cast<T>(m_value % other.m_value)};
     }
 
     // --- COMPOUND ASSIGNMENT OPERATORS ---
 
-    constexpr NullableInt& operator+=(const NullableInt& other)
+    constexpr OptionalInt& operator+=(const OptionalInt& other)
     {
         *this = *this + other;
         return *this;
     }
 
-    constexpr NullableInt& operator-=(const NullableInt& other)
+    constexpr OptionalInt& operator-=(const OptionalInt& other)
     {
         *this = *this - other;
         return *this;
     }
 
-    constexpr NullableInt& operator*=(const NullableInt& other)
+    constexpr OptionalInt& operator*=(const OptionalInt& other)
     {
         *this = *this * other;
         return *this;
     }
 
-    constexpr NullableInt& operator/=(const NullableInt& other)
+    constexpr OptionalInt& operator/=(const OptionalInt& other)
     {
         *this = *this / other;
         return *this;
     }
 
-    constexpr NullableInt& operator%=(const NullableInt& other)
+    constexpr OptionalInt& operator%=(const OptionalInt& other)
     {
         *this = *this % other;
         return *this;
@@ -175,78 +175,78 @@ public:
 
     // --- BITWISE OPERATORS ---
 
-    constexpr NullableInt operator&(const NullableInt& other) const
+    constexpr OptionalInt operator&(const OptionalInt& other) const
     {
         if (!hasValue() || !other.hasValue())
         {
             return null();
         }
-        return NullableInt{static_cast<T>(m_value & other.m_value)};
+        return OptionalInt{static_cast<T>(m_value & other.m_value)};
     }
 
-    constexpr NullableInt operator|(const NullableInt& other) const
+    constexpr OptionalInt operator|(const OptionalInt& other) const
     {
         if (!hasValue() || !other.hasValue())
         {
             return null();
         }
-        return NullableInt{static_cast<T>(m_value | other.m_value)};
+        return OptionalInt{static_cast<T>(m_value | other.m_value)};
     }
 
-    constexpr NullableInt operator^(const NullableInt& other) const
+    constexpr OptionalInt operator^(const OptionalInt& other) const
     {
         if (!hasValue() || !other.hasValue())
         {
             return null();
         }
-        return NullableInt{static_cast<T>(m_value ^ other.m_value)};
+        return OptionalInt{static_cast<T>(m_value ^ other.m_value)};
     }
 
-    constexpr NullableInt operator<<(const NullableInt& other) const
+    constexpr OptionalInt operator<<(const OptionalInt& other) const
     {
         if (!hasValue() || !other.hasValue())
         {
             return null();
         }
-        return NullableInt{static_cast<T>(m_value << other.m_value)};
+        return OptionalInt{static_cast<T>(m_value << other.m_value)};
     }
 
-    constexpr NullableInt operator>>(const NullableInt& other) const
+    constexpr OptionalInt operator>>(const OptionalInt& other) const
     {
         if (!hasValue() || !other.hasValue())
         {
             return null();
         }
-        return NullableInt{static_cast<T>(m_value >> other.m_value)};
+        return OptionalInt{static_cast<T>(m_value >> other.m_value)};
     }
 
     // --- BITWISE COMPOUND ASSIGNMENT ---
 
-    constexpr NullableInt& operator&=(const NullableInt& other)
+    constexpr OptionalInt& operator&=(const OptionalInt& other)
     {
         *this = *this & other;
         return *this;
     }
 
-    constexpr NullableInt& operator|=(const NullableInt& other)
+    constexpr OptionalInt& operator|=(const OptionalInt& other)
     {
         *this = *this | other;
         return *this;
     }
 
-    constexpr NullableInt& operator^=(const NullableInt& other)
+    constexpr OptionalInt& operator^=(const OptionalInt& other)
     {
         *this = *this ^ other;
         return *this;
     }
 
-    constexpr NullableInt& operator<<=(const NullableInt& other)
+    constexpr OptionalInt& operator<<=(const OptionalInt& other)
     {
         *this = *this << other;
         return *this;
     }
 
-    constexpr NullableInt& operator>>=(const NullableInt& other)
+    constexpr OptionalInt& operator>>=(const OptionalInt& other)
     {
         *this = *this >> other;
         return *this;
@@ -254,9 +254,9 @@ public:
 
     // --- RELATIONAL OPERATORS ---
 
-    constexpr bool operator==(const NullableInt& other) const = default;
+    constexpr bool operator==(const OptionalInt& other) const = default;
 
-    constexpr std::strong_ordering operator<=>(const NullableInt& other) const
+    constexpr std::strong_ordering operator<=>(const OptionalInt& other) const
     {
         if (!hasValue() && !other.hasValue())
         {
@@ -275,7 +275,7 @@ public:
 
     // --- STREAM OPERATOR ---
 
-    friend std::ostream& operator<<(std::ostream& os, const NullableInt& value)
+    friend std::ostream& operator<<(std::ostream& os, const OptionalInt& value)
     {
         if (value.hasValue())
         {
@@ -294,4 +294,4 @@ private:
 
 }
 
-#endif //SIMD_FIX_NULLABLE_INT_HPP
+#endif //SIMD_FIX_OPTIONAL_INT_HPP

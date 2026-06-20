@@ -251,7 +251,7 @@ public:
      * @param value nullable value to write
      */
     template <FixedString Tag, typename NullableType>
-        requires EncodableNullableInteger<NullableType>
+        requires EncodableOptionalInteger<NullableType>
     void encode(const NullableType& value)
     {
         if (value.hasValue())
@@ -268,7 +268,7 @@ public:
      * @param value nullable value to write
      */
     template <FixedString Tag, typename NullableType>
-        requires EncodableNullableLongInteger<NullableType>
+        requires EncodableOptionalLongInteger<NullableType>
     void encode(const NullableType& value)
     {
         if (value.hasValue())
@@ -285,7 +285,7 @@ public:
      * @param value nullable value to write
      */
     template <FixedString Tag, typename NullableType>
-        requires EncodableNullableString<NullableType>
+        requires EncodableOptionalString<NullableType>
     void encode(const NullableType& value)
     {
         if (value.hasValue())
@@ -302,7 +302,7 @@ public:
      * @param value nullable value to write
      */
     template <FixedString Tag, typename NullableType>
-        requires EncodableNullableFixedDecimal<NullableType>
+        requires EncodableOptionalFixedDecimal<NullableType>
     void encode(const NullableType& value)
     {
         if (value.hasValue())
