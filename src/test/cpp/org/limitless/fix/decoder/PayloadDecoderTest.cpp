@@ -130,6 +130,31 @@ TEST(PayloadDecoder, TrailerSplitValue)
     ASSERT_EQ(5, tokens[14].m_length);
 }
 
+TEST(PayloadDecoder, SplitTagDigitZero)
+{
+    // Tag 150 ("150=0") starts at byte 94, placing the '0' digit of "150"
+    // at position 96 — the first byte of a new 16-byte SIMD chunk. The
+    // previous chunk carries "15" via m_tag. The digit '0' maps to value 0
+    // after subtracting '0', which is identical to the "no digit" sentinel.
+    // Before the fix, processBlock treated it as a non-digit and emitted
+    // tag 15 instead of 150.
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0142" SOH "35=8" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "37=ORD002" SOH "17=EXEC002" SOH "150=0" SOH "39=0" SOH
+        "55=MSFT" SOH "54=2" SOH "151=200" SOH "14=0" SOH
+        "6=0" SOH "60=20260613-19:26:13.959" SOH "10=249" SOH);
+    PayloadDecoder<FIXT_1_1> decoder;
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_EQ(message.size(), processed);
+
+    const auto tokens = decoder.tokens();
+    ASSERT_EQ(150, tokens[9].m_tag);
+    ASSERT_EQ(98, tokens[9].m_position);
+    ASSERT_EQ(1, tokens[9].m_length);
+}
+
 TEST(PayloadDecoder, HopGroup)
 {
     const auto logout = utils::makeSpan(

@@ -562,6 +562,127 @@ TEST(MessageDecoder, SequenceResetNoGapFill)
     ASSERT_TRUE(app.found);
 }
 
+TEST(MessageDecoder, ExecutionReportFill)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(ExecutionReportDecoder& report)
+        {
+            EXPECT_EQ("ORD001", toString(report.orderID().value()));
+            EXPECT_EQ("CL001", toString(report.clOrdID().value()));
+            EXPECT_EQ("EXEC001", toString(report.execID().value()));
+            EXPECT_EQ(ExecType::Trade, report.execType().value());
+            EXPECT_EQ(OrdStatus::Filled, report.ordStatus().value());
+            EXPECT_EQ("AAPL", toString(report.symbol().value()));
+            EXPECT_EQ(Side::Buy, report.side().value());
+            EXPECT_EQ(100U, report.orderQty().value());
+            EXPECT_EQ(utils::FixedDecimal(15050, -2), report.price().value());
+            EXPECT_EQ(100U, report.lastQty().value());
+            EXPECT_EQ(utils::FixedDecimal(15050, -2), report.lastPx().value());
+            EXPECT_EQ(0U, report.leavesQty().value());
+            EXPECT_EQ(100U, report.cumQty().value());
+            EXPECT_EQ(utils::FixedDecimal(15050, -2), report.avgPx().value());
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0208" SOH "35=8" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=3" SOH "52=20260613-19:26:13.959" SOH
+        "37=ORD001" SOH "11=CL001" SOH "17=EXEC001" SOH "150=F" SOH "39=2" SOH
+        "55=AAPL" SOH "54=1" SOH "38=100" SOH "44=150.50000000" SOH
+        "32=100" SOH "31=150.50000000" SOH "151=0" SOH "14=100" SOH
+        "6=150.50000000" SOH "60=20260613-19:26:13.959" SOH "10=023" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
+TEST(MessageDecoder, ExecutionReportMinimal)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(ExecutionReportDecoder& report)
+        {
+            EXPECT_EQ("ORD002", toString(report.orderID().value()));
+            EXPECT_FALSE(report.clOrdID().has_value());
+            EXPECT_EQ("EXEC002", toString(report.execID().value()));
+            EXPECT_EQ(ExecType::New, report.execType().value());
+            EXPECT_EQ(OrdStatus::New, report.ordStatus().value());
+            EXPECT_EQ("MSFT", toString(report.symbol().value()));
+            EXPECT_EQ(Side::Sell, report.side().value());
+            EXPECT_FALSE(report.orderQty().has_value());
+            EXPECT_FALSE(report.price().has_value());
+            EXPECT_FALSE(report.lastQty().has_value());
+            EXPECT_FALSE(report.lastPx().has_value());
+            EXPECT_EQ(200U, report.leavesQty().value());
+            EXPECT_EQ(0U, report.cumQty().value());
+            EXPECT_FALSE(report.text().has_value());
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0142" SOH "35=8" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "37=ORD002" SOH "17=EXEC002" SOH "150=0" SOH "39=0" SOH
+        "55=MSFT" SOH "54=2" SOH "151=200" SOH "14=0" SOH
+        "6=0" SOH "60=20260613-19:26:13.959" SOH "10=249" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
+TEST(MessageDecoder, ExecutionReportReject)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(ExecutionReportDecoder& report)
+        {
+            EXPECT_EQ("NONE", toString(report.orderID().value()));
+            EXPECT_EQ("CL003", toString(report.clOrdID().value()));
+            EXPECT_EQ("EXEC003", toString(report.execID().value()));
+            EXPECT_EQ(ExecType::Rejected, report.execType().value());
+            EXPECT_EQ(OrdStatus::Rejected, report.ordStatus().value());
+            EXPECT_EQ("TSLA", toString(report.symbol().value()));
+            EXPECT_EQ(Side::Buy, report.side().value());
+            EXPECT_EQ(0U, report.leavesQty().value());
+            EXPECT_EQ(0U, report.cumQty().value());
+            EXPECT_EQ("Insufficient buying power", toString(report.text().value()));
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0176" SOH "35=8" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=5" SOH "52=20260613-19:26:13.959" SOH
+        "37=NONE" SOH "11=CL003" SOH "17=EXEC003" SOH "150=8" SOH "39=8" SOH
+        "55=TSLA" SOH "54=1" SOH "151=0" SOH "14=0" SOH
+        "6=0" SOH "60=20260613-19:26:13.959" SOH
+        "58=Insufficient buying power" SOH "10=180" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
 TEST(MessageDecoder, InvalidMandatoryFields)
 {
     PayloadDecoder<FIXT_1_1> decoder;

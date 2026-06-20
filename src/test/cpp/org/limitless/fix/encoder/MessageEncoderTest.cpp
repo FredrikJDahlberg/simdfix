@@ -211,6 +211,108 @@ TEST(MessageEncoder, SequenceResetNoGapFill)
               "34=5" SOH "52=20260613-19:26:13.959" SOH "36=10" SOH "10=042" SOH, encoded);
 }
 
+TEST(MessageEncoder, ExecutionReportFill)
+{
+    std::array<uint8_t, 512> buffer{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    encoder.wrap(0, buffer);
+
+    ExecutionReportEncoder report{};
+    encoder.wrapMessage(report)
+            .sequenceNumber(3)
+            .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+            .orderID("ORD001")
+            .clOrdID("CL001")
+            .execID("EXEC001")
+            .execType(ExecType::Trade)
+            .ordStatus(OrdStatus::Filled)
+            .symbol("AAPL")
+            .side(Side::Buy)
+            .orderQty(100)
+            .price(utils::FixedDecimal{15050, -2})
+            .lastQty(100)
+            .lastPx(utils::FixedDecimal{15050, -2})
+            .leavesQty(0)
+            .cumQty(100)
+            .avgPx(utils::FixedDecimal{15050, -2})
+            .transactTime(std::chrono::milliseconds{1'781'378'773'959});
+
+    const auto length = encoder.encode(report);
+    const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
+
+    EXPECT_EQ("8=FIXT.1.1" SOH "9=0208" SOH "35=8" SOH "49=SENDER" SOH "56=TARGET" SOH
+              "34=3" SOH "52=20260613-19:26:13.959" SOH
+              "37=ORD001" SOH "11=CL001" SOH "17=EXEC001" SOH "150=F" SOH "39=2" SOH
+              "55=AAPL" SOH "54=1" SOH "38=100" SOH "44=150.50000000" SOH
+              "32=100" SOH "31=150.50000000" SOH "151=0" SOH "14=100" SOH
+              "6=150.50000000" SOH "60=20260613-19:26:13.959" SOH "10=023" SOH, encoded);
+}
+
+TEST(MessageEncoder, ExecutionReportMinimal)
+{
+    std::array<uint8_t, 512> buffer{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    encoder.wrap(0, buffer);
+
+    ExecutionReportEncoder report{};
+    encoder.wrapMessage(report)
+            .sequenceNumber(1)
+            .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+            .orderID("ORD002")
+            .execID("EXEC002")
+            .execType(ExecType::New)
+            .ordStatus(OrdStatus::New)
+            .symbol("MSFT")
+            .side(Side::Sell)
+            .leavesQty(200)
+            .cumQty(0)
+            .avgPx(utils::FixedDecimal{0, 0})
+            .transactTime(std::chrono::milliseconds{1'781'378'773'959});
+
+    const auto length = encoder.encode(report);
+    const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
+
+    EXPECT_EQ("8=FIXT.1.1" SOH "9=0142" SOH "35=8" SOH "49=SENDER" SOH "56=TARGET" SOH
+              "34=1" SOH "52=20260613-19:26:13.959" SOH
+              "37=ORD002" SOH "17=EXEC002" SOH "150=0" SOH "39=0" SOH
+              "55=MSFT" SOH "54=2" SOH "151=200" SOH "14=0" SOH
+              "6=0" SOH "60=20260613-19:26:13.959" SOH "10=249" SOH, encoded);
+}
+
+TEST(MessageEncoder, ExecutionReportReject)
+{
+    std::array<uint8_t, 512> buffer{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    encoder.wrap(0, buffer);
+
+    ExecutionReportEncoder report{};
+    encoder.wrapMessage(report)
+            .sequenceNumber(5)
+            .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+            .orderID("NONE")
+            .clOrdID("CL003")
+            .execID("EXEC003")
+            .execType(ExecType::Rejected)
+            .ordStatus(OrdStatus::Rejected)
+            .symbol("TSLA")
+            .side(Side::Buy)
+            .leavesQty(0)
+            .cumQty(0)
+            .avgPx(utils::FixedDecimal{0, 0})
+            .transactTime(std::chrono::milliseconds{1'781'378'773'959})
+            .text("Insufficient buying power");
+
+    const auto length = encoder.encode(report);
+    const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
+
+    EXPECT_EQ("8=FIXT.1.1" SOH "9=0176" SOH "35=8" SOH "49=SENDER" SOH "56=TARGET" SOH
+              "34=5" SOH "52=20260613-19:26:13.959" SOH
+              "37=NONE" SOH "11=CL003" SOH "17=EXEC003" SOH "150=8" SOH "39=8" SOH
+              "55=TSLA" SOH "54=1" SOH "151=0" SOH "14=0" SOH
+              "6=0" SOH "60=20260613-19:26:13.959" SOH
+              "58=Insufficient buying power" SOH "10=180" SOH, encoded);
+}
+
 TEST(MessageEncoder, LogonWithXmlData)
 {
     std::array<uint8_t, 512> buffer{};
