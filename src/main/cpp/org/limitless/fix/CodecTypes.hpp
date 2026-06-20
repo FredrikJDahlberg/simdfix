@@ -279,7 +279,7 @@ struct Result
         InvalidLength
     };
 
-    uint32_t m_processed;
+    uint32_t m_processed{};
     Values m_value;
 
     constexpr Result() : m_value{Success} {}
@@ -298,11 +298,6 @@ struct Result
     constexpr bool operator==(const Values value) const
     {
         return m_value == value;
-    }
-
-    constexpr bool operator!=(const Values value) const
-    {
-        return m_value != value;
     }
 
     static constexpr std::string_view Names[] = {

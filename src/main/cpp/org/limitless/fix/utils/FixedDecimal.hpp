@@ -5,10 +5,10 @@
 #ifndef SIMD_FIX_FIXEDDECIMAL_HPP
 #define SIMD_FIX_FIXEDDECIMAL_HPP
 
+#include <compare>
 #include <cstdint>
 #include <ostream>
 #include <iomanip>
-#include <stdexcept>
 
 namespace org::limitless::fix::utils {
 
@@ -76,12 +76,12 @@ public:
         }
     }
 
-    int64_t mantissa() const
+    [[nodiscard]] constexpr int64_t mantissa() const
     {
         return m_mantissa;
     }
 
-    double toDouble() const
+    [[nodiscard]] constexpr double toDouble() const
     {
         return static_cast<double>(m_mantissa) / static_cast<double>(Scale);
     }
@@ -160,35 +160,7 @@ public:
         return *this;
     }
 
-    bool operator==(const FixedDecimal& other) const
-    {
-        return m_mantissa == other.m_mantissa;
-    }
-
-    bool operator!=(const FixedDecimal& other) const
-    {
-        return m_mantissa != other.m_mantissa;
-    }
-
-    bool operator<(const FixedDecimal& other) const
-    {
-        return m_mantissa < other.m_mantissa;
-    }
-
-    bool operator<=(const FixedDecimal& other) const
-    {
-        return m_mantissa <= other.m_mantissa;
-    }
-
-    bool operator>=(const FixedDecimal& other) const
-    {
-        return m_mantissa >= other.m_mantissa;
-    }
-
-    bool operator>(const FixedDecimal& other) const
-    {
-        return m_mantissa > other.m_mantissa;
-    }
+    constexpr auto operator<=>(const FixedDecimal& other) const = default;
 
     friend std::ostream& operator<<(std::ostream& os, const FixedDecimal& value)
     {

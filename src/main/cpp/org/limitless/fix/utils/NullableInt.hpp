@@ -5,6 +5,7 @@
 #ifndef SIMD_FIX_NULLABLE_INT_HPP
 #define SIMD_FIX_NULLABLE_INT_HPP
 
+#include <compare>
 #include <concepts>
 #include <limits>
 #include <ostream>
@@ -253,42 +254,23 @@ public:
 
     // --- RELATIONAL OPERATORS ---
 
-    constexpr bool operator==(const NullableInt& other) const
-    {
-        return m_value == other.m_value;
-    }
+    constexpr bool operator==(const NullableInt& other) const = default;
 
-    constexpr bool operator!=(const NullableInt& other) const
+    constexpr std::strong_ordering operator<=>(const NullableInt& other) const
     {
-        return m_value != other.m_value;
-    }
-
-    constexpr bool operator<(const NullableInt& other) const
-    {
+        if (!hasValue() && !other.hasValue())
+        {
+            return std::strong_ordering::equal;
+        }
         if (!hasValue())
         {
-            return other.hasValue();
+            return std::strong_ordering::less;
         }
         if (!other.hasValue())
         {
-            return false;
+            return std::strong_ordering::greater;
         }
-        return m_value < other.m_value;
-    }
-
-    constexpr bool operator<=(const NullableInt& other) const
-    {
-        return !(other < *this);
-    }
-
-    constexpr bool operator>(const NullableInt& other) const
-    {
-        return other < *this;
-    }
-
-    constexpr bool operator>=(const NullableInt& other) const
-    {
-        return !(*this < other);
+        return m_value <=> other.m_value;
     }
 
     // --- STREAM OPERATOR ---

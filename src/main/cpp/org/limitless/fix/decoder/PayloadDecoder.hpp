@@ -6,6 +6,7 @@
 #define SIMD_FIX_DECODER_HPP
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cstring>
 #include <span>
@@ -47,8 +48,8 @@ class PayloadDecoder
     static inline const simd::Uint8x16 ZerosBlock{'0'};
     static inline const simd::Uint8x16 NineMask{9};
 
-    Token m_tokens[MaxSize]{};
-    uint16_t m_tags[MaxSize]{};
+    std::array<Token, MaxSize> m_tokens{};
+    std::array<uint16_t, MaxSize> m_tags{};
 
     simd::Uint8x16 m_block{};
     uint32_t m_tag{};
@@ -56,8 +57,8 @@ class PayloadDecoder
     size_t m_count{};
     uint32_t m_skipEnd{};
 
-    uint8_t m_protocol[16];
-    uint32_t m_protocolLength;
+    std::array<uint8_t, 16> m_protocol{};
+    uint32_t m_protocolLength{};
 
 public:
     using position_t = uint32_t;
@@ -73,7 +74,7 @@ public:
         m_protocol[1] = '=';
         const auto code = Protocol::code(protocol);
         const auto size = code.size();
-        std::memcpy(m_protocol + 2, code.data(), size);
+        std::memcpy(m_protocol.data() + 2, code.data(), size);
         m_protocol[2 + size] = FieldEnd;
         m_protocolLength = size + 2;
     }
@@ -91,7 +92,7 @@ public:
      */
     [[nodiscard]] std::span<Token> tokens() noexcept
     {
-        return { m_tokens, m_count };
+        return { m_tokens.data(), m_count };
     }
 
     /**
@@ -113,7 +114,7 @@ public:
         }
 
         const auto messageType = buffer[m_tokens[MessageTypePosition].m_position];
-        result.m_value = handler.handle(buffer, std::span(m_tokens, m_count), std::span(m_tags, m_count), m_count, messageType);
+        result.m_value = handler.handle(buffer, std::span(m_tokens.data(), m_count), std::span(m_tags.data(), m_count), m_count, messageType);
         return result;
     }
 
@@ -139,7 +140,7 @@ public:
 
         const auto data = buffer.data();
         const auto length = static_cast<length_t>(buffer.size());
-        if (std::memcmp(data, m_protocol, m_protocolLength) != 0)
+        if (std::memcmp(data, m_protocol.data(), m_protocolLength) != 0)
         {
             return { 8, Result::InvalidBeginString };
         }
@@ -323,7 +324,7 @@ private:
             ++m_count;
             ++token;
             token->m_tag = m_tag;
-            m_tags[token - m_tokens] = m_tag;
+            m_tags[token - m_tokens.data()] = m_tag;
             token->m_position = offset + 1;
             m_position = 0;
             m_tag = 0;
@@ -357,7 +358,7 @@ private:
                 m_tag = 0;
             }
             token->m_tag = utils::asciiToUin32(value, digit, count);
-            m_tags[token - m_tokens] = token->m_tag;
+            m_tags[token - m_tokens.data()] = token->m_tag;
             token->m_position = offset + tagPos + count + 1;
             remainingDigitFlags >>= digitBits;
             nonTagBitPos += digitBits;
@@ -398,7 +399,7 @@ private:
 
         auto* dataToken = &m_tokens[m_count++];
         dataToken->m_tag = static_cast<uint16_t>(dataTagNum);
-        m_tags[dataToken - m_tokens] = dataToken->m_tag;
+        m_tags[dataToken - m_tokens.data()] = dataToken->m_tag;
         dataToken->m_position = pos;
         dataToken->m_length = static_cast<int16_t>(lengthValue);
 
@@ -493,7 +494,7 @@ private:
             last->m_length = offset + m_position - 1 - last->m_position;
             last = &m_tokens[m_count++];
             last->m_tag = utils::asciiToUint64(m_tag, data, tagEndPos, false);
-            m_tags[last - m_tokens] = last->m_tag;
+            m_tags[last - m_tokens.data()] = last->m_tag;
             last->m_position = offset + tagEndPos + 1;
             last->m_length = fieldEndPos - tagEndPos - 1;
             position = fieldEndPos + 1;
@@ -512,7 +513,7 @@ private:
         while (position + 7 < remaining)
         {
             last->m_tag = utils::asciiToUint64(0, data + position, tagEndPos - position, false);
-            m_tags[last - m_tokens] = last->m_tag;
+            m_tags[last - m_tokens.data()] = last->m_tag;
             position += tagEndPos - position + 1;
             last->m_position = position + offset;
             last->m_length = fieldEndPos - position;
@@ -530,7 +531,7 @@ private:
             constexpr uint32_t checkSumPrefixLen = 3; // "10="
             last = &m_tokens[m_count++];
             last->m_tag = CheckSumTag;
-            m_tags[last - m_tokens] = CheckSumTag;
+            m_tags[last - m_tokens.data()] = CheckSumTag;
             last->m_position = offset + position + checkSumPrefixLen;
             last->m_length = CheckSumValueLength;
         }

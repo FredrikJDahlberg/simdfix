@@ -31,28 +31,29 @@ inline void print(const uint32_t length, const uint8_t* buffer)
     std::printf("\n");
 }
 
+inline constexpr uint32_t PowersOf10_32[] = {
+    1, 10, 100, 1'000, 10'000, 100'000,
+    1'000'000, 10'000'000, 100'000'000, 1'000'000'000
+};
+
+inline constexpr uint64_t PowersOf10_64[] = {
+    1ULL, 10ULL, 100ULL, 1'000ULL, 10'000ULL, 100'000ULL,
+    1'000'000ULL, 10'000'000ULL, 100'000'000ULL, 1'000'000'000ULL,
+    10'000'000'000ULL, 100'000'000'000ULL, 1'000'000'000'000ULL,
+    10'000'000'000'000ULL, 100'000'000'000'000ULL, 1'000'000'000'000'000ULL,
+    10'000'000'000'000'000ULL, 100'000'000'000'000'000ULL,
+    1'000'000'000'000'000'000ULL, 10'000'000'000'000'000'000ULL
+};
+
 /**
  * Multiplies value by 10^power.
  * @param value value to scale
  * @param power power of ten, 0-9; values outside this range return value unchanged
  * @return value * 10^power
  */
-[[nodiscard]] inline uint32_t scale(const uint32_t value, const uint32_t power)
+[[nodiscard]] constexpr uint32_t scale(const uint32_t value, const uint32_t power)
 {
-    switch (power)
-    {
-        case 0: return value;
-        case 1: return value * 10;
-        case 2: return value * 100;
-        case 3: return value * 1'000;
-        case 4: return value * 10'000;
-        case 5: return value * 100'000;
-        case 6: return value * 1'000'000;
-        case 7: return value * 10'000'000;
-        case 8: return value * 100'000'000;
-        case 9: return value * 1'000'000'000;
-        default: return value;
-    }
+    return power < std::size(PowersOf10_32) ? value * PowersOf10_32[power] : value;
 }
 
 /**
@@ -61,32 +62,9 @@ inline void print(const uint32_t length, const uint8_t* buffer)
  * @param power power of ten, 0-19; values outside this range return value unchanged
  * @return value * 10^power
  */
-[[nodiscard]] inline uint64_t scale(const uint64_t value, const uint32_t power)
+[[nodiscard]] constexpr uint64_t scale(const uint64_t value, const uint32_t power)
 {
-    switch (power)
-    {
-        case 0: return value;
-        case 1: return value * 10ULL;
-        case 2: return value * 100ULL;
-        case 3: return value * 1'000ULL;
-        case 4: return value * 10'000ULL;
-        case 5: return value * 100'000ULL;
-        case 6: return value * 1'000'000ULL;
-        case 7: return value * 10'000'000ULL;
-        case 8: return value * 100'000'000ULL;
-        case 9: return value * 1'000'000'000ULL;
-        case 10: return value * 10'000'000'000ULL;
-        case 11: return value * 100'000'000'000ULL;
-        case 12: return value * 1'000'000'000'000ULL;
-        case 13: return value * 10'000'000'000'000ULL;
-        case 14: return value * 100'000'000'000'000ULL;
-        case 15: return value * 1'000'000'000'000'000ULL;
-        case 16: return value * 10'000'000'000'000'000ULL;
-        case 17: return value * 100'000'000'000'000'000ULL;
-        case 18: return value * 1'000'000'000'000'000'000ULL;
-        case 19: return value * 10'000'000'000'000'000'000ULL;
-        default: return value; // 18'446'744'073'709'551'615
-    }
+    return power < std::size(PowersOf10_64) ? value * PowersOf10_64[power] : value;
 }
 
 inline constexpr int64_t MillisPerDay = 24 * 60 * 60 * 1'000;
@@ -226,7 +204,7 @@ template<size_t N>
 {
     const uint64_t mask = 0x01010101'01010101ULL * value;
     bytes ^= mask;
-    bytes = bytes - 0x01010101'01010101ULL & ~bytes & 0x80808080'80808080ULL;
+    bytes = (bytes - 0x01010101'01010101ULL) & ~bytes & 0x80808080'80808080ULL;
     return bytes;
 }
 
