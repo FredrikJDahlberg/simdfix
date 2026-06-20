@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <string_view>
 
+#include "org/limitless/fix/CodecTypes.hpp"
+
 namespace org::limitless::fix {
 
 struct Protocol
@@ -30,6 +32,10 @@ struct Protocol
         return value >= Null && value < Max ? Codes[value] : Codes[0];
     }
 };
+
+inline constexpr FixedString FIXT_1_1 {"FIXT.1.1"};
+inline constexpr FixedString FIX_4_3 {"FIX.4.3"};
+inline constexpr FixedString FIX_4_4 {"FIX.4.4"};
 
 } // namespace org::limitless::fix
 
@@ -58,16 +64,74 @@ struct MessageType
         Logout,
         TestRequest,
         Heartbeat,
+        ResendRequest,
+        Reject,
+        SequenceReset,
         NewOrderSingle
     };
-    static constexpr std::string_view Codes[6]  =
+    static constexpr std::string_view Codes[9]  =
     {
         "?",
         "A",
         "5",
         "1",
         "0",
+        "2",
+        "3",
+        "4",
         "D"
+    };
+};
+
+struct SessionRejectReason
+{
+    enum Values
+    {
+        Null,
+        InvalidTagNumber,
+        RequiredTagMissing,
+        TagNotDefinedForMessageType,
+        UndefinedTag,
+        TagSpecifiedWithoutValue,
+        ValueIsIncorrect,
+        IncorrectDataFormat,
+        DecryptionProblem,
+        SignatureProblem,
+        CompIDProblem,
+        SendingTimeAccuracyProblem,
+        InvalidMsgType
+    };
+    static constexpr std::string_view Codes[13]  =
+    {
+        "?",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11"
+    };
+};
+
+struct GapFillFlag
+{
+    enum Values
+    {
+        Null,
+        GapFillMessage,
+        SequenceReset
+    };
+    static constexpr std::string_view Codes[3]  =
+    {
+        "?",
+        "Y",
+        "N"
     };
 };
 

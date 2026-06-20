@@ -341,6 +341,204 @@ public:
 
 };
 
+struct ResendRequestEncoder : MessageEncoder
+{
+private:
+    HopsEncoder m_hops;
+
+public:
+    ResendRequestEncoder() : 
+        m_hops{m_encoder}
+    {
+    }
+
+    ResendRequestEncoder(const ResendRequestEncoder&) = delete;
+    ResendRequestEncoder& operator=(const ResendRequestEncoder&) = delete;
+    ResendRequestEncoder(ResendRequestEncoder&&) = delete;
+    ResendRequestEncoder& operator=(ResendRequestEncoder&&) = delete;
+
+    static constexpr std::string_view MessageId = "2";
+
+    ResendRequestEncoder& wrap(const std::span<uint8_t> data, const uint32_t offset = 0)
+    {
+        MessageEncoder::wrap(data, offset);
+        return *this;
+    }
+
+    [[nodiscard]] std::string_view type() const
+    {
+        return MessageId;
+    }
+
+    ResendRequestEncoder& sequenceNumber(const std::uint32_t value)
+    {
+        m_encoder.encode<"34", std::uint32_t>(value);
+        return *this;
+    }
+
+    ResendRequestEncoder& sendingTime(const std::chrono::milliseconds value)
+    {
+        m_encoder.encode<"52", std::chrono::milliseconds>(value);
+        return *this;
+    }
+
+    ResendRequestEncoder& beginSeqNo(const std::uint32_t value)
+    {
+        m_encoder.encode<"7", std::uint32_t>(value);
+        return *this;
+    }
+
+    ResendRequestEncoder& endSeqNo(const std::uint32_t value)
+    {
+        m_encoder.encode<"16", std::uint32_t>(value);
+        return *this;
+    }
+
+    HopsEncoder& hops(const uint32_t count)
+    {
+        return m_hops.wrap(count);
+    }
+
+};
+
+struct RejectEncoder : MessageEncoder
+{
+private:
+    HopsEncoder m_hops;
+
+public:
+    RejectEncoder() : 
+        m_hops{m_encoder}
+    {
+    }
+
+    RejectEncoder(const RejectEncoder&) = delete;
+    RejectEncoder& operator=(const RejectEncoder&) = delete;
+    RejectEncoder(RejectEncoder&&) = delete;
+    RejectEncoder& operator=(RejectEncoder&&) = delete;
+
+    static constexpr std::string_view MessageId = "3";
+
+    RejectEncoder& wrap(const std::span<uint8_t> data, const uint32_t offset = 0)
+    {
+        MessageEncoder::wrap(data, offset);
+        return *this;
+    }
+
+    [[nodiscard]] std::string_view type() const
+    {
+        return MessageId;
+    }
+
+    RejectEncoder& sequenceNumber(const std::uint32_t value)
+    {
+        m_encoder.encode<"34", std::uint32_t>(value);
+        return *this;
+    }
+
+    RejectEncoder& sendingTime(const std::chrono::milliseconds value)
+    {
+        m_encoder.encode<"52", std::chrono::milliseconds>(value);
+        return *this;
+    }
+
+    RejectEncoder& refSeqNum(const std::uint32_t value)
+    {
+        m_encoder.encode<"45", std::uint32_t>(value);
+        return *this;
+    }
+
+    RejectEncoder& refTagID(const std::uint32_t value)
+    {
+        m_encoder.encode<"371", std::uint32_t>(value);
+        return *this;
+    }
+
+    RejectEncoder& refMsgType(const MessageType::Values value)
+    {
+        m_encoder.encode<"372", false, MessageType>(value);
+        return *this;
+    }
+
+    RejectEncoder& sessionRejectReason(const SessionRejectReason::Values value)
+    {
+        m_encoder.encode<"373", false, SessionRejectReason>(value);
+        return *this;
+    }
+
+    RejectEncoder& text(const std::string_view value)
+    {
+        m_encoder.encode<"58", std::string_view>(value);
+        return *this;
+    }
+
+    HopsEncoder& hops(const uint32_t count)
+    {
+        return m_hops.wrap(count);
+    }
+
+};
+
+struct SequenceResetEncoder : MessageEncoder
+{
+private:
+    HopsEncoder m_hops;
+
+public:
+    SequenceResetEncoder() : 
+        m_hops{m_encoder}
+    {
+    }
+
+    SequenceResetEncoder(const SequenceResetEncoder&) = delete;
+    SequenceResetEncoder& operator=(const SequenceResetEncoder&) = delete;
+    SequenceResetEncoder(SequenceResetEncoder&&) = delete;
+    SequenceResetEncoder& operator=(SequenceResetEncoder&&) = delete;
+
+    static constexpr std::string_view MessageId = "4";
+
+    SequenceResetEncoder& wrap(const std::span<uint8_t> data, const uint32_t offset = 0)
+    {
+        MessageEncoder::wrap(data, offset);
+        return *this;
+    }
+
+    [[nodiscard]] std::string_view type() const
+    {
+        return MessageId;
+    }
+
+    SequenceResetEncoder& sequenceNumber(const std::uint32_t value)
+    {
+        m_encoder.encode<"34", std::uint32_t>(value);
+        return *this;
+    }
+
+    SequenceResetEncoder& sendingTime(const std::chrono::milliseconds value)
+    {
+        m_encoder.encode<"52", std::chrono::milliseconds>(value);
+        return *this;
+    }
+
+    SequenceResetEncoder& gapFillFlag(const GapFillFlag::Values value)
+    {
+        m_encoder.encode<"123", false, GapFillFlag>(value);
+        return *this;
+    }
+
+    SequenceResetEncoder& newSeqNo(const std::uint32_t value)
+    {
+        m_encoder.encode<"36", std::uint32_t>(value);
+        return *this;
+    }
+
+    HopsEncoder& hops(const uint32_t count)
+    {
+        return m_hops.wrap(count);
+    }
+
+};
+
 struct NewOrderSingleEncoder : MessageEncoder
 {
 private:

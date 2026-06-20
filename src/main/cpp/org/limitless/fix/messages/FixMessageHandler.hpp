@@ -16,6 +16,9 @@ class MessageHandler
     LogoutDecoder m_logout;
     HeartbeatDecoder m_heartbeat;
     TestRequestDecoder m_testRequest;
+    ResendRequestDecoder m_resendRequest;
+    RejectDecoder m_reject;
+    SequenceResetDecoder m_sequenceReset;
     NewOrderSingleDecoder m_newOrderSingle;
 
 public:
@@ -31,6 +34,9 @@ public:
         m_logout.context(&context);
         m_heartbeat.context(&context);
         m_testRequest.context(&context);
+        m_resendRequest.context(&context);
+        m_reject.context(&context);
+        m_sequenceReset.context(&context);
         m_newOrderSingle.context(&context);
     }
 
@@ -75,6 +81,30 @@ public:
                     status = receive(m_testRequest);
                 }
                 break;
+            case ResendRequestDecoder::MessageId:
+                m_resendRequest.wrap(data, tokens, tags, count);
+                status = m_resendRequest.checkRequired();
+                if (status == Result::Success)
+                {
+                    status = receive(m_resendRequest);
+                }
+                break;
+            case RejectDecoder::MessageId:
+                m_reject.wrap(data, tokens, tags, count);
+                status = m_reject.checkRequired();
+                if (status == Result::Success)
+                {
+                    status = receive(m_reject);
+                }
+                break;
+            case SequenceResetDecoder::MessageId:
+                m_sequenceReset.wrap(data, tokens, tags, count);
+                status = m_sequenceReset.checkRequired();
+                if (status == Result::Success)
+                {
+                    status = receive(m_sequenceReset);
+                }
+                break;
             case NewOrderSingleDecoder::MessageId:
                 m_newOrderSingle.wrap(data, tokens, tags, count);
                 status = m_newOrderSingle.checkRequired();
@@ -94,6 +124,9 @@ protected:
     Result::Values handle(LogoutDecoder&) { return Result::Success; }
     Result::Values handle(HeartbeatDecoder&) { return Result::Success; }
     Result::Values handle(TestRequestDecoder&) { return Result::Success; }
+    Result::Values handle(ResendRequestDecoder&) { return Result::Success; }
+    Result::Values handle(RejectDecoder&) { return Result::Success; }
+    Result::Values handle(SequenceResetDecoder&) { return Result::Success; }
     Result::Values handle(NewOrderSingleDecoder&) { return Result::Success; }
 };
 

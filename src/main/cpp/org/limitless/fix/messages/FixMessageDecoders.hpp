@@ -434,6 +434,273 @@ public:
 
 };
 
+struct ResendRequestDecoder : MessageDecoder
+{
+private:
+    HopsDecoder m_hops;
+
+public:
+    ResendRequestDecoder() : 
+        m_hops{m_decoder}
+    {
+    }
+
+    ResendRequestDecoder(const ResendRequestDecoder&) = delete;
+    ResendRequestDecoder& operator=(const ResendRequestDecoder&) = delete;
+    ResendRequestDecoder(ResendRequestDecoder&&) = delete;
+    ResendRequestDecoder& operator=(ResendRequestDecoder&&) = delete;
+
+    static constexpr uint8_t MessageId = '2';
+
+    ResendRequestDecoder& wrap(const std::span<const uint8_t> data,
+            const std::span<Token> tokens,
+            const std::span<uint16_t> tags,
+            const uint32_t count)
+    {
+        m_decoder.wrap(data, tokens, tags, count);
+        return *this;
+    }
+
+    void context(const SessionContext* context)
+    {
+        MessageDecoder::context(context);
+    }
+
+    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    {
+        return m_decoder.getUint32<9, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    {
+        return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    {
+        return m_decoder.getString<49, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    {
+        return m_decoder.getString<56, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    {
+        return m_decoder.getUint32<34, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    {
+        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> beginSeqNo() const
+    {
+        return m_decoder.getUint32<7, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> endSeqNo() const
+    {
+        return m_decoder.getUint32<16, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] HopsDecoder& hops()
+    {
+        return m_hops.wrap();
+    }
+
+};
+
+struct RejectDecoder : MessageDecoder
+{
+private:
+    HopsDecoder m_hops;
+
+public:
+    RejectDecoder() : 
+        m_hops{m_decoder}
+    {
+    }
+
+    RejectDecoder(const RejectDecoder&) = delete;
+    RejectDecoder& operator=(const RejectDecoder&) = delete;
+    RejectDecoder(RejectDecoder&&) = delete;
+    RejectDecoder& operator=(RejectDecoder&&) = delete;
+
+    static constexpr uint8_t MessageId = '3';
+
+    RejectDecoder& wrap(const std::span<const uint8_t> data,
+            const std::span<Token> tokens,
+            const std::span<uint16_t> tags,
+            const uint32_t count)
+    {
+        m_decoder.wrap(data, tokens, tags, count);
+        return *this;
+    }
+
+    void context(const SessionContext* context)
+    {
+        MessageDecoder::context(context);
+    }
+
+    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    {
+        return m_decoder.getUint32<9, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    {
+        return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    {
+        return m_decoder.getString<49, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    {
+        return m_decoder.getString<56, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    {
+        return m_decoder.getUint32<34, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    {
+        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> refSeqNum() const
+    {
+        return m_decoder.getUint32<45, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> refTagID() const
+    {
+        return m_decoder.getUint32<371, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<MessageType::Values, Result::Values> refMsgType() const
+    {
+        return m_decoder.getEnum<372, false, MessageType, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<SessionRejectReason::Values, Result::Values> sessionRejectReason() const
+    {
+        return m_decoder.getEnum<373, false, SessionRejectReason, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
+    {
+        return m_decoder.getString<58, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] HopsDecoder& hops()
+    {
+        return m_hops.wrap();
+    }
+
+};
+
+struct SequenceResetDecoder : MessageDecoder
+{
+private:
+    HopsDecoder m_hops;
+
+public:
+    SequenceResetDecoder() : 
+        m_hops{m_decoder}
+    {
+    }
+
+    SequenceResetDecoder(const SequenceResetDecoder&) = delete;
+    SequenceResetDecoder& operator=(const SequenceResetDecoder&) = delete;
+    SequenceResetDecoder(SequenceResetDecoder&&) = delete;
+    SequenceResetDecoder& operator=(SequenceResetDecoder&&) = delete;
+
+    static constexpr uint8_t MessageId = '4';
+
+    SequenceResetDecoder& wrap(const std::span<const uint8_t> data,
+            const std::span<Token> tokens,
+            const std::span<uint16_t> tags,
+            const uint32_t count)
+    {
+        m_decoder.wrap(data, tokens, tags, count);
+        return *this;
+    }
+
+    void context(const SessionContext* context)
+    {
+        MessageDecoder::context(context);
+    }
+
+    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    {
+        return m_decoder.getUint32<9, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    {
+        return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    {
+        return m_decoder.getString<49, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    {
+        return m_decoder.getString<56, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    {
+        return m_decoder.getUint32<34, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    {
+        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<GapFillFlag::Values, Result::Values> gapFillFlag() const
+    {
+        return m_decoder.getEnum<123, false, GapFillFlag, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> newSeqNo() const
+    {
+        return m_decoder.getUint32<36, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] HopsDecoder& hops()
+    {
+        return m_hops.wrap();
+    }
+
+};
+
 struct NewOrderSingleDecoder : MessageDecoder
 {
 private:
