@@ -280,9 +280,9 @@ struct Result
     };
 
     uint32_t m_processed{};
-    Values m_value;
+    Values m_value{Success};
 
-    constexpr Result() : m_value{Success} {}
+    constexpr Result() = default;
 
     explicit constexpr Result(const Values value) : m_value{value} {}
 

@@ -287,7 +287,7 @@ private:
         {
             return {processed, status};
         }
-        return {processed, m_count < 7 ? Result::RequiredFieldMissing : status};
+        return {processed, m_count < RequiredFieldCount ? Result::RequiredFieldMissing : status};
     }
 
     /**
@@ -471,17 +471,7 @@ private:
         const uint8_t* data = buffer.data() + offset;
         const size_t remaining = buffer.size() - offset;
         uint64_t bytes = 0;
-        if (remaining >= sizeof(uint64_t))
-        {
-            std::memcpy(&bytes, data, sizeof(uint64_t));
-        }
-        else
-        {
-            for (size_t i = 0; i < remaining; ++i)
-            {
-                bytes |= static_cast<uint64_t>(data[i]) << (i * 8);
-            }
-        }
+        std::memcpy(&bytes, data, std::min(remaining, sizeof(uint64_t)));
         uint64_t tagEnds = utils::findByte(TagEnd, bytes);
         uint64_t fieldEnds = utils::findByte(FieldEnd, bytes);
         uint32_t tagEndBit = std::countr_zero(tagEnds);
