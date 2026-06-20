@@ -6,6 +6,7 @@
 
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
 #include "org/limitless/fix/decoder/FieldDecoder.hpp"
+#include "org/limitless/fix/messages/FixTypes.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
 namespace org::limitless::fix::decoder {
@@ -18,7 +19,7 @@ TEST(FieldDecoder, GetInt32)
         "8=FIXT.1.1" SOH "9=62" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "9999=-12345" SOH "10=004" SOH);
 
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 
@@ -43,7 +44,7 @@ TEST(FieldDecoder, GetFixedDecimal)
         "8=FIXT.1.1" SOH "9=73" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "9999=123.45" SOH "9998=-0.01" SOH "10=020" SOH);
 
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 
@@ -68,7 +69,7 @@ TEST(FieldDecoder, GetInt32MissingField)
         "8=FIXT.1.1" SOH "9=50" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "10=179" SOH);
 
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 

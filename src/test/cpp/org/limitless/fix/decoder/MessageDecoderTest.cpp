@@ -44,7 +44,7 @@ TEST(MessageDecoder, Logon)
         }
     } app;
 
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(login, app);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
@@ -68,7 +68,7 @@ TEST(MessageDecoder, Logout)
         }
     } app;
 
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     {
         const auto logout = utils::makeSpan(
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
@@ -78,8 +78,8 @@ TEST(MessageDecoder, Logout)
         ASSERT_TRUE(app.found);
     }
     {
-        const auto reject = utils::makeSpan("8=FIXT.1.1" SOH "9=41" SOH "35=3" SOH
-            "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "45=666" SOH "10=247" SOH);
+        const auto reject = utils::makeSpan("8=FIXT.1.1" SOH "9=41" SOH "35=Z" SOH
+            "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "45=666" SOH "10=030" SOH);
         auto [processed, status] = decoder.parse(reject, app);
         ASSERT_EQ(Result::InvalidMessageType, status);
     }
@@ -103,7 +103,7 @@ TEST(MessageDecoder, MessageFragment)
         }
     } app;
 
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     {
         const auto logout1 = utils::makeSpan(
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH );
@@ -154,7 +154,7 @@ TEST(MessageDecoder, HopGroup1)
             return Result::Success;
         }
     } app;
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
@@ -195,7 +195,7 @@ TEST(MessageDecoder, HopGroup2)
             return Result::Success;
         }
     } app;
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=86" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
         "52=20260609-12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "628=20" SOH  "10=090" SOH);
     auto[processed, status] = decoder.parse(logout, app);
@@ -231,7 +231,7 @@ TEST(MessageDecoder, HopGroup3)
             return Result::Success;
         }
     } app;
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=108" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
         "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=20260609-12:13:14.000" SOH
         "629=20260609-12:13:15.000" SOH "10=253" SOH);
@@ -263,7 +263,7 @@ TEST(MessageDecoder, InvalidGroupCount)
             return Result::Success;
         }
     } app;
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=70" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=12:12:12.123" SOH
         "627=2" SOH "629=10" SOH "628=20" SOH "10=071" SOH);
@@ -293,7 +293,7 @@ TEST(MessageDecoder, NewOrderSingle)
         }
     } app;
 
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     const auto message = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0129" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH
@@ -326,7 +326,7 @@ TEST(MessageDecoder, LogonWithXmlData)
         }
     } app;
 
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     const auto message = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0090" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
@@ -361,7 +361,7 @@ TEST(MessageDecoder, LogonWithXmlDataEmbeddedSoh)
         }
     } app;
 
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     const auto message = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
@@ -404,7 +404,7 @@ TEST(MessageDecoder, LogonWithXmlDataInlineSkip)
             return -1;
         }
     };
-    PayloadDecoder<"FIXT.1.1", DataFields> decoder;
+    PayloadDecoder<FIXT_1_1, DataFields> decoder;
     const auto message = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
@@ -424,9 +424,147 @@ TEST(MessageDecoder, LogonWithXmlDataInlineSkip)
     }
 }
 
+TEST(MessageDecoder, ResendRequest)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(ResendRequestDecoder& resend)
+        {
+            EXPECT_EQ(1U, resend.beginSeqNo().value());
+            EXPECT_EQ(4U, resend.endSeqNo().value());
+            EXPECT_EQ(5U, resend.sequenceNumber().value());
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0064" SOH "35=2" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=5" SOH "52=20260613-19:26:13.959" SOH "7=1" SOH "16=4" SOH "10=162" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
+TEST(MessageDecoder, Reject)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(RejectDecoder& reject)
+        {
+            EXPECT_EQ(9U, reject.refSeqNum().value());
+            EXPECT_EQ(55U, reject.refTagID().value());
+            EXPECT_EQ(MessageType::NewOrderSingle, reject.refMsgType().value());
+            EXPECT_EQ(SessionRejectReason::RequiredTagMissing, reject.sessionRejectReason().value());
+            EXPECT_EQ("Missing Symbol", toString(reject.text().value()));
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0098" SOH "35=3" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=10" SOH "52=20260613-19:26:13.959" SOH "45=9" SOH "371=55" SOH "372=D" SOH
+        "373=1" SOH "58=Missing Symbol" SOH "10=191" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
+TEST(MessageDecoder, RejectMinimal)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(RejectDecoder& reject)
+        {
+            EXPECT_EQ(2U, reject.refSeqNum().value());
+            EXPECT_FALSE(reject.refTagID().has_value());
+            EXPECT_FALSE(reject.refMsgType().has_value());
+            EXPECT_FALSE(reject.sessionRejectReason().has_value());
+            EXPECT_FALSE(reject.text().has_value());
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0060" SOH "35=3" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=3" SOH "52=20260613-19:26:13.959" SOH "45=2" SOH "10=247" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
+TEST(MessageDecoder, SequenceReset)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(SequenceResetDecoder& seqReset)
+        {
+            EXPECT_EQ(GapFillFlag::GapFillMessage, seqReset.gapFillFlag().value());
+            EXPECT_EQ(10U, seqReset.newSeqNo().value());
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0067" SOH "35=4" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=5" SOH "52=20260613-19:26:13.959" SOH "123=Y" SOH "36=10" SOH "10=093" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
+TEST(MessageDecoder, SequenceResetNoGapFill)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(SequenceResetDecoder& seqReset)
+        {
+            EXPECT_FALSE(seqReset.gapFillFlag().has_value());
+            EXPECT_EQ(10U, seqReset.newSeqNo().value());
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0061" SOH "35=4" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=5" SOH "52=20260613-19:26:13.959" SOH "36=10" SOH "10=042" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
 TEST(MessageDecoder, InvalidMandatoryFields)
 {
-    PayloadDecoder<"FIXT.1.1"> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     struct AppHandler : MessageHandler<AppHandler>{} app;
     {
         const auto message = utils::makeSpan("666=FIXT.1.1" SOH);
