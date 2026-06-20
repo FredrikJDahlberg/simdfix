@@ -194,29 +194,8 @@ public:
             }
             std::printf("\n");
 #endif
-            complete = processBlock(offset, tagDigits, digits, bits, data);
+            complete = processBlock(tagDigits, digits, bits, data, length, offset, blockSum);
             bits = 0;
-            if (m_skipEnd > 0)
-            {
-                const position_t blockEnd = offset + Uint8x16::Size;
-                if (m_skipEnd > blockEnd)
-                {
-                    const position_t sumEnd = std::min(m_skipEnd, static_cast<position_t>(length));
-                    for (position_t i = blockEnd; i < sumEnd; ++i)
-                    {
-                        blockSum += data[i];
-                    }
-                }
-                else
-                {
-                    for (position_t i = m_skipEnd; i < blockEnd; ++i)
-                    {
-                        blockSum -= data[i];
-                    }
-                }
-                offset = m_skipEnd - Uint8x16::Size;
-                m_skipEnd = 0;
-            }
         }
         if (complete)
         {
@@ -291,11 +270,44 @@ private:
     }
 
     /**
+     * Adjusts blockSum and offset after emitDataSkip has set m_skipEnd,
+     * correcting for bytes inside the data payload that the SIMD scan
+     * either missed or double-counted.
+     * @param data raw message bytes
+     * @param length message length
+     * @param offset current block offset, updated to resume after the skip
+     * @param blockSum running byte sum, corrected for the skipped region
+     */
+    void applyDataSkip(const data_t* data,
+                       const length_t length,
+                       position_t& offset,
+                       uint64_t& blockSum)
+    {
+        const position_t blockEnd = offset + simd::Uint8x16::Size;
+        if (m_skipEnd > blockEnd)
+        {
+            const position_t sumEnd = std::min(m_skipEnd, static_cast<position_t>(length));
+            for (position_t i = blockEnd; i < sumEnd; ++i)
+            {
+                blockSum += data[i];
+            }
+        }
+        else
+        {
+            for (position_t i = m_skipEnd; i < blockEnd; ++i)
+            {
+                blockSum -= data[i];
+            }
+        }
+        offset = m_skipEnd - simd::Uint8x16::Size;
+        m_skipEnd = 0;
+    }
+
+    /**
      * Consumes one 16-byte block's worth of tag digits: closes out the
      * previous token (handling a tag split across the block boundary),
      * extracts each tag number found in this block into new tokens, and
      * carries over a trailing partial tag to the next block.
-     * @param offset byte offset of this block within the message
      * @param tagDigitFlags bitmask with a 4-bit-aligned nibble set for each
      *        byte position in this block that is part of a tag number
      * @param digits ASCII digit value at each lane where validTags was set,
@@ -303,13 +315,19 @@ private:
      * @param nonTagBitPos bit position to resume scanning from; nonzero
      *        only for the first block, to skip the already-consumed
      *        BeginString
+     * @param data raw message bytes
+     * @param length message length
+     * @param offset current block offset, updated on data skip
+     * @param blockSum running byte sum, corrected on data skip
      * @return true once the CheckSum tag (10) has been tokenized
      */
-    bool processBlock(const position_t offset,
-                      const uint64_t tagDigitFlags,
+    bool processBlock(const uint64_t tagDigitFlags,
                       const data_t* digits,
                       position_t nonTagBitPos,
-                      const data_t* data)
+                      const data_t* data,
+                      const length_t length,
+                      position_t& offset,
+                      uint64_t& blockSum)
     {
         const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
         const auto trailingCount = std::countl_one(trailingTagFlags);
@@ -319,6 +337,7 @@ private:
             token->m_length = static_cast<int16_t>(m_position + offset - 1 - token->m_position);
             if (emitDataSkip(data, token))
             {
+                applyDataSkip(data, length, offset, blockSum);
                 return false;
             }
             ++m_count;
@@ -344,6 +363,7 @@ private:
 
             if (emitDataSkip(data, token))
             {
+                applyDataSkip(data, length, offset, blockSum);
                 return false;
             }
 
@@ -394,7 +414,10 @@ private:
 
         // Scan past the SOH after the length value, then past the data tag's "NNN=" prefix
         auto pos = static_cast<position_t>(token->m_position + token->m_length + 1);
-        while (data[pos] != TagEnd) ++pos;
+        while (data[pos] != TagEnd)
+        {
+            ++pos;
+        }
         ++pos;
 
         auto* dataToken = &m_tokens[m_count++];
