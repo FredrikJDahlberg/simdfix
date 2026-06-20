@@ -332,7 +332,7 @@ private:
         const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
         const auto trailingCount = std::countl_one(trailingTagFlags);
         auto* token = &m_tokens[m_count - 1];
-        if (m_tag != 0 && digits[0] == 0)
+        if (m_tag != 0 && (tagDigitFlags & 0xF) == 0)
         {  // split tag ending in first position of next block
             token->m_length = static_cast<int16_t>(m_position + offset - 1 - token->m_position);
             if (emitDataSkip(data, token))
