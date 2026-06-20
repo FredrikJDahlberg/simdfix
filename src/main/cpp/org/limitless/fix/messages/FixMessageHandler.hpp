@@ -19,6 +19,7 @@ class MessageHandler
     ResendRequestDecoder m_resendRequest;
     RejectDecoder m_reject;
     SequenceResetDecoder m_sequenceReset;
+    ExecutionReportDecoder m_executionReport;
     NewOrderSingleDecoder m_newOrderSingle;
 
 public:
@@ -37,6 +38,7 @@ public:
         m_resendRequest.context(&context);
         m_reject.context(&context);
         m_sequenceReset.context(&context);
+        m_executionReport.context(&context);
         m_newOrderSingle.context(&context);
     }
 
@@ -105,6 +107,14 @@ public:
                     status = receive(m_sequenceReset);
                 }
                 break;
+            case ExecutionReportDecoder::MessageId:
+                m_executionReport.wrap(data, tokens, tags, count);
+                status = m_executionReport.checkRequired();
+                if (status == Result::Success)
+                {
+                    status = receive(m_executionReport);
+                }
+                break;
             case NewOrderSingleDecoder::MessageId:
                 m_newOrderSingle.wrap(data, tokens, tags, count);
                 status = m_newOrderSingle.checkRequired();
@@ -127,6 +137,7 @@ protected:
     Result::Values handle(ResendRequestDecoder&) { return Result::Success; }
     Result::Values handle(RejectDecoder&) { return Result::Success; }
     Result::Values handle(SequenceResetDecoder&) { return Result::Success; }
+    Result::Values handle(ExecutionReportDecoder&) { return Result::Success; }
     Result::Values handle(NewOrderSingleDecoder&) { return Result::Success; }
 };
 

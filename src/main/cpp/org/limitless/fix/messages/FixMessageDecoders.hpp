@@ -701,6 +701,160 @@ public:
 
 };
 
+struct ExecutionReportDecoder : MessageDecoder
+{
+private:
+    HopsDecoder m_hops;
+
+public:
+    ExecutionReportDecoder() : 
+        m_hops{m_decoder}
+    {
+    }
+
+    ExecutionReportDecoder(const ExecutionReportDecoder&) = delete;
+    ExecutionReportDecoder& operator=(const ExecutionReportDecoder&) = delete;
+    ExecutionReportDecoder(ExecutionReportDecoder&&) = delete;
+    ExecutionReportDecoder& operator=(ExecutionReportDecoder&&) = delete;
+
+    static constexpr uint8_t MessageId = '8';
+
+    ExecutionReportDecoder& wrap(const std::span<const uint8_t> data,
+            const std::span<Token> tokens,
+            const std::span<uint16_t> tags,
+            const uint32_t count)
+    {
+        m_decoder.wrap(data, tokens, tags, count);
+        return *this;
+    }
+
+    void context(const SessionContext* context)
+    {
+        MessageDecoder::context(context);
+    }
+
+    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    {
+        return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    {
+        return m_decoder.getUint32<9, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    {
+        return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    {
+        return m_decoder.getString<49, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    {
+        return m_decoder.getString<56, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    {
+        return m_decoder.getUint32<34, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    {
+        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> orderID() const
+    {
+        return m_decoder.getString<37, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> clOrdID() const
+    {
+        return m_decoder.getString<11, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> execID() const
+    {
+        return m_decoder.getString<17, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<ExecType::Values, Result::Values> execType() const
+    {
+        return m_decoder.getEnum<150, true, ExecType, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<OrdStatus::Values, Result::Values> ordStatus() const
+    {
+        return m_decoder.getEnum<39, true, OrdStatus, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> symbol() const
+    {
+        return m_decoder.getString<55, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<Side::Values, Result::Values> side() const
+    {
+        return m_decoder.getEnum<54, true, Side, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> orderQty() const
+    {
+        return m_decoder.getUint32<38, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<utils::FixedDecimal, Result::Values> price() const
+    {
+        return m_decoder.getFixedDecimal<44, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> lastQty() const
+    {
+        return m_decoder.getUint32<32, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<utils::FixedDecimal, Result::Values> lastPx() const
+    {
+        return m_decoder.getFixedDecimal<31, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> leavesQty() const
+    {
+        return m_decoder.getUint32<151, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::uint32_t, Result::Values> cumQty() const
+    {
+        return m_decoder.getUint32<14, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<utils::FixedDecimal, Result::Values> avgPx() const
+    {
+        return m_decoder.getFixedDecimal<6, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> transactTime() const
+    {
+        return m_decoder.getTimestamp<60, true, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
+    {
+        return m_decoder.getString<58, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] HopsDecoder& hops()
+    {
+        return m_hops.wrap();
+    }
+
+};
+
 struct NewOrderSingleDecoder : MessageDecoder
 {
 private:

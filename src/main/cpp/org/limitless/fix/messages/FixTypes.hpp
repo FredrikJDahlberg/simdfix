@@ -67,9 +67,10 @@ struct MessageType
         ResendRequest,
         Reject,
         SequenceReset,
-        NewOrderSingle
+        NewOrderSingle,
+        ExecutionReport
     };
-    static constexpr std::string_view Codes[9]  =
+    static constexpr std::string_view Codes[10]  =
     {
         "?",
         "A",
@@ -79,7 +80,8 @@ struct MessageType
         "2",
         "3",
         "4",
-        "D"
+        "D",
+        "8"
     };
 };
 
@@ -214,6 +216,92 @@ struct HandlInst
         "1",
         "2",
         "3"
+    };
+};
+
+struct ExecType
+{
+    enum Values
+    {
+        Null,
+        New,
+        DoneForDay,
+        Canceled,
+        Replaced,
+        PendingCancel,
+        Stopped,
+        Rejected,
+        Suspended,
+        PendingNew,
+        Calculated,
+        Expired,
+        Restated,
+        PendingReplace,
+        Trade,
+        TradeCorrect,
+        TradeCancel,
+        OrderStatus
+    };
+    static constexpr std::string_view Codes[18]  =
+    {
+        "?",
+        "0",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I"
+    };
+};
+
+struct OrdStatus
+{
+    enum Values
+    {
+        Null,
+        New,
+        PartiallyFilled,
+        Filled,
+        DoneForDay,
+        Canceled,
+        Replaced,
+        PendingCancel,
+        Stopped,
+        Rejected,
+        Suspended,
+        PendingNew,
+        Calculated,
+        Expired,
+        PendingReplace
+    };
+    static constexpr std::string_view Codes[15]  =
+    {
+        "?",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "A",
+        "B",
+        "C",
+        "E"
     };
 };
 

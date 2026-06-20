@@ -22,6 +22,7 @@
             <element name="Reject" value="3"/>
             <element name="SequenceReset" value="4"/>
             <element name="NewOrderSingle" value="D"/>
+            <element name="ExecutionReport" value="8"/>
         </enum>
 
         <enum name="SessionRejectReason">
@@ -71,6 +72,43 @@
             <element name="AutoPrivate" value="1"/>
             <element name="AutoPublic" value="2"/>
             <element name="Manual" value="3"/>
+        </enum>
+
+        <enum name="ExecType">
+            <element name="New" value="0"/>
+            <element name="DoneForDay" value="3"/>
+            <element name="Canceled" value="4"/>
+            <element name="Replaced" value="5"/>
+            <element name="PendingCancel" value="6"/>
+            <element name="Stopped" value="7"/>
+            <element name="Rejected" value="8"/>
+            <element name="Suspended" value="9"/>
+            <element name="PendingNew" value="A"/>
+            <element name="Calculated" value="B"/>
+            <element name="Expired" value="C"/>
+            <element name="Restated" value="D"/>
+            <element name="PendingReplace" value="E"/>
+            <element name="Trade" value="F"/>
+            <element name="TradeCorrect" value="G"/>
+            <element name="TradeCancel" value="H"/>
+            <element name="OrderStatus" value="I"/>
+        </enum>
+
+        <enum name="OrdStatus">
+            <element name="New" value="0"/>
+            <element name="PartiallyFilled" value="1"/>
+            <element name="Filled" value="2"/>
+            <element name="DoneForDay" value="3"/>
+            <element name="Canceled" value="4"/>
+            <element name="Replaced" value="5"/>
+            <element name="PendingCancel" value="6"/>
+            <element name="Stopped" value="7"/>
+            <element name="Rejected" value="8"/>
+            <element name="Suspended" value="9"/>
+            <element name="PendingNew" value="A"/>
+            <element name="Calculated" value="B"/>
+            <element name="Expired" value="C"/>
+            <element name="PendingReplace" value="E"/>
         </enum>
 
         <enum name="Boolean">
@@ -149,6 +187,26 @@
         <field name="Header" type="StandardHeader"/>
         <field name="GapFillFlag" tag="123" type="GapFillFlag" presence="optional"/>
         <field name="NewSeqNo" tag="36" primitiveType="uint32"/>
+    </message>
+
+    <message name="ExecutionReport" id="8">
+        <field name="Header" type="StandardHeader"/>
+        <field name="OrderID" tag="37" primitiveType="string" length="20"/>
+        <field name="ClOrdID" tag="11" primitiveType="string" length="20" presence="optional"/>
+        <field name="ExecID" tag="17" primitiveType="string" length="20"/>
+        <field name="ExecType" tag="150" type="ExecType"/>
+        <field name="OrdStatus" tag="39" type="OrdStatus"/>
+        <field name="Symbol" tag="55" primitiveType="string" length="8"/>
+        <field name="Side" tag="54" type="Side"/>
+        <field name="OrderQty" tag="38" primitiveType="uint32" presence="optional"/>
+        <field name="Price" tag="44" primitiveType="decimal" presence="optional"/>
+        <field name="LastQty" tag="32" primitiveType="uint32" presence="optional"/>
+        <field name="LastPx" tag="31" primitiveType="decimal" presence="optional"/>
+        <field name="LeavesQty" tag="151" primitiveType="uint32"/>
+        <field name="CumQty" tag="14" primitiveType="uint32"/>
+        <field name="AvgPx" tag="6" primitiveType="decimal"/>
+        <field name="TransactTime" tag="60" primitiveType="timestamp"/>
+        <field name="Text" tag="58" primitiveType="string" length="64" presence="optional"/>
     </message>
 
     <message name="NewOrderSingle" id="D">

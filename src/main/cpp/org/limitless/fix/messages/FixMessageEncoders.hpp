@@ -539,6 +539,150 @@ public:
 
 };
 
+struct ExecutionReportEncoder : MessageEncoder
+{
+private:
+    HopsEncoder m_hops;
+
+public:
+    ExecutionReportEncoder() : 
+        m_hops{m_encoder}
+    {
+    }
+
+    ExecutionReportEncoder(const ExecutionReportEncoder&) = delete;
+    ExecutionReportEncoder& operator=(const ExecutionReportEncoder&) = delete;
+    ExecutionReportEncoder(ExecutionReportEncoder&&) = delete;
+    ExecutionReportEncoder& operator=(ExecutionReportEncoder&&) = delete;
+
+    static constexpr std::string_view MessageId = "8";
+
+    ExecutionReportEncoder& wrap(const std::span<uint8_t> data, const uint32_t offset = 0)
+    {
+        MessageEncoder::wrap(data, offset);
+        return *this;
+    }
+
+    [[nodiscard]] std::string_view type() const
+    {
+        return MessageId;
+    }
+
+    ExecutionReportEncoder& sequenceNumber(const std::uint32_t value)
+    {
+        m_encoder.encode<"34", std::uint32_t>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& sendingTime(const std::chrono::milliseconds value)
+    {
+        m_encoder.encode<"52", std::chrono::milliseconds>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& orderID(const std::string_view value)
+    {
+        m_encoder.encode<"37", std::string_view>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& clOrdID(const std::string_view value)
+    {
+        m_encoder.encode<"11", std::string_view>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& execID(const std::string_view value)
+    {
+        m_encoder.encode<"17", std::string_view>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& execType(const ExecType::Values value)
+    {
+        m_encoder.encode<"150", true, ExecType>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& ordStatus(const OrdStatus::Values value)
+    {
+        m_encoder.encode<"39", true, OrdStatus>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& symbol(const std::string_view value)
+    {
+        m_encoder.encode<"55", std::string_view>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& side(const Side::Values value)
+    {
+        m_encoder.encode<"54", true, Side>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& orderQty(const std::uint32_t value)
+    {
+        m_encoder.encode<"38", std::uint32_t>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& price(const utils::FixedDecimal value)
+    {
+        m_encoder.encode<"44">(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& lastQty(const std::uint32_t value)
+    {
+        m_encoder.encode<"32", std::uint32_t>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& lastPx(const utils::FixedDecimal value)
+    {
+        m_encoder.encode<"31">(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& leavesQty(const std::uint32_t value)
+    {
+        m_encoder.encode<"151", std::uint32_t>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& cumQty(const std::uint32_t value)
+    {
+        m_encoder.encode<"14", std::uint32_t>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& avgPx(const utils::FixedDecimal value)
+    {
+        m_encoder.encode<"6">(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& transactTime(const std::chrono::milliseconds value)
+    {
+        m_encoder.encode<"60", std::chrono::milliseconds>(value);
+        return *this;
+    }
+
+    ExecutionReportEncoder& text(const std::string_view value)
+    {
+        m_encoder.encode<"58", std::string_view>(value);
+        return *this;
+    }
+
+    HopsEncoder& hops(const uint32_t count)
+    {
+        return m_hops.wrap(count);
+    }
+
+};
+
 struct NewOrderSingleEncoder : MessageEncoder
 {
 private:
