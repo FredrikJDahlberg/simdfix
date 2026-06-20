@@ -13,6 +13,18 @@ namespace org::limitless::fix::simd {
 
 [[nodiscard]] inline int32_t find(const uint16_t* array, const int32_t cardinality, const uint16_t key)
 {
+    if (cardinality < 8)
+    {
+        for (int32_t i = 0; i < cardinality; ++i)
+        {
+            if (array[i] == key)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     const Uint8x16 keys{key};
     int32_t i = 0;
     Uint8x16 values{};
