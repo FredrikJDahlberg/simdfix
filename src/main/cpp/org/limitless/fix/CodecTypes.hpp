@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-04-25.
 //
 
-#ifndef SIMD_FIX_DICTIONARY_HPP
-#define SIMD_FIX_DICTIONARY_HPP
+#ifndef SIMD_FIX_CODEC_TYPES_HPP
+#define SIMD_FIX_CODEC_TYPES_HPP
 
 #include <algorithm>
 #include <concepts>
@@ -103,30 +103,6 @@ concept EncodableMessage = requires(T message, std::span<uint8_t> data)
     { message.type() } -> std::convertible_to<std::string_view>;
     { message.wrap(data) };
     { message.encodedLength() } -> std::convertible_to<std::size_t>;
-};
-
-struct Protocol
-{
-    enum Values
-    {
-        Null,
-        FIXT_1_1,
-        FIX_4_3,
-        FIX_4_4,
-        Max
-    };
-    static constexpr std::string_view Codes[]  =
-    {
-        "?",
-        "FIXT.1.1",
-        "FIX.4.3",
-        "FIX.4.4"
-    };
-
-    static constexpr auto code(const Values value)
-    {
-        return value >= Null && value < Max ? Codes[value] : Codes[0];
-    }
 };
 
 struct Token
@@ -249,6 +225,10 @@ struct Presence
 
     [[nodiscard]] static constexpr Values parse(const std::string_view name)
     {
+        if (name.empty())
+        {
+            return Required;
+        }
         constexpr auto end = Strings + std::size(Strings);
         const auto found = std::find(Strings, end, name);
         return found != end ? static_cast<Values>(found - Strings) : Null;
@@ -340,4 +320,4 @@ using TagSpan = std::span<uint16_t>;
 }
 
 
-#endif //SIMD_FIX_DICTIONARY_HPP
+#endif //SIMD_FIX_CODEC_TYPES_HPP

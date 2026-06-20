@@ -23,7 +23,7 @@ namespace org::limitless::fix::decoder {
 class MessageDecoder
 {
 private:
-    SessionContext* m_context{};
+    const SessionContext* m_context{};
 
 protected:
     FieldDecoder m_decoder{};
@@ -75,24 +75,34 @@ public:
     }
 
     /**
-     * Sets the session context used by checkRequired() to validate SenderCompID
-     * and TargetCompID.
-     * @param context expected CompIDs for this session
+     * Sets the session context used by checkRequired() to validate BeginString,
+     * SenderCompID and TargetCompID.
+     * @param context expected session parameters
      */
-    void context(SessionContext& context)
+    void context(const SessionContext* context)
     {
-        m_context = &context;
+        m_context = context;
     }
 
     /**
-     * Extracts and validates the standard header fields: SenderCompID (49),
-     * TargetCompID (56), MsgSeqNum (34), and SendingTime (52). If m_context
-     * is set and specifies expected CompIDs, the corresponding field must
+     * Extracts and validates the standard header fields: BeginString (8),
+     * SenderCompID (49), TargetCompID (56), MsgSeqNum (34), and
+     * SendingTime (52). If m_context is set, the corresponding fields must
      * match or the message is rejected.
      * @return Result::Success, or the first validation failure encountered
      */
     [[nodiscard]] Result::Values checkRequired()
     {
+        if (m_context != nullptr)
+        {
+            const auto beginString = m_decoder.getString<8, true, RecordType::Component>();
+            if (!beginString ||
+                !std::ranges::equal(beginString.value(), m_context->m_protocol))
+            {
+                return Result::InvalidBeginString;
+            }
+        }
+
         const auto sender = m_decoder.getString<49, true, RecordType::Component>();
         if (!sender || (m_context != nullptr &&
                         !std::ranges::equal(sender.value(), m_context->m_senderCompId)))

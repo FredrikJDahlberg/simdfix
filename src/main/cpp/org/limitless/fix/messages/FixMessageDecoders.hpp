@@ -39,7 +39,7 @@ struct NestedGroupDecoder : GroupDecoder
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> name() const
     {
-        return m_decoder.getString<501, false, RecordType::Group>();
+        return m_decoder.getString<501, true, RecordType::Group>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> nestedOne() const
@@ -135,44 +135,44 @@ public:
         return *this;
     }
 
-    void context(SessionContext& context)
+    void context(const SessionContext* context)
     {
         MessageDecoder::context(context);
     }
 
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
     {
-        return m_decoder.getEnum<8, false, Protocol, RecordType::Message>();
+        return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
-        return m_decoder.getUint32<9, false, RecordType::Message>();
+        return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
-        return m_decoder.getEnum<35, false, MessageType, RecordType::Message>();
+        return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, false, RecordType::Message>();
+        return m_decoder.getString<49, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, false, RecordType::Message>();
+        return m_decoder.getString<56, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, false, RecordType::Message>();
+        return m_decoder.getUint32<34, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, false, RecordType::Message>();
+        return m_decoder.getTimestamp<52, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<Encryption::Values, Result::Values> encryptMethod() const
@@ -182,7 +182,7 @@ public:
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> heartbeatInterval() const
     {
-        return m_decoder.getUint32<108, false, RecordType::Message>();
+        return m_decoder.getUint32<108, true, RecordType::Message>();
     }
 
     [[nodiscard]] HopsDecoder& hops()
@@ -224,49 +224,49 @@ public:
         return *this;
     }
 
-    void context(SessionContext& context)
+    void context(const SessionContext* context)
     {
         MessageDecoder::context(context);
     }
 
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
     {
-        return m_decoder.getEnum<8, false, Protocol, RecordType::Message>();
+        return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
-        return m_decoder.getUint32<9, false, RecordType::Message>();
+        return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
-        return m_decoder.getEnum<35, false, MessageType, RecordType::Message>();
+        return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, false, RecordType::Message>();
+        return m_decoder.getString<49, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, false, RecordType::Message>();
+        return m_decoder.getString<56, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, false, RecordType::Message>();
+        return m_decoder.getUint32<34, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, false, RecordType::Message>();
+        return m_decoder.getTimestamp<52, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
     {
-        return m_decoder.getString<58, false, RecordType::Message>();
+        return m_decoder.getString<58, true, RecordType::Message>();
     }
 
     [[nodiscard]] HopsDecoder& hops()
@@ -303,44 +303,44 @@ public:
         return *this;
     }
 
-    void context(SessionContext& context)
+    void context(const SessionContext* context)
     {
         MessageDecoder::context(context);
     }
 
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
     {
-        return m_decoder.getEnum<8, false, Protocol, RecordType::Message>();
+        return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
-        return m_decoder.getUint32<9, false, RecordType::Message>();
+        return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
-        return m_decoder.getEnum<35, false, MessageType, RecordType::Message>();
+        return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, false, RecordType::Message>();
+        return m_decoder.getString<49, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, false, RecordType::Message>();
+        return m_decoder.getString<56, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, false, RecordType::Message>();
+        return m_decoder.getUint32<34, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, false, RecordType::Message>();
+        return m_decoder.getTimestamp<52, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> testReqID() const
@@ -382,44 +382,44 @@ public:
         return *this;
     }
 
-    void context(SessionContext& context)
+    void context(const SessionContext* context)
     {
         MessageDecoder::context(context);
     }
 
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
     {
-        return m_decoder.getEnum<8, false, Protocol, RecordType::Message>();
+        return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
-        return m_decoder.getUint32<9, false, RecordType::Message>();
+        return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
-        return m_decoder.getEnum<35, false, MessageType, RecordType::Message>();
+        return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, false, RecordType::Message>();
+        return m_decoder.getString<49, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, false, RecordType::Message>();
+        return m_decoder.getString<56, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, false, RecordType::Message>();
+        return m_decoder.getUint32<34, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, false, RecordType::Message>();
+        return m_decoder.getTimestamp<52, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> testReqID() const
@@ -461,44 +461,44 @@ public:
         return *this;
     }
 
-    void context(SessionContext& context)
+    void context(const SessionContext* context)
     {
         MessageDecoder::context(context);
     }
 
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
     {
-        return m_decoder.getEnum<8, false, Protocol, RecordType::Message>();
+        return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
     {
-        return m_decoder.getUint32<9, false, RecordType::Message>();
+        return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
     {
-        return m_decoder.getEnum<35, false, MessageType, RecordType::Message>();
+        return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, false, RecordType::Message>();
+        return m_decoder.getString<49, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, false, RecordType::Message>();
+        return m_decoder.getString<56, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, false, RecordType::Message>();
+        return m_decoder.getUint32<34, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, false, RecordType::Message>();
+        return m_decoder.getTimestamp<52, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> account() const
@@ -508,37 +508,37 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> clOrdID() const
     {
-        return m_decoder.getString<11, false, RecordType::Message>();
+        return m_decoder.getString<11, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<HandlInst::Values, Result::Values> handlInst() const
     {
-        return m_decoder.getEnum<21, false, HandlInst, RecordType::Message>();
+        return m_decoder.getEnum<21, true, HandlInst, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> symbol() const
     {
-        return m_decoder.getString<55, false, RecordType::Message>();
+        return m_decoder.getString<55, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<Side::Values, Result::Values> side() const
     {
-        return m_decoder.getEnum<54, false, Side, RecordType::Message>();
+        return m_decoder.getEnum<54, true, Side, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> transactTime() const
     {
-        return m_decoder.getTimestamp<60, false, RecordType::Message>();
+        return m_decoder.getTimestamp<60, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> orderQty() const
     {
-        return m_decoder.getUint32<38, false, RecordType::Message>();
+        return m_decoder.getUint32<38, true, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<OrdType::Values, Result::Values> ordType() const
     {
-        return m_decoder.getEnum<40, false, OrdType, RecordType::Message>();
+        return m_decoder.getEnum<40, true, OrdType, RecordType::Message>();
     }
 
     [[nodiscard]] std::expected<utils::FixedDecimal, Result::Values> price() const

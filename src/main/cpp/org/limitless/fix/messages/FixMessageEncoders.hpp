@@ -396,7 +396,7 @@ public:
 
     NewOrderSingleEncoder& handlInst(const HandlInst::Values value)
     {
-        m_encoder.encode<"21", false, HandlInst>(value);
+        m_encoder.encode<"21", true, HandlInst>(value);
         return *this;
     }
 
@@ -408,7 +408,7 @@ public:
 
     NewOrderSingleEncoder& side(const Side::Values value)
     {
-        m_encoder.encode<"54", false, Side>(value);
+        m_encoder.encode<"54", true, Side>(value);
         return *this;
     }
 
@@ -426,7 +426,7 @@ public:
 
     NewOrderSingleEncoder& ordType(const OrdType::Values value)
     {
-        m_encoder.encode<"40", false, OrdType>(value);
+        m_encoder.encode<"40", true, OrdType>(value);
         return *this;
     }
 

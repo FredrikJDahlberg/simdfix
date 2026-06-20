@@ -223,7 +223,7 @@ struct LogonDataGetterHandler : org::limitless::fix::messages::MessageHandler<Lo
 // COLD: 1 GB buffer — data comes from DRAM for most of the run.
 static void benchColdCache()
 {
-    decoder::PayloadDecoder decoder{org::limitless::fix::Protocol::FIXT_1_1};
+    decoder::PayloadDecoder<"FIXT.1.1"> decoder;
 
     constexpr size_t COLD_SIZE = 1024ULL * 1024 * 1024;
     auto coldBuf = std::make_unique<uint8_t[]>(COLD_SIZE);
@@ -244,7 +244,7 @@ static void benchColdCache()
 // HOT: 256 KB buffer — fits in L2, measures pure compute throughput.
 static void benchHotCache()
 {
-    decoder::PayloadDecoder decoder{Protocol::FIXT_1_1};
+    decoder::PayloadDecoder<"FIXT.1.1"> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -282,7 +282,7 @@ static void benchHotCache()
 // GETTERS: parse + apply every LogonDecoder getter to the message.
 static void benchGetters()
 {
-    decoder::PayloadDecoder decoder{Protocol::FIXT_1_1};
+    decoder::PayloadDecoder<"FIXT.1.1"> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -313,7 +313,7 @@ static void benchGetters()
 // repeating group, to the message.
 static void benchGroups()
 {
-    decoder::PayloadDecoder decoder{Protocol::FIXT_1_1};
+    decoder::PayloadDecoder<"FIXT.1.1"> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -357,7 +357,7 @@ static void benchLogonData()
             return -1;
         }
     };
-    decoder::PayloadDecoder<DataFields> decoder{Protocol::FIXT_1_1};
+    decoder::PayloadDecoder<"FIXT.1.1", DataFields> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -393,7 +393,7 @@ static void benchLogonData()
 // NOS_HOT: hot-cache decode of NewOrderSingle (tokenization only, no getters).
 static void benchNewOrderSingleHot()
 {
-    decoder::PayloadDecoder decoder{Protocol::FIXT_1_1};
+    decoder::PayloadDecoder<"FIXT.1.1"> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -457,7 +457,7 @@ struct NewOrderSingleGetterHandler : org::limitless::fix::messages::MessageHandl
 
 static void benchNewOrderSingleGetters()
 {
-    decoder::PayloadDecoder decoder{Protocol::FIXT_1_1};
+    decoder::PayloadDecoder<"FIXT.1.1"> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;

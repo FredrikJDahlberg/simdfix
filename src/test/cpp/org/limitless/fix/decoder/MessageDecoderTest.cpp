@@ -44,7 +44,7 @@ TEST(MessageDecoder, Logon)
         }
     } app;
 
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     auto [processed, status] = decoder.parse(login, app);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
@@ -68,7 +68,7 @@ TEST(MessageDecoder, Logout)
         }
     } app;
 
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     {
         const auto logout = utils::makeSpan(
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
@@ -103,7 +103,7 @@ TEST(MessageDecoder, MessageFragment)
         }
     } app;
 
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     {
         const auto logout1 = utils::makeSpan(
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH );
@@ -154,7 +154,7 @@ TEST(MessageDecoder, HopGroup1)
             return Result::Success;
         }
     } app;
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
@@ -195,7 +195,7 @@ TEST(MessageDecoder, HopGroup2)
             return Result::Success;
         }
     } app;
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=86" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
         "52=20260609-12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "628=20" SOH  "10=090" SOH);
     auto[processed, status] = decoder.parse(logout, app);
@@ -231,7 +231,7 @@ TEST(MessageDecoder, HopGroup3)
             return Result::Success;
         }
     } app;
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=108" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
         "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=20260609-12:13:14.000" SOH
         "629=20260609-12:13:15.000" SOH "10=253" SOH);
@@ -263,7 +263,7 @@ TEST(MessageDecoder, InvalidGroupCount)
             return Result::Success;
         }
     } app;
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=70" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=12:12:12.123" SOH
         "627=2" SOH "629=10" SOH "628=20" SOH "10=071" SOH);
@@ -293,7 +293,7 @@ TEST(MessageDecoder, NewOrderSingle)
         }
     } app;
 
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     const auto message = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0129" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH
@@ -326,7 +326,7 @@ TEST(MessageDecoder, LogonWithXmlData)
         }
     } app;
 
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     const auto message = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0090" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
@@ -361,7 +361,7 @@ TEST(MessageDecoder, LogonWithXmlDataEmbeddedSoh)
         }
     } app;
 
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     const auto message = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
@@ -404,7 +404,7 @@ TEST(MessageDecoder, LogonWithXmlDataInlineSkip)
             return -1;
         }
     };
-    PayloadDecoder<DataFields> decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1", DataFields> decoder;
     const auto message = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
@@ -426,7 +426,7 @@ TEST(MessageDecoder, LogonWithXmlDataInlineSkip)
 
 TEST(MessageDecoder, InvalidMandatoryFields)
 {
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     struct AppHandler : MessageHandler<AppHandler>{} app;
     {
         const auto message = utils::makeSpan("666=FIXT.1.1" SOH);

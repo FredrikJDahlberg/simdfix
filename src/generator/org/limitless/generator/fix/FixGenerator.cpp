@@ -12,6 +12,7 @@ using namespace org::limitless::fix;
 using namespace org::limitless::generator::fix;
 
 static void generateTypes(const std::string& fileName,
+                          const Record& protocol,
                           const std::vector<Record>& enums);
 static void generateDecoders(const std::string& fileName,
                              const std::vector<Record>& records);
@@ -41,7 +42,7 @@ int main(int argc, char** argv)
 
     std::string typesFile{argv[2]};
     typesFile.append("/FixTypes.hpp");
-    generateTypes(typesFile, model.m_enums);
+    generateTypes(typesFile, model.m_protocol, model.m_enums);
 
     std::string decodersFile{argv[2]};
     decodersFile.append("/FixMessageDecoders.hpp");
@@ -80,7 +81,36 @@ static void generateEnums(std::ostream& out, const Record& record)
     out << "};\n\n";
 }
 
+static void generateProtocol(std::ostream& out, const Record& protocol)
+{
+    out << "namespace org::limitless::fix {\n\n";
+    out << "struct Protocol\n{\n";
+    out << "    enum Values\n    {\n";
+    for (const auto& field : protocol.m_fields)
+    {
+        out << std::format("        {},\n", field.m_name);
+    }
+    out << "        Max\n";
+    out << "    };\n";
+
+    auto size = protocol.m_fields.size();
+    out << std::format("    static constexpr std::string_view Codes[{}]  =\n    {{\n", size);
+    const auto end = protocol.m_fields.end();
+    for (auto value = protocol.m_fields.begin(); value != end; ++value)
+    {
+        out << std::format("        \"{}\"{}\n", value->m_type, value != end - 1 ? "," : "");
+    }
+    out << "    };\n\n";
+    out << "    static constexpr auto code(const Values value)\n";
+    out << "    {\n";
+    out << "        return value >= Null && value < Max ? Codes[value] : Codes[0];\n";
+    out << "    }\n";
+    out << "};\n\n";
+    out << "} // namespace org::limitless::fix\n\n";
+}
+
 static void generateTypes(const std::string& fileName,
+                          const Record& protocol,
                           const std::vector<Record>& enums)
 {
     std::ofstream out(fileName);
@@ -95,6 +125,7 @@ static void generateTypes(const std::string& fileName,
     out << "#define SIMD_FIX_TYPES_HPP\n\n";
     out << "#include <cstdint>\n";
     out << "#include <string_view>\n\n";
+    generateProtocol(out, protocol);
     out << "namespace org::limitless::fix::messages {\n\n";
     for (const auto& type: enums)
     {
@@ -359,7 +390,7 @@ static void generateWrapNextDecoders(std::ostream& out, const Record& record)
         out << "        return *this;\n";
         out << "    }\n\n";
 
-        out << "    void context(SessionContext& context)\n";
+        out << "    void context(const SessionContext* context)\n";
         out << "    {\n";
         out << "        MessageDecoder::context(context);\n";
         out << "    }\n\n";

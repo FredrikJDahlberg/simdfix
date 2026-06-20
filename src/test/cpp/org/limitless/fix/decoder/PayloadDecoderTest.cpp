@@ -33,7 +33,7 @@ TEST(PayloadDecoder, Basics)
         "141=Y" SOH "553=Username" SOH "554=Password" SOH "1137=9" SOH "10=218" SOH
         // next message
         "8=FIXT.1.1" SOH "9=118" SOH);
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(Result::Success, status);
     ASSERT_EQ(message.size() - 17, processed);
@@ -63,7 +63,7 @@ TEST(PayloadDecoder, TrailerSplitCheckSum)
 {
     const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=47" SOH "35=A" SOH
         "49=Buyer" SOH "56=Seller" SOH "34=2000001" SOH "52=20190605" SOH "10=046" SOH);
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(Result::Success, status);
     ASSERT_EQ(message.size(), processed);
@@ -86,7 +86,7 @@ TEST(PayloadDecoder, TrailerFieldEnd)
 {
     const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=21" SOH "35=66" SOH
         "666=66" SOH "1=1" SOH "2=2" SOH "10=233" SOH);
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(Result::Success, status);
 }
@@ -94,7 +94,7 @@ TEST(PayloadDecoder, TrailerFieldEnd)
 TEST(PayloadDecoder, Fragment)
 {
     const auto message = utils::makeSpan("8=FIXT.");
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(Result::MessageFragment, status);
     ASSERT_EQ(0UL, processed);
@@ -116,7 +116,7 @@ TEST(PayloadDecoder, TrailerSplitValue)
         "34=1" SOH "52=20260613-19:26:13.959" SOH
         "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
         "38=100" SOH "40=2" SOH "44=15000" SOH "10=126" SOH);
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(Result::Success, status);
     ASSERT_EQ(message.size(), processed);
@@ -135,7 +135,7 @@ TEST(PayloadDecoder, HopGroup)
     const auto logout = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
-    PayloadDecoder decoder{Protocol::FIXT_1_1};
+    PayloadDecoder<"FIXT.1.1"> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
     constexpr Token expectedTokens[] =

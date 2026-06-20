@@ -87,6 +87,7 @@ struct DataModel
 {
     std::unordered_map<std::string, Type> m_types{};
     std::unordered_map<std::string, Record> m_recordsByType{};
+    Record m_protocol{};
     std::vector<Record> m_enums{};
     std::vector<Record> m_records{};
 
@@ -253,9 +254,24 @@ struct DataModel
         }
     }
 
+    void processVersions(const pugi::xml_node& versions)
+    {
+        m_protocol = Record{"Protocol", "", RecordType::Enum};
+        m_protocol.m_fields.emplace_back(0, "Null", "?", 1, Presence::Null,
+                                         Category::Enum, RecordType::Enum);
+        for (auto version : versions.children("version"))
+        {
+            auto name = std::string{version.attribute("name").as_string()};
+            auto code = std::string{version.attribute("code").as_string()};
+            m_protocol.m_fields.emplace_back(0, std::move(name), std::move(code), 1,
+                                             Presence::Null, Category::Enum, RecordType::Enum);
+        }
+    }
+
     void process(const pugi::xml_document& doc)
     {
         const pugi::xml_node protocol = doc.child("protocol");
+        processVersions(protocol.child("versions"));
         processTypes(protocol.child("types").children());
         processRecords(protocol.select_nodes(".//component"), RecordType::Component);
         processRecords(protocol.select_nodes(".//group"), RecordType::Group);

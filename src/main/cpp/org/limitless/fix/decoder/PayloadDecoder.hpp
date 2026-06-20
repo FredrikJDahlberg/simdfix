@@ -30,10 +30,11 @@ struct NoDataFields
  * trailing CheckSum. Handles messages that are fragmented across chunk
  * boundaries, including tags split across a 16-byte block boundary.
  *
+ * @tparam BeginString FIX protocol version string (e.g. "FIXT.1.1", "FIX.4.4")
  * @tparam DataFields compile-time schema providing dataTag(uint16_t) for
  *         binary-safe data field skipping; defaults to NoDataFields (no skip)
  */
-template <typename DataFields = NoDataFields>
+template <FixedString BeginString, typename DataFields = NoDataFields>
 class PayloadDecoder
 {
     static constexpr size_t MaxSize = 64;
@@ -42,6 +43,20 @@ class PayloadDecoder
     static constexpr uint32_t MessageFragmentLimit = 32;
 
     static constexpr uint64_t CheckSumMask = 1 |  '1' << 8 | '0' << 16 | '=' << 24 | 1ULL << 56;
+
+    static constexpr uint32_t ProtocolLength = BeginString.Size - 1;
+    static constexpr auto ProtocolPrefix = []
+    {
+        std::array<uint8_t, ProtocolLength + 3> result{};
+        result[0] = '8';
+        result[1] = '=';
+        for (std::size_t i = 0; i < ProtocolLength; ++i)
+        {
+            result[i + 2] = static_cast<uint8_t>(BeginString.Value[i]);
+        }
+        result[ProtocolLength + 2] = FieldEnd;
+        return result;
+    }();
 
     static inline const simd::Uint8x16 TagEndsBlock{'='};
     static inline const simd::Uint8x16 FieldEndsBlock{0x01};
@@ -57,28 +72,13 @@ class PayloadDecoder
     size_t m_count{};
     uint32_t m_skipEnd{};
 
-    std::array<uint8_t, 16> m_protocol{};
-    uint32_t m_protocolLength{};
-
 public:
     using position_t = uint32_t;
     using length_t = uint16_t;
     using value_t = uint16_t;
     using data_t = uint8_t;
 
-    PayloadDecoder() = delete;
-
-    explicit PayloadDecoder(const Protocol::Values protocol)
-    {
-        m_protocol[0] = '8';
-        m_protocol[1] = '=';
-        const auto code = Protocol::code(protocol);
-        const auto size = code.size();
-        std::memcpy(m_protocol.data() + 2, code.data(), size);
-        m_protocol[2 + size] = FieldEnd;
-        m_protocolLength = size + 2;
-    }
-
+    PayloadDecoder() = default;
     ~PayloadDecoder() = default;
 
     PayloadDecoder(const PayloadDecoder&) = delete;
@@ -140,11 +140,11 @@ public:
 
         const auto data = buffer.data();
         const auto length = static_cast<length_t>(buffer.size());
-        if (std::memcmp(data, m_protocol.data(), m_protocolLength) != 0)
+        if (std::memcmp(data, ProtocolPrefix.data(), ProtocolPrefix.size()) != 0)
         {
             return { 8, Result::InvalidBeginString };
         }
-        m_tokens[BeginStringPosition] = { 2, 8, 8 };
+        m_tokens[BeginStringPosition] = { 2, 8, ProtocolLength };
         m_tags[BeginStringPosition] = 8;
         m_count = 1;
 
@@ -550,8 +550,6 @@ private:
         }
     }
 };
-
-PayloadDecoder(Protocol::Values) -> PayloadDecoder<NoDataFields>;
 
 }
 

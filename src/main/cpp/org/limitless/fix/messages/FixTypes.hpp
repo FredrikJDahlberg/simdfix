@@ -5,6 +5,34 @@
 #include <cstdint>
 #include <string_view>
 
+namespace org::limitless::fix {
+
+struct Protocol
+{
+    enum Values
+    {
+        Null,
+        FIXT_1_1,
+        FIX_4_3,
+        FIX_4_4,
+        Max
+    };
+    static constexpr std::string_view Codes[4]  =
+    {
+        "?",
+        "FIXT.1.1",
+        "FIX.4.3",
+        "FIX.4.4"
+    };
+
+    static constexpr auto code(const Values value)
+    {
+        return value >= Null && value < Max ? Codes[value] : Codes[0];
+    }
+};
+
+} // namespace org::limitless::fix
+
 namespace org::limitless::fix::messages {
 
 struct Encryption

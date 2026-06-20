@@ -1,5 +1,11 @@
 <protocol>
 
+    <versions>
+        <version name="FIXT_1_1" code="FIXT.1.1"/>
+        <version name="FIX_4_3" code="FIX.4.3"/>
+        <version name="FIX_4_4" code="FIX.4.4"/>
+    </versions>
+
     <types>
         <type name="String8" primitiveType="char" length="8"/>
 
