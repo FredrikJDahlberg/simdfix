@@ -45,7 +45,7 @@ public:
     Result::Values handle(const std::span<const uint8_t> data,
                           const std::span<Token> tokens,
                           const std::span<uint16_t> tags,
-                          const uint32_t count,
+                          const int32_t count,
                           const uint8_t messageType)
     {
         auto status = Result::InvalidMessageType;

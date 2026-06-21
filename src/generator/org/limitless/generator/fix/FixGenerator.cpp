@@ -299,7 +299,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "    Result::Values handle(const std::span<const uint8_t> data,\n";
     out << "                          const std::span<Token> tokens,\n";
     out << "                          const std::span<uint16_t> tags,\n";
-    out << "                          const uint32_t count,\n";
+    out << "                          const int32_t count,\n";
     out << "                          const uint8_t messageType)\n";
     out << "    {\n";
     out << "        auto status = Result::InvalidMessageType;\n";
@@ -393,7 +393,7 @@ static void generateWrapNextDecoders(std::ostream& out, const Record& record)
         out << "const std::span<const uint8_t> data,\n";
         out << "            const std::span<Token> tokens,\n";
         out << "            const std::span<uint16_t> tags,\n";
-        out << "            const uint32_t count)\n";
+        out << "            const int32_t count)\n";
         out << "    {\n";
         out << "        m_decoder.wrap(data, tokens, tags, count);\n";
         out << "        return *this;\n";

@@ -171,7 +171,7 @@ public:
             raw = (raw << shift) | (utils::AsciiZeros & ((1ULL << shift) - 1));
             raw -= utils::AsciiZeros;
             raw = raw * 10 + (raw >> 8);
-            int64_t mantissa = static_cast<int64_t>(
+            auto mantissa = static_cast<int64_t>(
                 ((raw & utils::SwarMask) * utils::SwarFactor1 +
                  (raw >> 16 & utils::SwarMask) * utils::SwarFactor2) >> 32);
             return utils::FixedDecimal{negative ? -mantissa : mantissa, exponent};

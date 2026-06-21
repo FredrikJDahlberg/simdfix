@@ -114,7 +114,7 @@ public:
         }
 
         const auto messageType = buffer[m_tokens[MessageTypePosition].m_position];
-        result.m_value = handler.handle(buffer, std::span(m_tokens.data(), m_count), std::span(m_tags.data(), m_count), m_count, messageType);
+        result.m_value = handler.handle(buffer, std::span(m_tokens.data(), m_count), std::span(m_tags.data(), m_count), static_cast<int32_t>(m_count), messageType);
         return result;
     }
 

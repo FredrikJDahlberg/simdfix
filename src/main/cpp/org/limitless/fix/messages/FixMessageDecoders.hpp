@@ -129,7 +129,7 @@ public:
     LogonDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
             const std::span<uint16_t> tags,
-            const uint32_t count)
+            const int32_t count)
     {
         m_decoder.wrap(data, tokens, tags, count);
         return *this;
@@ -218,7 +218,7 @@ public:
     LogoutDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
             const std::span<uint16_t> tags,
-            const uint32_t count)
+            const int32_t count)
     {
         m_decoder.wrap(data, tokens, tags, count);
         return *this;
@@ -297,7 +297,7 @@ public:
     HeartbeatDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
             const std::span<uint16_t> tags,
-            const uint32_t count)
+            const int32_t count)
     {
         m_decoder.wrap(data, tokens, tags, count);
         return *this;
@@ -376,7 +376,7 @@ public:
     TestRequestDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
             const std::span<uint16_t> tags,
-            const uint32_t count)
+            const int32_t count)
     {
         m_decoder.wrap(data, tokens, tags, count);
         return *this;
@@ -455,7 +455,7 @@ public:
     ResendRequestDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
             const std::span<uint16_t> tags,
-            const uint32_t count)
+            const int32_t count)
     {
         m_decoder.wrap(data, tokens, tags, count);
         return *this;
@@ -539,7 +539,7 @@ public:
     RejectDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
             const std::span<uint16_t> tags,
-            const uint32_t count)
+            const int32_t count)
     {
         m_decoder.wrap(data, tokens, tags, count);
         return *this;
@@ -638,7 +638,7 @@ public:
     SequenceResetDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
             const std::span<uint16_t> tags,
-            const uint32_t count)
+            const int32_t count)
     {
         m_decoder.wrap(data, tokens, tags, count);
         return *this;
@@ -722,7 +722,7 @@ public:
     ExecutionReportDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
             const std::span<uint16_t> tags,
-            const uint32_t count)
+            const int32_t count)
     {
         m_decoder.wrap(data, tokens, tags, count);
         return *this;
@@ -876,7 +876,7 @@ public:
     NewOrderSingleDecoder& wrap(const std::span<const uint8_t> data,
             const std::span<Token> tokens,
             const std::span<uint16_t> tags,
-            const uint32_t count)
+            const int32_t count)
     {
         m_decoder.wrap(data, tokens, tags, count);
         return *this;
