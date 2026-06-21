@@ -118,6 +118,54 @@ TEST(Time, DateTimeToEpochUTCInvalidLength)
     EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260607-12:34:56.12").count()); // one char short, 20 chars
 }
 
+TEST(Time, TimeOnlyToMillis)
+{
+    const auto check = [](const std::string_view input, const int64_t expected)
+    {
+        const auto data = reinterpret_cast<const uint8_t*>(input.data());
+        EXPECT_EQ(expected, utils::timeOnlyToMillis(data, input.length())) << "input=" << input;
+    };
+
+    check("00:00:00", 0);
+    check("00:00:01", 1'000);
+    check("00:01:00", 60'000);
+    check("01:00:00", 3'600'000);
+    check("12:34:56", 45'296'000);
+    check("23:59:59", 86'399'000);
+    check("12:34:56.789", 45'296'789);
+    check("00:00:00.001", 1);
+    check("23:59:59.999", 86'399'999);
+}
+
+TEST(Time, TimeOnlyToMillisInvalidLength)
+{
+    const auto data = reinterpret_cast<const uint8_t*>("12:34");
+    EXPECT_EQ(-1, utils::timeOnlyToMillis(data, 5));
+    EXPECT_EQ(-1, utils::timeOnlyToMillis(data, 0));
+}
+
+TEST(Time, DateOnlyToEpochUTC)
+{
+    const auto check = [](const std::string_view input, const int64_t expected)
+    {
+        const auto data = reinterpret_cast<const uint8_t*>(input.data());
+        EXPECT_EQ(expected, utils::dateOnlyToEpochUTC(data, input.length())) << "input=" << input;
+    };
+
+    check("19700101", 0);
+    check("20260101", 1'767'225'600'000);
+    check("20260607", 1'780'790'400'000);
+    check("20000229", 951'782'400'000);
+    check("20240101", 1'704'067'200'000);
+}
+
+TEST(Time, DateOnlyToEpochUTCInvalidLength)
+{
+    const auto data = reinterpret_cast<const uint8_t*>("2026010");
+    EXPECT_EQ(-1, utils::dateOnlyToEpochUTC(data, 7));
+    EXPECT_EQ(-1, utils::dateOnlyToEpochUTC(data, 9));
+}
+
 TEST(Encode, Uint32ToAscii)
 {
     const auto check = [](const uint32_t value, const std::string_view expected)

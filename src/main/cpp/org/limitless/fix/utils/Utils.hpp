@@ -71,6 +71,9 @@ inline constexpr int64_t MillisPerDay = 24 * 60 * 60 * 1'000;
 
 inline constexpr uint32_t UTCTimestampShortLength = 17; // "YYYYMMDD-HH:MM:SS"
 inline constexpr uint32_t UTCTimestampLength = 21;      // "YYYYMMDD-HH:MM:SS.sss"
+inline constexpr uint32_t UTCTimeOnlyShortLength = 8;   // "HH:MM:SS"
+inline constexpr uint32_t UTCTimeOnlyLength = 12;       // "HH:MM:SS.sss"
+inline constexpr uint32_t UTCDateOnlyLength = 8;        // "YYYYMMDD"
 
 inline constexpr uint64_t SwarMask = 0x000000FF000000FF;
 inline constexpr uint64_t SwarFactor1 = 0x000F424000000064; // 100 + (1000000ULL << 32)
@@ -303,6 +306,60 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
 }
 
 /**
+ * Parses a FIX UTCTimeOnly ("HH:MM:SS" or "HH:MM:SS.sss")
+ * into milliseconds since midnight.
+ * @param data UTCTimeOnly bytes; must have at least sizeof(uint64_t) readable bytes
+ * @param length 8 (no milliseconds) or 12 (with milliseconds)
+ * @return milliseconds since midnight, or -1 if length is invalid
+ */
+inline int64_t timeOnlyToMillis(const uint8_t* data, const uint32_t length)
+{
+    if (length < UTCTimeOnlyShortLength)
+    {
+        return -1;
+    }
+    uint64_t time = 0;
+    std::memcpy(&time, data, sizeof(time));
+    time -= 0x30303a30303a3030ull;
+    const auto hours = (time & 0xff) * 10 + ((time >> 8) & 0xff);
+    const auto mins  = (time >> 24 & 0xff) * 10 + (time >> 32 & 0xff);
+    const auto secs  = (time >> 48 & 0xff) * 10 + (time >> 56);
+    int64_t millis = (hours * 3'600 + mins * 60 + secs) * 1000;
+    if (length == UTCTimeOnlyShortLength)
+    {
+        return millis;
+    }
+    if (length == UTCTimeOnlyLength)
+    {
+        time = 0;
+        std::memcpy(&time, data + UTCTimeOnlyShortLength, 4);
+        time -= 0x3030302e;
+        millis += (time >> 24) + (time >> 16 & 0xff) * 10 + (time >> 8 & 0xff) * 100;
+        return millis;
+    }
+    return -1;
+}
+
+/**
+ * Parses a FIX UTCDateOnly ("YYYYMMDD") into milliseconds since the Unix epoch (midnight UTC).
+ * @param data UTCDateOnly bytes; must have at least sizeof(uint64_t) readable bytes
+ * @param length must be 8
+ * @return milliseconds since the Unix epoch at midnight UTC, or -1 if length is invalid
+ */
+inline int64_t dateOnlyToEpochUTC(const uint8_t* data, const uint32_t length)
+{
+    if (length != UTCDateOnlyLength)
+    {
+        return -1;
+    }
+    const uint64_t date = asciiToUint64(data, 8, true);
+    const auto years = fastDivide<10000>(date);
+    const auto month = fastDivide<100>(date - 10000 * fastDivide<10000>(date));
+    const auto day = date - 100 * fastDivide<100>(date);
+    return daysSince1970(years, month, day) * static_cast<uint64_t>(MillisPerDay);
+}
+
+/**
  * Writes the decimal ASCII representation of value (no leading zeros, "0" for
  * zero) into data starting at offset.
  * @param value value to convert
@@ -422,6 +479,7 @@ inline size_t uint64ToAscii(const uint64_t value, std::span<uint8_t> data, const
 
     size_t skipped = skip0 < 8 ? skip0 : 8 + (skip1 < 8 ? skip1 : 8 + skip2);
     skipped = std::min(skipped, size_t{19}); // keep at least one digit for value == 0
+
 
     const size_t length = 20 - skipped;
     std::memcpy(data.data() + offset, digits + skipped, length);
@@ -569,6 +627,28 @@ inline void writeTimeOfDay(const uint32_t msOfDay, uint8_t* dst)
     writeFixedDigits<2>(msOfDay / 1'000 % 60, dst + 6);
     dst[8] = '.';
     writeFixedDigits<3>(msOfDay % 1'000, dst + 9);
+}
+
+/**
+ * Writes "YYYYMMDD" (8 bytes) for the given date.
+ * @param days days since 1970-01-01
+ * @param dst destination buffer, must have 8 writable bytes
+ */
+inline void writeDateOnly(const int64_t days, uint8_t* dst)
+{
+    const int64_t z = days + 719468;
+    const int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+    const uint64_t doe = static_cast<uint64_t>(z - era * 146097);
+    const uint64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    const uint64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    const uint64_t mp = (5 * doy + 2) / 153;
+    const uint64_t day = doy - (153 * mp + 2) / 5 + 1;
+    const uint64_t month = mp + (mp < 10 ? 3 : -9);
+    const int64_t year = static_cast<int64_t>(yoe) + era * 400 + (month <= 2 ? 1 : 0);
+
+    writeFixedDigits<4>(static_cast<uint32_t>(year), dst);
+    writeFixedDigits<2>(static_cast<uint32_t>(month), dst + 4);
+    writeFixedDigits<2>(static_cast<uint32_t>(day), dst + 6);
 }
 
 /**

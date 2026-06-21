@@ -72,6 +72,29 @@ class FieldEncoder
         m_encodedLength += utils::UTCTimestampLength;
     }
 
+    /**
+     * Writes a FIX UTCTimeOnly ("HH:MM:SS.sss", 12 bytes).
+     * @param millis milliseconds since midnight
+     */
+    void encodeUTCTimeOnly(const int64_t millis)
+    {
+        auto* dst = m_data.data() + m_offset + m_encodedLength;
+        utils::writeTimeOfDay(static_cast<uint32_t>(millis), dst);
+        m_encodedLength += utils::UTCTimeOnlyLength;
+    }
+
+    /**
+     * Writes a FIX UTCDateOnly ("YYYYMMDD", 8 bytes).
+     * @param millis milliseconds since the Unix epoch
+     */
+    void encodeUTCDateOnly(const int64_t millis)
+    {
+        const auto days = millis / utils::MillisPerDay;
+        auto* dst = m_data.data() + m_offset + m_encodedLength;
+        utils::writeDateOnly(days, dst);
+        m_encodedLength += utils::UTCDateOnlyLength;
+    }
+
 public:
     FieldEncoder() = default;
 
@@ -198,6 +221,36 @@ public:
         encode<Tag>();
         const auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
         encodeTimestamp(millis);
+        m_data[m_offset + m_encodedLength] = FieldEnd;
+        ++m_encodedLength;
+    }
+
+    /**
+     * Writes "TAG=VALUE" followed by SOH, where VALUE is a FIX UTCTimeOnly
+     * ("HH:MM:SS.sss").
+     * @tparam Tag tag number to write
+     * @param duration time since midnight
+     */
+    template <FixedString Tag>
+    void encodeUTCTimeOnly(const std::chrono::milliseconds duration)
+    {
+        encode<Tag>();
+        encodeUTCTimeOnly(duration.count());
+        m_data[m_offset + m_encodedLength] = FieldEnd;
+        ++m_encodedLength;
+    }
+
+    /**
+     * Writes "TAG=VALUE" followed by SOH, where VALUE is a FIX UTCDateOnly
+     * ("YYYYMMDD").
+     * @tparam Tag tag number to write
+     * @param duration time since the Unix epoch
+     */
+    template <FixedString Tag>
+    void encodeUTCDateOnly(const std::chrono::milliseconds duration)
+    {
+        encode<Tag>();
+        encodeUTCDateOnly(duration.count());
         m_data[m_offset + m_encodedLength] = FieldEnd;
         ++m_encodedLength;
     }

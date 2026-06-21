@@ -522,6 +522,16 @@ static void generateFieldEncoders(std::ostream& out, const Record& record)
                 out << std::format("        m_encoder.encode<\"{}\">(value);\n",
                                    field.m_tag);
             }
+            else if (field.m_category == Category::UTCTimeOnly)
+            {
+                out << std::format("        m_encoder.encodeUTCTimeOnly<\"{}\">(value);\n",
+                                   field.m_tag);
+            }
+            else if (field.m_category == Category::UTCDateOnly)
+            {
+                out << std::format("        m_encoder.encodeUTCDateOnly<\"{}\">(value);\n",
+                                   field.m_tag);
+            }
             else
             {
                 out << std::format("        m_encoder.encode<\"{}\", {}>(value);\n",

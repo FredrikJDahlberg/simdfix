@@ -102,6 +102,8 @@ struct DataModel
 
         m_types.try_emplace("decimal", "FixedDecimal", 8, 1, Category::Decimal);
         m_types.try_emplace("timestamp", "std::chrono::millis", 8, 1, Category::Timestamp);
+        m_types.try_emplace("timeonly",  "std::chrono::millis", 8, 1, Category::UTCTimeOnly);
+        m_types.try_emplace("dateonly",  "std::chrono::millis", 8, 1, Category::UTCDateOnly);
         m_types.try_emplace("string", "std::string_view", 1, 1, Category::String);
 
         m_types.try_emplace("Protocol", "Protocol", 1, 1, Category::Enum);

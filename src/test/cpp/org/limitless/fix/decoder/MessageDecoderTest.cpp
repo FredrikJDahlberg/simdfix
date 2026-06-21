@@ -304,6 +304,47 @@ TEST(MessageDecoder, NewOrderSingle)
     ASSERT_TRUE(app.found);
 }
 
+TEST(MessageDecoder, NewOrderSingleWithDateAndTime)
+{
+    struct AppHandler : MessageHandler<AppHandler>
+    {
+        using MessageHandler::handle;
+
+        bool found = false;
+
+        Result::Values handle(NewOrderSingleDecoder& order)
+        {
+            EXPECT_EQ("ORDER2", toString(order.clOrdID().value()));
+            EXPECT_EQ("AAPL", toString(order.symbol().value()));
+            EXPECT_EQ(Side::Buy, order.side().value());
+            EXPECT_EQ(100U, order.orderQty().value());
+            EXPECT_EQ(OrdType::Limit, order.ordType().value());
+
+            const auto tradeDate = order.tradeDate();
+            EXPECT_TRUE(tradeDate.has_value());
+            EXPECT_EQ(std::chrono::milliseconds{1'781'308'800'000}, tradeDate.value());
+
+            const auto maturityTime = order.maturityTime();
+            EXPECT_TRUE(maturityTime.has_value());
+            EXPECT_EQ(std::chrono::milliseconds{45'296'789}, maturityTime.value());
+
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0166" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "11=ORDER2" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
+        "38=100" SOH "40=2" SOH "44=120.00000000" SOH
+        "75=20260613" SOH "1079=12:34:56.789" SOH "10=151" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
 TEST(MessageDecoder, LogonWithXmlData)
 {
     struct AppHandler : MessageHandler<AppHandler>

@@ -790,6 +790,18 @@ public:
         return *this;
     }
 
+    NewOrderSingleEncoder& tradeDate(const std::chrono::milliseconds value)
+    {
+        m_encoder.encodeUTCDateOnly<"75">(value);
+        return *this;
+    }
+
+    NewOrderSingleEncoder& maturityTime(const std::chrono::milliseconds value)
+    {
+        m_encoder.encodeUTCTimeOnly<"1079">(value);
+        return *this;
+    }
+
     HopsEncoder& hops(const uint32_t count)
     {
         return m_hops.wrap(count);

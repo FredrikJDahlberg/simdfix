@@ -9,17 +9,14 @@ Unsupported FIX data types
 `timestamp`, and `string`. The following standard FIX data types have no
 mapping/`Category` and cannot yet be used in `protocol.xml`:
 
-- `UTCTimeOnly` — "HH:MM:SS" or "HH:MM:SS.sss" (8 or 12 bytes). Parsing
-  is a subset of the existing `dateTimeToEpochUTC` logic (time-of-day
-  portion). Needs a `Category::TimeOnly` that maps to
-  `std::chrono::milliseconds` (millis since midnight) and a
-  `getTimeOnly` / `encodeTimeOnly` pair.
-- `UTCDateOnly` — "YYYYMMDD" (8 bytes). Parsing reuses the existing SWAR
-  date parse in `dateTimeToEpochUTC`. Needs a `Category::DateOnly` that
-  maps to `std::chrono::days` (or an integer day count) and a
-  `getDateOnly` / `encodeDateOnly` pair.
+- ~~`UTCTimeOnly`~~ — done. Primitive type `timeonly`, `Category::UTCTimeOnly`.
+  Decodes "HH:MM:SS" / "HH:MM:SS.sss" to `std::chrono::milliseconds`
+  (millis since midnight). Encodes via `encodeUTCTimeOnly`.
+- ~~`UTCDateOnly`~~ — done. Primitive type `dateonly`, `Category::UTCDateOnly`.
+  Decodes "YYYYMMDD" to `std::chrono::milliseconds` (millis since epoch
+  at midnight UTC). Encodes via `encodeUTCDateOnly`.
 - `LocalMktDate` — same wire format as `UTCDateOnly`, different semantic
-  (local timezone). Can share the same `Category::DateOnly` codec.
+  (local timezone). Can share the same `Category::UTCDateOnly` codec.
 - `MonthYear` — "YYYYMM", "YYYYMMDD", or "YYYYMMwN" (6, 8, or 8 bytes).
   Variable-length; needs its own parser and a struct or integer
   representation.

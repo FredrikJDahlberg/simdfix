@@ -109,6 +109,37 @@ TEST(MessageEncoder, NewOrderSingle)
               "38=100" SOH "40=2" SOH "44=120.00000000" SOH "10=199" SOH, encoded);
 }
 
+TEST(MessageEncoder, NewOrderSingleWithDateAndTime)
+{
+    std::array<uint8_t, 512> buffer{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    encoder.wrap(0, buffer);
+
+    NewOrderSingleEncoder order{};
+    encoder.wrapMessage(order)
+            .sequenceNumber(1)
+            .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+            .clOrdID("ORDER2")
+            .handlInst(HandlInst::AutoPrivate)
+            .symbol("AAPL")
+            .side(Side::Buy)
+            .transactTime(std::chrono::milliseconds{1'781'378'773'959})
+            .orderQty(100)
+            .ordType(OrdType::Limit)
+            .price(utils::FixedDecimal{120, 0})
+            .tradeDate(std::chrono::milliseconds{1'781'378'773'959})
+            .maturityTime(std::chrono::milliseconds{45'296'789});
+
+    const auto length = encoder.encode(order);
+    const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
+
+    EXPECT_EQ("8=FIXT.1.1" SOH "9=0166" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+              "34=1" SOH "52=20260613-19:26:13.959" SOH
+              "11=ORDER2" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
+              "38=100" SOH "40=2" SOH "44=120.00000000" SOH
+              "75=20260613" SOH "1079=12:34:56.789" SOH "10=151" SOH, encoded);
+}
+
 TEST(MessageEncoder, ResendRequest)
 {
     std::array<uint8_t, 256> buffer{};

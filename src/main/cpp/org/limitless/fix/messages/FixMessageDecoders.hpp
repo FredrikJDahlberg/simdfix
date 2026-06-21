@@ -977,6 +977,16 @@ public:
         return m_decoder.getString<58, false, RecordType::Message>();
     }
 
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> tradeDate() const
+    {
+        return m_decoder.getUTCDateOnly<75, false, RecordType::Message>();
+    }
+
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> maturityTime() const
+    {
+        return m_decoder.getUTCTimeOnly<1079, false, RecordType::Message>();
+    }
+
     [[nodiscard]] HopsDecoder& hops()
     {
         return m_hops.wrap();

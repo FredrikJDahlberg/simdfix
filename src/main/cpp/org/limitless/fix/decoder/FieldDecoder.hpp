@@ -392,6 +392,46 @@ public:
     }
 
     /**
+     * Looks up Tag and parses its value as a FIX UTCTimeOnly, returned as
+     * milliseconds since midnight.
+     * @tparam Tag tag number to read
+     * @tparam Required whether a missing field is an error
+     * @tparam Parent context the tag is being looked up in
+     * @return field value, or Result::RequiredFieldMissing/Success if absent
+     */
+    template <uint32_t Tag, bool Required, RecordType::Values Parent>
+    [[nodiscard]] constexpr TimestampResult getUTCTimeOnly() const
+    {
+        const auto index = findIndex<Tag, Parent>();
+        if (index >= 0)
+        {
+            const auto& token = m_tokens[index];
+            return std::chrono::milliseconds{utils::timeOnlyToMillis(m_data.data() + token.m_position, token.m_length)};
+        }
+        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+    }
+
+    /**
+     * Looks up Tag and parses its value as a FIX UTCDateOnly, returned as
+     * milliseconds since the Unix epoch at midnight UTC.
+     * @tparam Tag tag number to read
+     * @tparam Required whether a missing field is an error
+     * @tparam Parent context the tag is being looked up in
+     * @return field value, or Result::RequiredFieldMissing/Success if absent
+     */
+    template <uint32_t Tag, bool Required, RecordType::Values Parent>
+    [[nodiscard]] constexpr TimestampResult getUTCDateOnly() const
+    {
+        const auto index = findIndex<Tag, Parent>();
+        if (index >= 0)
+        {
+            const auto& token = m_tokens[index];
+            return std::chrono::milliseconds{utils::dateOnlyToEpochUTC(m_data.data() + token.m_position, token.m_length)};
+        }
+        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+    }
+
+    /**
      * Looks up Tag and maps its single-character value to an enum type via
      * utils::find.
      * @tparam Tag tag number to read

@@ -222,6 +222,8 @@
         <field name="Price" tag="44" primitiveType="decimal" presence="optional"/>
         <field name="TimeInForce" tag="59" type="TimeInForce" presence="optional"/>
         <field name="Text" tag="58" primitiveType="string" length="64" presence="optional"/>
+        <field name="TradeDate" tag="75" primitiveType="dateonly" presence="optional"/>
+        <field name="MaturityTime" tag="1079" primitiveType="timeonly" presence="optional"/>
     </message>
 
 </protocol>
