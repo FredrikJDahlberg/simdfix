@@ -53,7 +53,7 @@ public:
         {
             case LogonDecoder::MessageId:
                 m_logon.wrap(data, tokens, tags, count);
-                status = m_logon.checkRequired();
+                status = m_logon.validate();
                 if (status == Result::Success)
                 {
                     status = receive(m_logon);
@@ -61,7 +61,7 @@ public:
                 break;
             case LogoutDecoder::MessageId:
                 m_logout.wrap(data, tokens, tags, count);
-                status = m_logout.checkRequired();
+                status = m_logout.validate();
                 if (status == Result::Success)
                 {
                     status = receive(m_logout);
@@ -69,7 +69,7 @@ public:
                 break;
             case HeartbeatDecoder::MessageId:
                 m_heartbeat.wrap(data, tokens, tags, count);
-                status = m_heartbeat.checkRequired();
+                status = m_heartbeat.validate();
                 if (status == Result::Success)
                 {
                     status = receive(m_heartbeat);
@@ -77,7 +77,7 @@ public:
                 break;
             case TestRequestDecoder::MessageId:
                 m_testRequest.wrap(data, tokens, tags, count);
-                status = m_testRequest.checkRequired();
+                status = m_testRequest.validate();
                 if (status == Result::Success)
                 {
                     status = receive(m_testRequest);
@@ -85,7 +85,7 @@ public:
                 break;
             case ResendRequestDecoder::MessageId:
                 m_resendRequest.wrap(data, tokens, tags, count);
-                status = m_resendRequest.checkRequired();
+                status = m_resendRequest.validate();
                 if (status == Result::Success)
                 {
                     status = receive(m_resendRequest);
@@ -93,7 +93,7 @@ public:
                 break;
             case RejectDecoder::MessageId:
                 m_reject.wrap(data, tokens, tags, count);
-                status = m_reject.checkRequired();
+                status = m_reject.validate();
                 if (status == Result::Success)
                 {
                     status = receive(m_reject);
@@ -101,7 +101,7 @@ public:
                 break;
             case SequenceResetDecoder::MessageId:
                 m_sequenceReset.wrap(data, tokens, tags, count);
-                status = m_sequenceReset.checkRequired();
+                status = m_sequenceReset.validate();
                 if (status == Result::Success)
                 {
                     status = receive(m_sequenceReset);
@@ -109,7 +109,7 @@ public:
                 break;
             case ExecutionReportDecoder::MessageId:
                 m_executionReport.wrap(data, tokens, tags, count);
-                status = m_executionReport.checkRequired();
+                status = m_executionReport.validate();
                 if (status == Result::Success)
                 {
                     status = receive(m_executionReport);
@@ -117,7 +117,7 @@ public:
                 break;
             case NewOrderSingleDecoder::MessageId:
                 m_newOrderSingle.wrap(data, tokens, tags, count);
-                status = m_newOrderSingle.checkRequired();
+                status = m_newOrderSingle.validate();
                 if (status == Result::Success)
                 {
                     status = receive(m_newOrderSingle);

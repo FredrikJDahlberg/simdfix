@@ -190,7 +190,7 @@ struct Category
     }
 };
 
-// Per-session expectations checked by MessageDecoder::checkRequired.
+// Per-session expectations checked by the generated validate() method.
 // Non-owning: the spans must remain valid for the lifetime of the session.
 struct SessionContext
 {

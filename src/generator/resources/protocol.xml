@@ -155,7 +155,7 @@
 
     <message name="Logout" id="5">
         <field name="Header" type="StandardHeader"/>
-        <field name="Text" tag="58" primitiveType="char" length="8"/>
+        <field name="Text" tag="58" primitiveType="char" length="8" presence="optional"/>
     </message>
 
     <message name="Heartbeat" id="0">

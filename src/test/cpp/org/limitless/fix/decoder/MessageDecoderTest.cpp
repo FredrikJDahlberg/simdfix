@@ -724,6 +724,108 @@ TEST(MessageDecoder, ExecutionReportReject)
     ASSERT_TRUE(app.found);
 }
 
+TEST(MessageDecoder, InvalidBeginString)
+{
+    PayloadDecoder<FIXT_1_1> decoder;
+    struct AppHandler : MessageHandler<AppHandler>{} app;
+    // "FIX.4.2" does not match the PayloadDecoder<FIXT_1_1> expected prefix
+    const auto message = utils::makeSpan(
+        "8=FIX.4.2" SOH "9=0053" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH "10=000" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::InvalidBeginString, status) << Result(status).name();
+}
+
+TEST(MessageDecoder, InvalidCheckSum)
+{
+    // Use a valid Logon from the encoder test, but replace the checksum value
+    PayloadDecoder<FIXT_1_1> decoder;
+    struct AppHandler : MessageHandler<AppHandler>{} app;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=999" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::InvalidCheckSum, status) << Result(status).name();
+}
+
+TEST(MessageDecoder, InvalidMessageType)
+{
+    // Valid structure but MsgType 'Z' is not registered in the handler
+    PayloadDecoder<FIXT_1_1> decoder;
+    struct AppHandler : MessageHandler<AppHandler>{} app;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0067" SOH "35=Z" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=099" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::InvalidMessageType, status) << Result(status).name();
+}
+
+TEST(MessageDecoder, InvalidSenderCompId)
+{
+    // Valid Logon but SenderCompID "WRONG!" does not match the session context
+    PayloadDecoder<FIXT_1_1> decoder;
+    SessionContext context{"FIXT.1.1", "SENDER", "TARGET"};
+
+    struct AppHandler : MessageHandler<AppHandler>{} app;
+    app.setSessionContext(context);
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0067" SOH "35=A" SOH "49=WRONG!" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=055" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::InvalidSenderCompId, status) << Result(status).name();
+}
+
+TEST(MessageDecoder, InvalidTargetCompId)
+{
+    // Valid Logon but TargetCompID "WRONG!" does not match the session context
+    PayloadDecoder<FIXT_1_1> decoder;
+    SessionContext context{"FIXT.1.1", "SENDER", "TARGET"};
+
+    struct AppHandler : MessageHandler<AppHandler>{} app;
+    app.setSessionContext(context);
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=WRONG!" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=049" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::InvalidTargetCompId, status) << Result(status).name();
+}
+
+TEST(MessageDecoder, MissingSendingTime)
+{
+    // Valid structure but missing tag 52 (SendingTime)
+    PayloadDecoder<FIXT_1_1> decoder;
+    struct AppHandler : MessageHandler<AppHandler>{} app;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0042" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "98=0" SOH "108=30" SOH "10=094" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::InvalidSendingTime, status) << Result(status).name();
+}
+
+TEST(MessageDecoder, MissingSequenceNumber)
+{
+    // Valid structure but missing tag 34 (MsgSeqNum)
+    PayloadDecoder<FIXT_1_1> decoder;
+    struct AppHandler : MessageHandler<AppHandler>{} app;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0062" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=111" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::InvalidSequenceNumber, status) << Result(status).name();
+}
+
+TEST(MessageDecoder, MissingRequiredField)
+{
+    // Logon without HeartbeatInterval (tag 108) — required by the protocol
+    PayloadDecoder<FIXT_1_1> decoder;
+    struct AppHandler : MessageHandler<AppHandler>{} app;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0060" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "10=009" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::RequiredFieldMissing, status) << Result(status).name();
+}
+
 TEST(MessageDecoder, InvalidMandatoryFields)
 {
     PayloadDecoder<FIXT_1_1> decoder;

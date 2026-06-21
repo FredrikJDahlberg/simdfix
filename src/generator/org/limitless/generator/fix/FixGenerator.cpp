@@ -310,7 +310,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
         auto memberName = uncap(message.m_name);
         out << std::format("            case {}Decoder::MessageId:\n", message.m_name);
         out << std::format("                m_{}.wrap(data, tokens, tags, count);\n", memberName);
-        out << std::format("                status = m_{}.checkRequired();\n", memberName);
+        out << std::format("                status = m_{}.validate();\n", memberName);
         out << "                if (status == Result::Success)\n";
         out << "                {\n";
         out << std::format("                    status = receive(m_{});\n", memberName);
@@ -573,6 +573,58 @@ static void generateFieldEncoders(std::ostream& out, const Record& record)
     }
 }
 
+static constexpr std::pair<int32_t, std::string_view> HeaderErrorCodes[] = {
+    {49, "InvalidSenderCompId"},
+    {56, "InvalidTargetCompId"},
+    {34, "InvalidSequenceNumber"},
+    {52, "InvalidSendingTime"},
+};
+
+static std::string_view headerErrorCode(const int32_t tag)
+{
+    for (const auto& [t, code] : HeaderErrorCodes)
+    {
+        if (t == tag)
+        {
+            return code;
+        }
+    }
+    return {};
+}
+
+static void generateCheckRequired(std::ostream& out, const Record& record)
+{
+    if (record.m_parent != RecordType::Message)
+    {
+        return;
+    }
+
+    out << "    [[nodiscard]] Result::Values validate()\n";
+    out << "    {\n";
+
+    for (const auto& field : record.m_fields)
+    {
+        if (field.m_presence != Presence::Required ||
+            field.m_category == Category::Counter ||
+            field.m_category == Category::Struct ||
+            field.m_tag == 8 || field.m_tag == 9 || field.m_tag == 35)
+        {
+            continue;
+        }
+        auto methodName = field.m_name;
+        methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
+        const auto errorCode = headerErrorCode(field.m_tag);
+        const auto resultName = errorCode.empty() ? "RequiredFieldMissing" : std::string{errorCode};
+        out << std::format("        if (!{}())\n", methodName);
+        out << "        {\n";
+        out << std::format("            return Result::{};\n", resultName);
+        out << "        }\n";
+    }
+
+    out << "        return validateSession();\n";
+    out << "    }\n\n";
+}
+
 static void generateRecordDecoders(std::ostream& out, const Record& record)
 {
     out << std::format("struct {}Decoder : ", record.m_name);
@@ -585,6 +637,7 @@ static void generateRecordDecoders(std::ostream& out, const Record& record)
         out << std::format("    static constexpr uint8_t MessageId = '{}';\n\n", record.m_id);
     }
     generateWrapNextDecoders(out, record);
+    generateCheckRequired(out, record);
     generateGetters(out, record);
     out << "};\n\n";
 }

@@ -75,7 +75,7 @@ public:
     }
 
     /**
-     * Sets the session context used by checkRequired() to validate BeginString,
+     * Sets the session context used by validate() to validate BeginString,
      * SenderCompID and TargetCompID.
      * @param context expected session parameters
      */
@@ -85,49 +85,40 @@ public:
     }
 
     /**
-     * Extracts and validates the standard header fields: BeginString (8),
-     * SenderCompID (49), TargetCompID (56), MsgSeqNum (34), and
-     * SendingTime (52). If m_context is set, the corresponding fields must
-     * match or the message is rejected.
+     * Validates SenderCompID (49), TargetCompID (56), and BeginString (8)
+     * against the SessionContext, if one has been set. Field presence is
+     * checked by the generated validate(); this method only compares
+     * values.
      * @return Result::Success, or the first validation failure encountered
      */
-    [[nodiscard]] Result::Values checkRequired()
+    [[nodiscard]] Result::Values validateSession()
     {
-        if (m_context != nullptr)
+        if (m_context == nullptr)
         {
-            const auto beginString = m_decoder.getString<8, true, RecordType::Component>();
-            if (!beginString ||
-                !std::ranges::equal(beginString.value(), m_context->m_protocol))
-            {
-                return Result::InvalidBeginString;
-            }
+            return Result::Success;
         }
 
-        const auto sender = m_decoder.getString<49, true, RecordType::Component>();
-        if (!sender || (m_context != nullptr &&
-                        !std::ranges::equal(sender.value(), m_context->m_senderCompId)))
+        const auto beginString = m_decoder.getString<8, true, RecordType::Message>();
+        if (!beginString ||
+            !std::ranges::equal(beginString.value(), m_context->m_protocol))
+        {
+            return Result::InvalidBeginString;
+        }
+
+        const auto sender = m_decoder.getString<49, true, RecordType::Message>();
+        if (!sender ||
+            !std::ranges::equal(sender.value(), m_context->m_senderCompId))
         {
             return Result::InvalidSenderCompId;
         }
 
-        const auto target = m_decoder.getString<56, true, RecordType::Component>();
-        if (!target || (m_context != nullptr &&
-                        !std::ranges::equal(target.value(), m_context->m_targetCompId)))
+        const auto target = m_decoder.getString<56, true, RecordType::Message>();
+        if (!target ||
+            !std::ranges::equal(target.value(), m_context->m_targetCompId))
         {
             return Result::InvalidTargetCompId;
         }
 
-        const auto sequenceNumber = m_decoder.getUint32<34, true, RecordType::Component>();
-        if (!sequenceNumber)
-        {
-            return Result::InvalidSequenceNumber;
-        }
-
-        const auto sendingTime = m_decoder.getTimestamp<52, true, RecordType::Component>();
-        if (!sendingTime)
-        {
-            return Result::InvalidSendingTime;
-        }
         return Result::Success;
     }
 };

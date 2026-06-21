@@ -140,6 +140,31 @@ public:
         MessageDecoder::context(context);
     }
 
+    [[nodiscard]] Result::Values validate()
+    {
+        if (!sender())
+        {
+            return Result::InvalidSenderCompId;
+        }
+        if (!target())
+        {
+            return Result::InvalidTargetCompId;
+        }
+        if (!sequenceNumber())
+        {
+            return Result::InvalidSequenceNumber;
+        }
+        if (!sendingTime())
+        {
+            return Result::InvalidSendingTime;
+        }
+        if (!heartbeatInterval())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        return validateSession();
+    }
+
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
@@ -229,6 +254,27 @@ public:
         MessageDecoder::context(context);
     }
 
+    [[nodiscard]] Result::Values validate()
+    {
+        if (!sender())
+        {
+            return Result::InvalidSenderCompId;
+        }
+        if (!target())
+        {
+            return Result::InvalidTargetCompId;
+        }
+        if (!sequenceNumber())
+        {
+            return Result::InvalidSequenceNumber;
+        }
+        if (!sendingTime())
+        {
+            return Result::InvalidSendingTime;
+        }
+        return validateSession();
+    }
+
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
@@ -266,7 +312,7 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
     {
-        return m_decoder.getString<58, true, RecordType::Message>();
+        return m_decoder.getString<58, false, RecordType::Message>();
     }
 
     [[nodiscard]] HopsDecoder& hops()
@@ -306,6 +352,27 @@ public:
     void context(const SessionContext* context)
     {
         MessageDecoder::context(context);
+    }
+
+    [[nodiscard]] Result::Values validate()
+    {
+        if (!sender())
+        {
+            return Result::InvalidSenderCompId;
+        }
+        if (!target())
+        {
+            return Result::InvalidTargetCompId;
+        }
+        if (!sequenceNumber())
+        {
+            return Result::InvalidSequenceNumber;
+        }
+        if (!sendingTime())
+        {
+            return Result::InvalidSendingTime;
+        }
+        return validateSession();
     }
 
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
@@ -387,6 +454,27 @@ public:
         MessageDecoder::context(context);
     }
 
+    [[nodiscard]] Result::Values validate()
+    {
+        if (!sender())
+        {
+            return Result::InvalidSenderCompId;
+        }
+        if (!target())
+        {
+            return Result::InvalidTargetCompId;
+        }
+        if (!sequenceNumber())
+        {
+            return Result::InvalidSequenceNumber;
+        }
+        if (!sendingTime())
+        {
+            return Result::InvalidSendingTime;
+        }
+        return validateSession();
+    }
+
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
@@ -464,6 +552,35 @@ public:
     void context(const SessionContext* context)
     {
         MessageDecoder::context(context);
+    }
+
+    [[nodiscard]] Result::Values validate()
+    {
+        if (!sender())
+        {
+            return Result::InvalidSenderCompId;
+        }
+        if (!target())
+        {
+            return Result::InvalidTargetCompId;
+        }
+        if (!sequenceNumber())
+        {
+            return Result::InvalidSequenceNumber;
+        }
+        if (!sendingTime())
+        {
+            return Result::InvalidSendingTime;
+        }
+        if (!beginSeqNo())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!endSeqNo())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        return validateSession();
     }
 
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
@@ -548,6 +665,31 @@ public:
     void context(const SessionContext* context)
     {
         MessageDecoder::context(context);
+    }
+
+    [[nodiscard]] Result::Values validate()
+    {
+        if (!sender())
+        {
+            return Result::InvalidSenderCompId;
+        }
+        if (!target())
+        {
+            return Result::InvalidTargetCompId;
+        }
+        if (!sequenceNumber())
+        {
+            return Result::InvalidSequenceNumber;
+        }
+        if (!sendingTime())
+        {
+            return Result::InvalidSendingTime;
+        }
+        if (!refSeqNum())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        return validateSession();
     }
 
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
@@ -649,6 +791,31 @@ public:
         MessageDecoder::context(context);
     }
 
+    [[nodiscard]] Result::Values validate()
+    {
+        if (!sender())
+        {
+            return Result::InvalidSenderCompId;
+        }
+        if (!target())
+        {
+            return Result::InvalidTargetCompId;
+        }
+        if (!sequenceNumber())
+        {
+            return Result::InvalidSequenceNumber;
+        }
+        if (!sendingTime())
+        {
+            return Result::InvalidSendingTime;
+        }
+        if (!newSeqNo())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        return validateSession();
+    }
+
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
@@ -731,6 +898,67 @@ public:
     void context(const SessionContext* context)
     {
         MessageDecoder::context(context);
+    }
+
+    [[nodiscard]] Result::Values validate()
+    {
+        if (!sender())
+        {
+            return Result::InvalidSenderCompId;
+        }
+        if (!target())
+        {
+            return Result::InvalidTargetCompId;
+        }
+        if (!sequenceNumber())
+        {
+            return Result::InvalidSequenceNumber;
+        }
+        if (!sendingTime())
+        {
+            return Result::InvalidSendingTime;
+        }
+        if (!orderID())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!execID())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!execType())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!ordStatus())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!symbol())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!side())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!leavesQty())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!cumQty())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!avgPx())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!transactTime())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        return validateSession();
     }
 
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
@@ -885,6 +1113,55 @@ public:
     void context(const SessionContext* context)
     {
         MessageDecoder::context(context);
+    }
+
+    [[nodiscard]] Result::Values validate()
+    {
+        if (!sender())
+        {
+            return Result::InvalidSenderCompId;
+        }
+        if (!target())
+        {
+            return Result::InvalidTargetCompId;
+        }
+        if (!sequenceNumber())
+        {
+            return Result::InvalidSequenceNumber;
+        }
+        if (!sendingTime())
+        {
+            return Result::InvalidSendingTime;
+        }
+        if (!clOrdID())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!handlInst())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!symbol())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!side())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!transactTime())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!orderQty())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        if (!ordType())
+        {
+            return Result::RequiredFieldMissing;
+        }
+        return validateSession();
     }
 
     [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
