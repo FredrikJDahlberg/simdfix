@@ -40,26 +40,26 @@ public:
     template <uint32_t LengthTag, uint32_t DataTag>
     DataDecoder& wrap()
     {
-        const auto* lengthToken = m_decoder.nextField(LengthTag);
-        if (lengthToken == nullptr)
+        const auto* lengthField = m_decoder.nextField(LengthTag);
+        if (lengthField == nullptr)
         {
             m_result = std::unexpected{Result::Success};
             return *this;
         }
-        const auto length = m_decoder.convertToUint32(lengthToken);
+        const auto length = m_decoder.convertToUint32(lengthField);
         if (!length.has_value())
         {
             m_result = std::unexpected{length.error()};
             return *this;
         }
 
-        const auto* dataToken = m_decoder.nextField(DataTag);
-        if (dataToken == nullptr)
+        const auto* dataField = m_decoder.nextField(DataTag);
+        if (dataField == nullptr)
         {
             m_result = std::unexpected{Result::Success};
             return *this;
         }
-        m_result = m_decoder.bufferAt(dataToken->m_position, length.value());
+        m_result = m_decoder.bufferAt(dataField->m_position, length.value());
         return *this;
     }
 

@@ -180,16 +180,21 @@ public:
             return std::unexpected{Result::InvalidValue};
         }
         const auto* valueDigits = digits + start;
-        uint64_t word = 0;
-        std::memcpy(&word, valueDigits, sizeof(word));
-        const uint64_t dots = utils::findByte('.', word);
-        if (dots != 0)
+        uint32_t dotPos = len;
+        for (uint32_t i = 0; i < len; ++i)
         {
-            const uint32_t before = std::countr_zero(dots) / 8;
-            const uint32_t after = len - before - 1;
-            if (before == 0 || after == 0 ||
-                !utils::isDigits(valueDigits, before) ||
-                !utils::isDigits(valueDigits + before + 1, after))
+            if (valueDigits[i] == '.')
+            {
+                dotPos = i;
+                break;
+            }
+        }
+        if (dotPos < len)
+        {
+            const uint32_t after = len - dotPos - 1;
+            if (dotPos == 0 || after == 0 ||
+                !utils::isDigits(valueDigits, dotPos) ||
+                !utils::isDigits(valueDigits + dotPos + 1, after))
             {
                 return std::unexpected{Result::InvalidValue};
             }

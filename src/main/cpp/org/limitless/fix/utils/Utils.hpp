@@ -242,7 +242,7 @@ template <uint32_t Divisor>
 [[nodiscard]] uint32_t fastDivide(const uint32_t number)
 {
     static_assert(Divisor == 10 || Divisor == 100 || Divisor == 1'000 || Divisor == 10'000,
-                  "fastDivide only supports compile-time divisors of 10 or 100.");
+                  "unsupported fastDivide compile time divisor");
     if constexpr (Divisor == 10)
     {
         return static_cast<uint32_t>(number * 0xCCCCCCCDULL >> 35);
@@ -269,7 +269,7 @@ template <uint32_t Divisor>
  * @param day day of month, 1-31
  * @return days since 1970-01-01 (negative for earlier dates)
  */
-[[nodiscard]] inline int64_t daysSince1970(int year, int month, int day) noexcept
+[[nodiscard]] inline int64_t daysSince1970(int32_t year, const int32_t month, const int32_t day) noexcept
 {
     // Shift the calendar so that March is the first month of the "built-in" year.
     // This trick moves the leap day (Feb 29) to the very end of the calculation loop,
@@ -298,9 +298,9 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
         return -1;
     }
     const uint64_t date = asciiToUint64(data, 8, true);
-    const auto years = fastDivide<10000>(date);
-    const auto month = fastDivide<100>(date - 10000 * fastDivide<10000>(date));
-    const auto day = date - 100 * fastDivide<100>(date);
+    const int32_t years = fastDivide<10000>(date);
+    const int32_t month = fastDivide<100>(date - 10000 * fastDivide<10000>(date));
+    const int32_t day = date - 100 * fastDivide<100>(date);
     if (month < 1 || month > 12 || day < 1 || day > 31)
     {
         return -1;
@@ -310,9 +310,9 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     uint64_t time = 0;
     std::memcpy(&time, data + 9, sizeof(time));
     time -= 0x30303a30303a3030ull;
-    const auto hours = (time & 0xff) * 10 + ((time >> 8) & 0xff);
-    const auto mins  = (time >> 24 & 0xff) * 10 + (time >> 32 & 0xff);
-    const auto secs  = (time >> 48 & 0xff) * 10 + (time >> 56);
+    const int32_t hours = (time & 0xff) * 10 + ((time >> 8) & 0xff);
+    const int32_t mins  = (time >> 24 & 0xff) * 10 + (time >> 32 & 0xff);
+    const int32_t secs  = (time >> 48 & 0xff) * 10 + (time >> 56);
     if (hours > 23 || mins > 59 || secs > 59)
     {
         return -1;
