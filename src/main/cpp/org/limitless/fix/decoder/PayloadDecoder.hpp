@@ -63,7 +63,7 @@ class PayloadDecoder
     static inline const simd::Uint8x16 ZerosBlock{'0'};
     static inline const simd::Uint8x16 NineMask{9};
 
-    std::array<Token, MaxSize> m_tokens{};
+    std::array<Field, MaxSize> m_fields{};
     std::array<uint16_t, MaxSize> m_tags{};
 
     simd::Uint8x16 m_block{};
@@ -90,9 +90,9 @@ public:
      * Used for testing.
      * @return the tokens produced by the most recent parse() call
      */
-    [[nodiscard]] std::span<Token> tokens() noexcept
+    [[nodiscard]] std::span<Field> fields() noexcept
     {
-        return { m_tokens.data(), m_count };
+        return { m_fields.data(), m_count };
     }
 
     /**
@@ -113,13 +113,13 @@ public:
             return { result.m_processed, result.m_value };
         }
 
-        const auto messageType = buffer[m_tokens[MessageTypePosition].m_position];
-        result.m_value = handler.handle(buffer, std::span(m_tokens.data(), m_count), std::span(m_tags.data(), m_count), static_cast<int32_t>(m_count), messageType);
+        const auto messageType = buffer[m_fields[MessageTypePosition].m_position];
+        result.m_value = handler.handle(buffer, std::span(m_fields.data(), m_count), std::span(m_tags.data(), m_count), static_cast<int32_t>(m_count), messageType);
         return result;
     }
 
     /**
-     * Tokenizes buffer into m_tokens/m_tags: validates BeginString, scans
+     * Tokenizes buffer into m_fields/m_tags: validates BeginString, scans
      * 16 bytes at a time to locate tag/value boundaries, and validates
      * BodyLength and CheckSum on completion.
      * @param buffer raw FIX message bytes
@@ -144,7 +144,7 @@ public:
         {
             return { 8, Result::InvalidBeginString };
         }
-        m_tokens[BeginStringPosition] = { 2, 8, ProtocolLength };
+        m_fields[BeginStringPosition] = { 2, 8, ProtocolLength };
         m_tags[BeginStringPosition] = 8;
         m_count = 1;
 
@@ -199,7 +199,7 @@ public:
         }
         if (complete)
         {
-            m_tokens[m_count - 1].m_length = 3; // previous field is checksum
+            m_fields[m_count - 1].m_length = 3; // previous field is checksum
         }
         else if (offset < buffer.size())
         {
@@ -223,10 +223,10 @@ private:
      */
     Result checkRequiredFields(const data_t* data, const uint64_t blockSum, const position_t blockEnd) const
     {
-        const auto* last = &m_tokens[m_count - 1];
+        const auto* last = &m_fields[m_count - 1];
         const bool hasCheckSum = last->m_tag == CheckSumTag;
         const uint32_t processed = hasCheckSum ? last->m_position + last->m_length + 1 : 0;
-        const auto& bodyLength = m_tokens[BodyLengthPosition];
+        const auto& bodyLength = m_fields[BodyLengthPosition];
         if (bodyLength.m_tag != BodyLengthTag)
         {
             return {processed, Result::InvalidBodyLengthTag};
@@ -247,7 +247,7 @@ private:
         {
             return {0, Result::RequiredFieldMissing};
         }
-        if (m_tokens[MessageTypePosition].m_tag != MessageTypeTag)
+        if (m_fields[MessageTypePosition].m_tag != MessageTypeTag)
         {
             return {processed, Result::InvalidMessageTypeTag};
         }
@@ -255,7 +255,7 @@ private:
 #if !defined(NDEBUG)
         for (size_t i = 0; i < m_count; ++i)
         {
-            std::printf("%3zu tag = %3d, pos = %3d, len = %3d\n", i, m_tokens[i].m_tag, m_tokens[i].m_position, m_tokens[i].m_length);
+            std::printf("%3zu tag = %3d, pos = %3d, len = %3d\n", i, m_fields[i].m_tag, m_fields[i].m_position, m_fields[i].m_length);
         }
 #endif
 
@@ -331,27 +331,27 @@ private:
     {
         const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
         const auto trailingCount = std::countl_one(trailingTagFlags);
-        auto* token = &m_tokens[m_count - 1];
+        auto* field = &m_fields[m_count - 1];
         if (m_tag != 0 && (tagDigitFlags & 0xF) == 0)
         {  // split tag ending in first position of next block
-            token->m_length = static_cast<int16_t>(m_position + offset - 1 - token->m_position);
-            if (emitDataSkip(data, token))
+            field->m_length = static_cast<int16_t>(m_position + offset - 1 - field->m_position);
+            if (emitDataSkip(data, field))
             {
                 applyDataSkip(data, length, offset, blockSum);
                 return false;
             }
             ++m_count;
-            ++token;
-            token->m_tag = m_tag;
-            m_tags[token - m_tokens.data()] = m_tag;
-            token->m_position = offset + 1;
+            ++field;
+            field->m_tag = m_tag;
+            m_tags[field - m_fields.data()] = m_tag;
+            field->m_position = offset + 1;
             m_position = 0;
             m_tag = 0;
         }
-        token->m_length = m_position;
+        field->m_length = m_position;
 
         uint64_t remainingDigitFlags = tagDigitFlags & ~0ull >> std::max(4, trailingCount);
-        while (remainingDigitFlags > 0 && token->m_tag != CheckSumTag) [[likely]]
+        while (remainingDigitFlags > 0 && field->m_tag != CheckSumTag) [[likely]]
         {
             const int32_t nonTagCount = std::countr_zero(remainingDigitFlags);
             nonTagBitPos += nonTagCount;
@@ -359,15 +359,15 @@ private:
 
             const position_t digitBits = std::countr_one(remainingDigitFlags);
             const position_t tagPos = nonTagBitPos >> 2;
-            token->m_length += offset + tagPos - token->m_position - 1;
+            field->m_length += offset + tagPos - field->m_position - 1;
 
-            if (emitDataSkip(data, token))
+            if (emitDataSkip(data, field))
             {
                 applyDataSkip(data, length, offset, blockSum);
                 return false;
             }
 
-            token = &m_tokens[m_count++];
+            field = &m_fields[m_count++];
 
             const position_t count = digitBits >> 2;
             const data_t* digit = &digits[tagPos];
@@ -377,9 +377,9 @@ private:
                 value = m_tag;
                 m_tag = 0;
             }
-            token->m_tag = utils::asciiToUin32(value, digit, count);
-            m_tags[token - m_tokens.data()] = token->m_tag;
-            token->m_position = offset + tagPos + count + 1;
+            field->m_tag = utils::asciiToUin32(value, digit, count);
+            m_tags[field - m_fields.data()] = field->m_tag;
+            field->m_position = offset + tagPos + count + 1;
             remainingDigitFlags >>= digitBits;
             nonTagBitPos += digitBits;
         }
@@ -391,7 +391,7 @@ private:
             m_tag = utils::asciiToUin32(0, digit, count);
             m_position = -count;
         }
-        return m_tokens[m_count - 1].m_tag == 10;
+        return m_fields[m_count - 1].m_tag == 10;
     }
 
     /**
@@ -402,27 +402,27 @@ private:
      * @param token the just-completed length tag token
      * @return true if a data skip was emitted
      */
-    bool emitDataSkip(const data_t* data, const Token* token)
+    bool emitDataSkip(const data_t* data, const Field* field)
     {
-        const auto dataTagNum = DataFields::dataTag(token->m_tag);
+        const auto dataTagNum = DataFields::dataTag(field->m_tag);
         if (dataTagNum < 0)
         {
             return false;
         }
         const auto lengthValue = static_cast<uint32_t>(
-            utils::asciiToUint64(data + token->m_position, token->m_length, token->m_length <= 8));
+            utils::asciiToUint64(data + field->m_position, field->m_length, field->m_length <= 8));
 
         // Scan past the SOH after the length value, then past the data tag's "NNN=" prefix
-        auto pos = static_cast<position_t>(token->m_position + token->m_length + 1);
+        auto pos = static_cast<position_t>(field->m_position + field->m_length + 1);
         while (data[pos] != TagEnd)
         {
             ++pos;
         }
         ++pos;
 
-        auto* dataToken = &m_tokens[m_count++];
+        auto* dataToken = &m_fields[m_count++];
         dataToken->m_tag = static_cast<uint16_t>(dataTagNum);
-        m_tags[dataToken - m_tokens.data()] = dataToken->m_tag;
+        m_tags[dataToken - m_fields.data()] = dataToken->m_tag;
         dataToken->m_position = pos;
         dataToken->m_length = static_cast<int16_t>(lengthValue);
 
@@ -448,8 +448,8 @@ private:
                                    const position_t blockEnd) const
     {
         uint64_t checks = 0;
-        std::memcpy(&checks, data + m_tokens[m_count - 1].m_position - 4, sizeof(uint64_t));
-        const auto& checkSumToken = m_tokens[m_count - 1];
+        std::memcpy(&checks, data + m_fields[m_count - 1].m_position - 4, sizeof(uint64_t));
+        const auto& checkSumToken = m_fields[m_count - 1];
         if ((checks & CheckSumMask) != CheckSumMask)
         {
             return Result::InvalidCheckSumTag;
@@ -469,7 +469,7 @@ private:
         }
 
         const auto messageCheckSum = checkSumValue & 0xff;
-        if (utils::asciiToUint64(0, data + m_tokens[m_count - 1].m_position, 3, false) != messageCheckSum)
+        if (utils::asciiToUint64(0, data + m_fields[m_count - 1].m_position, 3, false) != messageCheckSum)
         {
             return Result::InvalidCheckSum;
         }
@@ -490,7 +490,7 @@ private:
 #if !defined(NDEBUG)
         utils::print(buffer.size() % 16, buffer.data() + offset);
 #endif
-        auto* last = &m_tokens[m_count - 1];
+        auto* last = &m_fields[m_count - 1];
         const uint8_t* data = buffer.data() + offset;
         const size_t remaining = buffer.size() - offset;
         uint64_t bytes = 0;
@@ -505,9 +505,9 @@ private:
         if (m_tag != 0)
         { // handle split tag
             last->m_length = offset + m_position - 1 - last->m_position;
-            last = &m_tokens[m_count++];
+            last = &m_fields[m_count++];
             last->m_tag = utils::asciiToUint64(m_tag, data, tagEndPos, false);
-            m_tags[last - m_tokens.data()] = last->m_tag;
+            m_tags[last - m_fields.data()] = last->m_tag;
             last->m_position = offset + tagEndPos + 1;
             last->m_length = fieldEndPos - tagEndPos - 1;
             position = fieldEndPos + 1;
@@ -521,17 +521,17 @@ private:
             fieldEnds &= ~(1ULL << fieldEndBit);
             fieldEndBit = std::countr_zero(fieldEnds);
             fieldEndPos = fieldEndBit / 8;
-            last = &m_tokens[m_count++];
+            last = &m_fields[m_count++];
         }
         while (position + 7 < remaining)
         {
             last->m_tag = utils::asciiToUint64(0, data + position, tagEndPos - position, false);
-            m_tags[last - m_tokens.data()] = last->m_tag;
+            m_tags[last - m_fields.data()] = last->m_tag;
             position += tagEndPos - position + 1;
             last->m_position = position + offset;
             last->m_length = fieldEndPos - position;
             position += last->m_length + 1;
-            last = &m_tokens[m_count++];
+            last = &m_fields[m_count++];
             tagEnds &= ~(1ULL << tagEndBit);
             tagEndBit = std::countr_zero(tagEnds);
             tagEndPos = tagEndBit / 8;
@@ -542,9 +542,9 @@ private:
         if (position < remaining)
         { // checked by decoder
             constexpr uint32_t checkSumPrefixLen = 3; // "10="
-            last = &m_tokens[m_count++];
+            last = &m_fields[m_count++];
             last->m_tag = CheckSumTag;
-            m_tags[last - m_tokens.data()] = CheckSumTag;
+            m_tags[last - m_fields.data()] = CheckSumTag;
             last->m_position = offset + position + checkSumPrefixLen;
             last->m_length = CheckSumValueLength;
         }

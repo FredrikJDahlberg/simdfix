@@ -27,14 +27,14 @@ TEST(GroupDecoder, ScopesFieldLookupToCurrentRepeat)
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 
-    const auto tokens = decoder.tokens();
-    std::vector<uint16_t> tags(tokens.size());
-    for (size_t i = 0; i < tokens.size(); ++i)
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
     {
-        tags[i] = tokens[i].m_tag;
+        tags[i] = fields[i].m_tag;
     }
 
-    FieldDecoder field{logout, tokens, tags, static_cast<int32_t>(tokens.size())};
+    FieldDecoder field{logout, fields, tags, static_cast<int32_t>(fields.size())};
     GroupDecoder group{field};
     group.wrap<627>();
     ASSERT_EQ(2u, group.count());
@@ -78,14 +78,14 @@ TEST(GroupDecoder, RewrapWithoutClearDoesNotLeakScopeDepth)
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 
-    const auto tokens = decoder.tokens();
-    std::vector<uint16_t> tags(tokens.size());
-    for (size_t i = 0; i < tokens.size(); ++i)
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
     {
-        tags[i] = tokens[i].m_tag;
+        tags[i] = fields[i].m_tag;
     }
 
-    FieldDecoder field{logout, tokens, tags, static_cast<int32_t>(tokens.size())};
+    FieldDecoder field{logout, fields, tags, static_cast<int32_t>(fields.size())};
     GroupDecoder group{field};
 
     // MaxGroupDepth is 8; iterate well beyond that without clear() to ensure

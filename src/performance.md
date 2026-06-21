@@ -1,6 +1,6 @@
 # Performance
 
-Figures from `SimdFixBenchmark` (release build: `-O3`, LTO, `-march=native`), measured on 2026-06-20.
+Figures from `SimdFixBenchmark` (release build: `-O3`, LTO, `-march=native`), measured on 2026-06-21.
 
 ## Test environment
 
@@ -22,15 +22,15 @@ before parsing).
 
 | Benchmark | Message | ns/msg | GB/s |
 |-----------|---------|-------:|-----:|
-| LOGON COLD | Logon, 142 B | 91.3 | 1.56 |
-| LOGON HOT | Logon, 142 B | 90.7 | 1.57 |
-| LOGON GETTERS | Logon, 142 B | 119.2 | 1.19 |
-| LOGON GROUPS | Logon + 3 hops, 253 B | 215.2 | 1.18 |
-| LOGON DATA | Logon + XmlData, 166 B | 150.7 | 1.10 |
-| LOGON ENCODE | Logon + 3 hops, ~224 B | 102.5 | 2.19 |
-| NOS HOT | NewOrderSingle, 154 B | 93.9 | 1.64 |
-| NOS GETTERS | NewOrderSingle, 154 B | 127.5 | 1.21 |
-| NOS ENCODE | NewOrderSingle, 154 B | 38.0 | 4.29 |
+| LOGON COLD | Logon, 142 B | 90.8 | 1.56 |
+| LOGON HOT | Logon, 142 B | 90.5 | 1.57 |
+| LOGON GETTERS | Logon, 142 B | 112.8 | 1.26 |
+| LOGON GROUPS | Logon + 3 hops, 253 B | 211.2 | 1.20 |
+| LOGON DATA | Logon + XmlData, 166 B | 143.7 | 1.16 |
+| LOGON ENCODE | Logon + 3 hops, ~224 B | 101.1 | 2.22 |
+| NOS HOT | NewOrderSingle, 154 B | 93.6 | 1.65 |
+| NOS GETTERS | NewOrderSingle, 154 B | 129.8 | 1.19 |
+| NOS ENCODE | NewOrderSingle, 154 B | 37.1 | 4.40 |
 
 ## What each benchmark measures
 
@@ -44,45 +44,52 @@ before parsing).
 - **NOS GETTERS** — as NOS HOT plus all 8 mandatory `NewOrderSingleDecoder` getters (clOrdID, handlInst, symbol, side, transactTime, orderQty, ordType, price).
 - **NOS ENCODE** — encodes a flat `NewOrderSingle` (no repeating groups) via `FixPayloadEncoder`/`NewOrderSingleEncoder`.
 
-## Changes since previous measurement (2026-06-19)
+## Changes since previous measurement (2026-06-20)
 
-1. **Split-tag digit-zero fix** — `processBlock` checked `digits[0] == 0`
-   to detect whether a tag carried across a 16-byte chunk boundary had
-   ended. The digit `'0'` maps to value 0 after the SIMD subtraction,
-   making it indistinguishable from "no digit". Changed to check the
-   `tagDigitFlags` bitmask (`(tagDigitFlags & 0xF) == 0`) instead.
-2. **New message types** — added ExecutionReport (35=8), ResendRequest
-   (35=2), Reject (35=3), and SequenceReset (35=4) to the protocol
-   definition, with ExecType, OrdStatus, SessionRejectReason, and
-   GapFillFlag enums. These are compile-time code-generated decoders and
-   encoders; the tokenizer hot path is unchanged.
-3. **FixedString protocol constants** — `Protocol::Values` codes are now
-   also available as free `inline constexpr FixedString` variables
-   (`FIXT_1_1`, `FIX_4_3`, `FIX_4_4`) for use as template arguments.
+1. **Index caching for required fields** — `validate()` now stores the
+   token index (`int8_t`, 1 byte per field) for each required field found
+   via `findIndex()`. Getters for required fields use the cached index
+   with `valueAt`/`enumAt`/`timeOnlyAt`/`dateOnlyAt` instead of
+   re-searching. Optional fields still search on demand.
+2. **UTC timestamp range validation** — `dateTimeToEpochUTC`,
+   `timeOnlyToMillis`, and `dateOnlyToEpochUTC` now validate hours (0-23),
+   minutes (0-59), seconds (0-59), month (1-12), and day (1-31), returning
+   -1 for out-of-range values. Getters propagate the error as
+   `std::unexpected{Result::InvalidLength}`.
+3. **Integer and decimal field validation** — `convertToUint32`,
+   `convertToInt32`, and `convertToFixedDecimal` now validate field
+   content at the point of use. Length bounds reject overflow (>10 digits
+   for uint32, >11 for int32, >20 for decimal). SWAR `isDigits` checks
+   all bytes are '0'–'9'; `findByte('.')` locates the decimal point
+   without a libc call. Returns `InvalidLength` or `InvalidValue`.
+4. **Enum validation** — `getEnum`/`enumAt` return
+   `std::unexpected{Result::InvalidValue}` for unrecognized codes instead
+   of silently returning `Enum::Null`.
+5. **Scope safety** — `wrap()` resets group scope depth;
+   `popGroupScope()` guards against underflow.
 
 | Benchmark | Before | After | Change |
 |-----------|-------:|------:|-------:|
-| LOGON COLD | 83.3 ns | 91.3 ns | +9.6% |
-| LOGON HOT | 83.2 ns | 90.7 ns | +9.0% |
-| LOGON GETTERS | 119.9 ns | 119.2 ns | −0.6% |
-| NOS HOT | 86.0 ns | 93.9 ns | +9.2% |
-| NOS GETTERS | 127.9 ns | 127.5 ns | −0.3% |
-| LOGON ENCODE | 100.4 ns | 102.5 ns | +2.1% |
-| NOS ENCODE | 38.0 ns | 38.0 ns | 0.0% |
+| LOGON HOT | 90.7 ns | 90.5 ns | −0.2% |
+| LOGON GETTERS | 119.2 ns | 112.8 ns | −5.4% |
+| NOS HOT | 93.9 ns | 93.6 ns | −0.3% |
+| NOS GETTERS | 127.5 ns | 129.8 ns | +1.8% |
+| LOGON ENCODE | 102.5 ns | 101.1 ns | −1.4% |
+| NOS ENCODE | 38.0 ns | 37.1 ns | −2.4% |
 
-The tokenization-only benchmarks (COLD, HOT, NOS HOT) show ~9% higher
-latency. The code change (one branch condition in `processBlock`) is
-too small to explain this; the likely cause is measurement environment
-variation (thermal state, background load). Getter and encode benchmarks
-are within run-to-run noise.
+Index caching reduces Logon getter overhead from 28.5 ns to 22.3 ns
+(−22%). NOS getters show a small increase (+2.3 ns) from the decimal
+digit validation on the `price` field, offset by index caching.
+Tokenization-only and encode benchmarks are unchanged.
 
 ## Observations
 
 - Cold vs. hot throughput is nearly identical — the parser is compute-bound,
   not memory-bound, even when streaming from DRAM.
-- Field access (LOGON GETTERS) adds ~29 ns per message on top of parsing;
-  NOS GETTERS adds ~34 ns for 8 fields versus Logon's 6, consistent with the
-  extra linear-search steps.
+- Field access (LOGON GETTERS) adds ~22 ns per message on top of parsing
+  thanks to index caching of required fields; NOS GETTERS adds ~36 ns for
+  its larger mix of required and optional fields (including SWAR digit
+  validation on integers and decimals).
 - The 3-entry repeating group (LOGON GROUPS) roughly doubles per-message cost
   versus LOGON GETTERS (longer message plus group iteration), while byte
   throughput stays the same.

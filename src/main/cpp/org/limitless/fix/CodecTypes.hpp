@@ -105,7 +105,7 @@ concept EncodableMessage = requires(T message, std::span<uint8_t> data)
     { message.encodedLength() } -> std::convertible_to<std::size_t>;
 };
 
-struct Token
+struct Field
 {
     uint16_t m_position{};
     uint16_t m_tag{};
@@ -262,7 +262,8 @@ struct Result
         InvalidMessageType,
         InvalidSendingTime,
         RequiredFieldMissing,
-        InvalidLength
+        InvalidLength,
+        InvalidValue
     };
 
     uint32_t m_processed{};
@@ -304,7 +305,8 @@ struct Result
         "InvalidMessageType",
         "InvalidSendingTime",
         "RequiredFieldMissing",
-        "InvalidLength"
+        "InvalidLength",
+        "InvalidValue"
     };
 
 };
@@ -320,7 +322,7 @@ using Uint64Result = std::expected<uint64_t, Result::Values>;
 using TimestampResult = std::expected<std::chrono::milliseconds, Result::Values>;
 using FixedDecimalResult = std::expected<utils::FixedDecimal, Result::Values>;
 using DataResult = std::expected<Buffer, Result::Values>;
-using TokenSpan = std::span<Token>;
+using FieldSpan = std::span<Field>;
 using TagSpan = std::span<uint16_t>;
 
 }

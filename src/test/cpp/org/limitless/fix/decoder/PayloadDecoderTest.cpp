@@ -12,7 +12,7 @@ namespace org::limitless::fix::decoder {
 
 #define SOH "\x01"
 
-void check(std::span<Token> result, const std::span<const Token> expected)
+void check(std::span<Field> result, const std::span<const Field> expected)
 {
     for (int i = 0; auto& [position, tag, length] : result)
     {
@@ -39,7 +39,7 @@ TEST(PayloadDecoder, Basics)
     ASSERT_EQ(Result::Success, status);
     ASSERT_EQ(message.size() - 17, processed);
     // ASSERT_EQ(218, checkSum);
-    constexpr Token expectedTokens[] =
+    constexpr Field expectedFields[] =
     {
         { 2, 8, 8 },
         { 13, 9, 3 },
@@ -57,7 +57,7 @@ TEST(PayloadDecoder, Basics)
         { 133, 1137, 1 },
         { 138, 10, 3 },
     };
-    check(decoder.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
+    check(decoder.fields(), std::span(expectedFields, std::size(expectedFields)));
 }
 
 TEST(PayloadDecoder, TrailerSplitCheckSum)
@@ -69,7 +69,7 @@ TEST(PayloadDecoder, TrailerSplitCheckSum)
     ASSERT_EQ(Result::Success, status);
     ASSERT_EQ(message.size(), processed);
 
-    constexpr Token expectedTokens[] =
+    constexpr Field expectedFields[] =
     {
         { 2, 8, 8 },
         { 13, 9, 2 },
@@ -80,7 +80,7 @@ TEST(PayloadDecoder, TrailerSplitCheckSum)
         { 54, 52, 8 },
         { 66, 10, 3 }
     };
-    check(decoder.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
+    check(decoder.fields(), std::span(expectedFields, std::size(expectedFields)));
 }
 
 TEST(PayloadDecoder, TrailerFieldEnd)
@@ -121,13 +121,13 @@ TEST(PayloadDecoder, TrailerSplitValue)
     ASSERT_EQ(Result::Success, status);
     ASSERT_EQ(message.size(), processed);
 
-    // Token 14 is tag 44 (Price); its value "15000" crosses the block→tail
+    // Field 14 is tag 44 (Price); its value "15000" crosses the block→tail
     // boundary.  Verify the full five-digit length is reported, not the
     // truncated two-digit length produced by the pre-fix formula.
-    const auto tokens = decoder.tokens();
-    ASSERT_EQ(44, tokens[14].m_tag);
-    ASSERT_EQ(141, tokens[14].m_position);
-    ASSERT_EQ(5, tokens[14].m_length);
+    const auto fields = decoder.fields();
+    ASSERT_EQ(44, fields[14].m_tag);
+    ASSERT_EQ(141, fields[14].m_position);
+    ASSERT_EQ(5, fields[14].m_length);
 }
 
 TEST(PayloadDecoder, SplitTagDigitZero)
@@ -149,10 +149,10 @@ TEST(PayloadDecoder, SplitTagDigitZero)
     ASSERT_EQ(Result::Success, status);
     ASSERT_EQ(message.size(), processed);
 
-    const auto tokens = decoder.tokens();
-    ASSERT_EQ(150, tokens[9].m_tag);
-    ASSERT_EQ(98, tokens[9].m_position);
-    ASSERT_EQ(1, tokens[9].m_length);
+    const auto fields = decoder.fields();
+    ASSERT_EQ(150, fields[9].m_tag);
+    ASSERT_EQ(98, fields[9].m_position);
+    ASSERT_EQ(1, fields[9].m_length);
 }
 
 TEST(PayloadDecoder, HopGroup)
@@ -163,7 +163,7 @@ TEST(PayloadDecoder, HopGroup)
     PayloadDecoder<FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
-    constexpr Token expectedTokens[] =
+    constexpr Field expectedFields[] =
     {
         { 2, 8, 8 },
         { 13, 9, 2 },
@@ -179,6 +179,6 @@ TEST(PayloadDecoder, HopGroup)
         { 97, 628, 2, },
         { 103, 10, 3 }
     };
-    check(decoder.tokens(), std::span(expectedTokens, std::size(expectedTokens)));
+    check(decoder.fields(), std::span(expectedFields, std::size(expectedFields)));
 }
 }

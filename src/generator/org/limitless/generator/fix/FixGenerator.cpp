@@ -297,7 +297,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     }
     out << "    }\n\n";
     out << "    Result::Values handle(const std::span<const uint8_t> data,\n";
-    out << "                          const std::span<Token> tokens,\n";
+    out << "                          const std::span<Field> fields,\n";
     out << "                          const std::span<uint16_t> tags,\n";
     out << "                          const int32_t count,\n";
     out << "                          const uint8_t messageType)\n";
@@ -309,7 +309,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     {
         auto memberName = uncap(message.m_name);
         out << std::format("            case {}Decoder::MessageId:\n", message.m_name);
-        out << std::format("                m_{}.wrap(data, tokens, tags, count);\n", memberName);
+        out << std::format("                m_{}.wrap(data, fields, tags, count);\n", memberName);
         out << std::format("                status = m_{}.validate();\n", memberName);
         out << "                if (status == Result::Success)\n";
         out << "                {\n";
@@ -373,7 +373,7 @@ static void generateConstructors(std::ostream& out, const Record& record, const 
     }
 }
 
-static bool isCachedField(const Field& field)
+static bool isCachedField(const org::limitless::generator::fix::Field& field)
 {
     return field.m_presence == Presence::Required &&
            field.m_category != Category::Counter &&
@@ -381,14 +381,14 @@ static bool isCachedField(const Field& field)
            field.m_tag != 8 && field.m_tag != 9 && field.m_tag != 35;
 }
 
-static std::string fieldReturnType(const Field& field)
+static std::string fieldReturnType(const org::limitless::generator::fix::Field& field)
 {
     const auto isEnum = field.m_category == Category::Enum;
     return isEnum ? std::format("{}::Values", field.m_type)
                   : std::string{Category::type(field.m_category)};
 }
 
-static std::string decoderCall(const Field& field, const Record& record)
+static std::string decoderCall(const org::limitless::generator::fix::Field& field, const Record& record)
 {
     const auto parent = RecordType::name(record.m_parent);
     const auto isEnum = field.m_category == Category::Enum;
@@ -439,11 +439,11 @@ static void generateWrapNextDecoders(std::ostream& out, const Record& record)
     {
         out << std::format("    {}Decoder& wrap(", record.m_name);
         out << "const std::span<const uint8_t> data,\n";
-        out << "            const std::span<Token> tokens,\n";
+        out << "            const std::span<Field> fields,\n";
         out << "            const std::span<uint16_t> tags,\n";
         out << "            const int32_t count)\n";
         out << "    {\n";
-        out << "        m_decoder.wrap(data, tokens, tags, count);\n";
+        out << "        m_decoder.wrap(data, fields, tags, count);\n";
         out << "        return *this;\n";
         out << "    }\n\n";
 

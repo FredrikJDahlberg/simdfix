@@ -133,11 +133,11 @@ public:
     static constexpr uint8_t MessageId = 'A';
 
     LogonDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Token> tokens,
+            const std::span<Field> fields,
             const std::span<uint16_t> tags,
             const int32_t count)
     {
-        m_decoder.wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, fields, tags, count);
         return *this;
     }
 
@@ -257,11 +257,11 @@ public:
     static constexpr uint8_t MessageId = '5';
 
     LogoutDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Token> tokens,
+            const std::span<Field> fields,
             const std::span<uint16_t> tags,
             const int32_t count)
     {
-        m_decoder.wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, fields, tags, count);
         return *this;
     }
 
@@ -366,11 +366,11 @@ public:
     static constexpr uint8_t MessageId = '0';
 
     HeartbeatDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Token> tokens,
+            const std::span<Field> fields,
             const std::span<uint16_t> tags,
             const int32_t count)
     {
-        m_decoder.wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, fields, tags, count);
         return *this;
     }
 
@@ -475,11 +475,11 @@ public:
     static constexpr uint8_t MessageId = '1';
 
     TestRequestDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Token> tokens,
+            const std::span<Field> fields,
             const std::span<uint16_t> tags,
             const int32_t count)
     {
-        m_decoder.wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, fields, tags, count);
         return *this;
     }
 
@@ -586,11 +586,11 @@ public:
     static constexpr uint8_t MessageId = '2';
 
     ResendRequestDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Token> tokens,
+            const std::span<Field> fields,
             const std::span<uint16_t> tags,
             const int32_t count)
     {
-        m_decoder.wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, fields, tags, count);
         return *this;
     }
 
@@ -711,11 +711,11 @@ public:
     static constexpr uint8_t MessageId = '3';
 
     RejectDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Token> tokens,
+            const std::span<Field> fields,
             const std::span<uint16_t> tags,
             const int32_t count)
     {
-        m_decoder.wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, fields, tags, count);
         return *this;
     }
 
@@ -846,11 +846,11 @@ public:
     static constexpr uint8_t MessageId = '4';
 
     SequenceResetDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Token> tokens,
+            const std::span<Field> fields,
             const std::span<uint16_t> tags,
             const int32_t count)
     {
-        m_decoder.wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, fields, tags, count);
         return *this;
     }
 
@@ -975,11 +975,11 @@ public:
     static constexpr uint8_t MessageId = '8';
 
     ExecutionReportDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Token> tokens,
+            const std::span<Field> fields,
             const std::span<uint16_t> tags,
             const int32_t count)
     {
-        m_decoder.wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, fields, tags, count);
         return *this;
     }
 
@@ -1216,11 +1216,11 @@ public:
     static constexpr uint8_t MessageId = 'D';
 
     NewOrderSingleDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Token> tokens,
+            const std::span<Field> fields,
             const std::span<uint16_t> tags,
             const int32_t count)
     {
-        m_decoder.wrap(data, tokens, tags, count);
+        m_decoder.wrap(data, fields, tags, count);
         return *this;
     }
 

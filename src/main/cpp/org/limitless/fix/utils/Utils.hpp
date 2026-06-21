@@ -211,6 +211,26 @@ template<size_t N>
     return bytes;
 }
 
+inline constexpr uint32_t MaxUint32Digits = 10;
+inline constexpr uint32_t MaxInt32Chars = 11;
+inline constexpr uint32_t MaxDecimalChars = 20;
+
+/**
+ * SWAR check that all bytes in [data, data+length) are ASCII digits ('0'-'9').
+ * @param data pointer to the bytes to check
+ * @param length number of bytes to validate, 1-8
+ * @return true if every byte is a digit
+ */
+[[nodiscard]] inline bool isDigits(const uint8_t* data, const uint32_t length)
+{
+    uint64_t word = 0;
+    std::memcpy(&word, data, sizeof(word));
+    const uint64_t zeroed = word - AsciiZeros;
+    const uint64_t overflow = (zeroed + 0x7676767676767676ULL) & 0x8080808080808080ULL;
+    const uint64_t mask = length < 8 ? (1ULL << (length * 8)) - 1 : ~0ULL;
+    return (overflow & mask) == 0;
+}
+
 /**
  * Divides number by a compile-time constant divisor using a multiply-and-shift
  * approximation, avoiding a hardware division instruction.

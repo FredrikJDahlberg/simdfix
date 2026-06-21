@@ -454,12 +454,12 @@ TEST(MessageDecoder, LogonWithXmlDataInlineSkip)
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 
-    const auto tokens = decoder.tokens();
-    for (size_t i = 0; i < tokens.size(); ++i)
+    const auto fields = decoder.fields();
+    for (size_t i = 0; i < fields.size(); ++i)
     {
-        if (tokens[i].m_tag == 213)
+        if (fields[i].m_tag == 213)
         {
-            EXPECT_EQ(12U, tokens[i].m_length);
+            EXPECT_EQ(12U, fields[i].m_length);
             break;
         }
     }

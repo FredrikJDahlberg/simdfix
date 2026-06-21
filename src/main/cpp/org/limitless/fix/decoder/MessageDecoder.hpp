@@ -34,29 +34,29 @@ public:
     /**
      * Constructs a decoder over an already-tokenized message.
      * @param data raw message bytes
-     * @param tokens token array produced by the tokenizer
-     * @param tags tag numbers, parallel to tokens
-     * @param size number of valid tokens/tags
+     * @param fields token array produced by the tokenizer
+     * @param tags tag numbers, parallel to fields
+     * @param size number of valid fields/tags
      */
-    MessageDecoder(const Buffer data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
-      : m_decoder{data, tokens, tags, size}
+    MessageDecoder(const Buffer data, const std::span<Field> fields, const std::span<uint16_t> tags, const int32_t size)
+      : m_decoder{data, fields, tags, size}
     {
     }
 
     /**
      * Rebinds the decoder to a new tokenized message.
      * @param data raw message bytes
-     * @param tokens token array produced by the tokenizer
-     * @param tags tag numbers, parallel to tokens
-     * @param size number of valid tokens/tags
+     * @param fields token array produced by the tokenizer
+     * @param tags tag numbers, parallel to fields
+     * @param size number of valid fields/tags
      */
-    void wrap(const Buffer data, const std::span<Token> tokens, const std::span<uint16_t> tags, const int32_t size)
+    void wrap(const Buffer data, const std::span<Field> fields, const std::span<uint16_t> tags, const int32_t size)
     {
-        m_decoder.wrap(data, tokens, tags, size);
+        m_decoder.wrap(data, fields, tags, size);
     }
 
     /**
-     * Reads the MsgType (tag 35) value from the third token. Single-byte
+     * Reads the MsgType (tag 35) value from the third field. Single-byte
      * MsgTypes (e.g. 'A') are returned as-is; two-byte MsgTypes are packed
      * little-endian into the result so they remain comparable to the
      * generated MessageId constants.
@@ -64,10 +64,10 @@ public:
      */
     [[nodiscard]] uint16_t type() const noexcept
     {
-        const auto& token = m_decoder.tokenAt(MessageTypePosition);
-        const auto position = token.m_position;
+        const auto& field = m_decoder.fieldAt(MessageTypePosition);
+        const auto position = field.m_position;
         uint16_t type = m_decoder.byteAt(position);
-        if (token.m_length == 2)
+        if (field.m_length == 2)
         {
             type = static_cast<uint16_t>(type + (m_decoder.byteAt(position + 1) << 8));
         }

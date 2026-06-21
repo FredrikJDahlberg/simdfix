@@ -47,6 +47,11 @@ public:
             return *this;
         }
         const auto length = m_decoder.convertToUint32(lengthToken);
+        if (!length.has_value())
+        {
+            m_result = std::unexpected{length.error()};
+            return *this;
+        }
 
         const auto* dataToken = m_decoder.nextField(DataTag);
         if (dataToken == nullptr)
@@ -54,7 +59,7 @@ public:
             m_result = std::unexpected{Result::Success};
             return *this;
         }
-        m_result = m_decoder.bufferAt(dataToken->m_position, length);
+        m_result = m_decoder.bufferAt(dataToken->m_position, length.value());
         return *this;
     }
 

@@ -50,16 +50,17 @@ public:
     template <uint32_t Tag>
     GroupDecoder& wrap()
     {
-        const Token* token = m_decoder.nextField(Tag);
-        if (token != nullptr)
+        const Field* field = m_decoder.nextField(Tag);
+        if (field != nullptr)
         {
             if (m_repeat > 0)
             {
                 m_decoder.popGroupScope();
             }
-            m_offset = m_decoder.indexOf(token);
-            m_count = m_decoder.convertToUint32(token);
-            m_delim = m_decoder.tokenAt(m_offset + 1).m_tag;
+            m_offset = m_decoder.indexOf(field);
+            const auto count = m_decoder.convertToUint32(field);
+            m_count = count.value_or(0);
+            m_delim = m_decoder.fieldAt(m_offset + 1).m_tag;
             m_repeat = 0;
         }
         else
@@ -80,7 +81,7 @@ public:
     /**
      * Advances to the next repeating-group entry, replacing the current
      * FieldDecoder group scope (if any) with the new entry's
-     * [begin, end) token range.
+     * [begin, end) field range.
      */
     void next()
     {
@@ -119,11 +120,11 @@ public:
 
 private:
     /**
-     * Finds the token index where the next repeating-group entry begins:
+     * Finds the field index where the next repeating-group entry begins:
      * the next occurrence of the delimiter tag after the current offset,
      * bounded by the enclosing group scope (or the whole message if this
      * group is not nested).
-     * @return token/tag index of the next entry's delimiter field
+     * @return field/tag index of the next entry's delimiter field
      */
     int32_t nextGroupOffset() const
     {

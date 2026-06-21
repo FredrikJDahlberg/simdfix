@@ -23,14 +23,14 @@ TEST(FieldDecoder, GetInt32)
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 
-    const auto tokens = decoder.tokens();
-    std::vector<uint16_t> tags(tokens.size());
-    for (size_t i = 0; i < tokens.size(); ++i)
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
     {
-        tags[i] = tokens[i].m_tag;
+        tags[i] = fields[i].m_tag;
     }
 
-    FieldDecoder field{logout, tokens, tags, static_cast<int32_t>(tokens.size())};
+    FieldDecoder field{logout, fields, tags, static_cast<int32_t>(fields.size())};
 
     const auto negative = field.getInt32<9999, false, RecordType::Message>().value_or(0);
     const auto positive = field.getInt32<34, false, RecordType::Message>().value_or(0);
@@ -48,19 +48,51 @@ TEST(FieldDecoder, GetFixedDecimal)
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 
-    const auto tokens = decoder.tokens();
-    std::vector<uint16_t> tags(tokens.size());
-    for (size_t i = 0; i < tokens.size(); ++i)
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
     {
-        tags[i] = tokens[i].m_tag;
+        tags[i] = fields[i].m_tag;
     }
 
-    FieldDecoder field{logout, tokens, tags, static_cast<int32_t>(tokens.size())};
+    FieldDecoder field{logout, fields, tags, static_cast<int32_t>(fields.size())};
 
     const auto positive = field.getFixedDecimal<9999, false, RecordType::Message>().value_or(utils::FixedDecimal{});
     const auto negative = field.getFixedDecimal<9998, false, RecordType::Message>().value_or(utils::FixedDecimal{});
     EXPECT_EQ(utils::FixedDecimal(12345, -2), positive);
     EXPECT_EQ(utils::FixedDecimal(-1, -2), negative);
+}
+
+TEST(FieldDecoder, GetUint32InvalidValue)
+{
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=83" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
+        "9999=ABC" SOH "9998=99999999999" SOH "9997=-" SOH "10=130" SOH);
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status);
+
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
+    {
+        tags[i] = fields[i].m_tag;
+    }
+
+    FieldDecoder field{message, fields, tags, static_cast<int32_t>(fields.size())};
+
+    const auto nonDigit = field.getUint32<9999, false, RecordType::Message>();
+    EXPECT_FALSE(nonDigit.has_value());
+    EXPECT_EQ(Result::InvalidValue, nonDigit.error());
+
+    const auto overflow = field.getUint32<9998, false, RecordType::Message>();
+    EXPECT_FALSE(overflow.has_value());
+    EXPECT_EQ(Result::InvalidLength, overflow.error());
+
+    const auto signOnly = field.getInt32<9997, false, RecordType::Message>();
+    EXPECT_FALSE(signOnly.has_value());
+    EXPECT_EQ(Result::InvalidValue, signOnly.error());
 }
 
 TEST(FieldDecoder, GetInt32MissingField)
@@ -73,14 +105,14 @@ TEST(FieldDecoder, GetInt32MissingField)
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 
-    const auto tokens = decoder.tokens();
-    std::vector<uint16_t> tags(tokens.size());
-    for (size_t i = 0; i < tokens.size(); ++i)
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
     {
-        tags[i] = tokens[i].m_tag;
+        tags[i] = fields[i].m_tag;
     }
 
-    FieldDecoder field{logout, tokens, tags, static_cast<int32_t>(tokens.size())};
+    FieldDecoder field{logout, fields, tags, static_cast<int32_t>(fields.size())};
 
     const auto optional = field.getInt32<9999, false, RecordType::Message>();
     const auto required = field.getInt32<9999, true, RecordType::Message>();
