@@ -118,6 +118,20 @@ TEST(Time, DateTimeToEpochUTCInvalidLength)
     EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260607-12:34:56.12").count()); // one char short, 20 chars
 }
 
+TEST(Time, DateTimeToEpochUTCInvalidContent)
+{
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260007-12:34:56.000").count()); // month 0
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20261307-12:34:56.000").count()); // month 13
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260600-12:34:56.000").count()); // day 0
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260632-12:34:56.000").count()); // day 32
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260607-24:34:56.000").count()); // hour 24
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260607-12:60:56.000").count()); // minute 60
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260607-12:34:60.000").count()); // second 60
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260607-24:34:56").count());     // hour 24 short form
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260607-12:60:56").count());     // minute 60 short form
+    EXPECT_EQ(-1, utils::dateTimeToEpochUTC("20260607-12:34:60").count());     // second 60 short form
+}
+
 TEST(Time, TimeOnlyToMillis)
 {
     const auto check = [](const std::string_view input, const int64_t expected)
@@ -144,6 +158,22 @@ TEST(Time, TimeOnlyToMillisInvalidLength)
     EXPECT_EQ(-1, utils::timeOnlyToMillis(data, 0));
 }
 
+TEST(Time, TimeOnlyToMillisInvalidContent)
+{
+    const auto check = [](const std::string_view input)
+    {
+        const auto data = reinterpret_cast<const uint8_t*>(input.data());
+        EXPECT_EQ(-1, utils::timeOnlyToMillis(data, input.length())) << "input=" << input;
+    };
+
+    check("24:00:00");     // hour 24
+    check("12:60:00");     // minute 60
+    check("12:34:60");     // second 60
+    check("24:00:00.000"); // hour 24 with millis
+    check("12:60:00.000"); // minute 60 with millis
+    check("12:34:60.000"); // second 60 with millis
+}
+
 TEST(Time, DateOnlyToEpochUTC)
 {
     const auto check = [](const std::string_view input, const int64_t expected)
@@ -164,6 +194,20 @@ TEST(Time, DateOnlyToEpochUTCInvalidLength)
     const auto data = reinterpret_cast<const uint8_t*>("2026010");
     EXPECT_EQ(-1, utils::dateOnlyToEpochUTC(data, 7));
     EXPECT_EQ(-1, utils::dateOnlyToEpochUTC(data, 9));
+}
+
+TEST(Time, DateOnlyToEpochUTCInvalidContent)
+{
+    const auto check = [](const std::string_view input)
+    {
+        const auto data = reinterpret_cast<const uint8_t*>(input.data());
+        EXPECT_EQ(-1, utils::dateOnlyToEpochUTC(data, input.length())) << "input=" << input;
+    };
+
+    check("20260001"); // month 0
+    check("20261301"); // month 13
+    check("20260600"); // day 0
+    check("20260632"); // day 32
 }
 
 TEST(Encode, Uint32ToAscii)

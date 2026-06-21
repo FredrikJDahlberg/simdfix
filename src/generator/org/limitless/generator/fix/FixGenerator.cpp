@@ -373,14 +373,62 @@ static void generateConstructors(std::ostream& out, const Record& record, const 
     }
 }
 
+static bool isCachedField(const Field& field)
+{
+    return field.m_presence == Presence::Required &&
+           field.m_category != Category::Counter &&
+           field.m_category != Category::Struct &&
+           field.m_tag != 8 && field.m_tag != 9 && field.m_tag != 35;
+}
+
+static std::string fieldReturnType(const Field& field)
+{
+    const auto isEnum = field.m_category == Category::Enum;
+    return isEnum ? std::format("{}::Values", field.m_type)
+                  : std::string{Category::type(field.m_category)};
+}
+
+static std::string decoderCall(const Field& field, const Record& record)
+{
+    const auto parent = RecordType::name(record.m_parent);
+    const auto isEnum = field.m_category == Category::Enum;
+    const auto mandatory = std::string{field.m_presence == Presence::Required ? "true" : "false"};
+    std::string arg = isEnum ? std::format(", {}", field.m_type) : "";
+    return std::format("m_decoder.get{}<{}, {}{}, RecordType::{}>()",
+                       Category::name(field.m_category), field.m_tag, mandatory, arg, parent);
+}
+
 static void generateStructFields(std::ostream& out, const Record& record, const std::string& codec)
 {
-    if (record.m_records.size() >= 1)
+    bool hasPrivate = !record.m_records.empty();
+    if (hasPrivate)
     {
         out << "private:\n";
         for (auto& comp: record.m_records)
         {
             out << std::format("    {}{} m_{};\n\n", comp.m_type, codec, uncap(comp.m_name));
+        }
+    }
+
+    if (codec == "Decoder" && record.m_parent == RecordType::Message)
+    {
+        bool first = true;
+        for (const auto& field : record.m_fields)
+        {
+            if (isCachedField(field))
+            {
+                if (!hasPrivate && first)
+                {
+                    out << "private:\n";
+                    hasPrivate = true;
+                }
+                first = false;
+                out << std::format("    int8_t m_{}Index{{-1}};\n", uncap(field.m_name));
+            }
+        }
+        if (!first)
+        {
+            out << "\n";
         }
     }
 }
@@ -453,22 +501,41 @@ static void generateWrapNextEncoders(std::ostream& out, const Record& record)
 
 static void generateGetters(std::ostream& out, const Record& record)
 {
-    auto parent = RecordType::name(record.m_parent);
     for (const auto& field: record.m_fields)
     {
         auto methodName = field.m_name;
         methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
-        auto category = field.m_category;
         if (field.m_category != Category::Counter && field.m_category != Category::Struct)
         {
-            const auto isEnum = field.m_category == Category::Enum;
-            const auto mandatory = std::string{field.m_presence == Presence::Required ? "true" : "false"};
             out << std::format("    [[nodiscard]] std::expected<{}, Result::Values> {}() const\n",
-                               isEnum ? std::format("{}::Values", field.m_type) : Category::type(category), methodName);
+                               fieldReturnType(field), methodName);
             out << "    {\n";
-            std::string arg = isEnum ? std::format(", {}", field.m_type) : "";
-            out << std::format("        return m_decoder.get{}<{}, {}{}, RecordType::{}>();\n",
-                               Category::name(category), field.m_tag, mandatory, arg, parent);
+            if (record.m_parent == RecordType::Message && isCachedField(field))
+            {
+                const auto memberName = uncap(field.m_name);
+                if (field.m_category == Category::Enum)
+                {
+                    out << std::format("        return m_decoder.enumAt<{}>(m_{}Index);\n",
+                                       field.m_type, memberName);
+                }
+                else if (field.m_category == Category::UTCTimeOnly)
+                {
+                    out << std::format("        return m_decoder.timeOnlyAt(m_{}Index);\n", memberName);
+                }
+                else if (field.m_category == Category::UTCDateOnly)
+                {
+                    out << std::format("        return m_decoder.dateOnlyAt(m_{}Index);\n", memberName);
+                }
+                else
+                {
+                    out << std::format("        return m_decoder.valueAt<{}>(m_{}Index);\n",
+                                       fieldReturnType(field), memberName);
+                }
+            }
+            else
+            {
+                out << std::format("        return {};\n", decoderCall(field, record));
+            }
             out << "    }\n\n";
         }
     }
@@ -604,18 +671,16 @@ static void generateCheckRequired(std::ostream& out, const Record& record)
 
     for (const auto& field : record.m_fields)
     {
-        if (field.m_presence != Presence::Required ||
-            field.m_category == Category::Counter ||
-            field.m_category == Category::Struct ||
-            field.m_tag == 8 || field.m_tag == 9 || field.m_tag == 35)
+        if (!isCachedField(field))
         {
             continue;
         }
-        auto methodName = field.m_name;
-        methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
+        const auto memberName = uncap(field.m_name);
         const auto errorCode = headerErrorCode(field.m_tag);
         const auto resultName = errorCode.empty() ? "RequiredFieldMissing" : std::string{errorCode};
-        out << std::format("        if (!{}())\n", methodName);
+        out << std::format("        m_{}Index = static_cast<int8_t>(m_decoder.findIndex<{}, RecordType::Message>());\n",
+                           memberName, field.m_tag);
+        out << std::format("        if (m_{}Index < 0)\n", memberName);
         out << "        {\n";
         out << std::format("            return Result::{};\n", resultName);
         out << "        }\n";

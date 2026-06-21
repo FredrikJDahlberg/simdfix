@@ -281,6 +281,10 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     const auto years = fastDivide<10000>(date);
     const auto month = fastDivide<100>(date - 10000 * fastDivide<10000>(date));
     const auto day = date - 100 * fastDivide<100>(date);
+    if (month < 1 || month > 12 || day < 1 || day > 31)
+    {
+        return -1;
+    }
     const auto days = daysSince1970(years, month, day);
 
     uint64_t time = 0;
@@ -289,6 +293,10 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     const auto hours = (time & 0xff) * 10 + ((time >> 8) & 0xff);
     const auto mins  = (time >> 24 & 0xff) * 10 + (time >> 32 & 0xff);
     const auto secs  = (time >> 48 & 0xff) * 10 + (time >> 56);
+    if (hours > 23 || mins > 59 || secs > 59)
+    {
+        return -1;
+    }
     uint64_t millis = days * static_cast<uint64_t>(MillisPerDay) + (hours * 3'600 + mins * 60 + secs) * 1000;
     if (length == UTCTimestampShortLength)
     {
@@ -324,6 +332,10 @@ inline int64_t timeOnlyToMillis(const uint8_t* data, const uint32_t length)
     const auto hours = (time & 0xff) * 10 + ((time >> 8) & 0xff);
     const auto mins  = (time >> 24 & 0xff) * 10 + (time >> 32 & 0xff);
     const auto secs  = (time >> 48 & 0xff) * 10 + (time >> 56);
+    if (hours > 23 || mins > 59 || secs > 59)
+    {
+        return -1;
+    }
     int64_t millis = (hours * 3'600 + mins * 60 + secs) * 1000;
     if (length == UTCTimeOnlyShortLength)
     {
@@ -356,6 +368,10 @@ inline int64_t dateOnlyToEpochUTC(const uint8_t* data, const uint32_t length)
     const auto years = fastDivide<10000>(date);
     const auto month = fastDivide<100>(date - 10000 * fastDivide<10000>(date));
     const auto day = date - 100 * fastDivide<100>(date);
+    if (month < 1 || month > 12 || day < 1 || day > 31)
+    {
+        return -1;
+    }
     return daysSince1970(years, month, day) * static_cast<uint64_t>(MillisPerDay);
 }
 

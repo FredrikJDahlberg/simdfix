@@ -112,6 +112,12 @@ private:
 
     DataDecoder m_xmlData;
 
+    int8_t m_senderIndex{-1};
+    int8_t m_targetIndex{-1};
+    int8_t m_sequenceNumberIndex{-1};
+    int8_t m_sendingTimeIndex{-1};
+    int8_t m_heartbeatIntervalIndex{-1};
+
 public:
     LogonDecoder() : 
         m_hops{m_decoder},
@@ -142,23 +148,28 @@ public:
 
     [[nodiscard]] Result::Values validate()
     {
-        if (!sender())
+        m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
+        if (m_senderIndex < 0)
         {
             return Result::InvalidSenderCompId;
         }
-        if (!target())
+        m_targetIndex = static_cast<int8_t>(m_decoder.findIndex<56, RecordType::Message>());
+        if (m_targetIndex < 0)
         {
             return Result::InvalidTargetCompId;
         }
-        if (!sequenceNumber())
+        m_sequenceNumberIndex = static_cast<int8_t>(m_decoder.findIndex<34, RecordType::Message>());
+        if (m_sequenceNumberIndex < 0)
         {
             return Result::InvalidSequenceNumber;
         }
-        if (!sendingTime())
+        m_sendingTimeIndex = static_cast<int8_t>(m_decoder.findIndex<52, RecordType::Message>());
+        if (m_sendingTimeIndex < 0)
         {
             return Result::InvalidSendingTime;
         }
-        if (!heartbeatInterval())
+        m_heartbeatIntervalIndex = static_cast<int8_t>(m_decoder.findIndex<108, RecordType::Message>());
+        if (m_heartbeatIntervalIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
@@ -182,22 +193,22 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+        return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
     [[nodiscard]] std::expected<Encryption::Values, Result::Values> encryptMethod() const
@@ -207,7 +218,7 @@ public:
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> heartbeatInterval() const
     {
-        return m_decoder.getUint32<108, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_heartbeatIntervalIndex);
     }
 
     [[nodiscard]] HopsDecoder& hops()
@@ -226,6 +237,11 @@ struct LogoutDecoder : MessageDecoder
 {
 private:
     HopsDecoder m_hops;
+
+    int8_t m_senderIndex{-1};
+    int8_t m_targetIndex{-1};
+    int8_t m_sequenceNumberIndex{-1};
+    int8_t m_sendingTimeIndex{-1};
 
 public:
     LogoutDecoder() : 
@@ -256,19 +272,23 @@ public:
 
     [[nodiscard]] Result::Values validate()
     {
-        if (!sender())
+        m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
+        if (m_senderIndex < 0)
         {
             return Result::InvalidSenderCompId;
         }
-        if (!target())
+        m_targetIndex = static_cast<int8_t>(m_decoder.findIndex<56, RecordType::Message>());
+        if (m_targetIndex < 0)
         {
             return Result::InvalidTargetCompId;
         }
-        if (!sequenceNumber())
+        m_sequenceNumberIndex = static_cast<int8_t>(m_decoder.findIndex<34, RecordType::Message>());
+        if (m_sequenceNumberIndex < 0)
         {
             return Result::InvalidSequenceNumber;
         }
-        if (!sendingTime())
+        m_sendingTimeIndex = static_cast<int8_t>(m_decoder.findIndex<52, RecordType::Message>());
+        if (m_sendingTimeIndex < 0)
         {
             return Result::InvalidSendingTime;
         }
@@ -292,22 +312,22 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+        return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
@@ -326,6 +346,11 @@ struct HeartbeatDecoder : MessageDecoder
 {
 private:
     HopsDecoder m_hops;
+
+    int8_t m_senderIndex{-1};
+    int8_t m_targetIndex{-1};
+    int8_t m_sequenceNumberIndex{-1};
+    int8_t m_sendingTimeIndex{-1};
 
 public:
     HeartbeatDecoder() : 
@@ -356,19 +381,23 @@ public:
 
     [[nodiscard]] Result::Values validate()
     {
-        if (!sender())
+        m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
+        if (m_senderIndex < 0)
         {
             return Result::InvalidSenderCompId;
         }
-        if (!target())
+        m_targetIndex = static_cast<int8_t>(m_decoder.findIndex<56, RecordType::Message>());
+        if (m_targetIndex < 0)
         {
             return Result::InvalidTargetCompId;
         }
-        if (!sequenceNumber())
+        m_sequenceNumberIndex = static_cast<int8_t>(m_decoder.findIndex<34, RecordType::Message>());
+        if (m_sequenceNumberIndex < 0)
         {
             return Result::InvalidSequenceNumber;
         }
-        if (!sendingTime())
+        m_sendingTimeIndex = static_cast<int8_t>(m_decoder.findIndex<52, RecordType::Message>());
+        if (m_sendingTimeIndex < 0)
         {
             return Result::InvalidSendingTime;
         }
@@ -392,22 +421,22 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+        return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> testReqID() const
@@ -426,6 +455,11 @@ struct TestRequestDecoder : MessageDecoder
 {
 private:
     HopsDecoder m_hops;
+
+    int8_t m_senderIndex{-1};
+    int8_t m_targetIndex{-1};
+    int8_t m_sequenceNumberIndex{-1};
+    int8_t m_sendingTimeIndex{-1};
 
 public:
     TestRequestDecoder() : 
@@ -456,19 +490,23 @@ public:
 
     [[nodiscard]] Result::Values validate()
     {
-        if (!sender())
+        m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
+        if (m_senderIndex < 0)
         {
             return Result::InvalidSenderCompId;
         }
-        if (!target())
+        m_targetIndex = static_cast<int8_t>(m_decoder.findIndex<56, RecordType::Message>());
+        if (m_targetIndex < 0)
         {
             return Result::InvalidTargetCompId;
         }
-        if (!sequenceNumber())
+        m_sequenceNumberIndex = static_cast<int8_t>(m_decoder.findIndex<34, RecordType::Message>());
+        if (m_sequenceNumberIndex < 0)
         {
             return Result::InvalidSequenceNumber;
         }
-        if (!sendingTime())
+        m_sendingTimeIndex = static_cast<int8_t>(m_decoder.findIndex<52, RecordType::Message>());
+        if (m_sendingTimeIndex < 0)
         {
             return Result::InvalidSendingTime;
         }
@@ -492,22 +530,22 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+        return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> testReqID() const
@@ -526,6 +564,13 @@ struct ResendRequestDecoder : MessageDecoder
 {
 private:
     HopsDecoder m_hops;
+
+    int8_t m_senderIndex{-1};
+    int8_t m_targetIndex{-1};
+    int8_t m_sequenceNumberIndex{-1};
+    int8_t m_sendingTimeIndex{-1};
+    int8_t m_beginSeqNoIndex{-1};
+    int8_t m_endSeqNoIndex{-1};
 
 public:
     ResendRequestDecoder() : 
@@ -556,27 +601,33 @@ public:
 
     [[nodiscard]] Result::Values validate()
     {
-        if (!sender())
+        m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
+        if (m_senderIndex < 0)
         {
             return Result::InvalidSenderCompId;
         }
-        if (!target())
+        m_targetIndex = static_cast<int8_t>(m_decoder.findIndex<56, RecordType::Message>());
+        if (m_targetIndex < 0)
         {
             return Result::InvalidTargetCompId;
         }
-        if (!sequenceNumber())
+        m_sequenceNumberIndex = static_cast<int8_t>(m_decoder.findIndex<34, RecordType::Message>());
+        if (m_sequenceNumberIndex < 0)
         {
             return Result::InvalidSequenceNumber;
         }
-        if (!sendingTime())
+        m_sendingTimeIndex = static_cast<int8_t>(m_decoder.findIndex<52, RecordType::Message>());
+        if (m_sendingTimeIndex < 0)
         {
             return Result::InvalidSendingTime;
         }
-        if (!beginSeqNo())
+        m_beginSeqNoIndex = static_cast<int8_t>(m_decoder.findIndex<7, RecordType::Message>());
+        if (m_beginSeqNoIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!endSeqNo())
+        m_endSeqNoIndex = static_cast<int8_t>(m_decoder.findIndex<16, RecordType::Message>());
+        if (m_endSeqNoIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
@@ -600,32 +651,32 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+        return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> beginSeqNo() const
     {
-        return m_decoder.getUint32<7, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_beginSeqNoIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> endSeqNo() const
     {
-        return m_decoder.getUint32<16, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_endSeqNoIndex);
     }
 
     [[nodiscard]] HopsDecoder& hops()
@@ -639,6 +690,12 @@ struct RejectDecoder : MessageDecoder
 {
 private:
     HopsDecoder m_hops;
+
+    int8_t m_senderIndex{-1};
+    int8_t m_targetIndex{-1};
+    int8_t m_sequenceNumberIndex{-1};
+    int8_t m_sendingTimeIndex{-1};
+    int8_t m_refSeqNumIndex{-1};
 
 public:
     RejectDecoder() : 
@@ -669,23 +726,28 @@ public:
 
     [[nodiscard]] Result::Values validate()
     {
-        if (!sender())
+        m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
+        if (m_senderIndex < 0)
         {
             return Result::InvalidSenderCompId;
         }
-        if (!target())
+        m_targetIndex = static_cast<int8_t>(m_decoder.findIndex<56, RecordType::Message>());
+        if (m_targetIndex < 0)
         {
             return Result::InvalidTargetCompId;
         }
-        if (!sequenceNumber())
+        m_sequenceNumberIndex = static_cast<int8_t>(m_decoder.findIndex<34, RecordType::Message>());
+        if (m_sequenceNumberIndex < 0)
         {
             return Result::InvalidSequenceNumber;
         }
-        if (!sendingTime())
+        m_sendingTimeIndex = static_cast<int8_t>(m_decoder.findIndex<52, RecordType::Message>());
+        if (m_sendingTimeIndex < 0)
         {
             return Result::InvalidSendingTime;
         }
-        if (!refSeqNum())
+        m_refSeqNumIndex = static_cast<int8_t>(m_decoder.findIndex<45, RecordType::Message>());
+        if (m_refSeqNumIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
@@ -709,27 +771,27 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+        return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> refSeqNum() const
     {
-        return m_decoder.getUint32<45, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_refSeqNumIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> refTagID() const
@@ -764,6 +826,12 @@ struct SequenceResetDecoder : MessageDecoder
 private:
     HopsDecoder m_hops;
 
+    int8_t m_senderIndex{-1};
+    int8_t m_targetIndex{-1};
+    int8_t m_sequenceNumberIndex{-1};
+    int8_t m_sendingTimeIndex{-1};
+    int8_t m_newSeqNoIndex{-1};
+
 public:
     SequenceResetDecoder() : 
         m_hops{m_decoder}
@@ -793,23 +861,28 @@ public:
 
     [[nodiscard]] Result::Values validate()
     {
-        if (!sender())
+        m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
+        if (m_senderIndex < 0)
         {
             return Result::InvalidSenderCompId;
         }
-        if (!target())
+        m_targetIndex = static_cast<int8_t>(m_decoder.findIndex<56, RecordType::Message>());
+        if (m_targetIndex < 0)
         {
             return Result::InvalidTargetCompId;
         }
-        if (!sequenceNumber())
+        m_sequenceNumberIndex = static_cast<int8_t>(m_decoder.findIndex<34, RecordType::Message>());
+        if (m_sequenceNumberIndex < 0)
         {
             return Result::InvalidSequenceNumber;
         }
-        if (!sendingTime())
+        m_sendingTimeIndex = static_cast<int8_t>(m_decoder.findIndex<52, RecordType::Message>());
+        if (m_sendingTimeIndex < 0)
         {
             return Result::InvalidSendingTime;
         }
-        if (!newSeqNo())
+        m_newSeqNoIndex = static_cast<int8_t>(m_decoder.findIndex<36, RecordType::Message>());
+        if (m_newSeqNoIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
@@ -833,22 +906,22 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+        return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
     [[nodiscard]] std::expected<GapFillFlag::Values, Result::Values> gapFillFlag() const
@@ -858,7 +931,7 @@ public:
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> newSeqNo() const
     {
-        return m_decoder.getUint32<36, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_newSeqNoIndex);
     }
 
     [[nodiscard]] HopsDecoder& hops()
@@ -872,6 +945,21 @@ struct ExecutionReportDecoder : MessageDecoder
 {
 private:
     HopsDecoder m_hops;
+
+    int8_t m_senderIndex{-1};
+    int8_t m_targetIndex{-1};
+    int8_t m_sequenceNumberIndex{-1};
+    int8_t m_sendingTimeIndex{-1};
+    int8_t m_orderIDIndex{-1};
+    int8_t m_execIDIndex{-1};
+    int8_t m_execTypeIndex{-1};
+    int8_t m_ordStatusIndex{-1};
+    int8_t m_symbolIndex{-1};
+    int8_t m_sideIndex{-1};
+    int8_t m_leavesQtyIndex{-1};
+    int8_t m_cumQtyIndex{-1};
+    int8_t m_avgPxIndex{-1};
+    int8_t m_transactTimeIndex{-1};
 
 public:
     ExecutionReportDecoder() : 
@@ -902,59 +990,73 @@ public:
 
     [[nodiscard]] Result::Values validate()
     {
-        if (!sender())
+        m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
+        if (m_senderIndex < 0)
         {
             return Result::InvalidSenderCompId;
         }
-        if (!target())
+        m_targetIndex = static_cast<int8_t>(m_decoder.findIndex<56, RecordType::Message>());
+        if (m_targetIndex < 0)
         {
             return Result::InvalidTargetCompId;
         }
-        if (!sequenceNumber())
+        m_sequenceNumberIndex = static_cast<int8_t>(m_decoder.findIndex<34, RecordType::Message>());
+        if (m_sequenceNumberIndex < 0)
         {
             return Result::InvalidSequenceNumber;
         }
-        if (!sendingTime())
+        m_sendingTimeIndex = static_cast<int8_t>(m_decoder.findIndex<52, RecordType::Message>());
+        if (m_sendingTimeIndex < 0)
         {
             return Result::InvalidSendingTime;
         }
-        if (!orderID())
+        m_orderIDIndex = static_cast<int8_t>(m_decoder.findIndex<37, RecordType::Message>());
+        if (m_orderIDIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!execID())
+        m_execIDIndex = static_cast<int8_t>(m_decoder.findIndex<17, RecordType::Message>());
+        if (m_execIDIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!execType())
+        m_execTypeIndex = static_cast<int8_t>(m_decoder.findIndex<150, RecordType::Message>());
+        if (m_execTypeIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!ordStatus())
+        m_ordStatusIndex = static_cast<int8_t>(m_decoder.findIndex<39, RecordType::Message>());
+        if (m_ordStatusIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!symbol())
+        m_symbolIndex = static_cast<int8_t>(m_decoder.findIndex<55, RecordType::Message>());
+        if (m_symbolIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!side())
+        m_sideIndex = static_cast<int8_t>(m_decoder.findIndex<54, RecordType::Message>());
+        if (m_sideIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!leavesQty())
+        m_leavesQtyIndex = static_cast<int8_t>(m_decoder.findIndex<151, RecordType::Message>());
+        if (m_leavesQtyIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!cumQty())
+        m_cumQtyIndex = static_cast<int8_t>(m_decoder.findIndex<14, RecordType::Message>());
+        if (m_cumQtyIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!avgPx())
+        m_avgPxIndex = static_cast<int8_t>(m_decoder.findIndex<6, RecordType::Message>());
+        if (m_avgPxIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!transactTime())
+        m_transactTimeIndex = static_cast<int8_t>(m_decoder.findIndex<60, RecordType::Message>());
+        if (m_transactTimeIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
@@ -978,27 +1080,27 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+        return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> orderID() const
     {
-        return m_decoder.getString<37, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_orderIDIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> clOrdID() const
@@ -1008,27 +1110,27 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> execID() const
     {
-        return m_decoder.getString<17, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_execIDIndex);
     }
 
     [[nodiscard]] std::expected<ExecType::Values, Result::Values> execType() const
     {
-        return m_decoder.getEnum<150, true, ExecType, RecordType::Message>();
+        return m_decoder.enumAt<ExecType>(m_execTypeIndex);
     }
 
     [[nodiscard]] std::expected<OrdStatus::Values, Result::Values> ordStatus() const
     {
-        return m_decoder.getEnum<39, true, OrdStatus, RecordType::Message>();
+        return m_decoder.enumAt<OrdStatus>(m_ordStatusIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> symbol() const
     {
-        return m_decoder.getString<55, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_symbolIndex);
     }
 
     [[nodiscard]] std::expected<Side::Values, Result::Values> side() const
     {
-        return m_decoder.getEnum<54, true, Side, RecordType::Message>();
+        return m_decoder.enumAt<Side>(m_sideIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> orderQty() const
@@ -1053,22 +1155,22 @@ public:
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> leavesQty() const
     {
-        return m_decoder.getUint32<151, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_leavesQtyIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> cumQty() const
     {
-        return m_decoder.getUint32<14, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_cumQtyIndex);
     }
 
     [[nodiscard]] std::expected<utils::FixedDecimal, Result::Values> avgPx() const
     {
-        return m_decoder.getFixedDecimal<6, true, RecordType::Message>();
+        return m_decoder.valueAt<utils::FixedDecimal>(m_avgPxIndex);
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> transactTime() const
     {
-        return m_decoder.getTimestamp<60, true, RecordType::Message>();
+        return m_decoder.valueAt<std::chrono::milliseconds>(m_transactTimeIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
@@ -1087,6 +1189,18 @@ struct NewOrderSingleDecoder : MessageDecoder
 {
 private:
     HopsDecoder m_hops;
+
+    int8_t m_senderIndex{-1};
+    int8_t m_targetIndex{-1};
+    int8_t m_sequenceNumberIndex{-1};
+    int8_t m_sendingTimeIndex{-1};
+    int8_t m_clOrdIDIndex{-1};
+    int8_t m_handlInstIndex{-1};
+    int8_t m_symbolIndex{-1};
+    int8_t m_sideIndex{-1};
+    int8_t m_transactTimeIndex{-1};
+    int8_t m_orderQtyIndex{-1};
+    int8_t m_ordTypeIndex{-1};
 
 public:
     NewOrderSingleDecoder() : 
@@ -1117,47 +1231,58 @@ public:
 
     [[nodiscard]] Result::Values validate()
     {
-        if (!sender())
+        m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
+        if (m_senderIndex < 0)
         {
             return Result::InvalidSenderCompId;
         }
-        if (!target())
+        m_targetIndex = static_cast<int8_t>(m_decoder.findIndex<56, RecordType::Message>());
+        if (m_targetIndex < 0)
         {
             return Result::InvalidTargetCompId;
         }
-        if (!sequenceNumber())
+        m_sequenceNumberIndex = static_cast<int8_t>(m_decoder.findIndex<34, RecordType::Message>());
+        if (m_sequenceNumberIndex < 0)
         {
             return Result::InvalidSequenceNumber;
         }
-        if (!sendingTime())
+        m_sendingTimeIndex = static_cast<int8_t>(m_decoder.findIndex<52, RecordType::Message>());
+        if (m_sendingTimeIndex < 0)
         {
             return Result::InvalidSendingTime;
         }
-        if (!clOrdID())
+        m_clOrdIDIndex = static_cast<int8_t>(m_decoder.findIndex<11, RecordType::Message>());
+        if (m_clOrdIDIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!handlInst())
+        m_handlInstIndex = static_cast<int8_t>(m_decoder.findIndex<21, RecordType::Message>());
+        if (m_handlInstIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!symbol())
+        m_symbolIndex = static_cast<int8_t>(m_decoder.findIndex<55, RecordType::Message>());
+        if (m_symbolIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!side())
+        m_sideIndex = static_cast<int8_t>(m_decoder.findIndex<54, RecordType::Message>());
+        if (m_sideIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!transactTime())
+        m_transactTimeIndex = static_cast<int8_t>(m_decoder.findIndex<60, RecordType::Message>());
+        if (m_transactTimeIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!orderQty())
+        m_orderQtyIndex = static_cast<int8_t>(m_decoder.findIndex<38, RecordType::Message>());
+        if (m_orderQtyIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
-        if (!ordType())
+        m_ordTypeIndex = static_cast<int8_t>(m_decoder.findIndex<40, RecordType::Message>());
+        if (m_ordTypeIndex < 0)
         {
             return Result::RequiredFieldMissing;
         }
@@ -1181,22 +1306,22 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
     {
-        return m_decoder.getString<49, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
     {
-        return m_decoder.getString<56, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
     {
-        return m_decoder.getUint32<34, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
     {
-        return m_decoder.getTimestamp<52, true, RecordType::Message>();
+        return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> account() const
@@ -1206,37 +1331,37 @@ public:
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> clOrdID() const
     {
-        return m_decoder.getString<11, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_clOrdIDIndex);
     }
 
     [[nodiscard]] std::expected<HandlInst::Values, Result::Values> handlInst() const
     {
-        return m_decoder.getEnum<21, true, HandlInst, RecordType::Message>();
+        return m_decoder.enumAt<HandlInst>(m_handlInstIndex);
     }
 
     [[nodiscard]] std::expected<std::string_view, Result::Values> symbol() const
     {
-        return m_decoder.getString<55, true, RecordType::Message>();
+        return m_decoder.valueAt<std::string_view>(m_symbolIndex);
     }
 
     [[nodiscard]] std::expected<Side::Values, Result::Values> side() const
     {
-        return m_decoder.getEnum<54, true, Side, RecordType::Message>();
+        return m_decoder.enumAt<Side>(m_sideIndex);
     }
 
     [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> transactTime() const
     {
-        return m_decoder.getTimestamp<60, true, RecordType::Message>();
+        return m_decoder.valueAt<std::chrono::milliseconds>(m_transactTimeIndex);
     }
 
     [[nodiscard]] std::expected<std::uint32_t, Result::Values> orderQty() const
     {
-        return m_decoder.getUint32<38, true, RecordType::Message>();
+        return m_decoder.valueAt<std::uint32_t>(m_orderQtyIndex);
     }
 
     [[nodiscard]] std::expected<OrdType::Values, Result::Values> ordType() const
     {
-        return m_decoder.getEnum<40, true, OrdType, RecordType::Message>();
+        return m_decoder.enumAt<OrdType>(m_ordTypeIndex);
     }
 
     [[nodiscard]] std::expected<utils::FixedDecimal, Result::Values> price() const

@@ -296,6 +296,93 @@ public:
     }
 
     /**
+     * Converts the token at a pre-found index to the requested type.
+     * @tparam T value type to convert to
+     * @param index token index (must be valid)
+     * @return converted value
+     */
+    template <typename T>
+    [[nodiscard]] constexpr std::expected<T, Result::Values> valueAt(const int8_t index) const
+    {
+        const auto& token = m_tokens[index];
+        if constexpr (std::is_same_v<T, std::string_view>)
+        {
+            return std::string_view{reinterpret_cast<const char*>(m_data.data() + token.m_position), token.m_length};
+        }
+        else if constexpr (std::is_same_v<T, std::uint32_t>)
+        {
+            return convertToUint32(&token);
+        }
+        else if constexpr (std::is_same_v<T, std::int32_t>)
+        {
+            return convertToInt32(&token);
+        }
+        else if constexpr (std::is_same_v<T, utils::FixedDecimal>)
+        {
+            return convertToFixedDecimal(&token);
+        }
+        else if constexpr (std::is_same_v<T, std::chrono::milliseconds>)
+        {
+            const auto ms = utils::dateTimeToEpochUTC(m_data.data() + token.m_position, token.m_length);
+            if (ms < 0)
+            {
+                return std::unexpected{Result::InvalidLength};
+            }
+            return std::chrono::milliseconds{ms};
+        }
+        else
+        {
+            static_assert(sizeof(T) == 0, "unsupported type for valueAt");
+        }
+    }
+
+    /**
+     * Converts the token at a pre-found index to milliseconds since midnight (UTCTimeOnly).
+     * @param index token index (must be valid)
+     * @return converted value
+     */
+    [[nodiscard]] constexpr TimestampResult timeOnlyAt(const int8_t index) const
+    {
+        const auto& token = m_tokens[index];
+        const auto ms = utils::timeOnlyToMillis(m_data.data() + token.m_position, token.m_length);
+        if (ms < 0)
+        {
+            return std::unexpected{Result::InvalidLength};
+        }
+        return std::chrono::milliseconds{ms};
+    }
+
+    /**
+     * Converts the token at a pre-found index to milliseconds since epoch (UTCDateOnly).
+     * @param index token index (must be valid)
+     * @return converted value
+     */
+    [[nodiscard]] constexpr TimestampResult dateOnlyAt(const int8_t index) const
+    {
+        const auto& token = m_tokens[index];
+        const auto ms = utils::dateOnlyToEpochUTC(m_data.data() + token.m_position, token.m_length);
+        if (ms < 0)
+        {
+            return std::unexpected{Result::InvalidLength};
+        }
+        return std::chrono::milliseconds{ms};
+    }
+
+    /**
+     * Converts the token at a pre-found index to an enum value.
+     * @tparam Enum enum wrapper type
+     * @param index token index (must be valid)
+     * @return converted enum value
+     */
+    template <typename Enum>
+    [[nodiscard]] constexpr std::expected<typename Enum::Values, Result::Values> enumAt(const int8_t index) const
+    {
+        const auto& token = m_tokens[index];
+        const auto code = std::string_view{reinterpret_cast<const char*>(m_data.data() + token.m_position), token.m_length};
+        return utils::find<Enum>(code);
+    }
+
+    /**
      * Looks up Tag and returns its value as a string view into the message
      * buffer.
      * @tparam Tag tag number to read
@@ -386,7 +473,12 @@ public:
         if (index >= 0)
         {
             const auto& token = m_tokens[index];
-            return std::chrono::milliseconds{utils::dateTimeToEpochUTC(m_data.data() + token.m_position, token.m_length)};
+            const auto ms = utils::dateTimeToEpochUTC(m_data.data() + token.m_position, token.m_length);
+            if (ms < 0)
+            {
+                return std::unexpected{Result::InvalidLength};
+            }
+            return std::chrono::milliseconds{ms};
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
@@ -406,7 +498,12 @@ public:
         if (index >= 0)
         {
             const auto& token = m_tokens[index];
-            return std::chrono::milliseconds{utils::timeOnlyToMillis(m_data.data() + token.m_position, token.m_length)};
+            const auto ms = utils::timeOnlyToMillis(m_data.data() + token.m_position, token.m_length);
+            if (ms < 0)
+            {
+                return std::unexpected{Result::InvalidLength};
+            }
+            return std::chrono::milliseconds{ms};
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
@@ -426,7 +523,12 @@ public:
         if (index >= 0)
         {
             const auto& token = m_tokens[index];
-            return std::chrono::milliseconds{utils::dateOnlyToEpochUTC(m_data.data() + token.m_position, token.m_length)};
+            const auto ms = utils::dateOnlyToEpochUTC(m_data.data() + token.m_position, token.m_length);
+            if (ms < 0)
+            {
+                return std::unexpected{Result::InvalidLength};
+            }
+            return std::chrono::milliseconds{ms};
         }
         return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }

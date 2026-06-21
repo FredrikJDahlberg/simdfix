@@ -826,6 +826,58 @@ TEST(MessageDecoder, MissingRequiredField)
     ASSERT_EQ(Result::RequiredFieldMissing, status) << Result(status).name();
 }
 
+TEST(MessageDecoder, InvalidUTCTimestamp)
+{
+    // Logon with invalid SendingTime (hour 25)
+    {
+        PayloadDecoder<FIXT_1_1> decoder;
+        struct AppHandler : MessageHandler<AppHandler>
+        {
+            using MessageHandler::handle;
+
+            Result::Values handle(LogonDecoder& logon)
+            {
+                EXPECT_FALSE(logon.sendingTime().has_value());
+                EXPECT_EQ(Result::InvalidLength, logon.sendingTime().error());
+                return Result::Success;
+            }
+        } app;
+        const auto message = utils::makeSpan(
+            "8=FIXT.1.1" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+            "34=1" SOH "52=20260613-25:26:13.959" SOH "98=0" SOH "108=30" SOH "10=071" SOH);
+        auto [processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(Result::Success, status);
+    }
+    // NOS with invalid TransactTime (hour 25), invalid DateOnly (month 13),
+    // and invalid TimeOnly (minute 60)
+    {
+        PayloadDecoder<FIXT_1_1> decoder;
+        struct AppHandler : MessageHandler<AppHandler>
+        {
+            using MessageHandler::handle;
+
+            Result::Values handle(NewOrderSingleDecoder& order)
+            {
+                EXPECT_FALSE(order.transactTime().has_value());
+                EXPECT_EQ(Result::InvalidLength, order.transactTime().error());
+                EXPECT_FALSE(order.tradeDate().has_value());
+                EXPECT_EQ(Result::InvalidLength, order.tradeDate().error());
+                EXPECT_FALSE(order.maturityTime().has_value());
+                EXPECT_EQ(Result::InvalidLength, order.maturityTime().error());
+                return Result::Success;
+            }
+        } app;
+        const auto message = utils::makeSpan(
+            "8=FIXT.1.1" SOH "9=0159" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+            "34=1" SOH "52=20260613-19:26:13.959" SOH
+            "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-25:00:00.000" SOH
+            "38=100" SOH "40=2" SOH "44=15000" SOH
+            "75=20261301" SOH "1079=12:60:00.000" SOH "10=254" SOH);
+        auto [processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(Result::Success, status);
+    }
+}
+
 TEST(MessageDecoder, InvalidMandatoryFields)
 {
     PayloadDecoder<FIXT_1_1> decoder;
