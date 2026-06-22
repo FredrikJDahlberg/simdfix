@@ -4,6 +4,7 @@
 #include <span>
 #include <string>
 #include <chrono>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -18,6 +19,14 @@ namespace org::limitless::fix::decoder {
 
 using namespace org::limitless::fix::decoder;
 using namespace org::limitless::fix::messages;
+
+// Copies a message into an exact-size heap buffer so AddressSanitizer flags any
+// read past the logical end. A string-literal span (makeSpan) leaves a readable
+// '\0' immediately after the message, which would mask a one-byte tail over-read.
+[[nodiscard]] inline std::vector<uint8_t> heap(const std::span<const uint8_t> source)
+{
+    return {source.begin(), source.end()};
+}
 
 TEST(MessageDecoder, Logon)
 {
@@ -368,11 +377,11 @@ TEST(MessageDecoder, LogonWithXmlData)
     } app;
 
     PayloadDecoder<FIXT_1_1> decoder;
-    const auto message = utils::makeSpan(
+    const auto message = heap(utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0090" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
-        "212=11" SOH "213=<root/>test" SOH "10=124" SOH);
-    auto [processed, status] = decoder.parse(message, app);
+        "212=11" SOH "213=<root/>test" SOH "10=124" SOH));
+    auto [processed, status] = decoder.parse(Buffer{message.data(), message.size()}, app);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -403,11 +412,11 @@ TEST(MessageDecoder, LogonWithXmlDataEmbeddedSoh)
     } app;
 
     PayloadDecoder<FIXT_1_1> decoder;
-    const auto message = utils::makeSpan(
+    const auto message = heap(utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
-        "212=12" SOH "213=<root" SOH "/>test" SOH "10=127" SOH);
-    auto [processed, status] = decoder.parse(message, app);
+        "212=12" SOH "213=<root" SOH "/>test" SOH "10=127" SOH));
+    auto [processed, status] = decoder.parse(Buffer{message.data(), message.size()}, app);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -446,11 +455,11 @@ TEST(MessageDecoder, LogonWithXmlDataInlineSkip)
         }
     };
     PayloadDecoder<FIXT_1_1, DataFields> decoder;
-    const auto message = utils::makeSpan(
+    const auto message = heap(utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
-        "212=12" SOH "213=<root" SOH "/>test" SOH "10=127" SOH);
-    auto [processed, status] = decoder.parse(message, app);
+        "212=12" SOH "213=<root" SOH "/>test" SOH "10=127" SOH));
+    auto [processed, status] = decoder.parse(Buffer{message.data(), message.size()}, app);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 

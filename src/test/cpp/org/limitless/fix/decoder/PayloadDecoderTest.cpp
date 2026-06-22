@@ -2,6 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-04-11.
 //
 
+#include <vector>
+
 #include <gtest/gtest.h>
 
 #include "org/limitless/fix/utils/Utils.hpp"
@@ -11,6 +13,13 @@
 namespace org::limitless::fix::decoder {
 
 #define SOH "\x01"
+
+// Copies into an exact-size heap buffer so AddressSanitizer flags any read past
+// the logical end (a string-literal span leaves a readable '\0' after the data).
+[[nodiscard]] inline std::vector<uint8_t> heap(const std::span<const uint8_t> source)
+{
+    return {source.begin(), source.end()};
+}
 
 void check(std::span<Field> result, const std::span<const Field> expected)
 {
@@ -180,5 +189,61 @@ TEST(PayloadDecoder, HopGroup)
         { 103, 10, 3 }
     };
     check(decoder.fields(), std::span(expectedFields, std::size(expectedFields)));
+}
+
+// Buffer-safety regression: truncated and malformed messages must never read
+// out of bounds. Every buffer below is an exact-size heap allocation, so any
+// over-read trips an AddressSanitizer redzone (the Debug build links ASan).
+TEST(PayloadDecoder, TruncationSafety)
+{
+    struct DataFields
+    {
+        static constexpr int32_t dataTag(const uint16_t tag) { return tag == 212 ? 213 : -1; }
+    };
+
+    const auto logon = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH "56=SellerSide" SOH "34=1" SOH
+        "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH "141=Y" SOH
+        "553=Username" SOH "554=Password" SOH "1137=9" SOH "10=218" SOH);
+    const auto data = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH "34=1" SOH
+        "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "212=12" SOH "213=<root" SOH
+        "/>test" SOH "10=127" SOH);
+
+    // Every truncation of each message: must not crash, and an incomplete
+    // message must never report Success.
+    for (const auto full : {Buffer{logon}, Buffer{data}})
+    {
+        for (size_t n = 0; n < full.size(); ++n)
+        {
+            const auto buffer = heap(full.first(n));
+            PayloadDecoder<FIXT_1_1, DataFields> decoder;
+            auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
+            ASSERT_NE(Result::Success, status) << "truncated to " << n << " bytes";
+        }
+    }
+
+    // A data length field whose declared payload runs past the buffer end.
+    {
+        const auto truncated = heap(utils::makeSpan(
+            "8=FIXT.1.1" SOH "9=0050" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+            "34=1" SOH "212=99" SOH "213=<r"));
+        PayloadDecoder<FIXT_1_1, DataFields> decoder;
+        auto [processed, status] = decoder.parse(Buffer{truncated.data(), truncated.size()});
+        ASSERT_NE(Result::Success, status);
+    }
+
+    // Garbage body behind a valid BeginString prefix, various lengths.
+    for (size_t n = 32; n <= data.size(); ++n)
+    {
+        auto buffer = heap(data.first(n));
+        for (size_t i = 11; i < buffer.size(); ++i)
+        {
+            buffer[i] = static_cast<uint8_t>((i * 37 + 13) & 0xff);
+        }
+        PayloadDecoder<FIXT_1_1, DataFields> decoder;
+        auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
+        ASSERT_NE(Result::Success, status) << "garbage length " << n;
+    }
 }
 }

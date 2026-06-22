@@ -108,6 +108,12 @@ function(add_fix_test name source)
 endfunction()
 
 add_fix_test(PayloadDecoderTest     "${TEST_PATH}/decoder/PayloadDecoderTest.cpp")
+add_fix_test(PayloadDecoderFuzzTest "${TEST_PATH}/decoder/PayloadDecoderFuzzTest.cpp")
+# Fuzz the production code path: strip the decoder's debug diagnostics (which
+# would otherwise dump on every one of the tens of thousands of iterations).
+# ASan is independent of NDEBUG and stays active; the bounded debug-print paths
+# are covered by PayloadDecoder.TruncationSafety in the Debug build.
+target_compile_definitions(PayloadDecoderFuzzTest PRIVATE NDEBUG)
 add_fix_test(MessageDecoderTest      "${TEST_PATH}/decoder/MessageDecoderTest.cpp")
 add_fix_test(MessageEncoderTest      "${TEST_PATH}/encoder/MessageEncoderTest.cpp")
 add_fix_test(GroupDecoderTest "${TEST_PATH}/decoder/GroupDecoderTest.cpp")
@@ -119,7 +125,7 @@ add_fix_test(Uint8x16Test       "${TEST_PATH}/simd/Uint8x16Test.cpp")
 add_fix_test(LinearSearchTest  "${TEST_PATH}/simd/LinearSearchTest.cpp")
 
 set(FIX_TEST_TARGETS
-        PayloadDecoderTest
+        PayloadDecoderTest PayloadDecoderFuzzTest
         MessageDecoderTest MessageEncoderTest
         GroupDecoderTest FieldDecoderTest
         UtilsTest FixedDecimalTest OptionalIntTest Uint8x16Test LinearSearchTest)
@@ -156,6 +162,7 @@ if(XCRUN)
     add_custom_target(Coverage
         COMMAND ${CMAKE_COMMAND} -E make_directory ${COVERAGE_DIR}
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/PayloadDecoderTest.profraw"   $<TARGET_FILE:PayloadDecoderTest>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/PayloadDecoderFuzzTest.profraw" $<TARGET_FILE:PayloadDecoderFuzzTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/MessageDecoderTest.profraw"   $<TARGET_FILE:MessageDecoderTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/MessageEncoderTest.profraw"   $<TARGET_FILE:MessageEncoderTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/GroupDecoderTest.profraw"     $<TARGET_FILE:GroupDecoderTest>

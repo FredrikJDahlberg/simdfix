@@ -209,7 +209,7 @@ public:
         {
             processTrailer(offset, buffer);
         }
-        return checkRequiredFields(data, blockSum, offset);
+        return checkRequiredFields(data, blockSum, offset, length);
     }
 
 private:
@@ -222,10 +222,11 @@ private:
      * @param blockSum running sum of bytes covered by the SIMD scan, used
      *        to derive the checksum
      * @param blockEnd offset one past the last byte covered by blockSum
+     * @param messageLength total buffer length, used to bound the checksum read
      * @return Result::Success with the number of bytes processed, or the
      *         first validation failure
      */
-    Result checkRequiredFields(const data_t* data, const uint64_t blockSum, const position_t blockEnd) const
+    Result checkRequiredFields(const data_t* data, const uint64_t blockSum, const position_t blockEnd, const length_t messageLength) const
     {
         const auto* last = &m_fields[m_count - 1];
         const bool hasCheckSum = last->m_tag == CheckSumTag;
@@ -236,7 +237,14 @@ private:
             return {processed, Result::InvalidBodyLengthTag};
         }
 
-        const auto length = utils::asciiToUint64(0, data + bodyLength.m_position, bodyLength.m_length, true);
+        // Bound the BodyLength digit read; on malformed input field #1 may sit
+        // near or past the buffer end (padded reads a full 8 bytes).
+        if (static_cast<uint32_t>(bodyLength.m_position) + bodyLength.m_length > messageLength)
+        {
+            return {processed, Result::InvalidBodyLength};
+        }
+        const bool bodyPadded = static_cast<uint32_t>(bodyLength.m_position) + sizeof(uint64_t) <= messageLength;
+        const auto length = utils::asciiToUint64(0, data + bodyLength.m_position, bodyLength.m_length, bodyPadded);
         const uint32_t byteCount = last->m_position - bodyLength.m_position - bodyLength.m_length - 4;
         if (!hasCheckSum && byteCount < length)
         {
@@ -265,7 +273,7 @@ private:
 
 
         // checksum and field count
-        const auto status = processCheckSum(data, blockSum, blockEnd);
+        const auto status = processCheckSum(data, blockSum, blockEnd, messageLength);
         if (status != Result::Success)
         {
             return {processed, status};
@@ -339,7 +347,7 @@ private:
         if (m_tag != 0 && (tagDigitFlags & 0xF) == 0)
         {  // split tag ending in first position of next block
             field->m_length = static_cast<int16_t>(m_position + offset - 1 - field->m_position);
-            if (emitDataSkip(data, field))
+            if (emitDataSkip(data, length, field))
             {
                 applyDataSkip(data, length, offset, blockSum);
                 return false;
@@ -365,7 +373,7 @@ private:
             const position_t tagPos = nonTagBitPos >> 2;
             field->m_length += offset + tagPos - field->m_position - 1;
 
-            if (emitDataSkip(data, field))
+            if (emitDataSkip(data, length, field))
             {
                 applyDataSkip(data, length, offset, blockSum);
                 return false;
@@ -403,22 +411,33 @@ private:
      * value, emits a synthetic token for the data field, and sets m_skipEnd so
      * parse() skips past the data payload.
      * @param data raw message bytes
+     * @param length message length; bounds the scan for the data tag's '=' so a
+     *        truncated/malformed message cannot read past the buffer
      * @param field the just-completed length tag token
      * @return true if a data skip was emitted
      */
-    bool emitDataSkip(const data_t* data, const Field* field)
+    bool emitDataSkip(const data_t* data, const length_t length, const Field* field)
     {
         const auto dataTagNum = DataFields::dataTag(field->m_tag);
         if (dataTagNum < 0)
         {
             return false;
         }
+        // Bail if the length field's own digits fall outside the buffer
+        // (truncated/malformed message); checkRequiredFields then rejects it.
+        if (static_cast<uint32_t>(field->m_position) + field->m_length > length)
+        {
+            return false;
+        }
+        // Use the padded SWAR path only when 8 bytes can be read in-bounds.
+        const bool padded = field->m_length <= 8 &&
+            static_cast<uint32_t>(field->m_position) + sizeof(uint64_t) <= length;
         const auto lengthValue = static_cast<uint32_t>(
-            utils::asciiToUint64(data + field->m_position, field->m_length, field->m_length <= 8));
+            utils::asciiToUint64(data + field->m_position, field->m_length, padded));
 
         // Scan past the SOH after the length value, then past the data tag's "NNN=" prefix
         auto pos = static_cast<position_t>(field->m_position + field->m_length + 1);
-        while (data[pos] != TagEnd)
+        while (pos < length && data[pos] != TagEnd)
         {
             ++pos;
         }
@@ -430,7 +449,9 @@ private:
         dataToken->m_position = static_cast<uint16_t>(pos);
         dataToken->m_length = static_cast<int16_t>(lengthValue);
 
-        m_skipEnd = pos + lengthValue + 1;
+        // Clamp to the buffer so a huge (malformed) length cannot push the
+        // resumed scan offset out of range; checkRequiredFields rejects it.
+        m_skipEnd = std::min(pos + lengthValue + 1, static_cast<position_t>(length));
         m_tag = 0;
         m_position = 0;
         return true;
@@ -443,17 +464,26 @@ private:
      * @param blockSum running sum of bytes covered by the SIMD scan, used
      *        as the starting point for the checksum
      * @param blockEnd offset one past the last byte covered by blockSum
+     * @param length total buffer length, used to bound the checksum read
      * @return Result::Success, Result::InvalidCheckSumTag if the trailing
      *         bytes are not "\x01""10=...", or Result::InvalidCheckSum if
      *         the value does not match
      */
     Result::Values processCheckSum(const std::span<const data_t>::pointer data,
                                    const uint64_t blockSum,
-                                   const position_t blockEnd) const
+                                   const position_t blockEnd,
+                                   const length_t length) const
     {
-        uint64_t checks = 0;
-        std::memcpy(&checks, data + m_fields[m_count - 1].m_position - 4, sizeof(uint64_t));
         const auto& checkSumToken = m_fields[m_count - 1];
+        // On a malformed/truncated message the checksum token can be positioned
+        // at or past the buffer end; the 8-byte read below covers [pos-4, pos+4).
+        if (checkSumToken.m_position < 4 ||
+            static_cast<uint32_t>(checkSumToken.m_position) + 4 > length)
+        {
+            return Result::InvalidCheckSumTag;
+        }
+        uint64_t checks = 0;
+        std::memcpy(&checks, data + checkSumToken.m_position - 4, sizeof(uint64_t));
         if ((checks & CheckSumMask) != CheckSumMask)
         {
             return Result::InvalidCheckSumTag;
@@ -461,13 +491,15 @@ private:
 
         // blockSum covers [0, blockEnd); the checksum covers [0, checkSumEnd),
         // so correct for the difference (at most one block plus the checksum field).
+        // Clamp blockEnd to the buffer: a data-skip can leave it past the end.
         uint64_t checkSumValue = blockSum;
         const uint32_t checkSumEnd = checkSumToken.m_position - 3;
-        for (uint32_t position = checkSumEnd; position < blockEnd; ++position)
+        const uint32_t scanEnd = std::min(blockEnd, static_cast<position_t>(length));
+        for (uint32_t position = checkSumEnd; position < scanEnd; ++position)
         {
             checkSumValue -= data[position];
         }
-        for (uint32_t position = blockEnd; position < checkSumEnd; ++position)
+        for (uint32_t position = scanEnd; position < checkSumEnd; ++position)
         {
             checkSumValue += data[position];
         }
@@ -491,12 +523,12 @@ private:
      */
     void processTrailer(const position_t offset, const Buffer buffer)
     {
-#if !defined(NDEBUG)
-        utils::print(buffer.size() % 16, buffer.data() + offset);
-#endif
         auto* last = &m_fields[m_count - 1];
         const uint8_t* data = buffer.data() + offset;
         const size_t remaining = buffer.size() - offset;
+#if !defined(NDEBUG)
+        utils::print(static_cast<uint32_t>(remaining), data);
+#endif
         uint64_t bytes = 0;
         std::memcpy(&bytes, data, std::min(remaining, sizeof(uint64_t)));
         uint64_t tagEnds = utils::findByte(TagEnd, bytes);
@@ -510,7 +542,10 @@ private:
         { // handle split tag
             last->m_length = static_cast<uint16_t>(offset + m_position - 1 - last->m_position);
             last = &m_fields[m_count++];
-            last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(m_tag, data, tagEndPos, false));
+            // Clamp the digit count to the trailer: a truncated/malformed message
+            // may lack the '=' so tagEndPos is the not-found sentinel (8).
+            const uint32_t tagBytes = std::min(tagEndPos, static_cast<uint32_t>(remaining));
+            last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(m_tag, data, tagBytes, false));
             m_tags[last - m_fields.data()] = last->m_tag;
             last->m_position = static_cast<uint16_t>(offset + tagEndPos + 1);
             last->m_length = static_cast<uint16_t>(fieldEndPos - tagEndPos - 1);
@@ -529,6 +564,14 @@ private:
         }
         while (position + 7 < remaining)
         {
+            // Bail on an inconsistent trailer (missing '='/SOH desyncs the
+            // positions): guards against an unsigned underflow of the digit
+            // count and a read past the trailer. checkRequiredFields then
+            // reports the malformed message.
+            if (tagEndPos < position || tagEndPos > remaining)
+            {
+                break;
+            }
             last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(0, data + position, tagEndPos - position, false));
             m_tags[last - m_fields.data()] = last->m_tag;
             position += tagEndPos - position + 1;
