@@ -69,7 +69,7 @@ TEST(Parse, AsciiToInt32)
 {
     const auto check = [](const std::string_view text, const int32_t expected)
     {
-        ASSERT_EQ(expected, utils::asciiToInt32(reinterpret_cast<const uint8_t*>(text.data()), text.size())) << "text=" << text;
+        ASSERT_EQ(expected, utils::asciiToInt32(reinterpret_cast<const uint8_t*>(text.data()), static_cast<uint32_t>(text.size()))) << "text=" << text;
     };
 
     check("0\0\0\0\0\0\0\0", 0);
@@ -137,7 +137,7 @@ TEST(Time, TimeOnlyToMillis)
     const auto check = [](const std::string_view input, const int64_t expected)
     {
         const auto data = reinterpret_cast<const uint8_t*>(input.data());
-        EXPECT_EQ(expected, utils::timeOnlyToMillis(data, input.length())) << "input=" << input;
+        EXPECT_EQ(expected, utils::timeOnlyToMillis(data, static_cast<uint32_t>(input.length()))) << "input=" << input;
     };
 
     check("00:00:00", 0);
@@ -163,7 +163,7 @@ TEST(Time, TimeOnlyToMillisInvalidContent)
     const auto check = [](const std::string_view input)
     {
         const auto data = reinterpret_cast<const uint8_t*>(input.data());
-        EXPECT_EQ(-1, utils::timeOnlyToMillis(data, input.length())) << "input=" << input;
+        EXPECT_EQ(-1, utils::timeOnlyToMillis(data, static_cast<uint32_t>(input.length()))) << "input=" << input;
     };
 
     check("24:00:00");     // hour 24
@@ -179,7 +179,7 @@ TEST(Time, DateOnlyToEpochUTC)
     const auto check = [](const std::string_view input, const int64_t expected)
     {
         const auto data = reinterpret_cast<const uint8_t*>(input.data());
-        EXPECT_EQ(expected, utils::dateOnlyToEpochUTC(data, input.length())) << "input=" << input;
+        EXPECT_EQ(expected, utils::dateOnlyToEpochUTC(data, static_cast<uint32_t>(input.length()))) << "input=" << input;
     };
 
     check("19700101", 0);
@@ -201,7 +201,7 @@ TEST(Time, DateOnlyToEpochUTCInvalidContent)
     const auto check = [](const std::string_view input)
     {
         const auto data = reinterpret_cast<const uint8_t*>(input.data());
-        EXPECT_EQ(-1, utils::dateOnlyToEpochUTC(data, input.length())) << "input=" << input;
+        EXPECT_EQ(-1, utils::dateOnlyToEpochUTC(data, static_cast<uint32_t>(input.length()))) << "input=" << input;
     };
 
     check("20260001"); // month 0

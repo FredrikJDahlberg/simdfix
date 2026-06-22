@@ -341,7 +341,8 @@ static void generateConstructors(std::ostream& out, const Record& record, const 
     if (record.m_parent == RecordType::Message)
     {
         out << std::format("    {}{}() : \n", record.m_name, codec);
-    } else
+    }
+    else
     {
         out << std::format("    explicit {}{}(Field{}& {}) : \n", record.m_name, codec, codec, uncap(codec));
     }

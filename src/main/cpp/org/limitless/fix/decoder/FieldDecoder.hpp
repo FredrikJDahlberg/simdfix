@@ -107,7 +107,7 @@ public:
      */
     [[nodiscard]] const Field* nextField(const uint32_t tag) const
     {
-        const auto index = simd::find(m_tags.data(), m_size, tag);
+        const auto index = simd::find(m_tags.data(), m_size, static_cast<uint16_t>(tag));
         return index >= 0 ? &m_fields[index] : nullptr;
     }
 

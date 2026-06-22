@@ -28,3 +28,20 @@ mapping/`Category` and cannot yet be used in `protocol.xml`:
 - `MultipleCharValue`, `MultipleStringValue` — space-delimited multi-value
   fields. Would need a container return type (e.g. small vector or
   iterator) rather than a single scalar.
+
+Session handling
+-----
+
+- Logon/Logout handshake — initiate and accept FIX sessions, negotiate
+  HeartBtInt, and exchange Logon/Logout messages.
+- Heartbeat & TestRequest — send Heartbeat on the negotiated interval,
+  respond to TestRequest with the matching TestReqID, and detect missing
+  heartbeats.
+- Sequence number tracking — maintain inbound/outbound MsgSeqNum,
+  detect gaps, and trigger resend requests.
+- ResendRequest / SequenceReset — handle gap-fill and full-reset
+  scenarios for message recovery.
+- Message persistence & replay — store outbound messages for possible
+  resend and replay inbound messages after a reconnect.
+- Duplicate & PossDupFlag handling — detect and suppress duplicate
+  messages, set PossDupFlag / PossResend on retransmissions.

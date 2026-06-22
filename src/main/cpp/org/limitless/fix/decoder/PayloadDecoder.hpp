@@ -19,7 +19,10 @@ namespace org::limitless::fix::decoder {
 
 struct NoDataFields
 {
-    static constexpr int32_t dataTag(const uint16_t) { return -1; }
+    static constexpr int32_t dataTag(const uint16_t)
+    {
+        return -1;
+    }
 };
 
 /**
@@ -71,6 +74,7 @@ class PayloadDecoder
     int32_t m_position{};
     size_t m_count{};
     uint32_t m_skipEnd{};
+
 
 public:
     using position_t = uint32_t;
@@ -312,7 +316,7 @@ private:
      *        byte position in this block that is part of a tag number
      * @param digits ASCII digit value at each lane where validTags was set,
      *        zero elsewhere
-     * @param nonTagBitPos bit position to resume scanning from; nonzero
+     * @param nonTagBitPos the bit position to resume scanning from; nonzero
      *        only for the first block, to skip the already-consumed
      *        BeginString
      * @param data raw message bytes
@@ -342,13 +346,13 @@ private:
             }
             ++m_count;
             ++field;
-            field->m_tag = m_tag;
-            m_tags[field - m_fields.data()] = m_tag;
-            field->m_position = offset + 1;
+            field->m_tag = static_cast<uint16_t>(m_tag);
+            m_tags[field - m_fields.data()] = static_cast<uint16_t>(m_tag);
+            field->m_position = static_cast<uint16_t>(offset + 1);
             m_position = 0;
             m_tag = 0;
         }
-        field->m_length = m_position;
+        field->m_length = static_cast<uint16_t>(m_position);
 
         uint64_t remainingDigitFlags = tagDigitFlags & ~0ull >> std::max(4, trailingCount);
         while (remainingDigitFlags > 0 && field->m_tag != CheckSumTag) [[likely]]
@@ -377,9 +381,9 @@ private:
                 value = m_tag;
                 m_tag = 0;
             }
-            field->m_tag = utils::asciiToUin32(value, digit, count);
+            field->m_tag = static_cast<uint16_t>(utils::asciiToUin32(value, digit, count));
             m_tags[field - m_fields.data()] = field->m_tag;
-            field->m_position = offset + tagPos + count + 1;
+            field->m_position = static_cast<uint16_t>(offset + tagPos + count + 1);
             remainingDigitFlags >>= digitBits;
             nonTagBitPos += digitBits;
         }
@@ -399,7 +403,7 @@ private:
      * value, emits a synthetic token for the data field, and sets m_skipEnd so
      * parse() skips past the data payload.
      * @param data raw message bytes
-     * @param token the just-completed length tag token
+     * @param field the just-completed length tag token
      * @return true if a data skip was emitted
      */
     bool emitDataSkip(const data_t* data, const Field* field)
@@ -423,7 +427,7 @@ private:
         auto* dataToken = &m_fields[m_count++];
         dataToken->m_tag = static_cast<uint16_t>(dataTagNum);
         m_tags[dataToken - m_fields.data()] = dataToken->m_tag;
-        dataToken->m_position = pos;
+        dataToken->m_position = static_cast<uint16_t>(pos);
         dataToken->m_length = static_cast<int16_t>(lengthValue);
 
         m_skipEnd = pos + lengthValue + 1;
@@ -504,12 +508,12 @@ private:
         uint32_t position = 0;
         if (m_tag != 0)
         { // handle split tag
-            last->m_length = offset + m_position - 1 - last->m_position;
+            last->m_length = static_cast<uint16_t>(offset + m_position - 1 - last->m_position);
             last = &m_fields[m_count++];
-            last->m_tag = utils::asciiToUint64(m_tag, data, tagEndPos, false);
+            last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(m_tag, data, tagEndPos, false));
             m_tags[last - m_fields.data()] = last->m_tag;
-            last->m_position = offset + tagEndPos + 1;
-            last->m_length = fieldEndPos - tagEndPos - 1;
+            last->m_position = static_cast<uint16_t>(offset + tagEndPos + 1);
+            last->m_length = static_cast<uint16_t>(fieldEndPos - tagEndPos - 1);
             position = fieldEndPos + 1;
             m_tag = 0;
         }
@@ -525,11 +529,11 @@ private:
         }
         while (position + 7 < remaining)
         {
-            last->m_tag = utils::asciiToUint64(0, data + position, tagEndPos - position, false);
+            last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(0, data + position, tagEndPos - position, false));
             m_tags[last - m_fields.data()] = last->m_tag;
             position += tagEndPos - position + 1;
-            last->m_position = position + offset;
-            last->m_length = fieldEndPos - position;
+            last->m_position = static_cast<uint16_t>(position + offset);
+            last->m_length = static_cast<uint16_t>(fieldEndPos - position);
             position += last->m_length + 1;
             last = &m_fields[m_count++];
             tagEnds &= ~(1ULL << tagEndBit);
@@ -545,7 +549,7 @@ private:
             last = &m_fields[m_count++];
             last->m_tag = CheckSumTag;
             m_tags[last - m_fields.data()] = CheckSumTag;
-            last->m_position = offset + position + checkSumPrefixLen;
+            last->m_position = static_cast<uint16_t>(offset + position + checkSumPrefixLen);
             last->m_length = CheckSumValueLength;
         }
     }

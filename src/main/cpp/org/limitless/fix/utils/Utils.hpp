@@ -100,7 +100,7 @@ inline constexpr uint64_t SwarFactor2 = 0x0000271000000001; // 1 + (10000ULL << 
     }
     number = number * 10 + (number >> 8); // val = (val * 2561) >> 8;
     number = ((number & SwarMask) * SwarFactor1 + (number >> 16 & SwarMask) * SwarFactor2) >> 32;
-    return scale(value, length) + number;
+    return static_cast<uint32_t>(scale(value, length) + number);
 }
 
 inline constexpr uint64_t AsciiZeros = 0x3030303030303030ULL;
@@ -279,7 +279,7 @@ template <uint32_t Divisor>
     const int64_t era = fastDivide<100>(year >= 0 ? year : year - 399) >> 2;
     const int64_t yoe = static_cast<uint32_t>(year - era * 400);            // Year of era
     const int64_t doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1; // Day of year
-    const int64_t doe = yoe * 365 + yoe / 4 - fastDivide<100>(yoe) + doy;              // Day of era
+    const int64_t doe = yoe * 365 + yoe / 4 - fastDivide<100>(static_cast<uint32_t>(yoe)) + doy;              // Day of era
     return era * 146097 + doe - 719468;
 }
 
@@ -297,10 +297,10 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     {
         return -1;
     }
-    const uint64_t date = asciiToUint64(data, 8, true);
-    const int32_t years = fastDivide<10000>(date);
-    const int32_t month = fastDivide<100>(date - 10000 * fastDivide<10000>(date));
-    const int32_t day = date - 100 * fastDivide<100>(date);
+    const auto date = static_cast<uint32_t>(asciiToUint64(data, 8, true));
+    const uint32_t years = fastDivide<10000>(date);
+    const uint32_t month = fastDivide<100>(date - 10000 * years);
+    const uint32_t day = date - 100 * fastDivide<100>(date);
     if (month < 1 || month > 12 || day < 1 || day > 31)
     {
         return -1;
@@ -310,9 +310,9 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     uint64_t time = 0;
     std::memcpy(&time, data + 9, sizeof(time));
     time -= 0x30303a30303a3030ull;
-    const int32_t hours = (time & 0xff) * 10 + ((time >> 8) & 0xff);
-    const int32_t mins  = (time >> 24 & 0xff) * 10 + (time >> 32 & 0xff);
-    const int32_t secs  = (time >> 48 & 0xff) * 10 + (time >> 56);
+    const uint32_t hours = (time & 0xff) * 10 + ((time >> 8) & 0xff);
+    const uint32_t mins  = (time >> 24 & 0xff) * 10 + (time >> 32 & 0xff);
+    const uint32_t secs  = (time >> 48 & 0xff) * 10 + (time >> 56);
     if (hours > 23 || mins > 59 || secs > 59)
     {
         return -1;
@@ -384,9 +384,9 @@ inline int64_t dateOnlyToEpochUTC(const uint8_t* data, const uint32_t length)
     {
         return -1;
     }
-    const uint64_t date = asciiToUint64(data, 8, true);
+    const auto date = static_cast<uint32_t>(asciiToUint64(data, 8, true));
     const auto years = fastDivide<10000>(date);
-    const auto month = fastDivide<100>(date - 10000 * fastDivide<10000>(date));
+    const auto month = fastDivide<100>(date - 10000 * years);
     const auto day = date - 100 * fastDivide<100>(date);
     if (month < 1 || month > 12 || day < 1 || day > 31)
     {
@@ -467,7 +467,7 @@ inline size_t int32ToAscii(const int32_t value, std::span<uint8_t> data, const s
     if (value < 0)
     {
         data[offset] = '-';
-        const uint32_t magnitude = static_cast<uint32_t>(-static_cast<int64_t>(value));
+        const auto magnitude = static_cast<uint32_t>(-static_cast<int64_t>(value));
         return 1 + uint32ToAscii(magnitude, data, offset + 1);
     }
     return uint32ToAscii(static_cast<uint32_t>(value), data, offset);
@@ -584,7 +584,7 @@ inline size_t fixedDecimalToAscii(const int64_t mantissa,
         return pos - offset;
     }
 
-    const size_t fracDigits = static_cast<size_t>(-exponent);
+    const auto fracDigits = static_cast<size_t>(-exponent);
     if (digitCount > fracDigits)
     {
         const size_t intDigits = digitCount - fracDigits;
@@ -635,14 +635,13 @@ inline void writeDatePrefix(const int64_t days, uint8_t* dst)
 {
     const int64_t z = days + 719468;
     const int64_t era = (z >= 0 ? z : z - 146096) / 146097;
-    const uint64_t doe = static_cast<uint64_t>(z - era * 146097);
+    const auto doe = static_cast<uint64_t>(z - era * 146097);
     const uint64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
     const uint64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     const uint64_t mp = (5 * doy + 2) / 153;
     const uint64_t day = doy - (153 * mp + 2) / 5 + 1;
     const uint64_t month = mp + (mp < 10 ? 3 : -9);
     const int64_t year = static_cast<int64_t>(yoe) + era * 400 + (month <= 2 ? 1 : 0);
-
     writeFixedDigits<4>(static_cast<uint32_t>(year), dst);
     writeFixedDigits<2>(static_cast<uint32_t>(month), dst + 4);
     writeFixedDigits<2>(static_cast<uint32_t>(day), dst + 6);
@@ -695,7 +694,7 @@ inline void writeDateOnly(const int64_t days, uint8_t* dst)
 inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateTime)
 {
     const auto data = reinterpret_cast<const uint8_t*>(dateTime.data());
-    return std::chrono::milliseconds{dateTimeToEpochUTC(data, dateTime.length())};
+    return std::chrono::milliseconds{dateTimeToEpochUTC(data, static_cast<uint32_t>(dateTime.length()))};
 }
 
 /**
