@@ -276,7 +276,7 @@ template <uint32_t Divisor>
     // making the leap year distribution perfectly linear without if/else blocks.
     year -= (month <= 2) ? 1 : 0;
 
-    const int64_t era = fastDivide<100>(year >= 0 ? year : year - 399) >> 2;
+    const int64_t era = fastDivide<100>(static_cast<uint32_t>(year >= 0 ? year : year - 399)) >> 2;
     const int64_t yoe = static_cast<uint32_t>(year - era * 400);            // Year of era
     const int64_t doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1; // Day of year
     const int64_t doe = yoe * 365 + yoe / 4 - fastDivide<100>(static_cast<uint32_t>(yoe)) + doy;              // Day of era
@@ -305,7 +305,7 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     {
         return -1;
     }
-    const auto days = daysSince1970(years, month, day);
+    const auto days = daysSince1970(static_cast<int32_t>(years), static_cast<int32_t>(month), static_cast<int32_t>(day));
 
     uint64_t time = 0;
     std::memcpy(&time, data + 9, sizeof(time));
@@ -317,7 +317,7 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     {
         return -1;
     }
-    uint64_t millis = days * static_cast<uint64_t>(MillisPerDay) + (hours * 3'600 + mins * 60 + secs) * 1000;
+    auto millis = days * MillisPerDay + static_cast<int64_t>((hours * 3'600 + mins * 60 + secs) * 1000);
     if (length == UTCTimestampShortLength)
     {
         return millis;
@@ -327,7 +327,7 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
         time = 0;
         std::memcpy(&time, data + UTCTimestampShortLength, 4);
         time -= 0x3030302e;
-        millis += (time >> 24) + (time >> 16 & 0xff) * 10 + (time >> 8 & 0xff) * 100;
+        millis += static_cast<int64_t>((time >> 24) + (time >> 16 & 0xff) * 10 + (time >> 8 & 0xff) * 100);
         return millis;
     }
     return -1;
@@ -356,7 +356,7 @@ inline int64_t timeOnlyToMillis(const uint8_t* data, const uint32_t length)
     {
         return -1;
     }
-    int64_t millis = (hours * 3'600 + mins * 60 + secs) * 1000;
+    auto millis = static_cast<int64_t>((hours * 3'600 + mins * 60 + secs) * 1000);
     if (length == UTCTimeOnlyShortLength)
     {
         return millis;
@@ -366,7 +366,7 @@ inline int64_t timeOnlyToMillis(const uint8_t* data, const uint32_t length)
         time = 0;
         std::memcpy(&time, data + UTCTimeOnlyShortLength, 4);
         time -= 0x3030302e;
-        millis += (time >> 24) + (time >> 16 & 0xff) * 10 + (time >> 8 & 0xff) * 100;
+        millis += static_cast<int64_t>((time >> 24) + (time >> 16 & 0xff) * 10 + (time >> 8 & 0xff) * 100);
         return millis;
     }
     return -1;
@@ -392,7 +392,7 @@ inline int64_t dateOnlyToEpochUTC(const uint8_t* data, const uint32_t length)
     {
         return -1;
     }
-    return daysSince1970(years, month, day) * static_cast<uint64_t>(MillisPerDay);
+    return daysSince1970(static_cast<int32_t>(years), static_cast<int32_t>(month), static_cast<int32_t>(day)) * MillisPerDay;
 }
 
 /**
@@ -430,7 +430,7 @@ inline size_t uint32ToAscii(const uint32_t value, std::span<uint8_t> data, const
                                 static_cast<uint64_t>(d4) |
                                 0xFFFFFF0000000000ULL; // Sentinel high bits
         packedDigits |= 0x0000003030303030ULL;
-        size_t skippedZeros = std::countr_zero(packedDigits ^ 0x0000003030303030ULL) >> 3;
+        auto skippedZeros = static_cast<size_t>(std::countr_zero(packedDigits ^ 0x0000003030303030ULL) >> 3);
         if (skippedZeros > 4) [[unlikely]]
         {
             skippedZeros = 4;
@@ -560,7 +560,7 @@ inline size_t fixedDecimalToAscii(const int64_t mantissa,
                                   const size_t offset)
 {
     size_t pos = offset;
-    uint64_t magnitude = static_cast<uint64_t>(mantissa);
+    auto magnitude = static_cast<uint64_t>(mantissa);
     if (mantissa < 0)
     {
         data[pos++] = '-';
@@ -640,7 +640,7 @@ inline void writeDatePrefix(const int64_t days, uint8_t* dst)
     const uint64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     const uint64_t mp = (5 * doy + 2) / 153;
     const uint64_t day = doy - (153 * mp + 2) / 5 + 1;
-    const uint64_t month = mp + (mp < 10 ? 3 : -9);
+    const uint64_t month = mp + (mp < 10 ? 3ULL : static_cast<uint64_t>(-9));
     const int64_t year = static_cast<int64_t>(yoe) + era * 400 + (month <= 2 ? 1 : 0);
     writeFixedDigits<4>(static_cast<uint32_t>(year), dst);
     writeFixedDigits<2>(static_cast<uint32_t>(month), dst + 4);
@@ -673,12 +673,12 @@ inline void writeDateOnly(const int64_t days, uint8_t* dst)
 {
     const int64_t z = days + 719468;
     const int64_t era = (z >= 0 ? z : z - 146096) / 146097;
-    const uint64_t doe = static_cast<uint64_t>(z - era * 146097);
+    const auto doe = static_cast<uint64_t>(z - era * 146097);
     const uint64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
     const uint64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     const uint64_t mp = (5 * doy + 2) / 153;
     const uint64_t day = doy - (153 * mp + 2) / 5 + 1;
-    const uint64_t month = mp + (mp < 10 ? 3 : -9);
+    const uint64_t month = mp + (mp < 10 ? 3ULL : static_cast<uint64_t>(-9));
     const int64_t year = static_cast<int64_t>(yoe) + era * 400 + (month <= 2 ? 1 : 0);
 
     writeFixedDigits<4>(static_cast<uint32_t>(year), dst);

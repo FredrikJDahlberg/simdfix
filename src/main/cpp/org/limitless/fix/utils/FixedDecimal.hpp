@@ -107,14 +107,14 @@ public:
         {
             const int64_t intermediate64 = m_mantissa * other.m_mantissa;
             __int128 product = static_cast<__int128>(intermediate64) * SignedReciprocal64;
-            const int64_t upper_bits = static_cast<int64_t>(product >> 64);
-            const int64_t correction = static_cast<int64_t>(static_cast<uint64_t>(intermediate64) >> 63);
+            const auto upper_bits = static_cast<int64_t>(product >> 64);
+            const auto correction = static_cast<int64_t>(static_cast<uint64_t>(intermediate64) >> 63);
             return FixedDecimal(upper_bits + correction);
         }
 
         const __int128_t intermediate128 = static_cast<__int128_t>(m_mantissa) * other.m_mantissa;
         const __int128_t divided = (intermediate128 * SignedReciprocal128) >> 96;
-        const int64_t correction = static_cast<int64_t>(static_cast<uint64_t>(intermediate128 >> 127));
+        const auto correction = static_cast<int64_t>(static_cast<uint64_t>(intermediate128 >> 127));
         return FixedDecimal(static_cast<int64_t>(divided) + correction);
     }
 
