@@ -6,6 +6,8 @@
 #define SIMD_FIX_UTILS_HPP
 
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <string_view>
 #include <chrono>
 #include <span>

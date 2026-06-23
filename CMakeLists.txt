@@ -6,6 +6,14 @@ set(CMAKE_CXX_STANDARD 23)
 # (std::expected, std::print). Without this, toolchains whose C++23 support CMake
 # is unsure of (e.g. clang-18 on Ubuntu) quietly drop to C++20 and miscompile.
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Clang (through at least 18) advertises __cpp_concepts as 201907, but
+# libstdc++ gates std::expected on __cpp_concepts >= 202002. When building Clang
+# against libstdc++ (typically on Linux) this hides std::expected; align the
+# macro so the C++23 library is visible. Apple Clang uses libc++ and is fine.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE)
+    add_compile_options(-Wno-builtin-macro-redefined -D__cpp_concepts=202002L)
+endif()
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 enable_testing()

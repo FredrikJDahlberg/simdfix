@@ -9,6 +9,7 @@
 #include <expected>
 #include <span>
 #include <chrono>
+#include <utility>
 
 #include "org/limitless/fix/CodecTypes.hpp"
 #include "org/limitless/fix/simd/LinearSearch.hpp"
