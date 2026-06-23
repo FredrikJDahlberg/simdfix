@@ -54,8 +54,7 @@ set(FIX_HEADERS
         ${MAIN_PATH}/simd/LinearSearch.hpp ${MAIN_PATH}/encoder/FieldEncoder.hpp
         ${MAIN_PATH}/encoder/DataEncoder.hpp ${MAIN_PATH}/encoder/PayloadEncoder.hpp
         ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp)
-add_library(SimdFix ${FIX_HEADERS} ${GENERATED_HEADERS})
-target_sources(SimdFix INTERFACE ${FIX_HEADERS} ${GENERATED_HEADERS})
+add_library(SimdFix INTERFACE)
 target_include_directories(SimdFix INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
 target_compile_definitions(SimdFix INTERFACE $<$<CONFIG:Debug>:DEBUG_MODE> $<$<CONFIG:Release>:NDEBUG>
 )
@@ -119,7 +118,8 @@ add_custom_command(
         VERBATIM
 )
 add_custom_target(GenerateMessages DEPENDS ${GENERATED_HEADERS})
-add_dependencies(SimdFix GenerateMessages)
+# SimdFix is an INTERFACE (header-only) target and does not build, so it needs
+# no dependency on GenerateMessages; every consumer depends on it explicitly.
 
 include(GoogleTest)
 
@@ -213,5 +213,7 @@ endif()
 
 # Dynamically create an executable or library treating headers as source items
 # Using set_source_files_properties forces CMake/Compilers to attempt compilation
-add_library(header_test EXCLUDE_FROM_ALL ${FIX_HEADERS} ${FIX_GENERATED_HEADERS})
-set_source_files_properties(${FIX_HEADERS} PROPERTIES LANGUAGE CXX)
+add_library(header_test ${FIX_HEADERS} ${GENERATED_HEADERS})
+set_source_files_properties(${FIX_HEADERS} ${GENERATED_HEADERS} PROPERTIES LANGUAGE CXX)
+target_include_directories(header_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp)
+add_dependencies(header_test GenerateMessages)
