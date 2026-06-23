@@ -1,0 +1,41 @@
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # x86_64 exercises the SSE4.1 backend (Uint8x16_sse.inl).
+          - { name: x86_64 (SSE), runner: ubuntu-24.04 }
+          # arm64 exercises the NEON backend (Uint8x16_neon.inl).
+          - { name: arm64 (NEON), runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        # g++-14 provides libstdc++-14, which has C++23 <print>; the default
+        # libstdc++-13 on ubuntu-24.04 does not, and clang picks up the newer
+        # standard library automatically.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang g++-14 libgtest-dev libpugixml-dev
+
+      # SSE4.1 for the x86 Debug build is enabled automatically by CMake
+      # (check_cxx_compiler_flag); no per-arch flags needed here.
+      - name: Configure
+        run: >
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
