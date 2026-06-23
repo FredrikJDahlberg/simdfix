@@ -9,31 +9,8 @@
 #include <gtest/gtest.h>
 
 #include "org/limitless/fix/utils/Utils.hpp"
-#include "org/limitless/fix/unused/QuadSearch.hpp"
 
 namespace org::limitless::fix::decoder {
-
-TEST(QuadSearch, Sorted)
-{
-    {
-        const uint16_t values[] = {1, 2, 5, 7, 9, 12, 14, 15, 18, 23, 24, 29, 33, 35, 37, 40, 42 };
-        ASSERT_EQ(-1, simd::quadSearch(values, std::size(values), 47));
-        ASSERT_EQ(0, simd::quadSearch(values, std::size(values), 1));
-        ASSERT_EQ(16, simd::quadSearch(values, std::size(values), 42));
-    }
-    {
-        const uint16_t values[] = { 8, 9, 49, 35, 56, 34, 52, 1128, 98 };
-        ASSERT_EQ(5, simd::quadSearch(values, std::size(values), 34));
-        ASSERT_EQ(3, simd::quadSearch(values, std::size(values), 35));
-        ASSERT_EQ(8, simd::quadSearch(values, std::size(values), 98));
-    }
-    {
-        const uint16_t values[] = { 0, 0, 0, 0, 0, 0, 0, 0, 8, 9, 34, 35, 49, 52, 56, 98, 1128 };
-        ASSERT_EQ(10, simd::quadSearch(values, std::size(values), 34));
-        ASSERT_EQ(11, simd::quadSearch(values, std::size(values), 35));
-        ASSERT_EQ(16, simd::quadSearch(values, std::size(values), 1128));
-    }
-}
 
 TEST(Parse, AsciiToDecimal)
 {

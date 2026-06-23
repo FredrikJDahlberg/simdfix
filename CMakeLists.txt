@@ -2,11 +2,28 @@ cmake_minimum_required(VERSION 3.20)
 project(simdfix)
 
 set(CMAKE_CXX_STANDARD 23)
+# Fail loudly instead of silently decaying to C++20: the code needs real C++23
+# (std::expected, std::print). Without this, toolchains whose C++23 support CMake
+# is unsure of (e.g. clang-18 on Ubuntu) quietly drop to C++20 and miscompile.
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 enable_testing()
 
 find_package(GTest REQUIRED)
+
+# The x86 SSE backend (Uint8x16_sse.inl) uses _mm_blendv_epi8, an SSE4.1
+# intrinsic. The Release build already enables it via -march=native, but the
+# Debug build sets no architecture flags, so on x86 it fails to compile without
+# this. check_cxx_compiler_flag adds -msse4.1 only where the compiler accepts
+# it (x86 targets); on arm64 the flag is rejected and SIMDFIX_SSE41_FLAG stays
+# empty, since NEON is baseline there.
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-msse4.1" SIMDFIX_HAS_MSSE41)
+set(SIMDFIX_SSE41_FLAG "")
+if(SIMDFIX_HAS_MSSE41)
+    set(SIMDFIX_SSE41_FLAG -msse4.1)
+endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp
         ${CMAKE_SOURCE_DIR}/src/test/cpp
@@ -36,7 +53,7 @@ target_compile_definitions(SimdFix INTERFACE $<$<CONFIG:Debug>:DEBUG_MODE> $<$<C
 )
 target_compile_options(SimdFix INTERFACE
         -Wall -Wextra
-        $<$<CONFIG:Debug>:-g -O0 -fsanitize=address -fno-omit-frame-pointer -fprofile-instr-generate -fcoverage-mapping>
+        $<$<CONFIG:Debug>:-g -O0 -fsanitize=address -fno-omit-frame-pointer -fprofile-instr-generate -fcoverage-mapping ${SIMDFIX_SSE41_FLAG}>
         $<$<CONFIG:Release>:-O3 -march=native>
 )
 target_link_options(SimdFix INTERFACE
