@@ -73,7 +73,6 @@ class PayloadDecoder
     uint32_t m_tag{};
     int32_t m_position{};
     size_t m_count{};
-    uint32_t m_skipEnd{};
 
 
 public:
@@ -140,7 +139,6 @@ public:
         }
         m_count = 0;
         m_tag = 0;
-        m_skipEnd = 0;
 
         const auto data = buffer.data();
         const auto length = static_cast<length_t>(buffer.size());
@@ -282,40 +280,6 @@ private:
     }
 
     /**
-     * Adjusts blockSum and offset after emitDataSkip has set m_skipEnd,
-     * correcting for bytes inside the data payload that the SIMD scan
-     * either missed or double-counted.
-     * @param data raw message bytes
-     * @param length message length
-     * @param offset current block offset, updated to resume after the skip
-     * @param blockSum running byte sum, corrected for the skipped region
-     */
-    void applyDataSkip(const data_t* data,
-                       const length_t length,
-                       position_t& offset,
-                       uint64_t& blockSum)
-    {
-        const position_t blockEnd = offset + simd::Uint8x16::Size;
-        if (m_skipEnd > blockEnd)
-        {
-            const position_t sumEnd = std::min(m_skipEnd, static_cast<position_t>(length));
-            for (position_t i = blockEnd; i < sumEnd; ++i)
-            {
-                blockSum += data[i];
-            }
-        }
-        else
-        {
-            for (position_t i = m_skipEnd; i < blockEnd; ++i)
-            {
-                blockSum -= data[i];
-            }
-        }
-        offset = m_skipEnd - simd::Uint8x16::Size;
-        m_skipEnd = 0;
-    }
-
-    /**
      * Consumes one 16-byte block's worth of tag digits: closes out the
      * previous token (handling a tag split across the block boundary),
      * extracts each tag number found in this block into new tokens, and
@@ -347,9 +311,8 @@ private:
         if (m_tag != 0 && (tagDigitFlags & 0xF) == 0)
         {  // split tag ending in first position of next block
             field->m_length = static_cast<int16_t>(m_position + offset - 1 - field->m_position);
-            if (emitDataSkip(data, length, field))
+            if (skipDataField(data, length, field, offset, blockSum))
             {
-                applyDataSkip(data, length, offset, blockSum);
                 return false;
             }
             ++m_count;
@@ -373,9 +336,8 @@ private:
             const position_t tagPos = nonTagBitPos >> 2;
             field->m_length += offset + tagPos - field->m_position - 1;
 
-            if (emitDataSkip(data, length, field))
+            if (skipDataField(data, length, field, offset, blockSum))
             {
-                applyDataSkip(data, length, offset, blockSum);
                 return false;
             }
 
@@ -408,15 +370,20 @@ private:
 
     /**
      * If the just-completed token is a length tag for a data field, parses its
-     * value, emits a synthetic token for the data field, and sets m_skipEnd so
-     * parse() skips past the data payload.
+     * value, emits a synthetic token for the binary-safe data field, advances
+     * offset past the data payload, and re-bases blockSum so the checksum stays
+     * exact across the bytes the SIMD scan skips (or would double-count).
      * @param data raw message bytes
-     * @param length message length; bounds the scan for the data tag's '=' so a
-     *        truncated/malformed message cannot read past the buffer
+     * @param length message length; bounds every read so a truncated/malformed
+     *        message cannot read past the buffer
      * @param field the just-completed length tag token
-     * @return true if a data skip was emitted
+     * @param offset current block offset; on a skip, repositioned so the next
+     *        16-byte load resumes just past the data payload
+     * @param blockSum running checksum byte sum, corrected for the skipped region
+     * @return true if a data skip was emitted (the caller resumes the scan loop)
      */
-    bool emitDataSkip(const data_t* data, const length_t length, const Field* field)
+    bool skipDataField(const data_t* data, const length_t length, const Field* field,
+                       position_t& offset, uint64_t& blockSum)
     {
         const auto dataTagNum = DataFields::dataTag(field->m_tag);
         if (dataTagNum < 0)
@@ -435,7 +402,7 @@ private:
         const auto lengthValue = static_cast<uint32_t>(
             utils::asciiToUint64(data + field->m_position, field->m_length, padded));
 
-        // Scan past the SOH after the length value, then past the data tag's "NNN=" prefix
+        // Skip the SOH after the length value and the data tag's "NNN=" prefix.
         auto pos = static_cast<position_t>(field->m_position + field->m_length + 1);
         while (pos < length && data[pos] != TagEnd)
         {
@@ -449,9 +416,23 @@ private:
         dataToken->m_position = static_cast<uint16_t>(pos);
         dataToken->m_length = static_cast<int16_t>(lengthValue);
 
-        // Clamp to the buffer so a huge (malformed) length cannot push the
-        // resumed scan offset out of range; checkRequiredFields rejects it.
-        m_skipEnd = std::min(pos + lengthValue + 1, static_cast<position_t>(length));
+        // Resume just past the data payload's trailing SOH. Clamp to the buffer
+        // so a huge (malformed) length cannot push the scan offset out of range;
+        // checkRequiredFields rejects the message.
+        const position_t skipEnd = std::min(pos + lengthValue + 1, static_cast<position_t>(length));
+
+        // blockSum covers [0, blockEnd); re-base it to [0, skipEnd) so the
+        // checksum stays exact across the skipped region. At most one loop runs.
+        const position_t blockEnd = offset + simd::Uint8x16::Size;
+        for (position_t i = skipEnd; i < blockEnd; ++i)
+        {
+            blockSum -= data[i];
+        }
+        for (position_t i = blockEnd; i < skipEnd; ++i)
+        {
+            blockSum += data[i];
+        }
+        offset = skipEnd - simd::Uint8x16::Size;
         m_tag = 0;
         m_position = 0;
         return true;
