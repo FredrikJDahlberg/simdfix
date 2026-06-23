@@ -8,24 +8,38 @@ jobs:
   test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30          # fail fast instead of hanging on a missing runner
     strategy:
       fail-fast: false
       matrix:
         include:
-          # x86_64 exercises the SSE4.1 backend (Uint8x16_sse.inl).
-          - { name: x86_64 (SSE), runner: ubuntu-24.04 }
-          # arm64 exercises the NEON backend (Uint8x16_neon.inl).
-          - { name: arm64 (NEON), runner: ubuntu-24.04-arm }
+          # x86_64 exercises the SSE4.1 backend (Uint8x16_sse.inl) on a
+          # GitHub-hosted Linux runner.
+          - name: x86_64 (SSE)
+            runner: ubuntu-24.04
+            os: linux
+          # arm64 exercises the NEON backend (Uint8x16_neon.inl) on a
+          # self-hosted Apple Silicon Mac (labels: self-hosted, macOS, ARM64).
+          - name: arm64 (NEON)
+            runner: [self-hosted, macOS, ARM64]
+            os: macos
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        # g++-14 provides libstdc++-14, which has C++23 <print>; the default
-        # libstdc++-13 on ubuntu-24.04 does not, and clang picks up the newer
-        # standard library automatically.
+      # Linux: g++-14 provides libstdc++-14 (C++23 <print>); clang picks up the
+      # newer standard library automatically.
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake clang g++-14 libgtest-dev libpugixml-dev
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            cmake clang g++-14 libgtest-dev libpugixml-dev
+
+      # macOS: Apple Clang + libc++ already handle C++23; just ensure the
+      # libraries are present (no-op if already installed).
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos'
+        run: brew install cmake googletest pugixml
 
       # SSE4.1 for the x86 Debug build is enabled automatically by CMake
       # (check_cxx_compiler_flag); no per-arch flags needed here.
