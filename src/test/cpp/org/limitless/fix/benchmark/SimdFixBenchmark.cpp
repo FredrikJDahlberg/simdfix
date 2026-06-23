@@ -134,7 +134,7 @@ static void report(const char* label, const nanoseconds duration, const size_t m
     const auto seconds  = ::duration<double>(duration).count();
     const auto gbps     = static_cast<double>(msgCount) * static_cast<double>(msgBytes) / 1e9 / seconds;
     const auto nsPerMsg = static_cast<double>(duration.count()) / static_cast<double>(msgCount);
-    std::printf("%-12s %6lld ms   %6.3f GB/s   %5.1f ns/msg\n", label, ms, gbps, nsPerMsg);
+    std::printf("%-12s %6lld ms   %6.3f GB/s   %5.1f ns/msg\n", label, static_cast<long long>(ms), gbps, nsPerMsg);
 }
 
 // Applies every getter exposed by LogonDecoder, accumulating the results into
