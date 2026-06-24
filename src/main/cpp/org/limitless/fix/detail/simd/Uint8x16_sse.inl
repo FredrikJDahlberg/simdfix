@@ -8,8 +8,9 @@
 #endif
 
 #include <concepts>
-#include <cstring>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 
 #include <immintrin.h>
 

@@ -8,6 +8,7 @@
 #endif
 
 #include <concepts>
+#include <cstdint>
 #include <cstdio>
 
 #include <arm_neon.h>
