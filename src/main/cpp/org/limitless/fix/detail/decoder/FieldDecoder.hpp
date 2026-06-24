@@ -13,7 +13,7 @@
 
 #include "org/limitless/fix/detail/Tokens.hpp"
 #include "org/limitless/fix/detail/simd/LinearSearch.hpp"
-#include "org/limitless/fix/utils/Utils.hpp"
+#include "org/limitless/fix/utils/Conversions.hpp"
 
 namespace org::limitless::fix::detail::decoder {
 

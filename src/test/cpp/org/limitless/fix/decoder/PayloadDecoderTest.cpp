@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-#include "org/limitless/fix/utils/Utils.hpp"
+#include "org/limitless/fix/utils/Conversions.hpp"
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
 #include "org/limitless/fix/messages/FixTypes.hpp"
 

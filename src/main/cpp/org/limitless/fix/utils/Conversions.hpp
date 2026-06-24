@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-04-23.
 //
 
-#ifndef SIMD_FIX_UTILS_HPP
-#define SIMD_FIX_UTILS_HPP
+#ifndef SIMD_FIX_CONVERSIONS_HPP
+#define SIMD_FIX_CONVERSIONS_HPP
 
 #include <cstdint>
 #include <cstdio>
@@ -780,4 +780,4 @@ template <typename Enum>
 
 }
 
-#endif //SIMD_FIX_UTILS_HPP
+#endif //SIMD_FIX_CONVERSIONS_HPP

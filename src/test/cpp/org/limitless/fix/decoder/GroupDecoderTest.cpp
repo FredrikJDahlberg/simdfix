@@ -8,7 +8,7 @@
 #include "../../../../../../main/cpp/org/limitless/fix/detail/decoder/FieldDecoder.hpp"
 #include "org/limitless/fix/decoder/GroupDecoder.hpp"
 #include "org/limitless/fix/messages/FixTypes.hpp"
-#include "org/limitless/fix/utils/Utils.hpp"
+#include "org/limitless/fix/utils/Conversions.hpp"
 
 namespace org::limitless::fix::decoder {
 

@@ -52,7 +52,7 @@ set(GENERATED_HEADERS
         ${GENERATED_DIR}/FixMessageEncoders.hpp ${GENERATED_DIR}/FixMessageHandler.hpp)
 set(FIX_HEADERS
         ${MAIN_PATH}/Fix.hpp ${MAIN_PATH}/Types.hpp ${MAIN_PATH}/detail/Tokens.hpp
-        ${MAIN_PATH}/utils/Utils.hpp ${MAIN_PATH}/utils/FixedDecimal.hpp ${MAIN_PATH}/utils/OptionalInt.hpp
+        ${MAIN_PATH}/utils/Conversions.hpp ${MAIN_PATH}/utils/FixedDecimal.hpp ${MAIN_PATH}/utils/OptionalInt.hpp
         ${MAIN_PATH}/decoder/PayloadDecoder.hpp ${MAIN_PATH}/decoder/MessageDecoder.hpp
         ${MAIN_PATH}/detail/decoder/FieldDecoder.hpp
         ${MAIN_PATH}/decoder/DataDecoder.hpp ${MAIN_PATH}/decoder/GroupDecoder.hpp

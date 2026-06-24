@@ -12,7 +12,7 @@
 #include <string_view>
 
 #include "org/limitless/fix/Types.hpp"
-#include "org/limitless/fix/utils/Utils.hpp"
+#include "org/limitless/fix/utils/Conversions.hpp"
 
 namespace org::limitless::fix::encoder { class DataEncoder; }
 

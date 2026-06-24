@@ -12,7 +12,7 @@
 #include "org/limitless/fix/Types.hpp"
 #include "org/limitless/fix/detail/encoder/FieldEncoder.hpp"
 #include "org/limitless/fix/detail/simd/Uint8x16.hpp"
-#include "org/limitless/fix/utils/Utils.hpp"
+#include "org/limitless/fix/utils/Conversions.hpp"
 
 namespace org::limitless::fix::encoder {
 
