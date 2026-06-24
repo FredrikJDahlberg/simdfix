@@ -65,6 +65,71 @@ TEST(FieldDecoder, GetFixedDecimal)
     EXPECT_EQ(utils::FixedDecimal(-1, -2), negative);
 }
 
+TEST(FieldDecoder, GetFixedDecimalLong)
+{
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=86" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
+        "9999=123456.789012" SOH "9998=-1234.56789" SOH "10=213" SOH);
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status);
+
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
+    {
+        tags[i] = fields[i].m_tag;
+    }
+
+    FieldDecoder field{message, fields, tags, static_cast<int32_t>(fields.size())};
+
+    const auto positive = field.getFixedDecimal<9999, false, RecordType::Message>().value_or(utils::FixedDecimal{});
+    const auto negative = field.getFixedDecimal<9998, false, RecordType::Message>().value_or(utils::FixedDecimal{});
+    EXPECT_EQ(utils::FixedDecimal(123456789012LL, -6), positive);
+    EXPECT_EQ(utils::FixedDecimal(-123456789LL, -5), negative);
+}
+
+TEST(FieldDecoder, GetFixedDecimalInvalidValue)
+{
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=100" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
+        "9999=.123" SOH "9998=123." SOH "9997=12.3.4" SOH "9996=12A.5" SOH "9995=-" SOH "10=097" SOH);
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status);
+
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
+    {
+        tags[i] = fields[i].m_tag;
+    }
+
+    FieldDecoder field{message, fields, tags, static_cast<int32_t>(fields.size())};
+
+    const auto leadingDot = field.getFixedDecimal<9999, false, RecordType::Message>();
+    EXPECT_FALSE(leadingDot.has_value());
+    EXPECT_EQ(Result::InvalidValue, leadingDot.error());
+
+    const auto trailingDot = field.getFixedDecimal<9998, false, RecordType::Message>();
+    EXPECT_FALSE(trailingDot.has_value());
+    EXPECT_EQ(Result::InvalidValue, trailingDot.error());
+
+    const auto multipleDots = field.getFixedDecimal<9997, false, RecordType::Message>();
+    EXPECT_FALSE(multipleDots.has_value());
+    EXPECT_EQ(Result::InvalidValue, multipleDots.error());
+
+    const auto nonDigit = field.getFixedDecimal<9996, false, RecordType::Message>();
+    EXPECT_FALSE(nonDigit.has_value());
+    EXPECT_EQ(Result::InvalidValue, nonDigit.error());
+
+    const auto signOnly = field.getFixedDecimal<9995, false, RecordType::Message>();
+    EXPECT_FALSE(signOnly.has_value());
+    EXPECT_EQ(Result::InvalidValue, signOnly.error());
+}
+
 TEST(FieldDecoder, GetUint32InvalidValue)
 {
     const auto message = utils::makeSpan(

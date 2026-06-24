@@ -209,13 +209,11 @@ public:
         if (!std::is_constant_evaluated() && padded && len <= 8)
         {
             uint64_t raw;
-            std::memcpy(&raw, digits + start, sizeof(uint64_t));
-            const uint64_t dotMask = utils::findByte('.', raw);
+            std::memcpy(&raw, valueDigits, sizeof(uint64_t));
             int32_t exponent = 0;
             uint32_t digitCount = len;
-            if (dotMask != 0)
+            if (dotPos < len)
             {
-                const uint32_t dotPos = std::countr_zero(dotMask) / 8;
                 exponent = -static_cast<int32_t>(len - dotPos - 1);
                 const uint64_t lowerMask = (1ULL << (dotPos * 8)) - 1;
                 raw = (raw & lowerMask) | ((raw >> 8) & ~lowerMask);
@@ -231,6 +229,20 @@ public:
             return utils::FixedDecimal{negative ? -mantissa : mantissa, exponent};
         }
 
+        if (!std::is_constant_evaluated() && dotPos < len && dotPos <= 8)
+        {
+            const uint32_t fracDigits = len - dotPos - 1;
+            if (fracDigits <= 8)
+            {
+                const bool fracPadded = m_data.size() >= field->m_position + start + dotPos + 1 + sizeof(uint64_t);
+                const auto intPart = static_cast<int64_t>(utils::asciiToUint64(valueDigits, dotPos, padded));
+                const auto fracPart = static_cast<int64_t>(utils::asciiToUint64(valueDigits + dotPos + 1, fracDigits, fracPadded));
+                auto mantissa = intPart * static_cast<int64_t>(utils::PowersOf10_64[fracDigits]) + fracPart;
+                const auto exponent = -static_cast<int32_t>(fracDigits);
+                return utils::FixedDecimal{negative ? -mantissa : mantissa, exponent};
+            }
+        }
+
         int64_t mantissa = 0;
         int32_t exponent = 0;
         for (uint32_t i = start; i < field->m_length; ++i)
@@ -243,7 +255,7 @@ public:
             }
             mantissa = mantissa * 10 + (ch - '0');
         }
-        return utils::FixedDecimal{negative ? -mantissa : mantissa, static_cast<int8_t>(exponent)};
+        return utils::FixedDecimal{negative ? -mantissa : mantissa, exponent};
     }
 
     /**

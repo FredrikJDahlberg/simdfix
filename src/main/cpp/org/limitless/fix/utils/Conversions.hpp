@@ -229,10 +229,13 @@ inline constexpr uint32_t MaxDecimalChars = 20;
 {
     uint64_t word = 0;
     std::memcpy(&word, data, sizeof(word));
-    const uint64_t zeroed = word - AsciiZeros;
-    const uint64_t overflow = (zeroed + 0x7676767676767676ULL) & 0x8080808080808080ULL;
+    const uint64_t biased = word | 0x8080808080808080ULL;
+    const uint64_t sub = biased - AsciiZeros;
+    const uint64_t below = ~sub & 0x8080808080808080ULL;
+    const uint64_t digits = sub & 0x7F7F7F7F7F7F7F7FULL;
+    const uint64_t above = (digits + 0x7676767676767676ULL) & 0x8080808080808080ULL;
     const uint64_t mask = length < 8 ? (1ULL << (length * 8)) - 1 : ~0ULL;
-    return (overflow & mask) == 0;
+    return ((below | above) & mask) == 0;
 }
 
 /**
