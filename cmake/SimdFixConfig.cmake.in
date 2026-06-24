@@ -1,0 +1,7 @@
+@PACKAGE_INIT@
+
+# simdfix is a header-only INTERFACE library; the imported target carries its
+# include directories and compile features. Consumers link SimdFix::SimdFix.
+include("${CMAKE_CURRENT_LIST_DIR}/SimdFixTargets.cmake")
+
+check_required_components(SimdFix)
