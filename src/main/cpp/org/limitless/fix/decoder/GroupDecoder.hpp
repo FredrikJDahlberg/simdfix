@@ -135,7 +135,7 @@ private:
      * group is not nested).
      * @return field/tag index of the next entry's delimiter field
      */
-    int32_t nextGroupOffset() const
+    [[nodiscard]] int32_t nextGroupOffset() const
     {
         const auto outerEnd = m_decoder.groupScope().end;
         const auto end = m_decoder.find(m_offset + 1, m_delim, outerEnd);

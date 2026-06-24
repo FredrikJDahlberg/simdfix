@@ -2,6 +2,8 @@
 
 A SIMD-accelerated [FIX](https://www.fixtrading.org/standards/fix-sessions-online/) (Financial Information Exchange) protocol parser and encoder in C++23. It uses 16-byte parallel SIMD operations (ARM NEON / x86 SSE4.1) and SWAR digit parsing to tokenize raw FIX messages with zero copies.
 
+It parses at roughly **1.5 GB/s (~92 ns per message)** on an Apple M1 Pro, and stays compute-bound rather than memory-bound even when streaming from DRAM. See [src/performance.md](src/performance.md) for full figures and methodology.
+
 ## Features
 
 - **Header-only library** — no compiled translation units; add it as a CMake `INTERFACE` dependency.
@@ -55,6 +57,8 @@ Always use a Release build — Debug builds include AddressSanitizer and coverag
 ./cmake-build-release/SimdFixBenchmark            # run all benchmarks
 ./cmake-build-release/SimdFixBenchmark logon-hot   # run a specific benchmark
 ```
+
+Available benchmarks: `logon-cold`, `logon-hot`, `logon-getters`, `logon-groups`, `logon-data`, `logon-encode`, `nos-hot`, `nos-getters`, `nos-encode`, `er-hot`, `er-getters`, `er-encode`, or `all` (default). Results and methodology are documented in [src/performance.md](src/performance.md).
 
 ## Code Coverage
 

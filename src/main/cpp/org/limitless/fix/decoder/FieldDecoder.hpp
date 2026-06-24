@@ -68,7 +68,7 @@ public:
      * @param end exclusive upper bound on the search
      * @return pointer to the matching token, or to m_fields[end] if not found
      */
-    Field* find(int32_t offset, const uint16_t tag, const int32_t end)
+    [[nodiscard]] Field* find(int32_t offset, const uint16_t tag, const int32_t end)
     {
         while (offset < end && m_tags[offset] != tag)
         {
@@ -84,7 +84,7 @@ public:
      * @param tag tag number to find
      * @return pointer to the matching token, or to m_fields[m_size] if not found
      */
-    Field* find(const int32_t offset, const uint16_t tag)
+    [[nodiscard]] Field* find(const int32_t offset, const uint16_t tag)
     {
         return find(offset, tag, m_size);
     }

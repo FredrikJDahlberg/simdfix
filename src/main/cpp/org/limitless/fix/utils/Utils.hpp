@@ -352,7 +352,7 @@ template <uint32_t Divisor>
  * @param length 17 (no milliseconds) or 21 (with milliseconds)
  * @return milliseconds since the Unix epoch, or -1 if length is neither 17 nor 21
  */
-inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
+[[nodiscard]] inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
 {
     if (length < UTCTimestampShortLength)
     {
@@ -373,7 +373,7 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
  * @param length 8 (no milliseconds) or 12 (with milliseconds)
  * @return milliseconds since midnight, or -1 if length is invalid
  */
-inline int64_t timeOnlyToMillis(const uint8_t* data, const uint32_t length)
+[[nodiscard]] inline int64_t timeOnlyToMillis(const uint8_t* data, const uint32_t length)
 {
     if (length < UTCTimeOnlyShortLength)
     {
@@ -411,7 +411,7 @@ inline int64_t timeOnlyToMillis(const uint8_t* data, const uint32_t length)
  * @param length must be 8
  * @return milliseconds since the Unix epoch at midnight UTC, or -1 if length is invalid
  */
-inline int64_t dateOnlyToEpochUTC(const uint8_t* data, const uint32_t length)
+[[nodiscard]] inline int64_t dateOnlyToEpochUTC(const uint8_t* data, const uint32_t length)
 {
     if (length != UTCDateOnlyLength)
     {
@@ -717,7 +717,7 @@ inline void writeDateOnly(const int64_t days, uint8_t* dst)
  * @param dateTime UTCTimestamp string
  * @return time since the Unix epoch, or -1ms if dateTime has an unsupported length
  */
-inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateTime)
+[[nodiscard]] inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateTime)
 {
     const auto data = reinterpret_cast<const uint8_t*>(dateTime.data());
     return std::chrono::milliseconds{dateTimeToEpochUTC(data, static_cast<uint32_t>(dateTime.length()))};
@@ -732,7 +732,7 @@ inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateT
  * @return {table, singleByte} pair
  */
 template <typename Enum>
-constexpr std::pair<std::array<typename Enum::Values, 256>, bool> makeByteTable()
+[[nodiscard]] constexpr std::pair<std::array<typename Enum::Values, 256>, bool> makeByteTable()
 {
     std::array<typename Enum::Values, 256> table{};
     table.fill(Enum::Values::Null);
@@ -758,7 +758,7 @@ constexpr std::pair<std::array<typename Enum::Values, 256>, bool> makeByteTable(
  * @return the matching enum value, or Enum::Values::Null if code is not found
  */
 template <typename Enum>
-Enum::Values find(const std::string_view code)
+[[nodiscard]] Enum::Values find(const std::string_view code)
 {
     static constexpr auto built = makeByteTable<Enum>();
     if constexpr (built.second)
