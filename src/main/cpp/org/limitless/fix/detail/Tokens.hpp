@@ -189,12 +189,12 @@ enum class Presence
 
 [[nodiscard]] static constexpr Presence parse(const std::string_view name)
 {
-    static constexpr std::string_view Strings[] = { "Null", "constant", "optional", "required" };
+    constexpr std::string_view Strings[] = { "Null", "constant", "optional", "required" };
     if (name.empty())
     {
         return Presence::Required;
     }
-    constexpr auto end = Strings + std::size(Strings);
+    const auto end = Strings + std::size(Strings);
     const auto found = std::find(Strings, end, name);
     return found != end ? static_cast<Presence>(found - Strings) : Presence::Null;
 }

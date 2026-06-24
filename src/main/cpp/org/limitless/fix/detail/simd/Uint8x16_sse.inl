@@ -9,7 +9,7 @@
 
 #include <concepts>
 #include <cstring>
-#include <print>
+#include <cstdio>
 
 #include <immintrin.h>
 
@@ -319,9 +319,9 @@ struct Uint8x16
         _mm_store_si128(reinterpret_cast<__m128i*>(data), m_block);
         for (int i = 0; i < 16; ++i)
         {
-            std::print("{:02x} ", data[i]);
+            std::printf("%02x ", data[i]);
         }
-        std::println();
+        std::putchar('\n');
     }
 
     static void print(const value_type& block)
@@ -330,9 +330,9 @@ struct Uint8x16
         _mm_store_si128(reinterpret_cast<__m128i*>(data), block);
         for (int i = 0; i < 16; ++i)
         {
-            std::print("{:02x} ", data[i]);
+            std::printf("%02x ", data[i]);
         }
-        std::println();
+        std::putchar('\n');
     }
 };
 

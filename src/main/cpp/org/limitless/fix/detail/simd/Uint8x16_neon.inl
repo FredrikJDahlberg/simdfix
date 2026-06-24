@@ -8,7 +8,7 @@
 #endif
 
 #include <concepts>
-#include <print>
+#include <cstdio>
 
 #include <arm_neon.h>
 
@@ -311,9 +311,9 @@ struct Uint8x16
         const auto data = reinterpret_cast<const uint8_t*>(&block);
         for (int i = 0; i < 16; ++i)
         {
-            std::print("{:02x} ", data[i]);
+            std::printf("%02x ", data[i]);
         }
-        std::println();
+        std::putchar('\n');
     }
 };
 

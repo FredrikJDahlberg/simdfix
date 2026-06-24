@@ -1,24 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 project(simdfix)
 
-set(CMAKE_CXX_STANDARD 23)
-# Emit compile_commands.json so clangd/IDE tooling sees the real flags
-# (-std=c++23, include dirs). Without it the dangling compile_commands.json
-# symlink leaves clangd on default flags, where std::span loses its C++20 range
-# support and reports bogus "does not satisfy std::ranges::input_range" errors.
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# Fail loudly instead of silently decaying to C++20: the code needs real C++23
-# (std::expected, std::print). Without this, toolchains whose C++23 support CMake
-# is unsure of (e.g. clang-18 on Ubuntu) quietly drop to C++20 and miscompile.
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Clang (through at least 18) advertises __cpp_concepts as 201907, but
-# libstdc++ gates std::expected on __cpp_concepts >= 202002. When building Clang
-# against libstdc++ (typically on Linux) this hides std::expected; align the
-# macro so the C++23 library is visible. Apple Clang uses libc++ and is fine.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE)
-    add_compile_options(-Wno-builtin-macro-redefined -D__cpp_concepts=202002L)
-endif()
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 enable_testing()
@@ -56,6 +41,7 @@ set(FIX_HEADERS
         ${MAIN_PATH}/decoder/PayloadDecoder.hpp ${MAIN_PATH}/decoder/MessageDecoder.hpp
         ${MAIN_PATH}/detail/decoder/FieldDecoder.hpp
         ${MAIN_PATH}/decoder/DataDecoder.hpp ${MAIN_PATH}/decoder/GroupDecoder.hpp
+        ${MAIN_PATH}/detail/Expected.hpp ${MAIN_PATH}/detail/ByteSwap.hpp
         ${MAIN_PATH}/detail/simd/Uint8x16.hpp
         ${MAIN_PATH}/detail/simd/LinearSearch.hpp ${MAIN_PATH}/detail/encoder/FieldEncoder.hpp
         ${MAIN_PATH}/encoder/DataEncoder.hpp ${MAIN_PATH}/encoder/PayloadEncoder.hpp
@@ -167,6 +153,7 @@ add_custom_target(ProfileTime
 list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/include")
 find_package(pugixml REQUIRED)
 add_executable(Generator ${GENERATOR_PATH}/FixGenerator.cpp)
+set_target_properties(Generator PROPERTIES CXX_STANDARD 23)
 target_compile_options(Generator PRIVATE -O0 -Wall)
 target_include_directories(Generator PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp"

@@ -6,7 +6,7 @@
 #define SIMD_FIX_FIELD_DECODER_HPP
 
 #include <array>
-#include <expected>
+#include "org/limitless/fix/detail/Expected.hpp"
 #include <span>
 #include <chrono>
 #include <utility>
@@ -122,12 +122,12 @@ public:
     {
         if (field->m_length == 0 || field->m_length > utils::MaxUint32Digits)
         {
-            return std::unexpected{Result::InvalidLength};
+            return unexpected{Result::InvalidLength};
         }
         const auto* digits = m_data.data() + field->m_position;
         if (!utils::isDigits(digits, field->m_length))
         {
-            return std::unexpected{Result::InvalidValue};
+            return unexpected{Result::InvalidValue};
         }
         const auto padded = m_data.size() >= field->m_position + sizeof(uint64_t);
         return static_cast<uint32_t>(utils::asciiToUint64(0, digits, field->m_length, padded));
@@ -143,13 +143,13 @@ public:
     {
         if (field->m_length == 0 || field->m_length > utils::MaxInt32Chars)
         {
-            return std::unexpected{Result::InvalidLength};
+            return unexpected{Result::InvalidLength};
         }
         const auto* digits = m_data.data() + field->m_position;
         const uint32_t start = (digits[0] == '-') ? 1 : 0;
         if (field->m_length - start == 0 || !utils::isDigits(digits + start, field->m_length - start))
         {
-            return std::unexpected{Result::InvalidValue};
+            return unexpected{Result::InvalidValue};
         }
         return utils::asciiToInt32(digits, field->m_length);
     }
@@ -164,7 +164,7 @@ public:
     {
         if (field->m_length == 0 || field->m_length > utils::MaxDecimalChars)
         {
-            return std::unexpected{Result::InvalidLength};
+            return unexpected{Result::InvalidLength};
         }
         const uint8_t* digits = m_data.data() + field->m_position;
         uint32_t start = 0;
@@ -178,7 +178,7 @@ public:
         const uint32_t len = field->m_length - start;
         if (len == 0)
         {
-            return std::unexpected{Result::InvalidValue};
+            return unexpected{Result::InvalidValue};
         }
         const auto* valueDigits = digits + start;
         uint32_t dotPos = len;
@@ -197,12 +197,12 @@ public:
                 !utils::isDigits(valueDigits, dotPos) ||
                 !utils::isDigits(valueDigits + dotPos + 1, after))
             {
-                return std::unexpected{Result::InvalidValue};
+                return unexpected{Result::InvalidValue};
             }
         }
         else if (!utils::isDigits(valueDigits, len))
         {
-            return std::unexpected{Result::InvalidValue};
+            return unexpected{Result::InvalidValue};
         }
 
         const bool padded = m_data.size() >= field->m_position + start + sizeof(uint64_t);
@@ -371,7 +371,7 @@ public:
      * @return converted value
      */
     template <typename T>
-    [[nodiscard]] std::expected<T, Result> valueAt(const int8_t index) const
+    [[nodiscard]] expected<T, Result> valueAt(const int8_t index) const
     {
         const auto& field = m_fields[index];
         if constexpr (std::is_same_v<T, std::string_view>)
@@ -395,7 +395,7 @@ public:
             const auto ms = cachedTimestamp(m_data.data() + field.m_position, field.m_length);
             if (ms < 0)
             {
-                return std::unexpected{Result::InvalidLength};
+                return unexpected{Result::InvalidLength};
             }
             return std::chrono::milliseconds{ms};
         }
@@ -416,7 +416,7 @@ public:
         const auto ms = utils::timeOnlyToMillis(m_data.data() + field.m_position, field.m_length);
         if (ms < 0)
         {
-            return std::unexpected{Result::InvalidLength};
+            return unexpected{Result::InvalidLength};
         }
         return std::chrono::milliseconds{ms};
     }
@@ -432,7 +432,7 @@ public:
         const auto ms = utils::dateOnlyToEpochUTC(m_data.data() + field.m_position, field.m_length);
         if (ms < 0)
         {
-            return std::unexpected{Result::InvalidLength};
+            return unexpected{Result::InvalidLength};
         }
         return std::chrono::milliseconds{ms};
     }
@@ -444,14 +444,14 @@ public:
      * @return converted enum value
      */
     template <typename Enum>
-    [[nodiscard]] constexpr std::expected<typename Enum::Values, Result> enumAt(const int8_t index) const
+    [[nodiscard]] constexpr expected<typename Enum::Values, Result> enumAt(const int8_t index) const
     {
         const auto& field = m_fields[index];
         const auto code = std::string_view{reinterpret_cast<const char*>(m_data.data() + field.m_position), field.m_length};
         const auto value = utils::find<Enum>(code);
         if (value == Enum::Values::Null)
         {
-            return std::unexpected{Result::InvalidValue};
+            return unexpected{Result::InvalidValue};
         }
         return value;
     }
@@ -475,12 +475,12 @@ public:
             {
                 if (field.m_length == 0)
                 {
-                    return std::unexpected{Result::InvalidLength};
+                    return unexpected{Result::InvalidLength};
                 }
             }
             return std::string_view{reinterpret_cast<const char*>(m_data.data() + field.m_position), field.m_length};
         }
-        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+        return unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
     /**
@@ -498,7 +498,7 @@ public:
         {
             return convertToUint32(&m_fields[index]);
         }
-        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+        return unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
     /**
@@ -517,7 +517,7 @@ public:
         {
             return convertToInt32(&m_fields[index]);
         }
-        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+        return unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
     /**
@@ -536,7 +536,7 @@ public:
         {
             return convertToFixedDecimal(&m_fields[index]);
         }
-        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+        return unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
     /**
@@ -557,11 +557,11 @@ public:
             const auto ms = cachedTimestamp(m_data.data() + field.m_position, field.m_length);
             if (ms < 0)
             {
-                return std::unexpected{Result::InvalidLength};
+                return unexpected{Result::InvalidLength};
             }
             return std::chrono::milliseconds{ms};
         }
-        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+        return unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
     /**
@@ -582,11 +582,11 @@ public:
             const auto ms = utils::timeOnlyToMillis(m_data.data() + field.m_position, field.m_length);
             if (ms < 0)
             {
-                return std::unexpected{Result::InvalidLength};
+                return unexpected{Result::InvalidLength};
             }
             return std::chrono::milliseconds{ms};
         }
-        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+        return unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
     /**
@@ -607,11 +607,11 @@ public:
             const auto ms = utils::dateOnlyToEpochUTC(m_data.data() + field.m_position, field.m_length);
             if (ms < 0)
             {
-                return std::unexpected{Result::InvalidLength};
+                return unexpected{Result::InvalidLength};
             }
             return std::chrono::milliseconds{ms};
         }
-        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+        return unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
     /**
@@ -624,7 +624,7 @@ public:
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
     template <int32_t Tag, bool Required, typename Enum, RecordType Parent>
-    [[nodiscard]] constexpr std::expected<typename Enum::Values, Result> getEnum() const
+    [[nodiscard]] constexpr expected<typename Enum::Values, Result> getEnum() const
     {
         const auto index = findIndex<Tag, Parent>();
         if (index >= 0)
@@ -634,11 +634,11 @@ public:
             const auto value = utils::find<Enum>(code);
             if (value == Enum::Values::Null)
             {
-                return std::unexpected{Result::InvalidValue};
+                return unexpected{Result::InvalidValue};
             }
             return value;
         }
-        return std::unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
+        return unexpected{Required ? Result::RequiredFieldMissing : Result::Success};
     }
 
 private:

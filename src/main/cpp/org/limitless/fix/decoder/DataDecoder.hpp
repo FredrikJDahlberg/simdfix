@@ -21,7 +21,7 @@ using namespace org::limitless::fix::detail::decoder;
 class DataDecoder
 {
     FieldDecoder& m_decoder;
-    DataResult m_result{std::unexpected{Result::Success}};
+    DataResult m_result{unexpected{Result::Success}};
 
 public:
     explicit DataDecoder(FieldDecoder& decoder) : m_decoder(decoder)
@@ -45,20 +45,20 @@ public:
         const auto* lengthField = m_decoder.nextField(LengthTag);
         if (lengthField == nullptr)
         {
-            m_result = std::unexpected{Result::Success};
+            m_result = unexpected{Result::Success};
             return *this;
         }
         const auto length = m_decoder.convertToUint32(lengthField);
         if (!length.has_value())
         {
-            m_result = std::unexpected{length.error()};
+            m_result = unexpected{length.error()};
             return *this;
         }
 
         const auto* dataField = m_decoder.nextField(DataTag);
         if (dataField == nullptr)
         {
-            m_result = std::unexpected{Result::Success};
+            m_result = unexpected{Result::Success};
             return *this;
         }
         m_result = m_decoder.bufferAt(dataField->m_position, length.value());

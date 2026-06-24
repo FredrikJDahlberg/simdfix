@@ -6,7 +6,7 @@
 #define SIMD_FIX_MESSAGE_DECODER_HPP
 
 #include <algorithm>
-#include <expected>
+#include "org/limitless/fix/detail/Expected.hpp"
 #include <span>
 
 #include "org/limitless/fix/detail/Tokens.hpp"

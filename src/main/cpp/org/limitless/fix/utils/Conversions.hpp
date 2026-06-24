@@ -15,7 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <utility>
-#include <print>
+#include "org/limitless/fix/detail/ByteSwap.hpp"
 
 namespace org::limitless::fix::utils {
 
@@ -535,7 +535,7 @@ inline size_t uint64ToAscii(const uint64_t value, std::span<uint8_t> data, const
     constexpr uint64_t Mask8 = 0x3030303030303030ULL;
     const auto leadingZeroBytes = [](const uint64_t chunk)
     {
-        return static_cast<size_t>(std::countl_zero(std::byteswap(chunk ^ Mask8)) >> 3);
+        return static_cast<size_t>(std::countl_zero(detail::byteswap(chunk ^ Mask8)) >> 3);
     };
 
     const size_t skip0 = leadingZeroBytes(chunk0);

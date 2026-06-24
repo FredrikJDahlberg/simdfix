@@ -15,7 +15,7 @@ A SIMD-accelerated [FIX](https://www.fixtrading.org/standards/fix-sessions-onlin
 
 - C++23 compiler (Clang 16+ or GCC 13+)
 - CMake 3.20+
-- ARM (NEON) target
+- ARM (NEON) and INTEL (SSE) targets
 - [Google Test](https://github.com/google/googletest) (for tests)
 - [pugixml](https://pugixml.org/) (for the code generator)
 
@@ -96,25 +96,6 @@ Do not hand-edit files under `src/main/cpp/org/limitless/fix/messages/` — they
 
 ![Architecture](doc/architecture.png)
 
-### Decode Data Flow
-
-```
-Raw FIX bytes
-    → PayloadDecoder::parse()         # SIMD tokenization; fills Field[64] array
-    → MessageHandler::handle()        # Dispatch by MsgType tag
-    → LogonDecoder / ExecutionReportDecoder / ...  # Typed field access via SIMD LinearSearch
-    → Application handler (Session or user code)
-```
-
-### Encode Data Flow
-
-```
-Application handler
-    → LogonEncoder / NewOrderSingleEncoder / ...  # Typed field setters
-    → PayloadEncoder::encode()        # Serializes fields into FIX wire format
-    → Raw FIX bytes
-```
-
 ### Key Components
 
 #### Decoding
@@ -163,7 +144,7 @@ Application handler
 
 ### Design Constraints
 
-- **Max 64 fields** per message — compile-time constant in `PayloadDecoder.hpp`.
+- **Max 256 fields** per message — compile-time constant in `PayloadDecoder.hpp`.
 - **ARM NEON only** — `Uint8x16` wraps `arm_neon.h` intrinsics directly.
 - **No exceptions** — errors propagate as `std::expected<T, Result>`. (`std::invalid_argument` thrown from `GroupDecoder::wrap` on a missing tag is a known exception to this rule.)
 

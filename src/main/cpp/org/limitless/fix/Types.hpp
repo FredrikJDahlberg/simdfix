@@ -16,7 +16,7 @@
 #include <cstdint>
 #include <span>
 #include <string_view>
-#include <expected>
+#include "org/limitless/fix/detail/Expected.hpp"
 #include <chrono>
 #include <type_traits>
 
@@ -201,15 +201,15 @@ struct ParseResult
     Result m_value;
 };
 
-using Uint8Result = std::expected<uint8_t, Result>;
-using StringResult = std::expected<String, Result>;
-using Int32Result = std::expected<int32_t, Result>;
-using Uint32Result = std::expected<uint32_t, Result>;
-using Int64Result = std::expected<int64_t, Result>;
-using Uint64Result = std::expected<uint64_t, Result>;
-using TimestampResult = std::expected<std::chrono::milliseconds, Result>;
-using FixedDecimalResult = std::expected<utils::FixedDecimal, Result>;
-using DataResult = std::expected<Buffer, Result>;
+using Uint8Result = expected<uint8_t, Result>;
+using StringResult = expected<String, Result>;
+using Int32Result = expected<int32_t, Result>;
+using Uint32Result = expected<uint32_t, Result>;
+using Int64Result = expected<int64_t, Result>;
+using Uint64Result = expected<uint64_t, Result>;
+using TimestampResult = expected<std::chrono::milliseconds, Result>;
+using FixedDecimalResult = expected<utils::FixedDecimal, Result>;
+using DataResult = expected<Buffer, Result>;
 
 template <typename T>
 concept DecodableMessage = requires(T decoder, const SessionContext* ctx)
