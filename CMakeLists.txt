@@ -90,7 +90,7 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp/org
             PATTERN "*.hpp"
             PATTERN "*.inl"
             PATTERN "detail" EXCLUDE
-            PATTERN "unused" EXCLUDE)
+)
 
 install(EXPORT SimdFixTargets
         NAMESPACE SimdFix::
@@ -197,7 +197,7 @@ add_fix_test(MessageDecoderTest      "${TEST_PATH}/decoder/MessageDecoderTest.cp
 add_fix_test(MessageEncoderTest      "${TEST_PATH}/encoder/MessageEncoderTest.cpp")
 add_fix_test(GroupDecoderTest "${TEST_PATH}/decoder/GroupDecoderTest.cpp")
 add_fix_test(FieldDecoderTest "${TEST_PATH}/decoder/FieldDecoderTest.cpp")
-add_fix_test(UtilsTest       "${TEST_PATH}/utils/UtilsTest.cpp")
+add_fix_test(ConversionsTest       "${TEST_PATH}/utils/ConversionsTest.cpp")
 add_fix_test(FixedDecimalTest "${TEST_PATH}/utils/FixedDecimalTest.cpp")
 add_fix_test(OptionalIntTest  "${TEST_PATH}/utils/OptionalIntTest.cpp")
 add_fix_test(Uint8x16Test       "${TEST_PATH}/simd/Uint8x16Test.cpp")
@@ -207,7 +207,7 @@ set(FIX_TEST_TARGETS
         PayloadDecoderTest PayloadDecoderFuzzTest
         MessageDecoderTest MessageEncoderTest
         GroupDecoderTest FieldDecoderTest
-        UtilsTest FixedDecimalTest OptionalIntTest Uint8x16Test LinearSearchTest)
+        ConversionsTest FixedDecimalTest OptionalIntTest Uint8x16Test LinearSearchTest)
 
 add_custom_target(AllTests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
@@ -246,7 +246,7 @@ if(XCRUN)
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/MessageEncoderTest.profraw"   $<TARGET_FILE:MessageEncoderTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/GroupDecoderTest.profraw"     $<TARGET_FILE:GroupDecoderTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/FieldDecoderTest.profraw"     $<TARGET_FILE:FieldDecoderTest>
-        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/UtilsTest.profraw"            $<TARGET_FILE:UtilsTest>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/ConversionsTest.profraw"            $<TARGET_FILE:ConversionsTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/FixedDecimalTest.profraw"     $<TARGET_FILE:FixedDecimalTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/OptionalIntTest.profraw"      $<TARGET_FILE:OptionalIntTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/Uint8x16Test.profraw"         $<TARGET_FILE:Uint8x16Test>
