@@ -13,7 +13,7 @@
 
 #include <immintrin.h>
 
-namespace org::limitless::fix::detail {
+namespace org::limitless::fix::detail::simd {
 
 struct Uint8x16
 {
