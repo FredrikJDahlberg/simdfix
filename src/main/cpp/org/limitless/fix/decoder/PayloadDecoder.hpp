@@ -111,7 +111,7 @@ public:
      *         failure status if parsing failed
      */
     template <typename Handler>
-    Result parse(const Buffer buffer, Handler& handler)
+    ParseResult parse(const Buffer buffer, Handler& handler)
     {
         auto result = parse(buffer);
         if (result.m_value != Result::Success)
@@ -139,7 +139,7 @@ public:
      *         failure status (e.g. Result::MessageFragment if buffer ends
      *         mid-message)
      */
-    Result parse(const Buffer buffer)
+    ParseResult parse(const Buffer buffer)
     {
         if (buffer.size() < MessageFragmentLimit)
         {
@@ -232,7 +232,7 @@ private:
      * @return Result::Success with the number of bytes processed, or the
      *         first validation failure
      */
-    Result checkRequiredFields(const data_t* data, const uint64_t blockSum, const position_t blockEnd, const length_t messageLength) const
+    ParseResult checkRequiredFields(const data_t* data, const uint64_t blockSum, const position_t blockEnd, const length_t messageLength) const
     {
         const auto* last = &m_fields[m_count - 1];
         const bool hasCheckSum = last->m_tag == CheckSumTag;
@@ -458,10 +458,10 @@ private:
      *         bytes are not "\x01""10=...", or Result::InvalidCheckSum if
      *         the value does not match
      */
-    Result::Values processCheckSum(const std::span<const data_t>::pointer data,
-                                   const uint64_t blockSum,
-                                   const position_t blockEnd,
-                                   const length_t length) const
+    //Result::Values processCheckSum(const std::span<const data_t>::pointer data,
+    Result processCheckSum(const std::span<const data_t>::pointer data,                                   const uint64_t blockSum,
+                           const position_t blockEnd,
+                           const length_t length) const
     {
         const auto& checkSumToken = m_fields[m_count - 1];
         // On a malformed/truncated message the checksum token can be positioned

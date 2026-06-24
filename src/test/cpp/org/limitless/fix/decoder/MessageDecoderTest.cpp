@@ -46,7 +46,7 @@ TEST(MessageDecoder, Logon)
 
         bool found = false;
 
-        Result::Values handle(LogonDecoder& logon)
+        Result handle(LogonDecoder& logon)
         {
             const auto sender = logon.sender().value();
             EXPECT_EQ(std::string("Buyer"), std::string(reinterpret_cast<const char*>(sender.data()), sender.size()));
@@ -72,7 +72,7 @@ TEST(MessageDecoder, Logout)
 
         // skip logon
 
-        Result::Values handle(LogoutDecoder&)
+        Result handle(LogoutDecoder&)
         {
             std::printf("Found Logout\n");
             found = true;
@@ -107,7 +107,7 @@ TEST(MessageDecoder, MessageFragment)
 
         // skip logon
 
-        Result::Values handle(LogoutDecoder&)
+        Result handle(LogoutDecoder&)
         {
             std::printf("Found Logout\n");
             found = true;
@@ -143,7 +143,7 @@ TEST(MessageDecoder, HopGroup1)
 
         bool found = false;
 
-        Result::Values handle(LogoutDecoder& logout)
+        Result handle(LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
             auto& group = logout.hops();
@@ -189,7 +189,7 @@ TEST(MessageDecoder, HopGroup2)
 
         bool found = false;
 
-        Result::Values handle(LogoutDecoder& logout)
+        Result handle(LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
             auto& group = logout.hops();
@@ -222,7 +222,7 @@ TEST(MessageDecoder, HopGroup3)
 
         bool found = false;
 
-        Result::Values handle(LogoutDecoder& logout)
+        Result handle(LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
             auto& group = logout.hops();
@@ -259,7 +259,7 @@ TEST(MessageDecoder, InvalidGroupCount)
 
         bool found = false;
 
-        Result::Values handle(LogoutDecoder& logout)
+        Result handle(LogoutDecoder& logout)
         {
             std::printf("Got logout\n");
             auto& group = logout.hops();
@@ -291,7 +291,7 @@ TEST(MessageDecoder, NewOrderSingle)
 
         bool found = false;
 
-        Result::Values handle(NewOrderSingleDecoder& order)
+        Result handle(NewOrderSingleDecoder& order)
         {
             EXPECT_EQ("ORDER1", toString(order.clOrdID().value()));
             EXPECT_EQ(HandlInst::AutoPrivate, order.handlInst().value());
@@ -324,7 +324,7 @@ TEST(MessageDecoder, NewOrderSingleWithDateAndTime)
 
         bool found = false;
 
-        Result::Values handle(NewOrderSingleDecoder& order)
+        Result handle(NewOrderSingleDecoder& order)
         {
             EXPECT_EQ("ORDER2", toString(order.clOrdID().value()));
             EXPECT_EQ("AAPL", toString(order.symbol().value()));
@@ -365,7 +365,7 @@ TEST(MessageDecoder, LogonWithXmlData)
 
         bool found = false;
 
-        Result::Values handle(LogonDecoder& logon)
+        Result handle(LogonDecoder& logon)
         {
             EXPECT_EQ(Encryption::None, logon.encryptMethod().value());
             EXPECT_EQ(30U, logon.heartbeatInterval().value());
@@ -397,7 +397,7 @@ TEST(MessageDecoder, LogonWithXmlDataEmbeddedSoh)
 
         bool found = false;
 
-        Result::Values handle(LogonDecoder& logon)
+        Result handle(LogonDecoder& logon)
         {
             EXPECT_EQ(Encryption::None, logon.encryptMethod().value());
             EXPECT_EQ(30U, logon.heartbeatInterval().value());
@@ -432,7 +432,7 @@ TEST(MessageDecoder, LogonWithXmlDataInlineSkip)
 
         bool found = false;
 
-        Result::Values handle(LogonDecoder& logon)
+        Result handle(LogonDecoder& logon)
         {
             EXPECT_EQ(Encryption::None, logon.encryptMethod().value());
             EXPECT_EQ(30U, logon.heartbeatInterval().value());
@@ -485,7 +485,7 @@ TEST(MessageDecoder, ResendRequest)
 
         bool found = false;
 
-        Result::Values handle(ResendRequestDecoder& resend)
+        Result handle(ResendRequestDecoder& resend)
         {
             EXPECT_EQ(1U, resend.beginSeqNo().value());
             EXPECT_EQ(4U, resend.endSeqNo().value());
@@ -512,7 +512,7 @@ TEST(MessageDecoder, Reject)
 
         bool found = false;
 
-        Result::Values handle(RejectDecoder& reject)
+        Result handle(RejectDecoder& reject)
         {
             EXPECT_EQ(9U, reject.refSeqNum().value());
             EXPECT_EQ(55U, reject.refTagID().value());
@@ -542,7 +542,7 @@ TEST(MessageDecoder, RejectMinimal)
 
         bool found = false;
 
-        Result::Values handle(RejectDecoder& reject)
+        Result handle(RejectDecoder& reject)
         {
             EXPECT_EQ(2U, reject.refSeqNum().value());
             EXPECT_FALSE(reject.refTagID().has_value());
@@ -571,7 +571,7 @@ TEST(MessageDecoder, SequenceReset)
 
         bool found = false;
 
-        Result::Values handle(SequenceResetDecoder& seqReset)
+        Result handle(SequenceResetDecoder& seqReset)
         {
             EXPECT_EQ(GapFillFlag::GapFillMessage, seqReset.gapFillFlag().value());
             EXPECT_EQ(10U, seqReset.newSeqNo().value());
@@ -597,7 +597,7 @@ TEST(MessageDecoder, SequenceResetNoGapFill)
 
         bool found = false;
 
-        Result::Values handle(SequenceResetDecoder& seqReset)
+        Result handle(SequenceResetDecoder& seqReset)
         {
             EXPECT_FALSE(seqReset.gapFillFlag().has_value());
             EXPECT_EQ(10U, seqReset.newSeqNo().value());
@@ -623,7 +623,7 @@ TEST(MessageDecoder, ExecutionReportFill)
 
         bool found = false;
 
-        Result::Values handle(ExecutionReportDecoder& report)
+        Result handle(ExecutionReportDecoder& report)
         {
             EXPECT_EQ("ORD001", toString(report.orderID().value()));
             EXPECT_EQ("CL001", toString(report.clOrdID().value()));
@@ -665,7 +665,7 @@ TEST(MessageDecoder, ExecutionReportMinimal)
 
         bool found = false;
 
-        Result::Values handle(ExecutionReportDecoder& report)
+        Result handle(ExecutionReportDecoder& report)
         {
             EXPECT_EQ("ORD002", toString(report.orderID().value()));
             EXPECT_FALSE(report.clOrdID().has_value());
@@ -706,7 +706,7 @@ TEST(MessageDecoder, ExecutionReportReject)
 
         bool found = false;
 
-        Result::Values handle(ExecutionReportDecoder& report)
+        Result handle(ExecutionReportDecoder& report)
         {
             EXPECT_EQ("NONE", toString(report.orderID().value()));
             EXPECT_EQ("CL003", toString(report.clOrdID().value()));
@@ -745,7 +745,7 @@ TEST(MessageDecoder, InvalidBeginString)
         "8=FIX.4.2" SOH "9=0053" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "10=000" SOH);
     auto [processed, status] = decoder.parse(message, app);
-    ASSERT_EQ(Result::InvalidBeginString, status) << Result(status).name();
+    ASSERT_EQ(Result::InvalidBeginString, status) << name(status);
 }
 
 TEST(MessageDecoder, InvalidCheckSum)
@@ -757,7 +757,7 @@ TEST(MessageDecoder, InvalidCheckSum)
         "8=FIXT.1.1" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=999" SOH);
     auto [processed, status] = decoder.parse(message, app);
-    ASSERT_EQ(Result::InvalidCheckSum, status) << Result(status).name();
+    ASSERT_EQ(Result::InvalidCheckSum, status) << name(status);
 }
 
 TEST(MessageDecoder, InvalidMessageType)
@@ -769,7 +769,7 @@ TEST(MessageDecoder, InvalidMessageType)
         "8=FIXT.1.1" SOH "9=0067" SOH "35=Z" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=099" SOH);
     auto [processed, status] = decoder.parse(message, app);
-    ASSERT_EQ(Result::InvalidMessageType, status) << Result(status).name();
+    ASSERT_EQ(Result::InvalidMessageType, status) << name(status);
 }
 
 TEST(MessageDecoder, InvalidSenderCompId)
@@ -784,7 +784,7 @@ TEST(MessageDecoder, InvalidSenderCompId)
         "8=FIXT.1.1" SOH "9=0067" SOH "35=A" SOH "49=WRONG!" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=055" SOH);
     auto [processed, status] = decoder.parse(message, app);
-    ASSERT_EQ(Result::InvalidSenderCompId, status) << Result(status).name();
+    ASSERT_EQ(Result::InvalidSenderCompId, status) << name(status);
 }
 
 TEST(MessageDecoder, InvalidTargetCompId)
@@ -799,7 +799,7 @@ TEST(MessageDecoder, InvalidTargetCompId)
         "8=FIXT.1.1" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=WRONG!" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=049" SOH);
     auto [processed, status] = decoder.parse(message, app);
-    ASSERT_EQ(Result::InvalidTargetCompId, status) << Result(status).name();
+    ASSERT_EQ(Result::InvalidTargetCompId, status) << name(status);
 }
 
 TEST(MessageDecoder, MissingSendingTime)
@@ -811,7 +811,7 @@ TEST(MessageDecoder, MissingSendingTime)
         "8=FIXT.1.1" SOH "9=0042" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "98=0" SOH "108=30" SOH "10=094" SOH);
     auto [processed, status] = decoder.parse(message, app);
-    ASSERT_EQ(Result::InvalidSendingTime, status) << Result(status).name();
+    ASSERT_EQ(Result::InvalidSendingTime, status) << name(status);
 }
 
 TEST(MessageDecoder, MissingSequenceNumber)
@@ -823,7 +823,7 @@ TEST(MessageDecoder, MissingSequenceNumber)
         "8=FIXT.1.1" SOH "9=0062" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=111" SOH);
     auto [processed, status] = decoder.parse(message, app);
-    ASSERT_EQ(Result::InvalidSequenceNumber, status) << Result(status).name();
+    ASSERT_EQ(Result::InvalidSequenceNumber, status) << name(status);
 }
 
 TEST(MessageDecoder, MissingRequiredField)
@@ -835,7 +835,7 @@ TEST(MessageDecoder, MissingRequiredField)
         "8=FIXT.1.1" SOH "9=0060" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "10=009" SOH);
     auto [processed, status] = decoder.parse(message, app);
-    ASSERT_EQ(Result::RequiredFieldMissing, status) << Result(status).name();
+    ASSERT_EQ(Result::RequiredFieldMissing, status) << name(status);
 }
 
 TEST(MessageDecoder, InvalidUTCTimestamp)
@@ -847,7 +847,7 @@ TEST(MessageDecoder, InvalidUTCTimestamp)
         {
             using MessageHandler::handle;
 
-            Result::Values handle(LogonDecoder& logon)
+            Result handle(LogonDecoder& logon)
             {
                 EXPECT_FALSE(logon.sendingTime().has_value());
                 EXPECT_EQ(Result::InvalidLength, logon.sendingTime().error());
@@ -868,7 +868,7 @@ TEST(MessageDecoder, InvalidUTCTimestamp)
         {
             using MessageHandler::handle;
 
-            Result::Values handle(NewOrderSingleDecoder& order)
+            Result handle(NewOrderSingleDecoder& order)
             {
                 EXPECT_FALSE(order.transactTime().has_value());
                 EXPECT_EQ(Result::InvalidLength, order.transactTime().error());
@@ -897,42 +897,42 @@ TEST(MessageDecoder, InvalidMandatoryFields)
     {
         const auto message = utils::makeSpan("666=FIXT.1.1" SOH);
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(Result::MessageFragment, status) << Result(status).name();
+        ASSERT_EQ(Result::MessageFragment, status) << name(status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "666=66" SOH "666=66" SOH "666=66" SOH);
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(Result::InvalidBodyLengthTag, status) << Result(status).name();
+        ASSERT_EQ(Result::InvalidBodyLengthTag, status) << name(status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=35" SOH "52=101112.123" SOH
             "666=66" SOH "666=66" SOH "666=66" SOH "10=043" SOH);
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(Result::InvalidMessageTypeTag, status) << Result(status).name();
+        ASSERT_EQ(Result::InvalidMessageTypeTag, status) << name(status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "666=66" SOH "35=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "10=043" SOH);
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(Result::InvalidBodyLengthTag, status) << Result(status).name();
+        ASSERT_EQ(Result::InvalidBodyLengthTag, status) << name(status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=666" SOH "35=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "10=043" SOH);
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(Result::InvalidBodyLength, status) << Result(status).name();
+        ASSERT_EQ(Result::InvalidBodyLength, status) << name(status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=28" SOH "666=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "10=063" SOH);
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(Result::InvalidMessageTypeTag, status) << Result(status).name();
+        ASSERT_EQ(Result::InvalidMessageTypeTag, status) << name(status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=48" SOH "35=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "11=043" SOH "                     ");
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(Result::InvalidCheckSumTag, status) << Result(status).name();
+        ASSERT_EQ(Result::InvalidCheckSumTag, status) << name(status);
     }
 }
 

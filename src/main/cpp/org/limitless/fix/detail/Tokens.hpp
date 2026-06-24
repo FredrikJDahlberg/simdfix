@@ -19,7 +19,6 @@
 #include "org/limitless/fix/Types.hpp"
 
 namespace org::limitless::fix::detail {
-
 struct Field
 {
     uint16_t m_position{};
@@ -27,118 +26,178 @@ struct Field
     uint16_t m_length{};
 };
 
-struct Category
+enum class Category
 {
-    enum Values
-    {
-        Null,
-        Uint8,
-        Int32,
-        Uint32,
-        Int64,
-        Uint64,
-        Decimal,
-        Data,
-        String,
-        Timestamp,
-        UTCTimeOnly,
-        UTCDateOnly,
-        Counter,
-        Struct,
-        Group,
-        Enum,
-        Component,
-        Message
-    };
-
-    static constexpr std::string_view Names[] =
-    {
-        "Null",
-        "Uint8",
-        "Int32",
-        "Uint32",
-        "Int64",
-        "Uint64",
-        "FixedDecimal",
-        "Data",
-        "String",
-        "Timestamp",
-        "UTCTimeOnly",
-        "UTCDateOnly",
-        "Counter",
-        "Struct",
-        "Group",
-        "Enum",
-        "Component",
-        "Message"
-    };
-
-    static constexpr std::string_view Types[] =
-    {
-        "Null",
-        "std::uint8_t",
-        "std::int32_t",
-        "std::uint32_t",
-        "std::int64_t",
-        "std::uint64_t",
-        "utils::FixedDecimal",
-        "std::span<const uint8_t>",
-        "std::string_view",
-        "std::chrono::milliseconds",
-        "std::chrono::milliseconds",
-        "std::chrono::milliseconds",
-        "std::uint32_t",
-        "Struct",
-        "Group",
-        "Enum",
-        "Component",
-        "Message"
-    };
-
-    [[nodiscard]] static constexpr std::string_view name(const Values value)
-    {
-        return Names[value];
-    }
-    [[nodiscard]] static constexpr std::string_view type(const Values value)
-    {
-        return Types[value];
-    }
+    Null,
+    Uint8,
+    Int32,
+    Uint32,
+    Int64,
+    Uint64,
+    Decimal,
+    Data,
+    String,
+    Timestamp,
+    UTCTimeOnly,
+    UTCDateOnly,
+    Counter,
+    Struct,
+    Group,
+    Enum,
+    Component,
+    Message
 };
 
-struct RecordType
+static constexpr std::string_view name(const Category category)
 {
-    enum Values { Null, Message, Component, Group, Enum };
+    switch (category)
+    {
+        case Category::Uint8:
+            return "Uint8";
+        case Category::Int32:
+            return "Int32";
+        case Category::Uint32:
+            return "Uint32";
+        case Category::Int64:
+            return "Int64";
+        case Category::Uint64:
+            return "Uint64";
+        case Category::Decimal:
+            return "Decimal";
+        case Category::Data:
+            return "Data";
+        case Category::String:
+            return "String";
+        case Category::Timestamp:
+            return "Timestamp";
+        case Category::UTCTimeOnly:
+            return "UTCTimeOnly";
+        case Category::UTCDateOnly:
+            return "UTCDateOnly";
+        case Category::Counter:
+            return "Counter";
+        case Category::Struct:
+            return "Struct";
+        case Category::Group:
+            return "Group";
+        case Category::Enum:
+            return "Enum";
+        case Category::Component:
+            return "Component";
+        case Category::Message:
+            return "Message";
+        default:
+        case Category::Null:
+            return "??";
+    }
+}
 
-    static constexpr std::string_view Names[] = {
-        "Null", "Message", "Component", "Group", "Enum"
-    };
+static constexpr std::string_view type(const Category category)
+{
+    switch (category)
+    {
+        case Category::Uint8:
+            return "std::uint8_t";
+        case Category::Int32:
+            return "std::int32_t";
+        case Category::Uint32:
+            return "std::uint32_t";
+        case Category::Int64:
+            return "std::int64_t";
+        case Category::Uint64:
+            return "std::uint64_t";
+        case Category::Decimal:
+            return "utils::FixedDecimal";
+        case Category::Data:
+            return "std::span<const uint8_t>";
+        case Category::String:
+            return "std::string_view";
+        case Category::Timestamp:
+            return "std::chrono::milliseconds";
+        case Category::UTCTimeOnly:
+            return "std::chrono::milliseconds";
+        case Category::UTCDateOnly:
+            return "std::chrono::milliseconds";
+        case Category::Counter:
+            return "std::uint32_t";
+        case Category::Struct:
+            return "Struct";
+        case Category::Group:
+            return "Group";
+        case Category::Enum:
+            return "Enum";
+        case Category::Component:
+            return "Component";
+        case Category::Message:
+            return "Message";
+        default:
+        case Category::Null:
+            return "??";
+    }
+}
 
-    [[nodiscard]] static constexpr std::string_view name(const Values value) { return Names[value]; }
+enum class RecordType
+{
+    Null,
+    Message,
+    Component,
+    Group,
+    Enum
 };
 
-struct Presence
+static constexpr std::string_view name(RecordType type)
 {
-    enum Values { Null, Constant, Optional, Required };
-
-    static constexpr std::string_view Strings[] = { "NUll", "constant", "optional", "required" };
-    static constexpr std::string_view Names[] = { "Null", "Constant", "Optional", "Required" };
-
-    [[nodiscard]] static constexpr std::string_view name(const Values value)
+    switch (type)
     {
-        return Names[value];
+        case RecordType::Message:
+            return "Message";
+        case RecordType::Component:
+            return "Component";
+        case RecordType::Group:
+            return "Group";
+        case RecordType::Enum:
+            return "Enum";
+        case RecordType::Null:
+        default:
+            return "??";
     }
+}
 
-    [[nodiscard]] static constexpr Values parse(const std::string_view name)
-    {
-        if (name.empty())
-        {
-            return Required;
-        }
-        constexpr auto end = Strings + std::size(Strings);
-        const auto found = std::find(Strings, end, name);
-        return found != end ? static_cast<Values>(found - Strings) : Null;
-    }
+enum class Presence
+{
+    Null,
+    Constant,
+    Optional,
+    Required
 };
+
+[[nodiscard]] static constexpr std::string_view name(const Presence presence)
+{
+    switch (presence)
+    {
+        case Presence::Constant:
+            return "Constant";
+        case Presence::Optional:
+            return "Optional";
+        case Presence::Required:
+            return "Required";
+        case Presence::Null:
+        default:
+            return "??";
+    }
+}
+
+[[nodiscard]] static constexpr Presence parse(const std::string_view name)
+{
+    static constexpr std::string_view Strings[] = { "Null", "constant", "optional", "required" };
+    if (name.empty())
+    {
+        return Presence::Required;
+    }
+    constexpr auto end = Strings + std::size(Strings);
+    const auto found = std::find(Strings, end, name);
+    return found != end ? static_cast<Presence>(found - Strings) : Presence::Null;
+}
 
 using FieldSpan = std::span<Field>;
 using TagSpan = std::span<uint16_t>;

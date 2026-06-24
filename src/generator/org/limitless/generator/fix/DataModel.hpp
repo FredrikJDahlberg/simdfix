@@ -26,9 +26,9 @@ struct Type
     std::string m_name;
     int32_t m_size;
     int32_t m_length;
-    Category::Values m_type;
+    Category m_type;
 
-    Type(std::string name, const int32_t size, const int32_t length, const Category::Values type = Category::Null)
+    Type(std::string name, const int32_t size, const int32_t length, const Category type = Category::Null)
         : m_name(std::move(name)), m_size(size), m_length(length), m_type{type}
     {
     }
@@ -40,13 +40,13 @@ struct Field
     std::string m_name;
     std::string m_type;
     int32_t m_length{};
-    Category::Values m_category{Category::Null};
-    RecordType::Values m_parent{};
-    Presence::Values m_presence{Presence::Required};
+    Category m_category{Category::Null};
+    RecordType m_parent{};
+    Presence m_presence{Presence::Required};
 
     Field() = default;
     Field(const int32_t tag, std::string  name, std::string type,
-          const int32_t length, const Presence::Values presence, const Category::Values category, const RecordType::Values parent) :
+          const int32_t length, const Presence presence, const Category category, const RecordType parent) :
         m_tag(tag), m_name(std::move(name)), m_type(std::move(type)), m_length(length),
         m_category(category), m_parent(parent), m_presence{presence}
     {
@@ -62,19 +62,19 @@ struct Record
 {
     std::string m_name{};
     std::string m_id{};
-    RecordType::Values m_parent{};
+    RecordType m_parent{};
     std::vector<Field> m_fields{};
     std::vector<Field> m_records{};
     uint32_t m_tag;
 
     Record() = default;
 
-    Record(std::string name, std::string id, const RecordType::Values parent)
+    Record(std::string name, std::string id, const RecordType parent)
         : m_name(std::move(name)), m_id(std::move(id)), m_parent(parent), m_tag{0}
     {
     }
 
-    Record(std::string name, std::string id, const RecordType::Values type, const std::vector<Field>& fields)
+    Record(std::string name, std::string id, const RecordType type, const std::vector<Field>& fields)
         : m_name(std::move(name)), m_id(std::move(id)), m_parent(type), m_fields{fields}, m_tag{0}
     {
     }
@@ -149,8 +149,7 @@ struct DataModel
     }
 
     void processFields(const pugi::xml_object_range<pugi::xml_node_iterator>& nodes,
-                       const RecordType::Values parent,
-                       Record& record)
+                       const RecordType parent, Record& record)
     {
         for (const auto& field : nodes)
         {
@@ -161,7 +160,7 @@ struct DataModel
             const std::string_view primitive = field.attribute("primitiveType").as_string();
             const auto resolvedType = std::string{type.empty() ? primitive : type};
             const std::string_view presenceAttr = field.attribute("presence").as_string();
-            const auto presence = Presence::parse(presenceAttr);
+            const auto presence = limitless::fix::detail::parse(presenceAttr);
             auto refType = m_types.find(resolvedType);
             if (nodeType == "group")
             {
@@ -195,9 +194,9 @@ struct DataModel
                         auto& component = found->second;
                         record.m_fields.insert(record.m_fields.end(),
                             component.m_fields.begin(), component.m_fields.end());
-                        for (const auto& field : component.m_records)
+                        for (const auto& comp : component.m_records)
                         {
-                            record.m_records.emplace_back(field.m_tag, field.m_name, field.m_name, 0,
+                            record.m_records.emplace_back(comp.m_tag, comp.m_name, comp.m_name, 0,
                                                           presence, Category::Struct, parent);
                         }
                     }
@@ -217,7 +216,7 @@ struct DataModel
         }
     }
 
-    void processRecords(const pugi::xpath_node_set& records, const RecordType::Values parent)
+    void processRecords(const pugi::xpath_node_set& records, const RecordType parent)
     {
         for (const auto& recordNode : records)
         {

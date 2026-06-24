@@ -337,7 +337,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return token/tag index, or -1 if not found
      */
-    template <int32_t Tag, RecordType::Values Parent>
+    template <int32_t Tag, RecordType Parent>
     [[nodiscard]] int32_t findIndex() const
     {
         if constexpr (Parent == RecordType::Group)
@@ -359,7 +359,7 @@ public:
      * @return converted value
      */
     template <typename T>
-    [[nodiscard]] std::expected<T, Result::Values> valueAt(const int8_t index) const
+    [[nodiscard]] std::expected<T, Result> valueAt(const int8_t index) const
     {
         const auto& field = m_fields[index];
         if constexpr (std::is_same_v<T, std::string_view>)
@@ -432,7 +432,7 @@ public:
      * @return converted enum value
      */
     template <typename Enum>
-    [[nodiscard]] constexpr std::expected<typename Enum::Values, Result::Values> enumAt(const int8_t index) const
+    [[nodiscard]] constexpr std::expected<typename Enum::Values, Result> enumAt(const int8_t index) const
     {
         const auto& field = m_fields[index];
         const auto code = std::string_view{reinterpret_cast<const char*>(m_data.data() + field.m_position), field.m_length};
@@ -452,7 +452,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <int32_t Tag, bool Required, RecordType::Values Parent>
+    template <int32_t Tag, bool Required, RecordType Parent>
     [[nodiscard]] constexpr StringResult getString() const
     {
         const auto index = findIndex<Tag, Parent>();
@@ -478,7 +478,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <int32_t Tag, bool Required, RecordType::Values Parent>
+    template <int32_t Tag, bool Required, RecordType Parent>
     [[nodiscard]] Uint32Result getUint32() const
     {
         const auto index = findIndex<Tag, Parent>();
@@ -497,7 +497,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <int32_t Tag, bool Required, RecordType::Values Parent>
+    template <int32_t Tag, bool Required, RecordType Parent>
     [[nodiscard]] Int32Result getInt32() const
     {
         const auto index = findIndex<Tag, Parent>();
@@ -516,7 +516,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <int32_t Tag, bool Required, RecordType::Values Parent>
+    template <int32_t Tag, bool Required, RecordType Parent>
     [[nodiscard]] FixedDecimalResult getFixedDecimal() const
     {
         const auto index = findIndex<Tag, Parent>();
@@ -535,7 +535,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <uint32_t Tag, bool Required, RecordType::Values Parent>
+    template <uint32_t Tag, bool Required, RecordType Parent>
     [[nodiscard]] constexpr TimestampResult getTimestamp() const
     {
         const auto index = findIndex<Tag, Parent>();
@@ -560,7 +560,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <uint32_t Tag, bool Required, RecordType::Values Parent>
+    template <uint32_t Tag, bool Required, RecordType Parent>
     [[nodiscard]] constexpr TimestampResult getUTCTimeOnly() const
     {
         const auto index = findIndex<Tag, Parent>();
@@ -585,7 +585,7 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <uint32_t Tag, bool Required, RecordType::Values Parent>
+    template <uint32_t Tag, bool Required, RecordType Parent>
     [[nodiscard]] constexpr TimestampResult getUTCDateOnly() const
     {
         const auto index = findIndex<Tag, Parent>();
@@ -611,8 +611,8 @@ public:
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
-    template <int32_t Tag, bool Required, typename Enum, RecordType::Values Parent>
-    [[nodiscard]] constexpr std::expected<typename Enum::Values, Result::Values> getEnum() const
+    template <int32_t Tag, bool Required, typename Enum, RecordType Parent>
+    [[nodiscard]] constexpr std::expected<typename Enum::Values, Result> getEnum() const
     {
         const auto index = findIndex<Tag, Parent>();
         if (index >= 0)

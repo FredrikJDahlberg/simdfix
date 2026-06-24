@@ -46,7 +46,7 @@ namespace
         "/>test" SOH "10=127" SOH;
 
     // Parse a copy placed in an exact-size heap buffer so ASan guards the tail.
-    Result parseExact(std::span<const uint8_t> bytes)
+    ParseResult parseExact(std::span<const uint8_t> bytes)
     {
         std::vector<uint8_t> buffer(bytes.begin(), bytes.end());
         PayloadDecoder<FIXT_1_1, DataFields> decoder;

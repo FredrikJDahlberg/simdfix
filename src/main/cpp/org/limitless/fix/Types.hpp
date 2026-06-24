@@ -23,7 +23,6 @@
 #include "org/limitless/fix/utils/FixedDecimal.hpp"
 
 namespace org::limitless::fix {
-
 inline constexpr int32_t MaxGroupDepth = 8;
 
 inline constexpr uint32_t CheckSumTag = 10;
@@ -100,9 +99,6 @@ template <typename T>
 concept EncodableOptionalFixedDecimal = Nullable<T> &&
     std::same_as<std::remove_cvref_t<decltype(std::declval<const T>().value())>, utils::FixedDecimal>;
 
-// Matches generated message encoders (e.g. LogonEncoder, HeartbeatEncoder)
-// from FixMessageEncoders.hpp: a MessageEncoder subclass identified by a
-// MsgType code, wrappable over a destination buffer.
 template <typename T>
 concept EncodableMessage = requires(T message, std::span<uint8_t> data)
 {
@@ -127,93 +123,99 @@ struct SessionContext
     }
 };
 
-struct Result
+enum class Result
 {
-    enum Values
-    {
-        NullValue,
-        Success,
-        MessageFragment,
-        InvalidBeginString,
-        InvalidCheckSumTag,
-        InvalidBodyLengthTag,
-        InvalidBodyLength,
-        InvalidCheckSum,
-        InvalidTargetCompTag,
-        InvalidTargetCompId,
-        InvalidSenderCompTag,
-        InvalidSenderCompId,
-        InvalidSequenceNumber,
-        InvalidMessageTypeTag,
-        InvalidMessageType,
-        InvalidSendingTime,
-        RequiredFieldMissing,
-        InvalidLength,
-        InvalidValue
-    };
-
-    uint32_t m_processed{};
-    Values m_value{Success};
-
-    constexpr Result() = default;
-
-     constexpr Result(const Values value) : m_value{value} {}
-
-    constexpr Result(const uint32_t processed, const Values value) : m_processed{processed}, m_value{value}
-    {
-    }
-
-    [[nodiscard]] constexpr std::string_view name() const
-    {
-        return Names[m_value];
-    }
-
-    constexpr bool operator==(const Values value) const
-    {
-        return m_value == value;
-    }
-
-    static constexpr std::string_view Names[] = {
-        "NullValue",
-        "Success",
-        "MessageFragment",
-        "InvalidBeginString",
-        "InvalidCheckSumTag",
-        "InvalidBodyLengthTag",
-        "InvalidBodyLength",
-        "InvalidCheckSum",
-        "InvalidTargetCompTag",
-        "InvalidTargetCompId",
-        "InvalidSenderCompTag",
-        "InvalidSenderCompId",
-        "InvalidSequenceNumber",
-        "InvalidMessageTypeTag",
-        "InvalidMessageType",
-        "InvalidSendingTime",
-        "RequiredFieldMissing",
-        "InvalidLength",
-        "InvalidValue"
-    };
-
+    NullValue,
+    Success,
+    MessageFragment,
+    InvalidBeginString,
+    InvalidCheckSumTag,
+    InvalidBodyLengthTag,
+    InvalidBodyLength,
+    InvalidCheckSum,
+    InvalidTargetCompTag,
+    InvalidTargetCompId,
+    InvalidSenderCompTag,
+    InvalidSenderCompId,
+    InvalidSequenceNumber,
+    InvalidMessageTypeTag,
+    InvalidMessageType,
+    InvalidSendingTime,
+    RequiredFieldMissing,
+    InvalidLength,
+    InvalidValue
 };
+
+static constexpr std::string_view name(const Result value)
+{
+    switch (value)
+    {
+        case Result::NullValue:
+            return "NullValue";
+        case Result::Success:
+            return "Success";
+        case Result::MessageFragment:
+            return "MessageFragment";
+        case Result::InvalidBeginString:
+            return "InvalidBeginString";
+        case Result::InvalidCheckSumTag:
+            return "InvalidCheckSumTag";
+        case Result::InvalidBodyLengthTag:
+            return "InvalidBodyLengthTag";
+        case Result::InvalidBodyLength:
+            return "InvalidBodyLength";
+        case Result::InvalidCheckSum:
+            return "InvalidCheckSum";
+        case Result::InvalidTargetCompTag:
+            return "InvalidTargetCompTag";
+        case Result::InvalidTargetCompId:
+            return "InvalidTargetCompId";
+        case Result::InvalidSenderCompTag:
+            return "InvalidSenderCompTag";
+        case Result::InvalidSenderCompId:
+            return "InvalidSenderCompId";
+        case Result::InvalidSequenceNumber:
+            return "InvalidSequenceNumber";
+        case Result::InvalidMessageTypeTag:
+            return "InvalidMessageTypeTag";
+        case Result::InvalidMessageType:
+            return "InvalidMessageType";
+        case Result::InvalidSendingTime:
+            return "InvalidSendingTime";
+        case Result::RequiredFieldMissing:
+            return "RequiredFieldMissing";
+        case Result::InvalidLength:
+            return "InvalidLength";
+        case Result::InvalidValue:
+            return "InvalidValue";
+        default:
+            return "??";
+    }
+}
 
 using String = std::string_view;
 using Buffer = std::span<const uint8_t>;
-using Uint8Result = std::expected<uint8_t, Result::Values>;
-using StringResult = std::expected<String, Result::Values>;
-using Int32Result = std::expected<int32_t, Result::Values>;
-using Uint32Result = std::expected<uint32_t, Result::Values>;
-using Int64Result = std::expected<int64_t, Result::Values>;
-using Uint64Result = std::expected<uint64_t, Result::Values>;
-using TimestampResult = std::expected<std::chrono::milliseconds, Result::Values>;
-using FixedDecimalResult = std::expected<utils::FixedDecimal, Result::Values>;
-using DataResult = std::expected<Buffer, Result::Values>;
+struct ParseResult
+{
+    uint32_t m_processed;
+    Result m_value;
+};
+
+using Uint8Result = std::expected<uint8_t, Result>;
+using StringResult = std::expected<String, Result>;
+using Int32Result = std::expected<int32_t, Result>;
+using Uint32Result = std::expected<uint32_t, Result>;
+using Int64Result = std::expected<int64_t, Result>;
+using Uint64Result = std::expected<uint64_t, Result>;
+using TimestampResult = std::expected<std::chrono::milliseconds, Result>;
+using FixedDecimalResult = std::expected<utils::FixedDecimal, Result>;
+using DataResult = std::expected<Buffer, Result>;
 
 template <typename T>
 concept DecodableMessage = requires(T decoder, const SessionContext* ctx)
 {
     { T::MessageId } -> std::convertible_to<uint16_t>;
-    { decoder.validate() } -> std::same_as<Result::Values>;
+    { decoder.validate() } -> std::same_as<Result>;
     { decoder.context(ctx) };
 };
 

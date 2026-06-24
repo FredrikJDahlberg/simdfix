@@ -37,17 +37,17 @@ struct NestedGroupDecoder : GroupDecoder
         return *this;
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> name() const
+    [[nodiscard]] std::expected<std::string_view, Result> name() const
     {
         return m_decoder.getString<501, true, RecordType::Group>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> nestedOne() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> nestedOne() const
     {
         return m_decoder.getUint32<601, false, RecordType::Group>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> nestedTwo() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> nestedTwo() const
     {
         return m_decoder.getUint32<602, false, RecordType::Group>();
     }
@@ -83,17 +83,17 @@ public:
         return *this;
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> hopCompID() const
+    [[nodiscard]] std::expected<std::string_view, Result> hopCompID() const
     {
         return m_decoder.getString<628, false, RecordType::Group>();
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> hopSendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> hopSendingTime() const
     {
         return m_decoder.getTimestamp<629, false, RecordType::Group>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> hopRefID() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> hopRefID() const
     {
         return m_decoder.getUint32<630, false, RecordType::Group>();
     }
@@ -140,7 +140,7 @@ public:
 
     static constexpr uint16_t MessageId = 'A';
 
-    [[nodiscard]] Result::Values validate()
+    [[nodiscard]] Result validate()
     {
         m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
         if (m_senderIndex < 0)
@@ -171,42 +171,42 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    [[nodiscard]] std::expected<Protocol::Values, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> bodyLength() const
     {
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result> sender() const
     {
         return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result> target() const
     {
         return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> sequenceNumber() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> sendingTime() const
     {
         return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
-    [[nodiscard]] std::expected<Encryption::Values, Result::Values> encryptMethod() const
+    [[nodiscard]] std::expected<Encryption::Values, Result> encryptMethod() const
     {
         if (m_encryptMethodIndex < 0)
         {
@@ -215,7 +215,7 @@ public:
         return m_decoder.enumAt<Encryption>(m_encryptMethodIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> heartbeatInterval() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> heartbeatInterval() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_heartbeatIntervalIndex);
     }
@@ -263,7 +263,7 @@ public:
 
     static constexpr uint16_t MessageId = '5';
 
-    [[nodiscard]] Result::Values validate()
+    [[nodiscard]] Result validate()
     {
         m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
         if (m_senderIndex < 0)
@@ -289,42 +289,42 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    [[nodiscard]] std::expected<Protocol::Values, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> bodyLength() const
     {
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result> sender() const
     {
         return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result> target() const
     {
         return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> sequenceNumber() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> sendingTime() const
     {
         return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
+    [[nodiscard]] std::expected<std::string_view, Result> text() const
     {
         if (m_textIndex < 0)
         {
@@ -371,7 +371,7 @@ public:
 
     static constexpr uint16_t MessageId = '0';
 
-    [[nodiscard]] Result::Values validate()
+    [[nodiscard]] Result validate()
     {
         m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
         if (m_senderIndex < 0)
@@ -397,42 +397,42 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    [[nodiscard]] std::expected<Protocol::Values, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> bodyLength() const
     {
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result> sender() const
     {
         return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result> target() const
     {
         return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> sequenceNumber() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> sendingTime() const
     {
         return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> testReqID() const
+    [[nodiscard]] std::expected<std::string_view, Result> testReqID() const
     {
         if (m_testReqIDIndex < 0)
         {
@@ -479,7 +479,7 @@ public:
 
     static constexpr uint16_t MessageId = '1';
 
-    [[nodiscard]] Result::Values validate()
+    [[nodiscard]] Result validate()
     {
         m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
         if (m_senderIndex < 0)
@@ -505,42 +505,42 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    [[nodiscard]] std::expected<Protocol::Values, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> bodyLength() const
     {
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result> sender() const
     {
         return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result> target() const
     {
         return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> sequenceNumber() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> sendingTime() const
     {
         return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> testReqID() const
+    [[nodiscard]] std::expected<std::string_view, Result> testReqID() const
     {
         if (m_testReqIDIndex < 0)
         {
@@ -588,7 +588,7 @@ public:
 
     static constexpr uint16_t MessageId = '2';
 
-    [[nodiscard]] Result::Values validate()
+    [[nodiscard]] Result validate()
     {
         m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
         if (m_senderIndex < 0)
@@ -623,47 +623,47 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    [[nodiscard]] std::expected<Protocol::Values, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> bodyLength() const
     {
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result> sender() const
     {
         return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result> target() const
     {
         return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> sequenceNumber() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> sendingTime() const
     {
         return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> beginSeqNo() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> beginSeqNo() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_beginSeqNoIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> endSeqNo() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> endSeqNo() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_endSeqNoIndex);
     }
@@ -710,7 +710,7 @@ public:
 
     static constexpr uint16_t MessageId = '3';
 
-    [[nodiscard]] Result::Values validate()
+    [[nodiscard]] Result validate()
     {
         m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
         if (m_senderIndex < 0)
@@ -744,47 +744,47 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    [[nodiscard]] std::expected<Protocol::Values, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> bodyLength() const
     {
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result> sender() const
     {
         return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result> target() const
     {
         return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> sequenceNumber() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> sendingTime() const
     {
         return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> refSeqNum() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> refSeqNum() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_refSeqNumIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> refTagID() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> refTagID() const
     {
         if (m_refTagIDIndex < 0)
         {
@@ -793,7 +793,7 @@ public:
         return m_decoder.valueAt<std::uint32_t>(m_refTagIDIndex);
     }
 
-    [[nodiscard]] std::expected<MessageType::Values, Result::Values> refMsgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result> refMsgType() const
     {
         if (m_refMsgTypeIndex < 0)
         {
@@ -802,7 +802,7 @@ public:
         return m_decoder.enumAt<MessageType>(m_refMsgTypeIndex);
     }
 
-    [[nodiscard]] std::expected<SessionRejectReason::Values, Result::Values> sessionRejectReason() const
+    [[nodiscard]] std::expected<SessionRejectReason::Values, Result> sessionRejectReason() const
     {
         if (m_sessionRejectReasonIndex < 0)
         {
@@ -811,7 +811,7 @@ public:
         return m_decoder.enumAt<SessionRejectReason>(m_sessionRejectReasonIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
+    [[nodiscard]] std::expected<std::string_view, Result> text() const
     {
         if (m_textIndex < 0)
         {
@@ -859,7 +859,7 @@ public:
 
     static constexpr uint16_t MessageId = '4';
 
-    [[nodiscard]] Result::Values validate()
+    [[nodiscard]] Result validate()
     {
         m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
         if (m_senderIndex < 0)
@@ -890,42 +890,42 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    [[nodiscard]] std::expected<Protocol::Values, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> bodyLength() const
     {
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result> sender() const
     {
         return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result> target() const
     {
         return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> sequenceNumber() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> sendingTime() const
     {
         return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
-    [[nodiscard]] std::expected<GapFillFlag::Values, Result::Values> gapFillFlag() const
+    [[nodiscard]] std::expected<GapFillFlag::Values, Result> gapFillFlag() const
     {
         if (m_gapFillFlagIndex < 0)
         {
@@ -934,7 +934,7 @@ public:
         return m_decoder.enumAt<GapFillFlag>(m_gapFillFlagIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> newSeqNo() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> newSeqNo() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_newSeqNoIndex);
     }
@@ -992,7 +992,7 @@ public:
 
     static constexpr uint16_t MessageId = '8';
 
-    [[nodiscard]] Result::Values validate()
+    [[nodiscard]] Result validate()
     {
         m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
         if (m_senderIndex < 0)
@@ -1073,47 +1073,47 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    [[nodiscard]] std::expected<Protocol::Values, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> bodyLength() const
     {
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result> sender() const
     {
         return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result> target() const
     {
         return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> sequenceNumber() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> sendingTime() const
     {
         return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> orderID() const
+    [[nodiscard]] std::expected<std::string_view, Result> orderID() const
     {
         return m_decoder.valueAt<std::string_view>(m_orderIDIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> clOrdID() const
+    [[nodiscard]] std::expected<std::string_view, Result> clOrdID() const
     {
         if (m_clOrdIDIndex < 0)
         {
@@ -1122,32 +1122,32 @@ public:
         return m_decoder.valueAt<std::string_view>(m_clOrdIDIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> execID() const
+    [[nodiscard]] std::expected<std::string_view, Result> execID() const
     {
         return m_decoder.valueAt<std::string_view>(m_execIDIndex);
     }
 
-    [[nodiscard]] std::expected<ExecType::Values, Result::Values> execType() const
+    [[nodiscard]] std::expected<ExecType::Values, Result> execType() const
     {
         return m_decoder.enumAt<ExecType>(m_execTypeIndex);
     }
 
-    [[nodiscard]] std::expected<OrdStatus::Values, Result::Values> ordStatus() const
+    [[nodiscard]] std::expected<OrdStatus::Values, Result> ordStatus() const
     {
         return m_decoder.enumAt<OrdStatus>(m_ordStatusIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> symbol() const
+    [[nodiscard]] std::expected<std::string_view, Result> symbol() const
     {
         return m_decoder.valueAt<std::string_view>(m_symbolIndex);
     }
 
-    [[nodiscard]] std::expected<Side::Values, Result::Values> side() const
+    [[nodiscard]] std::expected<Side::Values, Result> side() const
     {
         return m_decoder.enumAt<Side>(m_sideIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> orderQty() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> orderQty() const
     {
         if (m_orderQtyIndex < 0)
         {
@@ -1156,7 +1156,7 @@ public:
         return m_decoder.valueAt<std::uint32_t>(m_orderQtyIndex);
     }
 
-    [[nodiscard]] std::expected<utils::FixedDecimal, Result::Values> price() const
+    [[nodiscard]] std::expected<utils::FixedDecimal, Result> price() const
     {
         if (m_priceIndex < 0)
         {
@@ -1165,7 +1165,7 @@ public:
         return m_decoder.valueAt<utils::FixedDecimal>(m_priceIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> lastQty() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> lastQty() const
     {
         if (m_lastQtyIndex < 0)
         {
@@ -1174,7 +1174,7 @@ public:
         return m_decoder.valueAt<std::uint32_t>(m_lastQtyIndex);
     }
 
-    [[nodiscard]] std::expected<utils::FixedDecimal, Result::Values> lastPx() const
+    [[nodiscard]] std::expected<utils::FixedDecimal, Result> lastPx() const
     {
         if (m_lastPxIndex < 0)
         {
@@ -1183,27 +1183,27 @@ public:
         return m_decoder.valueAt<utils::FixedDecimal>(m_lastPxIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> leavesQty() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> leavesQty() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_leavesQtyIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> cumQty() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> cumQty() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_cumQtyIndex);
     }
 
-    [[nodiscard]] std::expected<utils::FixedDecimal, Result::Values> avgPx() const
+    [[nodiscard]] std::expected<utils::FixedDecimal, Result> avgPx() const
     {
         return m_decoder.valueAt<utils::FixedDecimal>(m_avgPxIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> transactTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> transactTime() const
     {
         return m_decoder.valueAt<std::chrono::milliseconds>(m_transactTimeIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
+    [[nodiscard]] std::expected<std::string_view, Result> text() const
     {
         if (m_textIndex < 0)
         {
@@ -1262,7 +1262,7 @@ public:
 
     static constexpr uint16_t MessageId = 'D';
 
-    [[nodiscard]] Result::Values validate()
+    [[nodiscard]] Result validate()
     {
         m_senderIndex = static_cast<int8_t>(m_decoder.findIndex<49, RecordType::Message>());
         if (m_senderIndex < 0)
@@ -1328,42 +1328,42 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] std::expected<Protocol::Values, Result::Values> beginString() const
+    [[nodiscard]] std::expected<Protocol::Values, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> bodyLength() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> bodyLength() const
     {
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<MessageType::Values, Result::Values> msgType() const
+    [[nodiscard]] std::expected<MessageType::Values, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> sender() const
+    [[nodiscard]] std::expected<std::string_view, Result> sender() const
     {
         return m_decoder.valueAt<std::string_view>(m_senderIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> target() const
+    [[nodiscard]] std::expected<std::string_view, Result> target() const
     {
         return m_decoder.valueAt<std::string_view>(m_targetIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> sequenceNumber() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> sequenceNumber() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_sequenceNumberIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> sendingTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> sendingTime() const
     {
         return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> account() const
+    [[nodiscard]] std::expected<std::string_view, Result> account() const
     {
         if (m_accountIndex < 0)
         {
@@ -1372,42 +1372,42 @@ public:
         return m_decoder.valueAt<std::string_view>(m_accountIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> clOrdID() const
+    [[nodiscard]] std::expected<std::string_view, Result> clOrdID() const
     {
         return m_decoder.valueAt<std::string_view>(m_clOrdIDIndex);
     }
 
-    [[nodiscard]] std::expected<HandlInst::Values, Result::Values> handlInst() const
+    [[nodiscard]] std::expected<HandlInst::Values, Result> handlInst() const
     {
         return m_decoder.enumAt<HandlInst>(m_handlInstIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> symbol() const
+    [[nodiscard]] std::expected<std::string_view, Result> symbol() const
     {
         return m_decoder.valueAt<std::string_view>(m_symbolIndex);
     }
 
-    [[nodiscard]] std::expected<Side::Values, Result::Values> side() const
+    [[nodiscard]] std::expected<Side::Values, Result> side() const
     {
         return m_decoder.enumAt<Side>(m_sideIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> transactTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> transactTime() const
     {
         return m_decoder.valueAt<std::chrono::milliseconds>(m_transactTimeIndex);
     }
 
-    [[nodiscard]] std::expected<std::uint32_t, Result::Values> orderQty() const
+    [[nodiscard]] std::expected<std::uint32_t, Result> orderQty() const
     {
         return m_decoder.valueAt<std::uint32_t>(m_orderQtyIndex);
     }
 
-    [[nodiscard]] std::expected<OrdType::Values, Result::Values> ordType() const
+    [[nodiscard]] std::expected<OrdType::Values, Result> ordType() const
     {
         return m_decoder.enumAt<OrdType>(m_ordTypeIndex);
     }
 
-    [[nodiscard]] std::expected<utils::FixedDecimal, Result::Values> price() const
+    [[nodiscard]] std::expected<utils::FixedDecimal, Result> price() const
     {
         if (m_priceIndex < 0)
         {
@@ -1416,7 +1416,7 @@ public:
         return m_decoder.valueAt<utils::FixedDecimal>(m_priceIndex);
     }
 
-    [[nodiscard]] std::expected<TimeInForce::Values, Result::Values> timeInForce() const
+    [[nodiscard]] std::expected<TimeInForce::Values, Result> timeInForce() const
     {
         if (m_timeInForceIndex < 0)
         {
@@ -1425,7 +1425,7 @@ public:
         return m_decoder.enumAt<TimeInForce>(m_timeInForceIndex);
     }
 
-    [[nodiscard]] std::expected<std::string_view, Result::Values> text() const
+    [[nodiscard]] std::expected<std::string_view, Result> text() const
     {
         if (m_textIndex < 0)
         {
@@ -1434,7 +1434,7 @@ public:
         return m_decoder.valueAt<std::string_view>(m_textIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> tradeDate() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> tradeDate() const
     {
         if (m_tradeDateIndex < 0)
         {
@@ -1443,7 +1443,7 @@ public:
         return m_decoder.dateOnlyAt(m_tradeDateIndex);
     }
 
-    [[nodiscard]] std::expected<std::chrono::milliseconds, Result::Values> maturityTime() const
+    [[nodiscard]] std::expected<std::chrono::milliseconds, Result> maturityTime() const
     {
         if (m_maturityTimeIndex < 0)
         {

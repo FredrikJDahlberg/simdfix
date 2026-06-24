@@ -79,7 +79,7 @@ public:
      * values.
      * @return Result::Success, or the first validation failure encountered
      */
-    [[nodiscard]] Result::Values validateSession()
+    [[nodiscard]] Result validateSession()
     {
         if (m_context == nullptr)
         {

@@ -282,7 +282,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "    const SessionContext* m_context{};\n\n";
     out << "public:\n";
     out << "    template <typename Event>\n";
-    out << "    Result::Values receive(Event&& event)\n";
+    out << "    Result receive(Event&& event)\n";
     out << "    {\n";
     out << "        return static_cast<Handler*>(this)->handle(std::forward<Event>(event));\n";
     out << "    }\n\n";
@@ -290,8 +290,8 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "    {\n";
     out << "        m_context = &context;\n";
     out << "    }\n\n";
-    out << "    Result::Values handle(const detail::TokenizedMessage& message,\n";
-    out << "                          const uint16_t messageType)\n";
+    out << "    Result handle(const detail::TokenizedMessage& message,\n";
+    out << "                  const uint16_t messageType)\n";
     out << "    {\n";
     out << "        auto status = Result::InvalidMessageType;\n";
     out << "        switch (messageType)\n";
@@ -323,7 +323,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "protected:\n";
     for (auto& message: messages)
     {
-        out << std::format("    Result::Values handle({}Decoder&) {{ return Result::Success; }}\n", message.m_name);
+        out << std::format("    Result handle({}Decoder&) {{ return Result::Success; }}\n", message.m_name);
     }
     out << "};\n\n";
     out << "} // namespace org::limitless::fix::messages\n\n";
@@ -347,7 +347,7 @@ static void generateConstructors(std::ostream& out, const Record& record, const 
     if (record.m_parent == RecordType::Component || record.m_parent == RecordType::Group)
     {
         out << std::format("        {}{}{{{}}}{}\n",
-                           RecordType::name(record.m_parent), codec, uncap(codec),
+                           name(record.m_parent), codec, uncap(codec),
                            record.m_records.empty() ? "" : ",");
     }
     if (!record.m_records.empty())
@@ -398,17 +398,17 @@ static std::string fieldReturnType(const org::limitless::generator::fix::Field& 
 {
     const auto isEnum = field.m_category == Category::Enum;
     return isEnum ? std::format("{}::Values", field.m_type)
-                  : std::string{Category::type(field.m_category)};
+                  : std::string{type(field.m_category)};
 }
 
 static std::string decoderCall(const org::limitless::generator::fix::Field& field, const Record& record)
 {
-    const auto parent = RecordType::name(record.m_parent);
+    const auto parent = name(record.m_parent);
     const auto isEnum = field.m_category == Category::Enum;
     const auto mandatory = std::string{field.m_presence == Presence::Required ? "true" : "false"};
     std::string arg = isEnum ? std::format(", {}", field.m_type) : "";
     return std::format("m_decoder.get{}<{}, {}{}, RecordType::{}>()",
-                       Category::name(field.m_category), field.m_tag, mandatory, arg, parent);
+                       name(field.m_category), field.m_tag, mandatory, arg, parent);
 }
 
 static void generateStructFields(std::ostream& out, const Record& record, const std::string& codec)
@@ -503,7 +503,7 @@ static void generateGetters(std::ostream& out, const Record& record)
         methodName[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(methodName[0])));
         if (field.m_category != Category::Counter && field.m_category != Category::Struct)
         {
-            out << std::format("    [[nodiscard]] std::expected<{}, Result::Values> {}() const\n",
+            out << std::format("    [[nodiscard]] std::expected<{}, Result> {}() const\n",
                                fieldReturnType(field), methodName);
             out << "    {\n";
             if (record.m_parent == RecordType::Message && isCacheableField(field))
@@ -578,7 +578,7 @@ static void generateFieldEncoders(std::ostream& out, const Record& record)
             const auto isEnum = field.m_category == Category::Enum;
             const auto category = isEnum ?
                                       std::format("{}::Values", field.m_type) :
-                                      std::string{Category::type(field.m_category)};
+                                      std::string{type(field.m_category)};
             out << std::format("    {}Encoder& {}(const {} value)\n",
                                record.m_name, uncap(field.m_name), category);
             out << "    {\n";
@@ -606,7 +606,7 @@ static void generateFieldEncoders(std::ostream& out, const Record& record)
             else
             {
                 out << std::format("        m_encoder.encode<\"{}\", {}>(value);\n",
-                                   field.m_tag, Category::type(field.m_category));
+                                   field.m_tag, type(field.m_category));
             }
             out << "        return *this;\n";
             out << "    }\n\n";
@@ -670,7 +670,7 @@ static void generateCheckRequired(std::ostream& out, const Record& record)
         return;
     }
 
-    out << "    [[nodiscard]] Result::Values validate()\n";
+    out << "    [[nodiscard]] Result validate()\n";
     out << "    {\n";
 
     for (const auto& field : record.m_fields)
@@ -708,7 +708,7 @@ static void generateCheckRequired(std::ostream& out, const Record& record)
 static void generateRecordDecoders(std::ostream& out, const Record& record)
 {
     out << std::format("struct {}Decoder : ", record.m_name);
-    out << std::format("{}Decoder\n{{\n", RecordType::name(record.m_parent));
+    out << std::format("{}Decoder\n{{\n", name(record.m_parent));
 
     generateStructFields(out, record, "Decoder");
     generateConstructors(out, record, "Decoder");
@@ -733,7 +733,7 @@ static void generateRecordDecoders(std::ostream& out, const Record& record)
 static void generateRecordEncoders(std::ostream& out, const Record& record)
 {
     out << std::format("struct {}Encoder : ", record.m_name);
-    out << std::format("{}Encoder\n{{\n", RecordType::name(record.m_parent));
+    out << std::format("{}Encoder\n{{\n", name(record.m_parent));
 
     generateStructFields(out, record, "Encoder");
     generateConstructors(out, record, "Encoder");

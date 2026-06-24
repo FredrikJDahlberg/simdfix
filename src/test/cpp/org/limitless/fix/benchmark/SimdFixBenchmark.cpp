@@ -146,7 +146,7 @@ struct LogonGetterHandler : org::limitless::fix::messages::MessageHandler<LogonG
 
     uint64_t sink = 0;
 
-    org::limitless::fix::Result::Values handle(org::limitless::fix::messages::LogonDecoder& logon)
+    org::limitless::fix::Result handle(org::limitless::fix::messages::LogonDecoder& logon)
     {
         using org::limitless::fix::messages::Encryption;
 
@@ -171,7 +171,7 @@ struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<L
 
     uint64_t sink = 0;
 
-    org::limitless::fix::Result::Values handle(org::limitless::fix::messages::LogonDecoder& logon)
+    org::limitless::fix::Result handle(org::limitless::fix::messages::LogonDecoder& logon)
     {
         using org::limitless::fix::messages::Encryption;
 
@@ -202,7 +202,7 @@ struct LogonDataGetterHandler : org::limitless::fix::messages::MessageHandler<Lo
 
     uint64_t sink = 0;
 
-    org::limitless::fix::Result::Values handle(org::limitless::fix::messages::LogonDecoder& logon)
+    org::limitless::fix::Result handle(org::limitless::fix::messages::LogonDecoder& logon)
     {
         using org::limitless::fix::messages::Encryption;
 
@@ -440,7 +440,7 @@ struct NewOrderSingleGetterHandler : org::limitless::fix::messages::MessageHandl
 
     uint64_t sink = 0;
 
-    org::limitless::fix::Result::Values handle(org::limitless::fix::messages::NewOrderSingleDecoder& order)
+    org::limitless::fix::Result handle(org::limitless::fix::messages::NewOrderSingleDecoder& order)
     {
         using namespace org::limitless::fix::messages;
 
@@ -463,7 +463,7 @@ struct ExecutionReportGetterHandler : org::limitless::fix::messages::MessageHand
 
     uint64_t sink = 0;
 
-    org::limitless::fix::Result::Values handle(org::limitless::fix::messages::ExecutionReportDecoder& report)
+    org::limitless::fix::Result handle(org::limitless::fix::messages::ExecutionReportDecoder& report)
     {
         using namespace org::limitless::fix::messages;
 

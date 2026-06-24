@@ -16,7 +16,7 @@ class MessageHandler
 
 public:
     template <typename Event>
-    Result::Values receive(Event&& event)
+    Result receive(Event&& event)
     {
         return static_cast<Handler*>(this)->handle(std::forward<Event>(event));
     }
@@ -26,8 +26,8 @@ public:
         m_context = &context;
     }
 
-    Result::Values handle(const detail::TokenizedMessage& message,
-                          const uint16_t messageType)
+    Result handle(const detail::TokenizedMessage& message,
+                  const uint16_t messageType)
     {
         auto status = Result::InvalidMessageType;
         switch (messageType)
@@ -129,15 +129,15 @@ public:
     }
 
 protected:
-    Result::Values handle(LogonDecoder&) { return Result::Success; }
-    Result::Values handle(LogoutDecoder&) { return Result::Success; }
-    Result::Values handle(HeartbeatDecoder&) { return Result::Success; }
-    Result::Values handle(TestRequestDecoder&) { return Result::Success; }
-    Result::Values handle(ResendRequestDecoder&) { return Result::Success; }
-    Result::Values handle(RejectDecoder&) { return Result::Success; }
-    Result::Values handle(SequenceResetDecoder&) { return Result::Success; }
-    Result::Values handle(ExecutionReportDecoder&) { return Result::Success; }
-    Result::Values handle(NewOrderSingleDecoder&) { return Result::Success; }
+    Result handle(LogonDecoder&) { return Result::Success; }
+    Result handle(LogoutDecoder&) { return Result::Success; }
+    Result handle(HeartbeatDecoder&) { return Result::Success; }
+    Result handle(TestRequestDecoder&) { return Result::Success; }
+    Result handle(ResendRequestDecoder&) { return Result::Success; }
+    Result handle(RejectDecoder&) { return Result::Success; }
+    Result handle(SequenceResetDecoder&) { return Result::Success; }
+    Result handle(ExecutionReportDecoder&) { return Result::Success; }
+    Result handle(NewOrderSingleDecoder&) { return Result::Success; }
 };
 
 } // namespace org::limitless::fix::messages
