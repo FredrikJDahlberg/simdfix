@@ -31,32 +31,17 @@ private:
 protected:
     FieldDecoder m_decoder{};
 
-public:
-    MessageDecoder() = default;
-
-    /**
-     * Constructs a decoder over an already-tokenized message.
-     * @param data raw message bytes
-     * @param fields token array produced by the tokenizer
-     * @param tags tag numbers, parallel to fields
-     * @param size number of valid fields/tags
-     */
-    MessageDecoder(const Buffer data, const std::span<Field> fields, const std::span<uint16_t> tags, const int32_t size)
-      : m_decoder{data, fields, tags, size}
-    {
-    }
-
     /**
      * Rebinds the decoder to a new tokenized message.
-     * @param data raw message bytes
-     * @param fields token array produced by the tokenizer
-     * @param tags tag numbers, parallel to fields
-     * @param size number of valid fields/tags
+     * @param message tokenized message produced by the PayloadDecoder
      */
-    void wrap(const Buffer data, const std::span<Field> fields, const std::span<uint16_t> tags, const int32_t size)
+    void wrap(const TokenizedMessage& message)
     {
-        m_decoder.wrap(data, fields, tags, size);
+        m_decoder.wrap(message.data, message.fields, message.tags, message.size);
     }
+
+public:
+    MessageDecoder() = default;
 
     /**
      * Reads the MsgType (tag 35) value from the third field. Single-byte

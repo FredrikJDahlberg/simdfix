@@ -42,17 +42,14 @@ public:
         m_newOrderSingle.context(&context);
     }
 
-    Result::Values handle(const std::span<const uint8_t> data,
-                          const std::span<Field> fields,
-                          const std::span<uint16_t> tags,
-                          const int32_t count,
+    Result::Values handle(const detail::TokenizedMessage& message,
                           const uint8_t messageType)
     {
         auto status = Result::InvalidMessageType;
         switch (messageType)
         {
             case LogonDecoder::MessageId:
-                m_logon.wrap(data, fields, tags, count);
+                m_logon.wrap(message);
                 status = m_logon.validate();
                 if (status == Result::Success)
                 {
@@ -60,7 +57,7 @@ public:
                 }
                 break;
             case LogoutDecoder::MessageId:
-                m_logout.wrap(data, fields, tags, count);
+                m_logout.wrap(message);
                 status = m_logout.validate();
                 if (status == Result::Success)
                 {
@@ -68,7 +65,7 @@ public:
                 }
                 break;
             case HeartbeatDecoder::MessageId:
-                m_heartbeat.wrap(data, fields, tags, count);
+                m_heartbeat.wrap(message);
                 status = m_heartbeat.validate();
                 if (status == Result::Success)
                 {
@@ -76,7 +73,7 @@ public:
                 }
                 break;
             case TestRequestDecoder::MessageId:
-                m_testRequest.wrap(data, fields, tags, count);
+                m_testRequest.wrap(message);
                 status = m_testRequest.validate();
                 if (status == Result::Success)
                 {
@@ -84,7 +81,7 @@ public:
                 }
                 break;
             case ResendRequestDecoder::MessageId:
-                m_resendRequest.wrap(data, fields, tags, count);
+                m_resendRequest.wrap(message);
                 status = m_resendRequest.validate();
                 if (status == Result::Success)
                 {
@@ -92,7 +89,7 @@ public:
                 }
                 break;
             case RejectDecoder::MessageId:
-                m_reject.wrap(data, fields, tags, count);
+                m_reject.wrap(message);
                 status = m_reject.validate();
                 if (status == Result::Success)
                 {
@@ -100,7 +97,7 @@ public:
                 }
                 break;
             case SequenceResetDecoder::MessageId:
-                m_sequenceReset.wrap(data, fields, tags, count);
+                m_sequenceReset.wrap(message);
                 status = m_sequenceReset.validate();
                 if (status == Result::Success)
                 {
@@ -108,7 +105,7 @@ public:
                 }
                 break;
             case ExecutionReportDecoder::MessageId:
-                m_executionReport.wrap(data, fields, tags, count);
+                m_executionReport.wrap(message);
                 status = m_executionReport.validate();
                 if (status == Result::Success)
                 {
@@ -116,7 +113,7 @@ public:
                 }
                 break;
             case NewOrderSingleDecoder::MessageId:
-                m_newOrderSingle.wrap(data, fields, tags, count);
+                m_newOrderSingle.wrap(message);
                 status = m_newOrderSingle.validate();
                 if (status == Result::Success)
                 {

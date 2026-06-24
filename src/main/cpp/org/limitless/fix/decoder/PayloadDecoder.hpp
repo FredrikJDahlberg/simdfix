@@ -120,7 +120,8 @@ public:
         }
 
         const auto messageType = buffer[m_fields[MessageTypePosition].m_position];
-        result.m_value = handler.handle(buffer, std::span(m_fields.data(), m_count), std::span(m_tags.data(), m_count), static_cast<int32_t>(m_count), messageType);
+        const TokenizedMessage message{buffer, {m_fields.data(), m_count}, {m_tags.data(), m_count}, static_cast<int32_t>(m_count)};
+        result.m_value = handler.handle(message, messageType);
         return result;
     }
 

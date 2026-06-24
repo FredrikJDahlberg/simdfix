@@ -132,12 +132,9 @@ public:
 
     static constexpr uint8_t MessageId = 'A';
 
-    LogonDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Field> fields,
-            const std::span<uint16_t> tags,
-            const int32_t count)
+    LogonDecoder& wrap(const detail::TokenizedMessage& message)
     {
-        m_decoder.wrap(data, fields, tags, count);
+        MessageDecoder::wrap(message);
         return *this;
     }
 
@@ -256,12 +253,9 @@ public:
 
     static constexpr uint8_t MessageId = '5';
 
-    LogoutDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Field> fields,
-            const std::span<uint16_t> tags,
-            const int32_t count)
+    LogoutDecoder& wrap(const detail::TokenizedMessage& message)
     {
-        m_decoder.wrap(data, fields, tags, count);
+        MessageDecoder::wrap(message);
         return *this;
     }
 
@@ -365,12 +359,9 @@ public:
 
     static constexpr uint8_t MessageId = '0';
 
-    HeartbeatDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Field> fields,
-            const std::span<uint16_t> tags,
-            const int32_t count)
+    HeartbeatDecoder& wrap(const detail::TokenizedMessage& message)
     {
-        m_decoder.wrap(data, fields, tags, count);
+        MessageDecoder::wrap(message);
         return *this;
     }
 
@@ -474,12 +465,9 @@ public:
 
     static constexpr uint8_t MessageId = '1';
 
-    TestRequestDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Field> fields,
-            const std::span<uint16_t> tags,
-            const int32_t count)
+    TestRequestDecoder& wrap(const detail::TokenizedMessage& message)
     {
-        m_decoder.wrap(data, fields, tags, count);
+        MessageDecoder::wrap(message);
         return *this;
     }
 
@@ -585,12 +573,9 @@ public:
 
     static constexpr uint8_t MessageId = '2';
 
-    ResendRequestDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Field> fields,
-            const std::span<uint16_t> tags,
-            const int32_t count)
+    ResendRequestDecoder& wrap(const detail::TokenizedMessage& message)
     {
-        m_decoder.wrap(data, fields, tags, count);
+        MessageDecoder::wrap(message);
         return *this;
     }
 
@@ -710,12 +695,9 @@ public:
 
     static constexpr uint8_t MessageId = '3';
 
-    RejectDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Field> fields,
-            const std::span<uint16_t> tags,
-            const int32_t count)
+    RejectDecoder& wrap(const detail::TokenizedMessage& message)
     {
-        m_decoder.wrap(data, fields, tags, count);
+        MessageDecoder::wrap(message);
         return *this;
     }
 
@@ -845,12 +827,9 @@ public:
 
     static constexpr uint8_t MessageId = '4';
 
-    SequenceResetDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Field> fields,
-            const std::span<uint16_t> tags,
-            const int32_t count)
+    SequenceResetDecoder& wrap(const detail::TokenizedMessage& message)
     {
-        m_decoder.wrap(data, fields, tags, count);
+        MessageDecoder::wrap(message);
         return *this;
     }
 
@@ -974,12 +953,9 @@ public:
 
     static constexpr uint8_t MessageId = '8';
 
-    ExecutionReportDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Field> fields,
-            const std::span<uint16_t> tags,
-            const int32_t count)
+    ExecutionReportDecoder& wrap(const detail::TokenizedMessage& message)
     {
-        m_decoder.wrap(data, fields, tags, count);
+        MessageDecoder::wrap(message);
         return *this;
     }
 
@@ -1215,12 +1191,9 @@ public:
 
     static constexpr uint8_t MessageId = 'D';
 
-    NewOrderSingleDecoder& wrap(const std::span<const uint8_t> data,
-            const std::span<Field> fields,
-            const std::span<uint16_t> tags,
-            const int32_t count)
+    NewOrderSingleDecoder& wrap(const detail::TokenizedMessage& message)
     {
-        m_decoder.wrap(data, fields, tags, count);
+        MessageDecoder::wrap(message);
         return *this;
     }
 

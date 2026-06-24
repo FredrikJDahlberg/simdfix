@@ -22,18 +22,18 @@ before parsing).
 
 | Benchmark | Message | ns/msg | GB/s |
 |-----------|---------|-------:|-----:|
-| LOGON COLD | Logon, 142 B | 92.4 | 1.54 |
-| LOGON HOT | Logon, 142 B | 91.8 | 1.55 |
-| LOGON GETTERS | Logon, 142 B | 109.3 | 1.30 |
+| LOGON COLD | Logon, 142 B | 92.2 | 1.54 |
+| LOGON HOT | Logon, 142 B | 92.3 | 1.54 |
+| LOGON GETTERS | Logon, 142 B | 109.2 | 1.30 |
 | LOGON GROUPS | Logon + 3 hops, 253 B | 199.8 | 1.27 |
-| LOGON DATA | Logon + XmlData, 166 B | 153.2 | 1.08 |
-| LOGON ENCODE | Logon + 3 hops, ~224 B | 101.9 | 2.20 |
-| NOS HOT | NewOrderSingle, 154 B | 95.5 | 1.61 |
-| NOS GETTERS | NewOrderSingle, 154 B | 130.3 | 1.18 |
-| NOS ENCODE | NewOrderSingle, 154 B | 38.0 | 4.29 |
-| ER HOT | ExecutionReport, 245 B | 145.9 | 1.68 |
-| ER GETTERS | ExecutionReport, 245 B | 237.6 | 1.03 |
-| ER ENCODE | ExecutionReport, 245 B | 101.9 | 2.40 |
+| LOGON DATA | Logon + XmlData, 166 B | 154.2 | 1.08 |
+| LOGON ENCODE | Logon + 3 hops, ~224 B | 102.3 | 2.19 |
+| NOS HOT | NewOrderSingle, 154 B | 95.0 | 1.62 |
+| NOS GETTERS | NewOrderSingle, 154 B | 128.5 | 1.20 |
+| NOS ENCODE | NewOrderSingle, 154 B | 37.3 | 4.37 |
+| ER HOT | ExecutionReport, 245 B | 145.7 | 1.68 |
+| ER GETTERS | ExecutionReport, 245 B | 239.3 | 1.02 |
+| ER ENCODE | ExecutionReport, 245 B | 103.0 | 2.38 |
 
 ## What each benchmark measures
 
@@ -49,6 +49,38 @@ before parsing).
 - **ER HOT** — hot-cache tokenization of a flat `ExecutionReport` (245 B); no getters.
 - **ER GETTERS** — as ER HOT plus all 16 `ExecutionReportDecoder` getters (orderID, clOrdID, execID, execType, ordStatus, symbol, side, orderQty, price, lastQty, lastPx, leavesQty, cumQty, avgPx, transactTime, text) — a wide mix of string, enum, integer, decimal, and timestamp fields.
 - **ER ENCODE** — encodes a flat `ExecutionReport` via `FixPayloadEncoder`/`ExecutionReportEncoder`.
+
+## Changes since previous measurement (2026-06-24)
+
+1. **Namespace/directory alignment** — `FieldDecoder` moved to
+   `detail::decoder`, `FieldEncoder` to `detail::encoder`, matching their
+   directory paths. `PayloadEncoder` moved from `detail/encoder/` to the
+   public `encoder/` directory, symmetric with `PayloadDecoder`.
+2. **Public/internal separation enforced** — Introduced
+   `detail::TokenizedMessage` to bundle the token spans passed between
+   `PayloadDecoder` and the generated handler. `MessageDecoder::wrap` is
+   now protected, taking `TokenizedMessage` instead of raw `Field`/tag
+   spans. Removed `using namespace detail` from five public headers that
+   did not need it.
+3. **detail/ excluded from install** — `cmake --install` no longer ships
+   the `detail/` tree; consumers depend only on the public headers.
+
+These are structural refactors with no algorithmic changes. All numbers
+are within run-to-run noise of the previous measurement.
+
+| Benchmark | Before (06-24) | After (06-24) | Change |
+|-----------|---------------:|--------------:|-------:|
+| LOGON HOT | 91.8 ns | 92.3 ns | +0.5% |
+| LOGON GETTERS | 109.3 ns | 109.2 ns | −0.1% |
+| LOGON GROUPS | 199.8 ns | 199.8 ns | 0.0% |
+| LOGON DATA | 153.2 ns | 154.2 ns | +0.7% |
+| NOS HOT | 95.5 ns | 95.0 ns | −0.5% |
+| NOS GETTERS | 130.3 ns | 128.5 ns | −1.4% |
+| ER HOT | 145.9 ns | 145.7 ns | −0.1% |
+| ER GETTERS | 237.6 ns | 239.3 ns | +0.7% |
+| LOGON ENCODE | 101.9 ns | 102.3 ns | +0.4% |
+| NOS ENCODE | 38.0 ns | 37.3 ns | −1.8% |
+| ER ENCODE | 101.9 ns | 103.0 ns | +1.1% |
 
 ## Changes since previous measurement (2026-06-21)
 

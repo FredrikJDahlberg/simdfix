@@ -82,8 +82,8 @@ target_link_options(SimdFix INTERFACE
 # --- Install / packaging --------------------------------------------------
 # Makes the header-only library consumable via find_package(SimdFix). Public
 # headers install under <prefix>/include preserving the org/limitless/fix tree.
-# NOTE: detail/ ships for now because the public base classes still include
-# detail/Tokens.hpp; physically excluding it follows once that coupling is cut.
+# detail/ is excluded: all public API signatures use opaque types; the detail
+# headers are only needed for in-tree builds (tests, benchmarks).
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
@@ -94,6 +94,7 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp/org
         FILES_MATCHING
             PATTERN "*.hpp"
             PATTERN "*.inl"
+            PATTERN "detail" EXCLUDE
             PATTERN "unused" EXCLUDE)
 
 install(EXPORT SimdFixTargets

@@ -296,10 +296,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
         out << std::format("        m_{}.context(&context);\n", uncap(message.m_name));
     }
     out << "    }\n\n";
-    out << "    Result::Values handle(const std::span<const uint8_t> data,\n";
-    out << "                          const std::span<Field> fields,\n";
-    out << "                          const std::span<uint16_t> tags,\n";
-    out << "                          const int32_t count,\n";
+    out << "    Result::Values handle(const detail::TokenizedMessage& message,\n";
     out << "                          const uint8_t messageType)\n";
     out << "    {\n";
     out << "        auto status = Result::InvalidMessageType;\n";
@@ -309,7 +306,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     {
         auto memberName = uncap(message.m_name);
         out << std::format("            case {}Decoder::MessageId:\n", message.m_name);
-        out << std::format("                m_{}.wrap(data, fields, tags, count);\n", memberName);
+        out << std::format("                m_{}.wrap(message);\n", memberName);
         out << std::format("                status = m_{}.validate();\n", memberName);
         out << "                if (status == Result::Success)\n";
         out << "                {\n";
@@ -438,13 +435,9 @@ static void generateWrapNextDecoders(std::ostream& out, const Record& record)
 {
     if (record.m_parent == RecordType::Message)
     {
-        out << std::format("    {}Decoder& wrap(", record.m_name);
-        out << "const std::span<const uint8_t> data,\n";
-        out << "            const std::span<Field> fields,\n";
-        out << "            const std::span<uint16_t> tags,\n";
-        out << "            const int32_t count)\n";
+        out << std::format("    {}Decoder& wrap(const detail::TokenizedMessage& message)\n", record.m_name);
         out << "    {\n";
-        out << "        m_decoder.wrap(data, fields, tags, count);\n";
+        out << "        MessageDecoder::wrap(message);\n";
         out << "        return *this;\n";
         out << "    }\n\n";
 

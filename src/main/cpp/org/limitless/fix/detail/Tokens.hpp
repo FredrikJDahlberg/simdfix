@@ -143,6 +143,14 @@ struct Presence
 using FieldSpan = std::span<Field>;
 using TagSpan = std::span<uint16_t>;
 
+struct TokenizedMessage
+{
+    Buffer data;
+    FieldSpan fields;
+    TagSpan tags;
+    int32_t size;
+};
+
 }
 
 #endif //SIMD_FIX_DETAIL_TOKENS_HPP
