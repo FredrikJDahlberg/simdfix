@@ -5,9 +5,11 @@
 #ifndef SIMD_FIX_DATA_DECODER_HPP
 #define SIMD_FIX_DATA_DECODER_HPP
 
-#include "org/limitless/fix/decoder/FieldDecoder.hpp"
+#include "../detail/decoder/FieldDecoder.hpp"
 
 namespace org::limitless::fix::decoder {
+
+using namespace org::limitless::fix::detail;
 
 /**
  * Decodes length-prefixed data field pairs (e.g. XmlDataLen/XmlData,

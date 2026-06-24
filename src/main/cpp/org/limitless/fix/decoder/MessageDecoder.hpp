@@ -9,10 +9,12 @@
 #include <expected>
 #include <span>
 
-#include "org/limitless/fix/CodecTypes.hpp"
-#include "org/limitless/fix/decoder/FieldDecoder.hpp"
+#include "org/limitless/fix/detail/Tokens.hpp"
+#include "../detail/decoder/FieldDecoder.hpp"
 
 namespace org::limitless::fix::decoder {
+
+using namespace org::limitless::fix::detail;
 
 /**
  * Base for generated message decoders (e.g. LogonDecoder, LogoutDecoder).

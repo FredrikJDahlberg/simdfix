@@ -9,12 +9,14 @@
 #include <cstring>
 #include <span>
 
-#include "org/limitless/fix/CodecTypes.hpp"
-#include "org/limitless/fix/encoder/FieldEncoder.hpp"
-#include "org/limitless/fix/simd/Uint8x16.hpp"
+#include "org/limitless/fix/Types.hpp"
+#include "org/limitless/fix/detail/encoder/FieldEncoder.hpp"
+#include "org/limitless/fix/detail/simd/Uint8x16.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
-namespace org::limitless::fix::encoder {
+namespace org::limitless::fix::detail::encoder {
+
+using namespace org::limitless::fix::detail::simd;
 
 // Writes the FIX header (BeginString, BodyLength, MsgType, SenderCompID, TargetCompID)
 // ahead of a message body and, once the body has been encoded, fills in BodyLength
@@ -102,9 +104,9 @@ public:
         m_encodedLength = HeaderLength + static_cast<uint32_t>(message.encodedLength());
 
         uint32_t position = 0;
-        simd::ChecksumAccumulator accum;
-        simd::Uint8x16 block;
-        for (; position + simd::Uint8x16::Size <= m_encodedLength; position += simd::Uint8x16::Size)
+        ChecksumAccumulator accum;
+        Uint8x16 block;
+        for (; position + Uint8x16::Size <= m_encodedLength; position += Uint8x16::Size)
         {
             block.load(m_buffer.data() + m_offset + position);
             accum.add(block);

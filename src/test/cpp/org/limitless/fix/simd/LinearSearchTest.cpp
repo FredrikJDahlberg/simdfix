@@ -5,9 +5,10 @@
 #include <array>
 
 #include <gtest/gtest.h>
-#include "org/limitless/fix/simd/LinearSearch.hpp"
 
-using namespace org::limitless::fix::simd;
+#include "org/limitless/fix/detail/simd/LinearSearch.hpp"
+
+using namespace org::limitless::fix::detail::simd;
 
 TEST(LinearSearch, EmptyArray)
 {

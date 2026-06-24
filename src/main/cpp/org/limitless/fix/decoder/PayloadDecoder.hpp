@@ -11,11 +11,14 @@
 #include <cstring>
 #include <span>
 
-#include "org/limitless/fix/CodecTypes.hpp"
-#include "org/limitless/fix/simd/Uint8x16.hpp"
+#include "org/limitless/fix/detail/Tokens.hpp"
+#include "org/limitless/fix/detail/simd/Uint8x16.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
 namespace org::limitless::fix::decoder {
+
+using namespace org::limitless::fix::detail;
+using namespace org::limitless::fix::detail::simd;
 
 struct NoDataFields
 {
@@ -61,15 +64,15 @@ class PayloadDecoder
         return result;
     }();
 
-    static inline const simd::Uint8x16 TagEndsBlock{'='};
-    static inline const simd::Uint8x16 FieldEndsBlock{0x01};
-    static inline const simd::Uint8x16 ZerosBlock{'0'};
-    static inline const simd::Uint8x16 NineMask{9};
+    static inline const Uint8x16 TagEndsBlock{'='};
+    static inline const Uint8x16 FieldEndsBlock{0x01};
+    static inline const Uint8x16 ZerosBlock{'0'};
+    static inline const Uint8x16 NineMask{9};
 
     std::array<Field, MaxSize> m_fields{};
     std::array<uint16_t, MaxSize> m_tags{};
 
-    simd::Uint8x16 m_block{};
+    Uint8x16 m_block{};
     uint32_t m_tag{};
     int32_t m_position{};
     size_t m_count{};
@@ -132,7 +135,6 @@ public:
      */
     Result parse(const Buffer buffer)
     {
-        using simd::Uint8x16;
         if (buffer.size() < MessageFragmentLimit)
         {
             return { 0, Result::MessageFragment };
@@ -361,7 +363,7 @@ private:
         if (trailingCount >= 4)
         {
             const auto count = trailingCount >> 2;
-            const auto digit = &digits[simd::Uint8x16::Size - count];
+            const auto digit = &digits[Uint8x16::Size - count];
             m_tag = utils::asciiToUin32(0, digit, count);
             m_position = -count;
         }
@@ -423,7 +425,7 @@ private:
 
         // blockSum covers [0, blockEnd); re-base it to [0, skipEnd) so the
         // checksum stays exact across the skipped region. At most one loop runs.
-        const position_t blockEnd = offset + simd::Uint8x16::Size;
+        const position_t blockEnd = offset + Uint8x16::Size;
         for (position_t i = skipEnd; i < blockEnd; ++i)
         {
             blockSum -= data[i];
@@ -432,7 +434,7 @@ private:
         {
             blockSum += data[i];
         }
-        offset = skipEnd - simd::Uint8x16::Size;
+        offset = skipEnd - Uint8x16::Size;
         m_tag = 0;
         m_position = 0;
         return true;

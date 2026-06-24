@@ -12,13 +12,13 @@
 
 #include "pugixml.hpp"
 
-#include "org/limitless/fix/CodecTypes.hpp"
+#include "org/limitless/fix/detail/Tokens.hpp"
 
 namespace org::limitless::generator::fix {
 
-using limitless::fix::Category;
-using limitless::fix::RecordType;
-using limitless::fix::Presence;
+using limitless::fix::detail::Category;
+using limitless::fix::detail::RecordType;
+using limitless::fix::detail::Presence;
 using limitless::fix::MaxGroupDepth;
 
 struct Type

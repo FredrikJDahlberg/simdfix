@@ -11,19 +11,19 @@
 #include <span>
 #include <string_view>
 
-#include "org/limitless/fix/CodecTypes.hpp"
+#include "org/limitless/fix/Types.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
-namespace org::limitless::fix::encoder {
+namespace org::limitless::fix::encoder { class DataEncoder; }
+
+namespace org::limitless::fix::detail {
 
 // Encodes individual FIX fields ("TAG=VALUE" followed by SOH) into a buffer.
 // The lowest-level building block in the encoder stack; MessageEncoder and
 // GroupEncoder both hold a reference to one and delegate field encoding to it.
-class DataEncoder;
-
 class FieldEncoder
 {
-    friend class DataEncoder;
+    friend class encoder::DataEncoder;
 
     std::span<uint8_t> m_data{};
     uint32_t m_offset{};

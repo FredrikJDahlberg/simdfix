@@ -1,35 +1,34 @@
 //
-// x86 SSE4.1 backend for Uint8x16 / ChecksumAccumulator.
+// ARM NEON backend for Uint8x16 / ChecksumAccumulator.
 // Included by Uint8x16.hpp — do not include directly.
 //
 
-#if !defined(__x86_64__) && !defined(_M_X64)
-#error "Uint8x16_sse.inl requires x86-64 with SSE4.1"
+#if !defined(__aarch64__) && !defined(_M_ARM64)
+#error "Uint8x16_neon.inl requires ARM NEON (aarch64)"
 #endif
 
 #include <concepts>
-#include <cstring>
 #include <print>
 
-#include <immintrin.h>
+#include <arm_neon.h>
 
-namespace org::limitless::fix::simd {
+namespace org::limitless::fix::detail::simd {
 
 struct Uint8x16
 {
-    typedef __m128i value_type;
+    typedef uint8x16_t value_type;
 
     static uint32_t constexpr Size = 16;
 
-    static inline const value_type Ones = _mm_set1_epi8(-1);
-    static inline const value_type Zeros = _mm_setzero_si128();
+    static inline const value_type Ones = vdupq_n_u8(255);
+    static inline const value_type Zeros = vdupq_n_u8(0);
 
-    static inline const value_type AsciiZeros = _mm_set1_epi8('0');
-    static inline const value_type AsciiNines = _mm_set1_epi8('9');
+    static inline const value_type AsciiZeros = vdupq_n_u8('0');
+    static inline const value_type AsciiNines = vdupq_n_u8('9');
 
     value_type m_block{};
 
-    Uint8x16() : Uint8x16{static_cast<uint8_t>(0)}
+    Uint8x16() : Uint8x16{0}
     {
     }
 
@@ -38,28 +37,22 @@ struct Uint8x16
         m_block = block.m_block;
     }
 
+    /// Wraps an existing NEON 128-bit register value.
     explicit Uint8x16(const value_type block) : m_block(block)
     {
     }
 
-    /**
-     * Broadcasts a single byte across all 16 lanes.
-     * @param filler byte
-     */
+    /// Broadcasts a single byte across all 16 lanes (vdupq_n_u8).
     explicit Uint8x16(const uint8_t filler)
     {
-        m_block = _mm_set1_epi8(static_cast<char>(filler));
+        m_block = vdupq_n_u8(filler);
     }
 
-    /**
-     * Broadcasts a 16-bit value across all 8 lanes. Constrained to exact
-     * uint16_t arguments so int/char literals keep selecting the byte-broadcast
-     * constructor.
-     * @param filler 16-bit value
-     */
+    /// Broadcasts a 16-bit value across all 8 lanes (vdupq_n_u16).
+    /// Constrained to exact uint16_t so int/char literals select the byte constructor.
     explicit Uint8x16(const std::same_as<uint16_t> auto filler)
     {
-        m_block = _mm_set1_epi16(static_cast<short>(filler));
+        m_block = vreinterpretq_u8_u16(vdupq_n_u16(filler));
     }
 
     /**
@@ -82,7 +75,7 @@ struct Uint8x16
     {
         if (length >= 16) [[likely]]
         {
-            m_block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(buffer));
+            m_block = vld1q_u8(buffer);
         }
         else [[unlikely]]
         {
@@ -91,7 +84,7 @@ struct Uint8x16
             {
                 aligned[i] = buffer[i];
             }
-            m_block = _mm_load_si128(reinterpret_cast<const __m128i*>(aligned));
+            m_block = vld1q_u8(aligned);
         }
         return *this;
     }
@@ -106,7 +99,7 @@ struct Uint8x16
     {
         if (length >= 16) [[likely]]
         {
-            m_block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(buffer));
+            m_block = vreinterpretq_u8_u16(vld1q_u16(buffer));
         }
         else [[unlikely]]
         {
@@ -115,7 +108,7 @@ struct Uint8x16
             {
                 temp[i] = buffer[i];
             }
-            m_block = _mm_load_si128(reinterpret_cast<const __m128i*>(temp));
+            m_block = vreinterpretq_u8_u16(vld1q_u16(temp));
         }
         return *this;
     }
@@ -126,7 +119,7 @@ struct Uint8x16
      */
     void load(const uint8_t* buffer)
     {
-        m_block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(buffer));
+        m_block = vld1q_u8(buffer);
     }
 
     /**
@@ -137,30 +130,30 @@ struct Uint8x16
      */
     const Uint8x16& get(const size_t position, uint8_t* buffer) const
     {
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(buffer + position), m_block);
+        vst1q_u8(buffer + position, m_block);
         return *this;
     }
 
     Uint8x16& operator|=(const Uint8x16& block)
     {
-        m_block = _mm_or_si128(m_block, block.m_block);
+        m_block = vorrq_u8(m_block, block.m_block);
         return *this;
     }
 
     Uint8x16 operator|(const Uint8x16& block) const
     {
-        return Uint8x16{_mm_or_si128(this->m_block, block.m_block)};
+        return Uint8x16{vorrq_u8(this->m_block, block.m_block)};
     }
 
     Uint8x16& operator&=(const Uint8x16& block)
     {
-        m_block = _mm_and_si128(m_block, block.m_block);
+        m_block = vandq_u8(m_block, block.m_block);
         return *this;
     }
 
     Uint8x16 operator&(const Uint8x16& block) const
     {
-        return Uint8x16{_mm_and_si128(this->m_block, block.m_block)};
+        return Uint8x16{vandq_u8(this->m_block, block.m_block)};
     }
 
     /**
@@ -172,7 +165,7 @@ struct Uint8x16
     [[nodiscard]] Uint8x16 shiftLeft() const
     {
         static_assert(N >= 0 && N < 16, "Shift must be between 0 and 15");
-        return Uint8x16(_mm_bsrli_si128(m_block, N));
+        return Uint8x16(vextq_u8(m_block, Zeros, N));
     }
 
     /**
@@ -184,28 +177,28 @@ struct Uint8x16
     [[nodiscard]] Uint8x16 shiftRight() const
     {
         static_assert(N >= 0 && N < 16, "Shift must be between 0 and 15");
-        return Uint8x16(_mm_bslli_si128(m_block, N));
+        return Uint8x16(vextq_u8(Zeros, m_block, 16 - N));
     }
 
     Uint8x16 operator-(const Uint8x16& block) const
     {
-        return Uint8x16(_mm_sub_epi8(m_block, block.m_block));
+        return Uint8x16(vsubq_u8(m_block, block.m_block));
     }
 
     Uint8x16& operator-=(const Uint8x16& block)
     {
-        m_block = _mm_sub_epi8(m_block, block.m_block);
+        m_block = vsubq_u8(m_block, block.m_block);
         return *this;
     }
 
     Uint8x16 operator+(const Uint8x16& block) const
     {
-        return Uint8x16(_mm_add_epi8(m_block, block.m_block));
+        return Uint8x16(vaddq_u8(m_block, block.m_block));
     }
 
     Uint8x16& operator+=(const Uint8x16& block)
     {
-        m_block = _mm_add_epi8(m_block, block.m_block);
+        m_block = vaddq_u8(m_block, block.m_block);
         return *this;
     }
 
@@ -229,7 +222,7 @@ struct Uint8x16
      */
     Uint8x16 operator==(const Uint8x16& block) const
     {
-        return Uint8x16{_mm_cmpeq_epi8(this->m_block, block.m_block)};
+        return Uint8x16{vceqq_u8(this->m_block, block.m_block)};
     }
 
     /**
@@ -237,7 +230,7 @@ struct Uint8x16
      */
     Uint8x16 operator>=(const Uint8x16& block) const
     {
-        return Uint8x16{_mm_cmpeq_epi8(_mm_max_epu8(m_block, block.m_block), m_block)};
+        return Uint8x16{vcgeq_u8(m_block, block.m_block)};
     }
 
     /**
@@ -245,7 +238,7 @@ struct Uint8x16
      */
     Uint8x16 operator<=(const Uint8x16& block) const
     {
-        return Uint8x16{_mm_cmpeq_epi8(_mm_min_epu8(m_block, block.m_block), m_block)};
+        return Uint8x16{vcleq_u8(m_block, block.m_block)};
     }
 
     /**
@@ -254,9 +247,7 @@ struct Uint8x16
      */
     [[nodiscard]] uint64_t sum() const
     {
-        const __m128i sad = _mm_sad_epu8(m_block, Zeros);
-        const __m128i total = _mm_add_epi64(sad, _mm_bsrli_si128(sad, 8));
-        return static_cast<uint64_t>(_mm_cvtsi128_si64(total));
+        return vaddlvq_u8(m_block);
     }
 
     /**
@@ -268,13 +259,13 @@ struct Uint8x16
     }
 
     /**
-     * Byte-wise select: where this mask byte is 0xFF, take from block; elsewhere zero.
+     * Bitwise select: where this mask is set, take bits from block; elsewhere zero.
      * @param block values to pass through where the mask is set
      * @return selected vector
      */
     [[nodiscard]] Uint8x16 whenTrue(const Uint8x16& block) const
     {
-        return Uint8x16{_mm_blendv_epi8(Zeros, block.m_block, m_block)};
+        return Uint8x16{vbslq_u8(m_block, block.m_block, Zeros)};
     }
 
     /**
@@ -285,7 +276,7 @@ struct Uint8x16
      */
     Uint8x16& equal(const Uint8x16& block, Uint8x16& result)
     {
-        result.m_block = _mm_cmpeq_epi8(m_block, block.m_block);
+        result.m_block = vceqq_u8(m_block, block.m_block);
         return *this;
     }
 
@@ -294,40 +285,30 @@ struct Uint8x16
      */
     [[nodiscard]] Uint8x16 equal(const Uint8x16& block) const
     {
-        return Uint8x16{_mm_cmpeq_epi16(m_block, block.m_block)};
+        return Uint8x16{vreinterpretq_u8_u16(
+            vceqq_u16(vreinterpretq_u16_u8(m_block), vreinterpretq_u16_u8(block.m_block)))};
     }
 
     /**
      * Compresses the vector into a 64-bit mask with 4 bits per byte lane.
      * Nonzero lanes produce 0xF; zero lanes produce 0x0.
-     * Compatible with the NEON nibble-mask format used by PayloadDecoder.
      * @return 64-bit nibble mask
      */
     [[nodiscard]] uint64_t toUint64() const
     {
-        const __m128i isZero = _mm_cmpeq_epi8(m_block, Zeros);
-        const __m128i nibbles = _mm_andnot_si128(isZero, _mm_set1_epi8(0x0F));
-        const __m128i weights = _mm_set1_epi16(0x1001);
-        const __m128i paired = _mm_maddubs_epi16(nibbles, weights);
-        const __m128i packed = _mm_packus_epi16(paired, Zeros);
-        return static_cast<uint64_t>(_mm_extract_epi64(packed, 0));
+        const uint8x16_t mask = vtstq_u8(m_block, m_block);
+        const uint8x8_t narrowed = vshrn_n_u16(vreinterpretq_u16_u8(mask), 4);
+        return vget_lane_u64(vreinterpret_u64_u8(narrowed), 0);
     }
 
     void print() const
     {
-        alignas(16) uint8_t data[16];
-        _mm_store_si128(reinterpret_cast<__m128i*>(data), m_block);
-        for (int i = 0; i < 16; ++i)
-        {
-            std::print("{:02x} ", data[i]);
-        }
-        std::println();
+        print(m_block);
     }
 
     static void print(const value_type& block)
     {
-        alignas(16) uint8_t data[16];
-        _mm_store_si128(reinterpret_cast<__m128i*>(data), block);
+        const auto data = reinterpret_cast<const uint8_t*>(&block);
         for (int i = 0; i < 16; ++i)
         {
             std::print("{:02x} ", data[i]);
@@ -343,7 +324,7 @@ struct Uint8x16
  */
 struct ChecksumAccumulator
 {
-    __m128i m_accum = _mm_setzero_si128();
+    uint16x8_t m_accum = vdupq_n_u16(0);
 
     /**
      * Adds the byte sums of a 16-byte block to the running accumulator.
@@ -351,8 +332,7 @@ struct ChecksumAccumulator
      */
     void add(const Uint8x16& block)
     {
-        const __m128i ones = _mm_set1_epi8(1);
-        m_accum = _mm_add_epi16(m_accum, _mm_maddubs_epi16(block.m_block, ones));
+        m_accum = vaddq_u16(m_accum, vpaddlq_u8(block.m_block));
     }
 
     /**
@@ -360,12 +340,7 @@ struct ChecksumAccumulator
      */
     [[nodiscard]] uint32_t value() const
     {
-        const __m128i sum32 = _mm_madd_epi16(m_accum, _mm_set1_epi16(1));
-        const __m128i hi64 = _mm_bsrli_si128(sum32, 8);
-        const __m128i sum64 = _mm_add_epi32(sum32, hi64);
-        const __m128i hi32 = _mm_bsrli_si128(sum64, 4);
-        const __m128i total = _mm_add_epi32(sum64, hi32);
-        return static_cast<uint32_t>(_mm_cvtsi128_si32(total));
+        return vaddlvq_u16(m_accum);
     }
 };
 

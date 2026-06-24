@@ -51,16 +51,23 @@ set(GENERATED_HEADERS
         ${GENERATED_DIR}/FixTypes.hpp ${GENERATED_DIR}/FixMessageDecoders.hpp
         ${GENERATED_DIR}/FixMessageEncoders.hpp ${GENERATED_DIR}/FixMessageHandler.hpp)
 set(FIX_HEADERS
+        ${MAIN_PATH}/Fix.hpp ${MAIN_PATH}/Types.hpp ${MAIN_PATH}/detail/Tokens.hpp
         ${MAIN_PATH}/utils/Utils.hpp ${MAIN_PATH}/utils/FixedDecimal.hpp ${MAIN_PATH}/utils/OptionalInt.hpp
         ${MAIN_PATH}/decoder/PayloadDecoder.hpp ${MAIN_PATH}/decoder/MessageDecoder.hpp
-        ${MAIN_PATH}/CodecTypes.hpp ${MAIN_PATH}/decoder/FieldDecoder.hpp
+        ${MAIN_PATH}/detail/decoder/FieldDecoder.hpp
         ${MAIN_PATH}/decoder/DataDecoder.hpp ${MAIN_PATH}/decoder/GroupDecoder.hpp
-        ${MAIN_PATH}/simd/Uint8x16.hpp
-        ${MAIN_PATH}/simd/LinearSearch.hpp ${MAIN_PATH}/encoder/FieldEncoder.hpp
-        ${MAIN_PATH}/encoder/DataEncoder.hpp ${MAIN_PATH}/encoder/PayloadEncoder.hpp
+        ${MAIN_PATH}/detail/simd/Uint8x16.hpp
+        ${MAIN_PATH}/detail/simd/LinearSearch.hpp ${MAIN_PATH}/detail/encoder/FieldEncoder.hpp
+        ${MAIN_PATH}/encoder/DataEncoder.hpp ${MAIN_PATH}/detail/encoder/PayloadEncoder.hpp
         ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp)
 add_library(SimdFix INTERFACE)
-target_include_directories(SimdFix INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
+add_library(SimdFix::SimdFix ALIAS SimdFix)
+# In-tree builds (tests, benchmarks) see the headers where they live; installed
+# consumers see them under <prefix>/include. The public entry point is
+# org/limitless/fix/Fix.hpp; anything under org/limitless/fix/detail/ is internal.
+target_include_directories(SimdFix INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp>
+        $<INSTALL_INTERFACE:include>)
 target_compile_definitions(SimdFix INTERFACE $<$<CONFIG:Debug>:DEBUG_MODE> $<$<CONFIG:Release>:NDEBUG>
 )
 target_compile_options(SimdFix INTERFACE
@@ -71,6 +78,37 @@ target_compile_options(SimdFix INTERFACE
 target_link_options(SimdFix INTERFACE
         $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>
 )
+
+# --- Install / packaging --------------------------------------------------
+# Makes the header-only library consumable via find_package(SimdFix). Public
+# headers install under <prefix>/include preserving the org/limitless/fix tree.
+# NOTE: detail/ ships for now because the public base classes still include
+# detail/Tokens.hpp; physically excluding it follows once that coupling is cut.
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(TARGETS SimdFix EXPORT SimdFixTargets)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp/org
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        FILES_MATCHING
+            PATTERN "*.hpp"
+            PATTERN "*.inl"
+            PATTERN "unused" EXCLUDE)
+
+install(EXPORT SimdFixTargets
+        NAMESPACE SimdFix::
+        FILE SimdFixTargets.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SimdFix)
+
+configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/SimdFixConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/SimdFixConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SimdFix)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SimdFixConfig.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SimdFix)
+# --------------------------------------------------------------------------
 
 add_executable(SimdFixBenchmark ${TEST_PATH}/benchmark/SimdFixBenchmark.cpp)
 target_include_directories(SimdFixBenchmark PRIVATE

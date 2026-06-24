@@ -5,9 +5,9 @@
 #include <bit>
 
 #include <gtest/gtest.h>
-#include "org/limitless/fix/simd/Uint8x16.hpp"
+#include "org/limitless/fix/detail/simd/Uint8x16.hpp"
 
-using namespace org::limitless::fix::simd;
+using namespace org::limitless::fix::detail::simd;
 
 static void extract(const Uint8x16& v, uint8_t (&out)[16])
 {

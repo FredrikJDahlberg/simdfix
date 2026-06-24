@@ -5,9 +5,11 @@
 #ifndef SIMD_FIX_GROUP_ENCODER_HPP
 #define SIMD_FIX_GROUP_ENCODER_HPP
 
-#include "org/limitless/fix/encoder/FieldEncoder.hpp"
+#include "../detail/encoder/FieldEncoder.hpp"
 
 namespace org::limitless::fix::encoder {
+
+using namespace org::limitless::fix::detail;
 
 // Base class for generated repeating-group encoders (e.g. HopsEncoder).
 // Shares the FieldEncoder of the enclosing MessageEncoder/GroupEncoder and

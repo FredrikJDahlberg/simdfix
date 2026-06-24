@@ -5,9 +5,11 @@
 #ifndef SIMD_FIX_MESSAGE_ENCODER_HPP
 #define SIMD_FIX_MESSAGE_ENCODER_HPP
 
-#include "org/limitless/fix/encoder/FieldEncoder.hpp"
+#include "../detail/encoder/FieldEncoder.hpp"
 
 namespace org::limitless::fix::encoder {
+
+using namespace org::limitless::fix::detail;
 
 // Base class for generated message encoders (e.g. LogonEncoder, HeartbeatEncoder).
 // Owns the FieldEncoder used to write the message body and tracks how many bytes

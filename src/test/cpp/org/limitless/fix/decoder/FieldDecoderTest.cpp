@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
-#include "org/limitless/fix/decoder/FieldDecoder.hpp"
+#include "../../../../../../main/cpp/org/limitless/fix/detail/decoder/FieldDecoder.hpp"
 #include "org/limitless/fix/messages/FixTypes.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 

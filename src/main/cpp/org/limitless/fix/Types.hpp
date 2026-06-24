@@ -1,9 +1,15 @@
 //
 // Created by Fredrik Dahlberg on 2026-04-25.
 //
+// Public value and result vocabulary for simdfix: protocol constants, the
+// FixedString NTTP helper, the encode-dispatch concepts, SessionContext, the
+// Result status type, and the std::expected<…, Result::Values> aliases returned
+// by the decoders. This is the API-facing half of the former CodecTypes.hpp;
+// the tokenizer-internal types (Field, RecordType, …) live in detail/Tokens.hpp.
+//
 
-#ifndef SIMD_FIX_CODEC_TYPES_HPP
-#define SIMD_FIX_CODEC_TYPES_HPP
+#ifndef SIMD_FIX_TYPES_HPP
+#define SIMD_FIX_TYPES_HPP
 
 #include <algorithm>
 #include <concepts>
@@ -105,91 +111,6 @@ concept EncodableMessage = requires(T message, std::span<uint8_t> data)
     { message.encodedLength() } -> std::convertible_to<std::size_t>;
 };
 
-struct Field
-{
-    uint16_t m_position{};
-    uint16_t m_tag{};
-    uint16_t m_length{};
-};
-
-struct Category
-{
-    enum Values
-    {
-        Null,
-        Uint8,
-        Int32,
-        Uint32,
-        Int64,
-        Uint64,
-        Decimal,
-        Data,
-        String,
-        Timestamp,
-        UTCTimeOnly,
-        UTCDateOnly,
-        Counter,
-        Struct,
-        Group,
-        Enum,
-        Component,
-        Message
-    };
-
-    static constexpr std::string_view Names[] =
-    {
-        "Null",
-        "Uint8",
-        "Int32",
-        "Uint32",
-        "Int64",
-        "Uint64",
-        "FixedDecimal",
-        "Data",
-        "String",
-        "Timestamp",
-        "UTCTimeOnly",
-        "UTCDateOnly",
-        "Counter",
-        "Struct",
-        "Group",
-        "Enum",
-        "Component",
-        "Message"
-    };
-
-    static constexpr std::string_view Types[] =
-    {
-        "Null",
-        "std::uint8_t",
-        "std::int32_t",
-        "std::uint32_t",
-        "std::int64_t",
-        "std::uint64_t",
-        "utils::FixedDecimal",
-        "std::span<const uint8_t>",
-        "std::string_view",
-        "std::chrono::milliseconds",
-        "std::chrono::milliseconds",
-        "std::chrono::milliseconds",
-        "std::uint32_t",
-        "Struct",
-        "Group",
-        "Enum",
-        "Component",
-        "Message"
-    };
-
-    [[nodiscard]] static constexpr std::string_view name(const Values value)
-    {
-        return Names[value];
-    }
-    [[nodiscard]] static constexpr std::string_view type(const Values value)
-    {
-        return Types[value];
-    }
-};
-
 // Per-session expectations checked by the generated validate() method.
 // Non-owning: the spans must remain valid for the lifetime of the session.
 struct SessionContext
@@ -203,41 +124,6 @@ struct SessionContext
                    const std::string_view targetCompId) :
         m_protocol(protocol), m_senderCompId(senderCompId), m_targetCompId(targetCompId)
     {
-    }
-};
-
-struct RecordType
-{
-    enum Values { Null, Message, Component, Group, Enum };
-
-    static constexpr std::string_view Names[] = {
-        "Null", "Message", "Component", "Group", "Enum"
-    };
-
-    [[nodiscard]] static constexpr std::string_view name(const Values value) { return Names[value]; }
-};
-
-struct Presence
-{
-    enum Values { Null, Constant, Optional, Required };
-
-    static constexpr std::string_view Strings[] = { "NUll", "constant", "optional", "required" };
-    static constexpr std::string_view Names[] = { "Null", "Constant", "Optional", "Required" };
-
-    [[nodiscard]] static constexpr std::string_view name(const Values value)
-    {
-        return Names[value];
-    }
-
-    [[nodiscard]] static constexpr Values parse(const std::string_view name)
-    {
-        if (name.empty())
-        {
-            return Required;
-        }
-        constexpr auto end = Strings + std::size(Strings);
-        const auto found = std::find(Strings, end, name);
-        return found != end ? static_cast<Values>(found - Strings) : Null;
     }
 };
 
@@ -322,10 +208,7 @@ using Uint64Result = std::expected<uint64_t, Result::Values>;
 using TimestampResult = std::expected<std::chrono::milliseconds, Result::Values>;
 using FixedDecimalResult = std::expected<utils::FixedDecimal, Result::Values>;
 using DataResult = std::expected<Buffer, Result::Values>;
-using FieldSpan = std::span<Field>;
-using TagSpan = std::span<uint16_t>;
 
 }
 
-
-#endif //SIMD_FIX_CODEC_TYPES_HPP
+#endif //SIMD_FIX_TYPES_HPP

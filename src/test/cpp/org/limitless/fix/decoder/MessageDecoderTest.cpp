@@ -11,7 +11,7 @@
 
 #include <gtest/gtest.h>
 
-#include "org/limitless/fix/CodecTypes.hpp"
+#include "org/limitless/fix/Types.hpp"
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
 #include "org/limitless/fix/messages/FixMessageDecoders.hpp"
 #include "org/limitless/fix/messages/FixMessageHandler.hpp"

@@ -7,9 +7,9 @@
 
 #include <bit>
 
-#include "org/limitless/fix/simd/Uint8x16.hpp"
+#include "org/limitless/fix/detail/simd/Uint8x16.hpp"
 
-namespace org::limitless::fix::simd {
+namespace org::limitless::fix::detail::simd {
 
 [[nodiscard]] inline int32_t find(const uint16_t* array, const int32_t cardinality, const uint16_t key)
 {

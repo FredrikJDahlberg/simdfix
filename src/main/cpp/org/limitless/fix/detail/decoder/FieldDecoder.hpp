@@ -11,11 +11,11 @@
 #include <chrono>
 #include <utility>
 
-#include "org/limitless/fix/CodecTypes.hpp"
-#include "org/limitless/fix/simd/LinearSearch.hpp"
+#include "org/limitless/fix/detail/Tokens.hpp"
+#include "org/limitless/fix/detail/simd/LinearSearch.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
-namespace org::limitless::fix::decoder {
+namespace org::limitless::fix::detail {
 
 /**
  * Field-level access to a decoded FIX message: the raw byte buffer, the
