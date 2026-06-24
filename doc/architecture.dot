@@ -1,0 +1,110 @@
+digraph simdfix {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=11, shape=box, style="rounded,filled", fillcolor="#f5f5f5"];
+    edge [fontname="Helvetica", fontsize=9];
+
+    // Application layer
+    subgraph cluster_app {
+        label="Application";
+        style="rounded,dashed";
+        color="#888888";
+        fontsize=12;
+
+        Session [label="Session\n(state machine)", fillcolor="#dceefb"];
+        UserApp [label="User Handler\n(custom logic)", fillcolor="#dceefb"];
+    }
+
+    // Message handler
+    MessageHandler [label="MessageHandler\n(generated dispatch)", fillcolor="#fff3cd"];
+
+    Session -> MessageHandler [dir=back];
+    UserApp -> MessageHandler [dir=back];
+
+    // Decode path
+    subgraph cluster_decode {
+        label="Decode Path";
+        style="rounded,filled";
+        fillcolor="#e8f5e9";
+        color="#4caf50";
+        fontsize=12;
+
+        GenDecoders [label="Generated Decoders\nLogon | Logout | Heartbeat\nNewOrderSingle | ExecutionReport | ...", fillcolor="#fff3cd"];
+        GroupDecoder [label="GroupDecoder\nDataDecoder", fillcolor="#c8e6c9"];
+        MessageDecoder [label="MessageDecoder\n(header validation)", fillcolor="#c8e6c9"];
+        FieldDecoder [label="FieldDecoder\n(typed accessors, SWAR parsing\ngroup scopes, date memoization)", fillcolor="#c8e6c9"];
+        PayloadDecoder [label="PayloadDecoder\n(NEON tokenizer, 16 B/cycle\nchecksum, fragments)", fillcolor="#a5d6a7"];
+    }
+
+    // Encode path
+    subgraph cluster_encode {
+        label="Encode Path";
+        style="rounded,filled";
+        fillcolor="#e3f2fd";
+        color="#2196f3";
+        fontsize=12;
+
+        GenEncoders [label="Generated Encoders\nLogon | Logout | Heartbeat\nNewOrderSingle | ExecutionReport | ...", fillcolor="#fff3cd"];
+        GroupEncoder [label="GroupEncoder\nDataEncoder", fillcolor="#bbdefb"];
+        MessageEncoder [label="MessageEncoder\n(wrap, type, length)", fillcolor="#bbdefb"];
+        FieldEncoder [label="FieldEncoder\n(value → ASCII)", fillcolor="#bbdefb"];
+        PayloadEncoder [label="PayloadEncoder\n(framing, checksum)", fillcolor="#90caf9"];
+    }
+
+    // Decode edges
+    MessageHandler -> GenDecoders;
+    GenDecoders -> GroupDecoder;
+    GenDecoders -> MessageDecoder;
+    GroupDecoder -> FieldDecoder;
+    MessageDecoder -> FieldDecoder;
+    FieldDecoder -> PayloadDecoder;
+
+    // Encode edges
+    MessageHandler -> GenEncoders [dir=back];
+    GenEncoders -> GroupEncoder;
+    GenEncoders -> MessageEncoder;
+    GroupEncoder -> FieldEncoder;
+    MessageEncoder -> FieldEncoder;
+    FieldEncoder -> PayloadEncoder;
+
+    // Shared layer
+    subgraph cluster_shared {
+        label="Shared (SIMD + Utils)";
+        style="rounded,filled";
+        fillcolor="#fff8e1";
+        color="#ff9800";
+        fontsize=12;
+
+        LinearSearch [label="LinearSearch\n(NEON tag lookup, 8 tags/cycle)", fillcolor="#ffe0b2"];
+        Uint8x16 [label="Uint8x16\n(NEON uint8x16_t wrapper)", fillcolor="#ffcc80"];
+        Conversions [label="Conversions\n(SWAR digit parse/format\nisDigits, timestamps, enums)", fillcolor="#ffe0b2"];
+        FixedDecimal [label="FixedDecimal\n(int64 mantissa, 8 decimals\nreciprocal multiplication)", fillcolor="#ffe0b2"];
+    }
+
+    PayloadDecoder -> LinearSearch;
+    PayloadDecoder -> Uint8x16;
+    FieldDecoder -> LinearSearch;
+    FieldDecoder -> Conversions;
+    FieldDecoder -> FixedDecimal;
+    PayloadEncoder -> Conversions;
+    FieldEncoder -> Conversions;
+    FieldEncoder -> FixedDecimal;
+    LinearSearch -> Uint8x16;
+
+    // Code generation
+    subgraph cluster_gen {
+        label="Code Generation";
+        style="rounded,filled";
+        fillcolor="#f3e5f5";
+        color="#9c27b0";
+        fontsize=12;
+
+        ProtocolXml [label="protocol.xml", shape=note, fillcolor="#e1bee7"];
+        Generator [label="Generator\n(FixGenerator.cpp)", fillcolor="#ce93d8"];
+    }
+
+    ProtocolXml -> Generator;
+    Generator -> GenDecoders [style=dashed, label="generates"];
+    Generator -> GenEncoders [style=dashed, label="generates"];
+    Generator -> MessageHandler [style=dashed, label="generates"];
+}

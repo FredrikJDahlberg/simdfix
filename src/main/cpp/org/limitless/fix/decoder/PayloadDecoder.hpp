@@ -43,7 +43,7 @@ struct NoDataFields
 template <FixedString BeginString, typename DataFields = NoDataFields>
 class PayloadDecoder
 {
-    static constexpr size_t MaxSize = 64;
+    static constexpr size_t MaxSize = 256;
 
     static constexpr uint32_t RequiredFieldCount = 7;
     static constexpr uint32_t MessageFragmentLimit = 32;
