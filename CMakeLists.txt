@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.20)
 project(simdfix)
 
 set(CMAKE_CXX_STANDARD 23)
+# Emit compile_commands.json so clangd/IDE tooling sees the real flags
+# (-std=c++23, include dirs). Without it the dangling compile_commands.json
+# symlink leaves clangd on default flags, where std::span loses its C++20 range
+# support and reports bogus "does not satisfy std::ranges::input_range" errors.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Fail loudly instead of silently decaying to C++20: the code needs real C++23
 # (std::expected, std::print). Without this, toolchains whose C++23 support CMake
 # is unsure of (e.g. clang-18 on Ubuntu) quietly drop to C++20 and miscompile.
@@ -80,6 +85,20 @@ target_compile_options(SimdFixBenchmark PRIVATE -Wall
 )
 target_link_options(SimdFixBenchmark PRIVATE $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>)
 set_target_properties(SimdFixBenchmark PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+
+# Standalone micro-benchmark for the timestamp parsing path (header-only; no
+# generated messages needed). Build a Release configuration for real numbers.
+add_executable(TimestampBenchmark ${TEST_PATH}/benchmark/TimestampBenchmark.cpp)
+target_include_directories(TimestampBenchmark PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
+target_link_libraries(TimestampBenchmark PRIVATE SimdFix)
+target_compile_definitions(TimestampBenchmark PRIVATE $<$<CONFIG:Release>:NDEBUG>)
+target_compile_options(TimestampBenchmark PRIVATE -Wall
+        $<$<CONFIG:Debug>:-g -O0 -fsanitize=address -fno-omit-frame-pointer>
+        $<$<CONFIG:Release>:-O3 -march=native>
+)
+target_link_options(TimestampBenchmark PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
+set_target_properties(TimestampBenchmark PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 
 add_custom_target(ProfileCounters
         COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/counterprofile.trace

@@ -4,6 +4,7 @@
 #define NDEBUG 1
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdio>
 #include <memory>
@@ -455,6 +456,170 @@ struct NewOrderSingleGetterHandler : org::limitless::fix::messages::MessageHandl
     }
 };
 
+// EXEC_REPORT: parse + apply every ExecutionReportDecoder getter.
+struct ExecutionReportGetterHandler : org::limitless::fix::messages::MessageHandler<ExecutionReportGetterHandler>
+{
+    using MessageHandler::handle;
+
+    uint64_t sink = 0;
+
+    org::limitless::fix::Result::Values handle(org::limitless::fix::messages::ExecutionReportDecoder& report)
+    {
+        using namespace org::limitless::fix::messages;
+
+        sink += report.orderID().value_or(std::string_view{}).size();
+        sink += report.clOrdID().value_or(std::string_view{}).size();
+        sink += report.execID().value_or(std::string_view{}).size();
+        sink += static_cast<uint64_t>(report.execType().value_or(ExecType::New));
+        sink += static_cast<uint64_t>(report.ordStatus().value_or(OrdStatus::New));
+        sink += report.symbol().value_or(std::string_view{}).size();
+        sink += static_cast<uint64_t>(report.side().value_or(Side::Buy));
+        sink += report.orderQty().value_or(0);
+        sink += report.price().value_or(utils::FixedDecimal{}).mantissa();
+        sink += report.lastQty().value_or(0);
+        sink += report.lastPx().value_or(utils::FixedDecimal{}).mantissa();
+        sink += report.leavesQty().value_or(0);
+        sink += report.cumQty().value_or(0);
+        sink += report.avgPx().value_or(utils::FixedDecimal{}).mantissa();
+        sink += static_cast<uint64_t>(report.transactTime().value_or(std::chrono::milliseconds{0}).count());
+        sink += report.text().value_or(std::string_view{}).size();
+        return org::limitless::fix::Result::Success;
+    }
+};
+
+// Builds one ExecutionReport into buf and returns its encoded length. Using the
+// encoder guarantees a valid message with a correct BodyLength and CheckSum.
+static size_t encodeExecutionReport(const std::span<uint8_t> buf)
+{
+    using namespace org::limitless::fix::messages;
+
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    encoder.wrap(0, buf);
+
+    ExecutionReportEncoder report{};
+    encoder.wrapMessage(report)
+            .sequenceNumber(1)
+            .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+            .orderID("ORDER1")
+            .clOrdID("CLORD1")
+            .execID("EXEC1")
+            .execType(ExecType::Trade)
+            .ordStatus(OrdStatus::PartiallyFilled)
+            .symbol("AAPL")
+            .side(Side::Buy)
+            .orderQty(100)
+            .price(utils::FixedDecimal{15000, 0})
+            .lastQty(50)
+            .lastPx(utils::FixedDecimal{14950, 0})
+            .leavesQty(50)
+            .cumQty(50)
+            .avgPx(utils::FixedDecimal{14950, 0})
+            .transactTime(std::chrono::milliseconds{1'781'378'773'959})
+            .text("FILL");
+
+    return encoder.encode(report);
+}
+
+// ER_HOT: hot-cache decode of ExecutionReport (tokenization only, no getters).
+static void benchExecutionReportHot()
+{
+    decoder::PayloadDecoder<FIXT_1_1> decoder;
+
+    std::array<uint8_t, 256> msg{};
+    const size_t msgLength = encodeExecutionReport(msg);
+
+    constexpr size_t HOT_SIZE  = 256 * 1024;
+    constexpr size_t HOT_COUNT = 4096;
+    auto hotBuf = std::make_unique<uint8_t[]>(HOT_SIZE);
+
+    size_t i = 0;
+    for (; i + msgLength <= HOT_SIZE; i += msgLength)
+    {
+        std::memcpy(&hotBuf[i], msg.data(), msgLength);
+    }
+    std::memset(&hotBuf[i], ' ', HOT_SIZE - i);
+
+    const size_t msgsPerPass = HOT_SIZE / msgLength;
+
+    for (int w = 0; w < 4; ++w)
+    {
+        for (size_t j = 0; j < msgsPerPass; ++j)
+        {
+            const std::span<const uint8_t> bytes(&hotBuf[j * msgLength], msgLength);
+            (void) decoder.parse(bytes);
+        }
+    }
+
+    const size_t hotMsgs = msgsPerPass * HOT_COUNT;
+    const auto duration = timer([&]
+    {
+        for (size_t iter = 0; iter < HOT_COUNT; ++iter)
+        {
+            for (size_t j = 0; j < msgsPerPass; ++j)
+            {
+                const std::span<const uint8_t> bytes(&hotBuf[j * msgLength], msgLength);
+                (void) decoder.parse(bytes);
+            }
+        }
+    });
+    report("ER HOT", duration, hotMsgs, msgLength);
+}
+
+// ER_GETTERS: parse + apply every ExecutionReportDecoder getter.
+static void benchExecutionReportGetters()
+{
+    decoder::PayloadDecoder<FIXT_1_1> decoder;
+
+    std::array<uint8_t, 256> msg{};
+    const size_t msgLength = encodeExecutionReport(msg);
+
+    constexpr size_t HOT_SIZE  = 256 * 1024;
+    constexpr size_t HOT_COUNT = 4096;
+    auto hotBuf = std::make_unique<uint8_t[]>(HOT_SIZE);
+
+    size_t i = 0;
+    for (; i + msgLength <= HOT_SIZE; i += msgLength)
+    {
+        std::memcpy(&hotBuf[i], msg.data(), msgLength);
+    }
+    std::memset(&hotBuf[i], ' ', HOT_SIZE - i);
+
+    const size_t msgsPerPass = HOT_SIZE / msgLength;
+    const size_t hotMsgs = msgsPerPass * HOT_COUNT;
+
+    ExecutionReportGetterHandler handler{};
+    const auto duration = timer([&]
+    {
+        for (size_t iter = 0; iter < HOT_COUNT; ++iter)
+        {
+            for (size_t j = 0; j < msgsPerPass; ++j)
+            {
+                const std::span<const uint8_t> bytes(&hotBuf[j * msgLength], msgLength);
+                (void) decoder.parse(bytes, handler);
+            }
+        }
+    });
+    std::printf("sink = %llu\n", static_cast<unsigned long long>(handler.sink));
+    report("ER GETTERS", duration, hotMsgs, msgLength);
+}
+
+// ER_ENCODE: encode an ExecutionReport message repeatedly.
+static void benchExecutionReportEncode()
+{
+    constexpr size_t HOT_COUNT = 1'000'000;
+    std::array<uint8_t, 256> buffer{};
+
+    size_t encodedLength = 0;
+    const auto duration = timer([&]
+    {
+        for (size_t i = 0; i < HOT_COUNT; ++i)
+        {
+            encodedLength = encodeExecutionReport(buffer);
+        }
+    });
+    report("ER ENCODE", duration, HOT_COUNT, encodedLength);
+}
+
 static void benchNewOrderSingleGetters()
 {
     decoder::PayloadDecoder<FIXT_1_1> decoder;
@@ -575,6 +740,9 @@ static constexpr Benchmark BENCHMARKS[] = {
     {"nos-hot",       benchNewOrderSingleHot},
     {"nos-getters",   benchNewOrderSingleGetters},
     {"nos-encode",    benchNewOrderSingleEncode},
+    {"er-hot",        benchExecutionReportHot},
+    {"er-getters",    benchExecutionReportGetters},
+    {"er-encode",     benchExecutionReportEncode},
 };
 
 static void printUsage(const char* program)
@@ -589,9 +757,13 @@ static void printUsage(const char* program)
 
 int main(const int argc, char** argv)
 {
-    std::printf("Logon message length         = %zu bytes\n", LOGIN_LENGTH);
-    std::printf("Logon+data message length    = %zu bytes\n", LOGIN_DATA_LENGTH);
-    std::printf("NewOrderSingle message length = %zu bytes\n\n", NEW_ORDER_SINGLE_LENGTH);
+    std::array<uint8_t, 256> erBuf{};
+    const size_t erLength = encodeExecutionReport(erBuf);
+
+    std::printf("Logon message length          = %zu bytes\n", LOGIN_LENGTH);
+    std::printf("Logon+data message length     = %zu bytes\n", LOGIN_DATA_LENGTH);
+    std::printf("NewOrderSingle message length = %zu bytes\n", NEW_ORDER_SINGLE_LENGTH);
+    std::printf("ExecutionReport message length = %zu bytes\n\n", erLength);
 
     if (argc < 2)
     {

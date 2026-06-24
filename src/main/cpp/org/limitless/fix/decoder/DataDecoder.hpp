@@ -64,8 +64,7 @@ public:
     }
 
     /**
-     * @return the raw byte span from the most recent wrap(), or an error
-     *         if either tag was missing
+     * @return the raw byte span from the most recent wrap(), or an error if either tag was missing
      */
     [[nodiscard]] DataResult get() const
     {

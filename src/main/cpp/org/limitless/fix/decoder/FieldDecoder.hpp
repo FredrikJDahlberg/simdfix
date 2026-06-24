@@ -380,7 +380,7 @@ public:
         }
         else if constexpr (std::is_same_v<T, std::chrono::milliseconds>)
         {
-            const auto ms = utils::dateTimeToEpochUTC(m_data.data() + field.m_position, field.m_length);
+            const auto ms = cachedTimestamp(m_data.data() + field.m_position, field.m_length);
             if (ms < 0)
             {
                 return std::unexpected{Result::InvalidLength};
@@ -542,7 +542,7 @@ public:
         if (index >= 0)
         {
             const auto& field = m_fields[index];
-            const auto ms = utils::dateTimeToEpochUTC(m_data.data() + field.m_position, field.m_length);
+            const auto ms = cachedTimestamp(m_data.data() + field.m_position, field.m_length);
             if (ms < 0)
             {
                 return std::unexpected{Result::InvalidLength};
@@ -630,6 +630,44 @@ public:
     }
 
 private:
+    /**
+     * Parses a UTCTimestamp to milliseconds since the epoch, memoizing the
+     * expensive YYYYMMDD->days conversion. Successive timestamps that share a
+     * date (e.g. SendingTime and TransactTime, or every message in a day's
+     * feed) reuse the cached day count and skip the calendar arithmetic. The
+     * cache is keyed on the exact 8 date bytes, so distinct dates never
+     * collide, and only validated dates are cached. Persists across wrap() to
+     * exploit cross-message date locality.
+     * @param data UTCTimestamp bytes
+     * @param length 17 or 21
+     * @return milliseconds since the epoch, or -1 on bad length/value
+     */
+    [[nodiscard]] int64_t cachedTimestamp(const uint8_t* data, const uint32_t length) const
+    {
+        if (length < utils::UTCTimestampShortLength)
+        {
+            return -1;
+        }
+        uint64_t word;
+        std::memcpy(&word, data, sizeof(word));
+        int64_t days;
+        if (word == m_dateWord)
+        {
+            days = m_dateDays;
+        }
+        else
+        {
+            days = utils::dateToEpochDays(data);
+            if (days < 0)
+            {
+                return -1;
+            }
+            m_dateWord = word;
+            m_dateDays = days;
+        }
+        return utils::timestampMillisFromDays(data, length, days);
+    }
+
     Buffer m_data{};
     FieldSpan m_fields{};
     TagSpan m_tags{};
@@ -637,6 +675,11 @@ private:
 
     std::array<Scope, MaxGroupDepth> m_scopes{};
     int32_t m_scopeDepth{};
+
+    // Memoized date->days for cachedTimestamp(). m_dateWord holds the last 8
+    // date bytes seen; the sentinel never matches 8 ASCII digits.
+    mutable uint64_t m_dateWord{~0ull};
+    mutable int64_t m_dateDays{0};
 };
 
 }

@@ -1,9 +1,12 @@
 //
 // Created by Fredrik Dahlberg on 2026-04-24.
 //
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <ranges>
 #include <span>
 #include <string>
-#include <chrono>
 #include <vector>
 
 #include <gtest/gtest.h>

@@ -22,6 +22,7 @@ private:
     uint32_t m_repeat{};
     uint16_t m_delim{};
     uint32_t m_offset{};
+    uint32_t m_next{};
 
 protected:
     FieldDecoder& m_decoder;
@@ -62,6 +63,12 @@ public:
             m_count = count.value_or(0);
             m_delim = m_decoder.fieldAt(m_offset + 1).m_tag;
             m_repeat = 0;
+            // Locate the first entry's delimiter once; next() consumes this and
+            // each entry's end becomes the following entry's start.
+            if (m_count > 0)
+            {
+                m_next = nextGroupOffset();
+            }
         }
         else
         {
@@ -81,7 +88,9 @@ public:
     /**
      * Advances to the next repeating-group entry, replacing the current
      * FieldDecoder group scope (if any) with the new entry's
-     * [begin, end) field range.
+     * [begin, end) field range. The entry's start is the previous entry's
+     * cached end (or the first delimiter from wrap()), so only a single
+     * delimiter scan per entry is needed to find the end.
      */
     void next()
     {
@@ -89,11 +98,11 @@ public:
         {
             m_decoder.popGroupScope();
         }
-        m_offset = nextGroupOffset();
+        m_offset = m_next;
         ++m_repeat;
 
-        const auto found = nextGroupOffset();
-        m_decoder.pushGroupScope(m_offset, found);
+        m_next = nextGroupOffset();
+        m_decoder.pushGroupScope(m_offset, m_next);
     }
 
     /**

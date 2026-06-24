@@ -13,6 +13,8 @@
 #include <span>
 #include <bit>
 #include <algorithm>
+#include <array>
+#include <utility>
 #include <print>
 
 namespace org::limitless::fix::utils {
@@ -286,19 +288,14 @@ template <uint32_t Divisor>
 }
 
 /**
- * Parses a FIX UTCTimestamp ("YYYYMMDD-HH:MM:SS" or "YYYYMMDD-HH:MM:SS.sss")
- * into milliseconds since the Unix epoch.
- * @param data UTCTimestamp bytes; must have at least sizeof(uint64_t)
- *             readable bytes beyond the first 8 (for the SWAR date parse)
- * @param length 17 (no milliseconds) or 21 (with milliseconds)
- * @return milliseconds since the Unix epoch, or -1 if length is neither 17 nor 21
+ * Parses an 8-digit FIX date ("YYYYMMDD") into days since the Unix epoch. The
+ * heavy part of UTCTimestamp/UTCDateOnly parsing; factored out so callers can
+ * memoize it across fields that share a date (see FieldDecoder).
+ * @param data date bytes; must have at least sizeof(uint64_t) readable bytes
+ * @return days since 1970-01-01, or -1 if the month/day are out of range
  */
-inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
+[[nodiscard]] inline int64_t dateToEpochDays(const uint8_t* data)
 {
-    if (length < UTCTimestampShortLength)
-    {
-        return -1;
-    }
     const auto date = static_cast<uint32_t>(asciiToUint64(data, 8, true));
     const uint32_t years = fastDivide<10000>(date);
     const uint32_t month = fastDivide<100>(date - 10000 * years);
@@ -307,8 +304,20 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
     {
         return -1;
     }
-    const auto days = daysSince1970(static_cast<int32_t>(years), static_cast<int32_t>(month), static_cast<int32_t>(day));
+    return daysSince1970(static_cast<int32_t>(years), static_cast<int32_t>(month), static_cast<int32_t>(day));
+}
 
+/**
+ * Assembles a UTCTimestamp's milliseconds-since-epoch from a precomputed day
+ * count and the time-of-day portion ("HH:MM:SS[.sss]") at data + 9.
+ * @param data UTCTimestamp bytes; must have at least sizeof(uint64_t) readable
+ *             bytes beyond the first 9 (for the SWAR time parse)
+ * @param length 17 (no milliseconds) or 21 (with milliseconds)
+ * @param days days since the Unix epoch for the timestamp's date
+ * @return milliseconds since the Unix epoch, or -1 on a bad time/length
+ */
+[[nodiscard]] inline int64_t timestampMillisFromDays(const uint8_t* data, const uint32_t length, const int64_t days)
+{
     uint64_t time = 0;
     std::memcpy(&time, data + 9, sizeof(time));
     time -= 0x30303a30303a3030ull;
@@ -333,6 +342,28 @@ inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
         return millis;
     }
     return -1;
+}
+
+/**
+ * Parses a FIX UTCTimestamp ("YYYYMMDD-HH:MM:SS" or "YYYYMMDD-HH:MM:SS.sss")
+ * into milliseconds since the Unix epoch.
+ * @param data UTCTimestamp bytes; must have at least sizeof(uint64_t)
+ *             readable bytes beyond the first 8 (for the SWAR date parse)
+ * @param length 17 (no milliseconds) or 21 (with milliseconds)
+ * @return milliseconds since the Unix epoch, or -1 if length is neither 17 nor 21
+ */
+inline int64_t dateTimeToEpochUTC(const uint8_t* data, const uint32_t length)
+{
+    if (length < UTCTimestampShortLength)
+    {
+        return -1;
+    }
+    const auto days = dateToEpochDays(data);
+    if (days < 0)
+    {
+        return -1;
+    }
+    return timestampMillisFromDays(data, length, days);
 }
 
 /**
@@ -386,15 +417,8 @@ inline int64_t dateOnlyToEpochUTC(const uint8_t* data, const uint32_t length)
     {
         return -1;
     }
-    const auto date = static_cast<uint32_t>(asciiToUint64(data, 8, true));
-    const auto years = fastDivide<10000>(date);
-    const auto month = fastDivide<100>(date - 10000 * years);
-    const auto day = date - 100 * fastDivide<100>(date);
-    if (month < 1 || month > 12 || day < 1 || day > 31)
-    {
-        return -1;
-    }
-    return daysSince1970(static_cast<int32_t>(years), static_cast<int32_t>(month), static_cast<int32_t>(day)) * MillisPerDay;
+    const auto days = dateToEpochDays(data);
+    return days < 0 ? -1 : days * MillisPerDay;
 }
 
 /**
@@ -700,8 +724,34 @@ inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateT
 }
 
 /**
+ * Builds a 256-entry byte->value table for an enum whose Codes are all single
+ * bytes, mapping each code's byte to its enum value and every other byte to
+ * Null. The returned flag reports whether the code set is single-byte; when it
+ * is false the table is unusable and callers fall back to a linear scan.
+ * @tparam Enum enum wrapper type exposing a Codes array and a Values enum
+ * @return {table, singleByte} pair
+ */
+template <typename Enum>
+constexpr std::pair<std::array<typename Enum::Values, 256>, bool> makeByteTable()
+{
+    std::array<typename Enum::Values, 256> table{};
+    table.fill(Enum::Values::Null);
+    for (std::size_t value = 1; value < std::size(Enum::Codes); ++value)
+    {
+        if (Enum::Codes[value].size() != 1)
+        {
+            return {table, false};
+        }
+        table[static_cast<uint8_t>(Enum::Codes[value][0])] = static_cast<Enum::Values>(value);
+    }
+    return {table, true};
+}
+
+/**
  * Maps a FIX field's string code to the corresponding enum value via
- * Enum::Codes.
+ * Enum::Codes. Single-byte code sets (the common case) resolve through a
+ * compile-time byte table in O(1); enums with any multi-byte code fall back to
+ * a linear scan.
  * @tparam Enum enum wrapper type exposing a Codes array and a Values enum,
  *              including Values::Null
  * @param code string code to look up
@@ -710,14 +760,22 @@ inline std::chrono::milliseconds dateTimeToEpochUTC(const std::string_view dateT
 template <typename Enum>
 Enum::Values find(const std::string_view code)
 {
-    const auto end = Enum::Codes + std::size(Enum::Codes);
-    const auto found = std::find(Enum::Codes, end, code);
-    if (found != end)
+    static constexpr auto built = makeByteTable<Enum>();
+    if constexpr (built.second)
     {
-        auto index = std::distance(Enum::Codes, found);
-        return static_cast<Enum::Values>(index);
+        return code.size() == 1 ? built.first[static_cast<uint8_t>(code[0])] : Enum::Values::Null;
     }
-    return Enum::Values::Null;
+    else
+    {
+        const auto end = Enum::Codes + std::size(Enum::Codes);
+        const auto found = std::find(Enum::Codes, end, code);
+        if (found != end)
+        {
+            auto index = std::distance(Enum::Codes, found);
+            return static_cast<Enum::Values>(index);
+        }
+        return Enum::Values::Null;
+    }
 }
 
 }
