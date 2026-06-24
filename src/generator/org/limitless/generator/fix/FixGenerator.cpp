@@ -279,11 +279,8 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "using fix::Result;\n\n";
     out << "template <typename Handler>\n";
     out << "class MessageHandler\n{\n";
-    for (auto& message: messages)
-    {
-        out << std::format("    {}Decoder m_{};\n", message.m_name, uncap(message.m_name));
-    }
-    out << "\npublic:\n";
+    out << "    const SessionContext* m_context{};\n\n";
+    out << "public:\n";
     out << "    template <typename Event>\n";
     out << "    Result::Values receive(Event&& event)\n";
     out << "    {\n";
@@ -291,10 +288,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "    }\n\n";
     out << "    void setSessionContext(const SessionContext& context)\n";
     out << "    {\n";
-    for (auto& message: messages)
-    {
-        out << std::format("        m_{}.context(&context);\n", uncap(message.m_name));
-    }
+    out << "        m_context = &context;\n";
     out << "    }\n\n";
     out << "    Result::Values handle(const detail::TokenizedMessage& message,\n";
     out << "                          const uint8_t messageType)\n";
@@ -304,15 +298,22 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "        {\n";
     for (auto& message: messages)
     {
-        auto memberName = uncap(message.m_name);
+        // LogonDecoder logon;
+        // logon.context(m_context);
+        // logon.wrap(message);
+        auto localName = uncap(message.m_name);
         out << std::format("            case {}Decoder::MessageId:\n", message.m_name);
-        out << std::format("                m_{}.wrap(message);\n", memberName);
-        out << std::format("                status = m_{}.validate();\n", memberName);
+        out << "            {\n";
+        out << std::format("                {}Decoder {}{{m_context, message}};\n", message.m_name, localName);
+        //out << std::format("                {}.context(m_context);\n", localName);
+        //out << std::format("                {}.wrap(message);\n", localName);
+        out << std::format("                status = {}.validate();\n", localName);
         out << "                if (status == Result::Success)\n";
         out << "                {\n";
-        out << std::format("                    status = receive(m_{});\n", memberName);
+        out << std::format("                    status = receive({});\n", localName);
         out << "                }\n";
         out << "                break;\n";
+        out << "            }\n";
     }
     out << "            default:\n";
     out << "                break;\n";
@@ -359,10 +360,20 @@ static void generateConstructors(std::ostream& out, const Record& record, const 
                                uncap(codec), field.m_name != back.m_name ? "," : "");
         }
     }
+    out << "    {\n    }\n\n";
+
+    if (record.m_parent == RecordType::Message && codec == "Decoder")
+    {
+        out << std::format("    {}{}(const SessionContext* context, const TokenizedMessage& message)\n", record.m_name, codec);
+        out << std::format("        : {}{}{{}}\n", record.m_name, codec);
+        out << "    {\n";
+        out << std::format("        Message{}::wrap(message);\n", codec);
+        out << std::format("        Message{}::context(context);\n", codec);
+        out << "    }\n\n";
+    }
+
     if (!record.m_records.empty() || record.m_parent == RecordType::Group)
     {
-        out << "    {\n    }\n\n";
-
         const auto name = std::format("{}{}", record.m_name, codec);
         out << std::format("    {}(const {}&) = delete;\n", name, name);
         out << std::format("    {}& operator=(const {}&) = delete;\n", name, name);
@@ -433,20 +444,7 @@ static void generateStructFields(std::ostream& out, const Record& record, const 
 
 static void generateWrapNextDecoders(std::ostream& out, const Record& record)
 {
-    if (record.m_parent == RecordType::Message)
-    {
-        out << std::format("    {}Decoder& wrap(const detail::TokenizedMessage& message)\n", record.m_name);
-        out << "    {\n";
-        out << "        MessageDecoder::wrap(message);\n";
-        out << "        return *this;\n";
-        out << "    }\n\n";
-
-        out << "    void context(const SessionContext* context)\n";
-        out << "    {\n";
-        out << "        MessageDecoder::context(context);\n";
-        out << "    }\n\n";
-    }
-    else if (record.m_parent == RecordType::Group)
+    if (record.m_parent == RecordType::Group)
     {
         out << std::format("    {}Decoder& wrap()\n", record.m_name);
         out << "    {\n";

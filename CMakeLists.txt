@@ -59,7 +59,8 @@ set(FIX_HEADERS
         ${MAIN_PATH}/detail/simd/Uint8x16.hpp
         ${MAIN_PATH}/detail/simd/LinearSearch.hpp ${MAIN_PATH}/detail/encoder/FieldEncoder.hpp
         ${MAIN_PATH}/encoder/DataEncoder.hpp ${MAIN_PATH}/encoder/PayloadEncoder.hpp
-        ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp)
+        ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp
+        src/main/cpp/org/limitless/fix/session/Session.hpp)
 add_library(SimdFix INTERFACE)
 add_library(SimdFix::SimdFix ALIAS SimdFix)
 # In-tree builds (tests, benchmarks) see the headers where they live; installed
@@ -271,7 +272,8 @@ endif()
 
 # Dynamically create an executable or library treating headers as source items
 # Using set_source_files_properties forces CMake/Compilers to attempt compilation
-add_library(header_test ${FIX_HEADERS} ${GENERATED_HEADERS})
+add_library(header_test ${FIX_HEADERS} ${GENERATED_HEADERS}
+        src/main/cpp/org/limitless/fix/session/Session.hpp)
 set_source_files_properties(${FIX_HEADERS} ${GENERATED_HEADERS} PROPERTIES LANGUAGE CXX)
 target_include_directories(header_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp)
 add_dependencies(header_test GenerateMessages)

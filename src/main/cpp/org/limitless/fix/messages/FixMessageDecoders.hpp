@@ -125,23 +125,19 @@ public:
     {
     }
 
+    LogonDecoder(const SessionContext* context, const TokenizedMessage& message)
+        : LogonDecoder{}
+    {
+        MessageDecoder::wrap(message);
+        MessageDecoder::context(context);
+    }
+
     LogonDecoder(const LogonDecoder&) = delete;
     LogonDecoder& operator=(const LogonDecoder&) = delete;
     LogonDecoder(LogonDecoder&&) = delete;
     LogonDecoder& operator=(LogonDecoder&&) = delete;
 
     static constexpr uint8_t MessageId = 'A';
-
-    LogonDecoder& wrap(const detail::TokenizedMessage& message)
-    {
-        MessageDecoder::wrap(message);
-        return *this;
-    }
-
-    void context(const SessionContext* context)
-    {
-        MessageDecoder::context(context);
-    }
 
     [[nodiscard]] Result::Values validate()
     {
@@ -246,23 +242,19 @@ public:
     {
     }
 
+    LogoutDecoder(const SessionContext* context, const TokenizedMessage& message)
+        : LogoutDecoder{}
+    {
+        MessageDecoder::wrap(message);
+        MessageDecoder::context(context);
+    }
+
     LogoutDecoder(const LogoutDecoder&) = delete;
     LogoutDecoder& operator=(const LogoutDecoder&) = delete;
     LogoutDecoder(LogoutDecoder&&) = delete;
     LogoutDecoder& operator=(LogoutDecoder&&) = delete;
 
     static constexpr uint8_t MessageId = '5';
-
-    LogoutDecoder& wrap(const detail::TokenizedMessage& message)
-    {
-        MessageDecoder::wrap(message);
-        return *this;
-    }
-
-    void context(const SessionContext* context)
-    {
-        MessageDecoder::context(context);
-    }
 
     [[nodiscard]] Result::Values validate()
     {
@@ -352,23 +344,19 @@ public:
     {
     }
 
+    HeartbeatDecoder(const SessionContext* context, const TokenizedMessage& message)
+        : HeartbeatDecoder{}
+    {
+        MessageDecoder::wrap(message);
+        MessageDecoder::context(context);
+    }
+
     HeartbeatDecoder(const HeartbeatDecoder&) = delete;
     HeartbeatDecoder& operator=(const HeartbeatDecoder&) = delete;
     HeartbeatDecoder(HeartbeatDecoder&&) = delete;
     HeartbeatDecoder& operator=(HeartbeatDecoder&&) = delete;
 
     static constexpr uint8_t MessageId = '0';
-
-    HeartbeatDecoder& wrap(const detail::TokenizedMessage& message)
-    {
-        MessageDecoder::wrap(message);
-        return *this;
-    }
-
-    void context(const SessionContext* context)
-    {
-        MessageDecoder::context(context);
-    }
 
     [[nodiscard]] Result::Values validate()
     {
@@ -458,23 +446,19 @@ public:
     {
     }
 
+    TestRequestDecoder(const SessionContext* context, const TokenizedMessage& message)
+        : TestRequestDecoder{}
+    {
+        MessageDecoder::wrap(message);
+        MessageDecoder::context(context);
+    }
+
     TestRequestDecoder(const TestRequestDecoder&) = delete;
     TestRequestDecoder& operator=(const TestRequestDecoder&) = delete;
     TestRequestDecoder(TestRequestDecoder&&) = delete;
     TestRequestDecoder& operator=(TestRequestDecoder&&) = delete;
 
     static constexpr uint8_t MessageId = '1';
-
-    TestRequestDecoder& wrap(const detail::TokenizedMessage& message)
-    {
-        MessageDecoder::wrap(message);
-        return *this;
-    }
-
-    void context(const SessionContext* context)
-    {
-        MessageDecoder::context(context);
-    }
 
     [[nodiscard]] Result::Values validate()
     {
@@ -566,23 +550,19 @@ public:
     {
     }
 
+    ResendRequestDecoder(const SessionContext* context, const TokenizedMessage& message)
+        : ResendRequestDecoder{}
+    {
+        MessageDecoder::wrap(message);
+        MessageDecoder::context(context);
+    }
+
     ResendRequestDecoder(const ResendRequestDecoder&) = delete;
     ResendRequestDecoder& operator=(const ResendRequestDecoder&) = delete;
     ResendRequestDecoder(ResendRequestDecoder&&) = delete;
     ResendRequestDecoder& operator=(ResendRequestDecoder&&) = delete;
 
     static constexpr uint8_t MessageId = '2';
-
-    ResendRequestDecoder& wrap(const detail::TokenizedMessage& message)
-    {
-        MessageDecoder::wrap(message);
-        return *this;
-    }
-
-    void context(const SessionContext* context)
-    {
-        MessageDecoder::context(context);
-    }
 
     [[nodiscard]] Result::Values validate()
     {
@@ -688,23 +668,19 @@ public:
     {
     }
 
+    RejectDecoder(const SessionContext* context, const TokenizedMessage& message)
+        : RejectDecoder{}
+    {
+        MessageDecoder::wrap(message);
+        MessageDecoder::context(context);
+    }
+
     RejectDecoder(const RejectDecoder&) = delete;
     RejectDecoder& operator=(const RejectDecoder&) = delete;
     RejectDecoder(RejectDecoder&&) = delete;
     RejectDecoder& operator=(RejectDecoder&&) = delete;
 
     static constexpr uint8_t MessageId = '3';
-
-    RejectDecoder& wrap(const detail::TokenizedMessage& message)
-    {
-        MessageDecoder::wrap(message);
-        return *this;
-    }
-
-    void context(const SessionContext* context)
-    {
-        MessageDecoder::context(context);
-    }
 
     [[nodiscard]] Result::Values validate()
     {
@@ -820,23 +796,19 @@ public:
     {
     }
 
+    SequenceResetDecoder(const SessionContext* context, const TokenizedMessage& message)
+        : SequenceResetDecoder{}
+    {
+        MessageDecoder::wrap(message);
+        MessageDecoder::context(context);
+    }
+
     SequenceResetDecoder(const SequenceResetDecoder&) = delete;
     SequenceResetDecoder& operator=(const SequenceResetDecoder&) = delete;
     SequenceResetDecoder(SequenceResetDecoder&&) = delete;
     SequenceResetDecoder& operator=(SequenceResetDecoder&&) = delete;
 
     static constexpr uint8_t MessageId = '4';
-
-    SequenceResetDecoder& wrap(const detail::TokenizedMessage& message)
-    {
-        MessageDecoder::wrap(message);
-        return *this;
-    }
-
-    void context(const SessionContext* context)
-    {
-        MessageDecoder::context(context);
-    }
 
     [[nodiscard]] Result::Values validate()
     {
@@ -946,23 +918,19 @@ public:
     {
     }
 
+    ExecutionReportDecoder(const SessionContext* context, const TokenizedMessage& message)
+        : ExecutionReportDecoder{}
+    {
+        MessageDecoder::wrap(message);
+        MessageDecoder::context(context);
+    }
+
     ExecutionReportDecoder(const ExecutionReportDecoder&) = delete;
     ExecutionReportDecoder& operator=(const ExecutionReportDecoder&) = delete;
     ExecutionReportDecoder(ExecutionReportDecoder&&) = delete;
     ExecutionReportDecoder& operator=(ExecutionReportDecoder&&) = delete;
 
     static constexpr uint8_t MessageId = '8';
-
-    ExecutionReportDecoder& wrap(const detail::TokenizedMessage& message)
-    {
-        MessageDecoder::wrap(message);
-        return *this;
-    }
-
-    void context(const SessionContext* context)
-    {
-        MessageDecoder::context(context);
-    }
 
     [[nodiscard]] Result::Values validate()
     {
@@ -1184,23 +1152,19 @@ public:
     {
     }
 
+    NewOrderSingleDecoder(const SessionContext* context, const TokenizedMessage& message)
+        : NewOrderSingleDecoder{}
+    {
+        MessageDecoder::wrap(message);
+        MessageDecoder::context(context);
+    }
+
     NewOrderSingleDecoder(const NewOrderSingleDecoder&) = delete;
     NewOrderSingleDecoder& operator=(const NewOrderSingleDecoder&) = delete;
     NewOrderSingleDecoder(NewOrderSingleDecoder&&) = delete;
     NewOrderSingleDecoder& operator=(NewOrderSingleDecoder&&) = delete;
 
     static constexpr uint8_t MessageId = 'D';
-
-    NewOrderSingleDecoder& wrap(const detail::TokenizedMessage& message)
-    {
-        MessageDecoder::wrap(message);
-        return *this;
-    }
-
-    void context(const SessionContext* context)
-    {
-        MessageDecoder::context(context);
-    }
 
     [[nodiscard]] Result::Values validate()
     {

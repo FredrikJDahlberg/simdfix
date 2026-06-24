@@ -12,15 +12,7 @@ using fix::Result;
 template <typename Handler>
 class MessageHandler
 {
-    LogonDecoder m_logon;
-    LogoutDecoder m_logout;
-    HeartbeatDecoder m_heartbeat;
-    TestRequestDecoder m_testRequest;
-    ResendRequestDecoder m_resendRequest;
-    RejectDecoder m_reject;
-    SequenceResetDecoder m_sequenceReset;
-    ExecutionReportDecoder m_executionReport;
-    NewOrderSingleDecoder m_newOrderSingle;
+    const SessionContext* m_context{};
 
 public:
     template <typename Event>
@@ -31,15 +23,7 @@ public:
 
     void setSessionContext(const SessionContext& context)
     {
-        m_logon.context(&context);
-        m_logout.context(&context);
-        m_heartbeat.context(&context);
-        m_testRequest.context(&context);
-        m_resendRequest.context(&context);
-        m_reject.context(&context);
-        m_sequenceReset.context(&context);
-        m_executionReport.context(&context);
-        m_newOrderSingle.context(&context);
+        m_context = &context;
     }
 
     Result::Values handle(const detail::TokenizedMessage& message,
@@ -49,77 +33,95 @@ public:
         switch (messageType)
         {
             case LogonDecoder::MessageId:
-                m_logon.wrap(message);
-                status = m_logon.validate();
+            {
+                LogonDecoder logon{m_context, message};
+                status = logon.validate();
                 if (status == Result::Success)
                 {
-                    status = receive(m_logon);
+                    status = receive(logon);
                 }
                 break;
+            }
             case LogoutDecoder::MessageId:
-                m_logout.wrap(message);
-                status = m_logout.validate();
+            {
+                LogoutDecoder logout{m_context, message};
+                status = logout.validate();
                 if (status == Result::Success)
                 {
-                    status = receive(m_logout);
+                    status = receive(logout);
                 }
                 break;
+            }
             case HeartbeatDecoder::MessageId:
-                m_heartbeat.wrap(message);
-                status = m_heartbeat.validate();
+            {
+                HeartbeatDecoder heartbeat{m_context, message};
+                status = heartbeat.validate();
                 if (status == Result::Success)
                 {
-                    status = receive(m_heartbeat);
+                    status = receive(heartbeat);
                 }
                 break;
+            }
             case TestRequestDecoder::MessageId:
-                m_testRequest.wrap(message);
-                status = m_testRequest.validate();
+            {
+                TestRequestDecoder testRequest{m_context, message};
+                status = testRequest.validate();
                 if (status == Result::Success)
                 {
-                    status = receive(m_testRequest);
+                    status = receive(testRequest);
                 }
                 break;
+            }
             case ResendRequestDecoder::MessageId:
-                m_resendRequest.wrap(message);
-                status = m_resendRequest.validate();
+            {
+                ResendRequestDecoder resendRequest{m_context, message};
+                status = resendRequest.validate();
                 if (status == Result::Success)
                 {
-                    status = receive(m_resendRequest);
+                    status = receive(resendRequest);
                 }
                 break;
+            }
             case RejectDecoder::MessageId:
-                m_reject.wrap(message);
-                status = m_reject.validate();
+            {
+                RejectDecoder reject{m_context, message};
+                status = reject.validate();
                 if (status == Result::Success)
                 {
-                    status = receive(m_reject);
+                    status = receive(reject);
                 }
                 break;
+            }
             case SequenceResetDecoder::MessageId:
-                m_sequenceReset.wrap(message);
-                status = m_sequenceReset.validate();
+            {
+                SequenceResetDecoder sequenceReset{m_context, message};
+                status = sequenceReset.validate();
                 if (status == Result::Success)
                 {
-                    status = receive(m_sequenceReset);
+                    status = receive(sequenceReset);
                 }
                 break;
+            }
             case ExecutionReportDecoder::MessageId:
-                m_executionReport.wrap(message);
-                status = m_executionReport.validate();
+            {
+                ExecutionReportDecoder executionReport{m_context, message};
+                status = executionReport.validate();
                 if (status == Result::Success)
                 {
-                    status = receive(m_executionReport);
+                    status = receive(executionReport);
                 }
                 break;
+            }
             case NewOrderSingleDecoder::MessageId:
-                m_newOrderSingle.wrap(message);
-                status = m_newOrderSingle.validate();
+            {
+                NewOrderSingleDecoder newOrderSingle{m_context, message};
+                status = newOrderSingle.validate();
                 if (status == Result::Success)
                 {
-                    status = receive(m_newOrderSingle);
+                    status = receive(newOrderSingle);
                 }
                 break;
+            }
             default:
                 break;
         }
