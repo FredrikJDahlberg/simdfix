@@ -382,12 +382,16 @@ static void generateConstructors(std::ostream& out, const Record& record, const 
     }
 }
 
-static bool isCachedField(const org::limitless::generator::fix::Field& field)
+static bool isCacheableField(const org::limitless::generator::fix::Field& field)
 {
-    return field.m_presence == Presence::Required &&
-           field.m_category != Category::Counter &&
+    return field.m_category != Category::Counter &&
            field.m_category != Category::Struct &&
            field.m_tag != 8 && field.m_tag != 9 && field.m_tag != 35;
+}
+
+static bool isRequiredCacheableField(const org::limitless::generator::fix::Field& field)
+{
+    return field.m_presence == Presence::Required && isCacheableField(field);
 }
 
 static std::string fieldReturnType(const org::limitless::generator::fix::Field& field)
@@ -424,7 +428,7 @@ static void generateStructFields(std::ostream& out, const Record& record, const 
         bool first = true;
         for (const auto& field : record.m_fields)
         {
-            if (isCachedField(field))
+            if (isCacheableField(field))
             {
                 if (!hasPrivate && first)
                 {
@@ -502,9 +506,17 @@ static void generateGetters(std::ostream& out, const Record& record)
             out << std::format("    [[nodiscard]] std::expected<{}, Result::Values> {}() const\n",
                                fieldReturnType(field), methodName);
             out << "    {\n";
-            if (record.m_parent == RecordType::Message && isCachedField(field))
+            if (record.m_parent == RecordType::Message && isCacheableField(field))
             {
                 const auto memberName = uncap(field.m_name);
+                const auto optional = field.m_presence != Presence::Required;
+                if (optional)
+                {
+                    out << std::format("        if (m_{}Index < 0)\n", memberName);
+                    out << "        {\n";
+                    out << "            return std::unexpected{Result::Success};\n";
+                    out << "        }\n";
+                }
                 if (field.m_category == Category::Enum)
                 {
                     out << std::format("        return m_decoder.enumAt<{}>(m_{}Index);\n",
@@ -663,7 +675,7 @@ static void generateCheckRequired(std::ostream& out, const Record& record)
 
     for (const auto& field : record.m_fields)
     {
-        if (!isCachedField(field))
+        if (!isRequiredCacheableField(field))
         {
             continue;
         }
@@ -676,6 +688,17 @@ static void generateCheckRequired(std::ostream& out, const Record& record)
         out << "        {\n";
         out << std::format("            return Result::{};\n", resultName);
         out << "        }\n";
+    }
+
+    for (const auto& field : record.m_fields)
+    {
+        if (field.m_presence == Presence::Required || !isCacheableField(field))
+        {
+            continue;
+        }
+        const auto memberName = uncap(field.m_name);
+        out << std::format("        m_{}Index = static_cast<int8_t>(m_decoder.findIndex<{}, RecordType::Message>());\n",
+                           memberName, field.m_tag);
     }
 
     out << "        return validateSession();\n";
