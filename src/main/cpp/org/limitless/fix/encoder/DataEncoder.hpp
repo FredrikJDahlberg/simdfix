@@ -9,7 +9,6 @@
 
 namespace org::limitless::fix::encoder {
 
-using namespace org::limitless::fix::detail;
 using namespace org::limitless::fix::detail::encoder;
 
 /**

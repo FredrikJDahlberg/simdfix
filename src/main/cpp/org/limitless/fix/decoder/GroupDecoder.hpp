@@ -9,7 +9,6 @@
 
 namespace org::limitless::fix::decoder {
 
-using namespace org::limitless::fix::detail;
 using namespace org::limitless::fix::detail::decoder;
 
 /**
@@ -54,7 +53,7 @@ public:
     template <uint32_t Tag>
     GroupDecoder& wrap()
     {
-        const Field* field = m_decoder.nextField(Tag);
+        const auto* field = m_decoder.nextField(Tag);
         if (field != nullptr)
         {
             if (m_repeat > 0)

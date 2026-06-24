@@ -9,7 +9,6 @@
 
 namespace org::limitless::fix::decoder {
 
-using namespace org::limitless::fix::detail;
 using namespace org::limitless::fix::detail::decoder;
 
 /**
