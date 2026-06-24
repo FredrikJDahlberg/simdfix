@@ -8,11 +8,12 @@
 #include <bit>
 #include <cstdint>
 #include <type_traits>
+#include <version>
 
 namespace org::limitless::fix::detail
 {
 
-#if __cplusplus >= 202302L || (defined(__cpp_lib_byteswap) && __cpp_lib_byteswap >= 202110L)
+#if defined(__cpp_lib_byteswap) && __cpp_lib_byteswap >= 202110L
 
 using std::byteswap;
 

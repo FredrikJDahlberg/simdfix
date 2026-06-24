@@ -6,7 +6,9 @@
 #ifndef SIMD_FIX_EXPECTED_HPP
 #define SIMD_FIX_EXPECTED_HPP
 
-#if __cplusplus >= 202302L || (defined(__cpp_lib_expected) && __cpp_lib_expected >= 202211L)
+#include <version>
+
+#if defined(__cpp_lib_expected) && __cpp_lib_expected >= 202211L
 
 #include <expected>
 
