@@ -10,6 +10,7 @@
 namespace org::limitless::fix::encoder {
 
 using namespace org::limitless::fix::detail;
+using namespace org::limitless::fix::detail::encoder;
 
 // Base class for generated message encoders (e.g. LogonEncoder, HeartbeatEncoder).
 // Owns the FieldEncoder used to write the message body and tracks how many bytes

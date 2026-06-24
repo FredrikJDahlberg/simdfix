@@ -15,6 +15,7 @@
 namespace org::limitless::fix::decoder {
 
 using namespace org::limitless::fix::detail;
+using namespace org::limitless::fix::detail::decoder;
 
 /**
  * Base for generated message decoders (e.g. LogonDecoder, LogoutDecoder).

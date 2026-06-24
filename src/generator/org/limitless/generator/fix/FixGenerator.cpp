@@ -192,7 +192,7 @@ static void generateEncoders(const std::string& fileName,
     out << "#include \"org/limitless/fix/encoder/DataEncoder.hpp\"\n";
     out << "#include \"org/limitless/fix/encoder/GroupEncoder.hpp\"\n";
     out << "#include \"org/limitless/fix/encoder/MessageEncoder.hpp\"\n";
-    out << "#include \"org/limitless/fix/detail/encoder/PayloadEncoder.hpp\"\n\n";
+    out << "#include \"org/limitless/fix/encoder/PayloadEncoder.hpp\"\n\n";
     out << "#include \"org/limitless/fix/messages/FixTypes.hpp\"\n\n";
     out << "namespace org::limitless::fix::messages {\n\n";
     out << "using namespace org::limitless::fix::encoder;\n\n";
@@ -204,7 +204,7 @@ static void generateEncoders(const std::string& fileName,
     out << "template <FixedString Protocol, FixedString Target, FixedString Sender>\n";
     out << "class FixPayloadEncoder\n";
     out << "{\n";
-    out << "    detail::encoder::PayloadEncoder<Protocol, Target, Sender> m_encoder;\n";
+    out << "    PayloadEncoder<Protocol, Target, Sender> m_encoder;\n";
     out << "public:\n";
     out << "    FixPayloadEncoder() = default;\n\n";
 

@@ -58,7 +58,7 @@ set(FIX_HEADERS
         ${MAIN_PATH}/decoder/DataDecoder.hpp ${MAIN_PATH}/decoder/GroupDecoder.hpp
         ${MAIN_PATH}/detail/simd/Uint8x16.hpp
         ${MAIN_PATH}/detail/simd/LinearSearch.hpp ${MAIN_PATH}/detail/encoder/FieldEncoder.hpp
-        ${MAIN_PATH}/encoder/DataEncoder.hpp ${MAIN_PATH}/detail/encoder/PayloadEncoder.hpp
+        ${MAIN_PATH}/encoder/DataEncoder.hpp ${MAIN_PATH}/encoder/PayloadEncoder.hpp
         ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp)
 add_library(SimdFix INTERFACE)
 add_library(SimdFix::SimdFix ALIAS SimdFix)

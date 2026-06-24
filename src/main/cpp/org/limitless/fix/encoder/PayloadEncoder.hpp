@@ -14,8 +14,9 @@
 #include "org/limitless/fix/detail/simd/Uint8x16.hpp"
 #include "org/limitless/fix/utils/Utils.hpp"
 
-namespace org::limitless::fix::detail::encoder {
+namespace org::limitless::fix::encoder {
 
+using namespace org::limitless::fix::detail::encoder;
 using namespace org::limitless::fix::detail::simd;
 
 // Writes the FIX header (BeginString, BodyLength, MsgType, SenderCompID, TargetCompID)

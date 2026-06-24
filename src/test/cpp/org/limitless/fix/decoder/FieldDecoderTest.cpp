@@ -11,6 +11,8 @@
 
 namespace org::limitless::fix::decoder {
 
+using namespace org::limitless::fix::detail::decoder;
+
 #define SOH "\x01"
 
 TEST(FieldDecoder, GetInt32)

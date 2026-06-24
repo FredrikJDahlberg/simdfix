@@ -20,7 +20,7 @@
 
 #include "org/limitless/fix/Types.hpp"
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
-#include "detail/encoder/PayloadEncoder.hpp"
+#include "org/limitless/fix/encoder/PayloadEncoder.hpp"
 #include "org/limitless/fix/messages/FixMessageDecoders.hpp"
 #include "org/limitless/fix/messages/FixMessageEncoders.hpp"
 #include "org/limitless/fix/messages/FixMessageHandler.hpp"

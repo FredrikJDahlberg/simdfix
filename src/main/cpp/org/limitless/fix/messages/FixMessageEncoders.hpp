@@ -5,7 +5,7 @@
 #include "org/limitless/fix/encoder/DataEncoder.hpp"
 #include "org/limitless/fix/encoder/GroupEncoder.hpp"
 #include "org/limitless/fix/encoder/MessageEncoder.hpp"
-#include "org/limitless/fix/detail/encoder/PayloadEncoder.hpp"
+#include "org/limitless/fix/encoder/PayloadEncoder.hpp"
 
 #include "org/limitless/fix/messages/FixTypes.hpp"
 
@@ -813,7 +813,7 @@ public:
 template <FixedString Protocol, FixedString Target, FixedString Sender>
 class FixPayloadEncoder
 {
-    detail::encoder::PayloadEncoder<Protocol, Target, Sender> m_encoder;
+    PayloadEncoder<Protocol, Target, Sender> m_encoder;
 public:
     FixPayloadEncoder() = default;
 

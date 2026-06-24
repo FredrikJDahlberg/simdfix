@@ -10,6 +10,7 @@
 namespace org::limitless::fix::decoder {
 
 using namespace org::limitless::fix::detail;
+using namespace org::limitless::fix::detail::decoder;
 
 /**
  * Iterates the repeating entries of a FIX repeating group. Wraps the

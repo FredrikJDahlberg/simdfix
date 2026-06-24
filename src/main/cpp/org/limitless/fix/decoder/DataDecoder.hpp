@@ -10,6 +10,7 @@
 namespace org::limitless::fix::decoder {
 
 using namespace org::limitless::fix::detail;
+using namespace org::limitless::fix::detail::decoder;
 
 /**
  * Decodes length-prefixed data field pairs (e.g. XmlDataLen/XmlData,

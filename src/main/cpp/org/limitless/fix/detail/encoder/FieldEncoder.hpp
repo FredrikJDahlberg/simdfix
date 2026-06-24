@@ -16,14 +16,14 @@
 
 namespace org::limitless::fix::encoder { class DataEncoder; }
 
-namespace org::limitless::fix::detail {
+namespace org::limitless::fix::detail::encoder {
 
 // Encodes individual FIX fields ("TAG=VALUE" followed by SOH) into a buffer.
 // The lowest-level building block in the encoder stack; MessageEncoder and
 // GroupEncoder both hold a reference to one and delegate field encoding to it.
 class FieldEncoder
 {
-    friend class encoder::DataEncoder;
+    friend class org::limitless::fix::encoder::DataEncoder;
 
     std::span<uint8_t> m_data{};
     uint32_t m_offset{};

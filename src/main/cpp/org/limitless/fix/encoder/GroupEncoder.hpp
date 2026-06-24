@@ -10,6 +10,7 @@
 namespace org::limitless::fix::encoder {
 
 using namespace org::limitless::fix::detail;
+using namespace org::limitless::fix::detail::encoder;
 
 // Base class for generated repeating-group encoders (e.g. HopsEncoder).
 // Shares the FieldEncoder of the enclosing MessageEncoder/GroupEncoder and
