@@ -8,26 +8,32 @@ jobs:
   test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30          # fail fast instead of hanging on a missing runner
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
-          # x86_64 exercises the SSE4.1 backend (Uint8x16_sse.inl) on a
-          # GitHub-hosted Linux runner.
-          - name: x86_64 (SSE)
+          # C++20 — polyfill path (expected/byteswap shims)
+          - name: x86_64 C++20 (SSE)
             runner: ubuntu-24.04
             os: linux
-          # arm64 exercises the NEON backend (Uint8x16_neon.inl) on a
-          # self-hosted Apple Silicon Mac (labels: self-hosted, macOS, ARM64).
-          - name: arm64 (NEON)
+            cxx_standard: 20
+          - name: arm64 C++20 (NEON)
             runner: [self-hosted, macOS, ARM64]
             os: macos
+            cxx_standard: 20
+          # C++23 — std::expected / std::byteswap
+          - name: x86_64 C++23 (SSE)
+            runner: ubuntu-24.04
+            os: linux
+            cxx_standard: 23
+          - name: arm64 C++23 (NEON)
+            runner: [self-hosted, macOS, ARM64]
+            os: macos
+            cxx_standard: 23
     steps:
       - uses: actions/checkout@v4
 
-      # Linux: g++-14 provides libstdc++-14 (C++23 <print>); clang picks up the
-      # newer standard library automatically.
       - name: Install dependencies (Linux)
         if: matrix.os == 'linux'
         run: |
@@ -35,18 +41,15 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
             cmake clang g++-14 libgtest-dev libpugixml-dev
 
-      # macOS: Apple Clang + libc++ already handle C++23; just ensure the
-      # libraries are present (no-op if already installed).
       - name: Install dependencies (macOS)
         if: matrix.os == 'macos'
         run: brew install cmake googletest pugixml
 
-      # SSE4.1 for the x86 Debug build is enabled automatically by CMake
-      # (check_cxx_compiler_flag); no per-arch flags needed here.
       - name: Configure
         run: >
           cmake -B build -DCMAKE_BUILD_TYPE=Debug
           -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }}
 
       - name: Build
         run: cmake --build build -j
