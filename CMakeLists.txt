@@ -80,6 +80,12 @@ target_link_options(SimdFix INTERFACE
         $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>
 )
 
+add_library(SimdFixSession STATIC
+        src/main/cpp/org/limitless/fix/session/Session.cpp
+        src/main/cpp/org/limitless/fix/session/Session.hpp)
+target_link_libraries(SimdFixSession PUBLIC SimdFix)
+add_dependencies(SimdFixSession GenerateMessages)
+
 # --- Install / packaging --------------------------------------------------
 # Makes the header-only library consumable via find_package(SimdFix). Public
 # headers install under <prefix>/include preserving the org/limitless/fix tree.

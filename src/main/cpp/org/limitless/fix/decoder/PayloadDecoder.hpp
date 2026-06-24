@@ -119,7 +119,12 @@ public:
             return { result.m_processed, result.m_value };
         }
 
-        const auto messageType = buffer[m_fields[MessageTypePosition].m_position];
+        const auto& msgTypeField = m_fields[MessageTypePosition];
+        uint16_t messageType = buffer[msgTypeField.m_position];
+        if (msgTypeField.m_length >= 2 && buffer[msgTypeField.m_position + 1] != FieldEnd)
+        {
+            messageType = static_cast<uint16_t>(messageType | (buffer[msgTypeField.m_position + 1] << 8));
+        }
         const TokenizedMessage message{buffer, {m_fields.data(), m_count}, {m_tags.data(), m_count}, static_cast<int32_t>(m_count)};
         result.m_value = handler.handle(message, messageType);
         return result;

@@ -55,9 +55,9 @@ public:
         const auto& field = m_decoder.fieldAt(MessageTypePosition);
         const auto position = field.m_position;
         uint16_t type = m_decoder.byteAt(position);
-        if (field.m_length == 2)
+        if (field.m_length >= 2 && m_decoder.byteAt(position + 1) != FieldEnd)
         {
-            type = static_cast<uint16_t>(type + (m_decoder.byteAt(position + 1) << 8));
+            type = static_cast<uint16_t>(type | (m_decoder.byteAt(position + 1) << 8));
         }
         return type;
     }

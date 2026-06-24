@@ -157,7 +157,7 @@ struct Result
 
     constexpr Result() = default;
 
-    explicit constexpr Result(const Values value) : m_value{value} {}
+     constexpr Result(const Values value) : m_value{value} {}
 
     constexpr Result(const uint32_t processed, const Values value) : m_processed{processed}, m_value{value}
     {
@@ -208,6 +208,14 @@ using Uint64Result = std::expected<uint64_t, Result::Values>;
 using TimestampResult = std::expected<std::chrono::milliseconds, Result::Values>;
 using FixedDecimalResult = std::expected<utils::FixedDecimal, Result::Values>;
 using DataResult = std::expected<Buffer, Result::Values>;
+
+template <typename T>
+concept DecodableMessage = requires(T decoder, const SessionContext* ctx)
+{
+    { T::MessageId } -> std::convertible_to<uint16_t>;
+    { decoder.validate() } -> std::same_as<Result::Values>;
+    { decoder.context(ctx) };
+};
 
 }
 

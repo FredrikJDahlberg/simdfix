@@ -291,7 +291,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "        m_context = &context;\n";
     out << "    }\n\n";
     out << "    Result::Values handle(const detail::TokenizedMessage& message,\n";
-    out << "                          const uint8_t messageType)\n";
+    out << "                          const uint16_t messageType)\n";
     out << "    {\n";
     out << "        auto status = Result::InvalidMessageType;\n";
     out << "        switch (messageType)\n";
@@ -714,7 +714,15 @@ static void generateRecordDecoders(std::ostream& out, const Record& record)
     generateConstructors(out, record, "Decoder");
     if (record.m_parent == RecordType::Message)
     {
-        out << std::format("    static constexpr uint8_t MessageId = '{}';\n\n", record.m_id);
+        if (record.m_id.size() == 1)
+        {
+            out << std::format("    static constexpr uint16_t MessageId = '{}';\n\n", record.m_id);
+        }
+        else
+        {
+            out << std::format("    static constexpr uint16_t MessageId = '{}' | ('{}' << 8);\n\n",
+                               record.m_id[0], record.m_id[1]);
+        }
     }
     generateWrapNextDecoders(out, record);
     generateCheckRequired(out, record);

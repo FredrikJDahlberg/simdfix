@@ -27,7 +27,7 @@ public:
     }
 
     Result::Values handle(const detail::TokenizedMessage& message,
-                          const uint8_t messageType)
+                          const uint16_t messageType)
     {
         auto status = Result::InvalidMessageType;
         switch (messageType)

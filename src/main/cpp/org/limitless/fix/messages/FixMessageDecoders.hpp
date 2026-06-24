@@ -138,7 +138,7 @@ public:
     LogonDecoder(LogonDecoder&&) = delete;
     LogonDecoder& operator=(LogonDecoder&&) = delete;
 
-    static constexpr uint8_t MessageId = 'A';
+    static constexpr uint16_t MessageId = 'A';
 
     [[nodiscard]] Result::Values validate()
     {
@@ -261,7 +261,7 @@ public:
     LogoutDecoder(LogoutDecoder&&) = delete;
     LogoutDecoder& operator=(LogoutDecoder&&) = delete;
 
-    static constexpr uint8_t MessageId = '5';
+    static constexpr uint16_t MessageId = '5';
 
     [[nodiscard]] Result::Values validate()
     {
@@ -369,7 +369,7 @@ public:
     HeartbeatDecoder(HeartbeatDecoder&&) = delete;
     HeartbeatDecoder& operator=(HeartbeatDecoder&&) = delete;
 
-    static constexpr uint8_t MessageId = '0';
+    static constexpr uint16_t MessageId = '0';
 
     [[nodiscard]] Result::Values validate()
     {
@@ -477,7 +477,7 @@ public:
     TestRequestDecoder(TestRequestDecoder&&) = delete;
     TestRequestDecoder& operator=(TestRequestDecoder&&) = delete;
 
-    static constexpr uint8_t MessageId = '1';
+    static constexpr uint16_t MessageId = '1';
 
     [[nodiscard]] Result::Values validate()
     {
@@ -586,7 +586,7 @@ public:
     ResendRequestDecoder(ResendRequestDecoder&&) = delete;
     ResendRequestDecoder& operator=(ResendRequestDecoder&&) = delete;
 
-    static constexpr uint8_t MessageId = '2';
+    static constexpr uint16_t MessageId = '2';
 
     [[nodiscard]] Result::Values validate()
     {
@@ -708,7 +708,7 @@ public:
     RejectDecoder(RejectDecoder&&) = delete;
     RejectDecoder& operator=(RejectDecoder&&) = delete;
 
-    static constexpr uint8_t MessageId = '3';
+    static constexpr uint16_t MessageId = '3';
 
     [[nodiscard]] Result::Values validate()
     {
@@ -857,7 +857,7 @@ public:
     SequenceResetDecoder(SequenceResetDecoder&&) = delete;
     SequenceResetDecoder& operator=(SequenceResetDecoder&&) = delete;
 
-    static constexpr uint8_t MessageId = '4';
+    static constexpr uint16_t MessageId = '4';
 
     [[nodiscard]] Result::Values validate()
     {
@@ -990,7 +990,7 @@ public:
     ExecutionReportDecoder(ExecutionReportDecoder&&) = delete;
     ExecutionReportDecoder& operator=(ExecutionReportDecoder&&) = delete;
 
-    static constexpr uint8_t MessageId = '8';
+    static constexpr uint16_t MessageId = '8';
 
     [[nodiscard]] Result::Values validate()
     {
@@ -1260,7 +1260,7 @@ public:
     NewOrderSingleDecoder(NewOrderSingleDecoder&&) = delete;
     NewOrderSingleDecoder& operator=(NewOrderSingleDecoder&&) = delete;
 
-    static constexpr uint8_t MessageId = 'D';
+    static constexpr uint16_t MessageId = 'D';
 
     [[nodiscard]] Result::Values validate()
     {
