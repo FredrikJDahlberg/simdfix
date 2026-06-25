@@ -4,8 +4,9 @@
 
 #include <gtest/gtest.h>
 
-#include <array>
+#include <span>
 #include <type_traits>
+#include <vector>
 
 #include "org/limitless/fix/session/ClientSession.hpp"
 #include "org/limitless/fix/session/ServerSession.hpp"
@@ -69,17 +70,30 @@ TEST(Session, IsSessionMessageClassifiesAdminMessages)
     EXPECT_FALSE(Client::isSessionMessage(NewOrderSingleDecoder::MessageId));
 }
 
-TEST(Session, WrapHeaderStampsCompileTimeIdentityAndSequence)
+// Named transport policy: captures the bytes the session emits.
+struct CaptureTransport
 {
-    auto client = ClientSession<FIXT_1_1, "SENDER", "TARGET">::Builder{NullStorage{}}.build();
+    std::vector<uint8_t>* captured;
+    void operator()(const std::span<const uint8_t> bytes) const
+    {
+        captured->assign(bytes.begin(), bytes.end());
+    }
+};
+
+TEST(Session, SendRoutesEncodedMessageToTransport)
+{
+    std::vector<uint8_t> captured;
+    auto client = ClientSession<FIXT_1_1, "SENDER", "TARGET", NullStorage, CaptureTransport>::Builder{NullStorage{}}
+                      .transport(CaptureTransport{&captured})
+                      .build();
 
     client.keepAlive(milliseconds{1'781'378'773'959});   // advance the session clock
 
-    std::array<uint8_t, 256> buffer{};
     HeartbeatEncoder heartbeat{};
-    client.wrapHeader(heartbeat, buffer);   // CompIDs from template, seqnum/time from session state
-    const auto length = client.encode(heartbeat);
-    const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
+    client.wrapHeader(heartbeat);   // CompIDs from template, seqnum/time from session state
+    client.send(heartbeat);         // finalize + hand bytes to the transport
+
+    const std::string_view encoded{reinterpret_cast<const char*>(captured.data()), captured.size()};
 
     // BeginString (8) and CompIDs (49/56) come from the encoder's template
     // parameters; MsgSeqNum (34) and SendingTime (52) are stamped by wrapHeader.

@@ -5,6 +5,7 @@
 #ifndef SIMD_FIX_SESSION_HPP
 #define SIMD_FIX_SESSION_HPP
 
+#include <array>
 #include <chrono>
 #include <concepts>
 #include <cstdint>
@@ -42,6 +43,16 @@ concept FixMessageHandler = requires(MessageHandler handler,
 };
 
 /**
+ * Default transport policy: discards encoded messages. Lets a session be
+ * instantiated without a transport (decode-only or test use); a real transport
+ * is supplied via the Session's Transport template parameter.
+ */
+struct DiscardTransport
+{
+    void operator()(std::span<const uint8_t>) const noexcept {}
+};
+
+/**
  * Role-agnostic half of the FIX session layer: the state machine, sequence-number
  * bookkeeping, and the admin-message handling (Heartbeat, TestRequest, Logout,
  * Reject, ResendRequest, SequenceReset) that is identical for initiator and
@@ -64,9 +75,13 @@ concept FixMessageHandler = requires(MessageHandler handler,
  *         MessageHandler<Role> for the concrete role session
  * @tparam Storage the message store owned by the session and used by the
  *         resend / gap-fill path; defaults to a no-op store (no persistence)
+ * @tparam Transport the outbound transport policy: a callable invoked with each
+ *         finished message's bytes. Stored by value and called directly, so the
+ *         transmission inlines; defaults to DiscardTransport (no transmission)
  */
 template <FixedString Protocol, FixedString Sender, FixedString Target,
-          FixMessageHandler HandlerType, FixStorageStrategy Storage = NullStorage>
+          FixMessageHandler HandlerType, FixStorageStrategy Storage = NullStorage,
+          typename Transport = DiscardTransport>
 class Session : public HandlerType
 {
     enum class State : uint8_t
@@ -79,6 +94,7 @@ class Session : public HandlerType
         Active,           // Session authenticated and fully synchronized (LoggedOn)
         Recovering,       // Sequence gap detected; waiting for Resend Request replay
         SentLogout,       // Logout initiated; waiting for counterparty Logout confirmation
+        SentHeartbeat,    // Sent test request
         Closed            // Session completed cleanly or halted due to fatal error
     };
 
@@ -95,6 +111,7 @@ class Session : public HandlerType
             case State::Recovering: return "Recovering";
             case State::SentLogout: return "SentLogout";
             case State::Closed: return "Closed";
+            case State::SentHeartbeat: return "SentHeartbeat";
             case State::Null: default: return "??";
         }
     }
@@ -105,6 +122,11 @@ public:
     // below visible alongside the admin-message overloads declared here.
     using HandlerType::handle;
 
+    // Upper bound on a single encoded outbound message; sizes the send buffer.
+    static constexpr uint32_t MaxMessageSize{4096};
+
+    static constexpr milliseconds KeepAlivePeriod{100};
+
     // Default heartbeat interval used when a Builder does not override it.
     static constexpr milliseconds DefaultHeartbeatPeriod{10000};
 
@@ -114,17 +136,24 @@ public:
     /**
      * Periodic timer tick: drives heartbeat emission and test-request probing
      * based on the negotiated heartbeat interval.
-     * @param elapsed time since the previous tick
-     * @return Success, or a failure result if the peer is unresponsive
+     * @param nowMs time since the previous tick
+     * @return true when work has been done
      */
-    Result keepAlive(const milliseconds now)
+    bool keepAlive(const milliseconds nowMs)
     {
-        // if (now - m_nowMs >= m_heartbeatPeriod)
+        bool doWork = false;
+        if (nowMs - m_nowMs >= KeepAlivePeriod)
         {
-
+            m_nowMs = nowMs;
         }
-        m_nowMs = now;
-        return Result::Success;
+        if (m_nowMs - m_heartbeatTimestamp >= m_heartbeatPeriod)
+        {
+            // send test request
+            m_heartbeatPeriod = m_nowMs;
+            m_state = State::SentHeartbeat;
+            doWork = true;
+        }
+        return doWork;
     }
 
     Result handle(const LogoutDecoder& logout)
@@ -204,27 +233,29 @@ public:
      * the encoder's encode().
      * @tparam MessageEncoderType message encoder type, e.g. LogonEncoder
      * @param message message encoder to wrap
-     * @param buffer destination buffer
      * @return message, for chaining
      */
     template <typename MessageEncoderType>
-    MessageEncoderType& wrapHeader(MessageEncoderType& message, const std::span<uint8_t> buffer)
+    MessageEncoderType& wrapHeader(MessageEncoderType& message)
     {
-        m_encoder.wrap(0, buffer);
+        m_encoder.wrap(0, m_buffer);
         return m_encoder.wrapHeader(message, m_nextOutgoingSeqNum, m_nowMs);
     }
 
     /**
      * Finalizes an outbound message whose body has been encoded after
-     * wrapHeader(): fills in MsgType and BodyLength and appends the CheckSum.
+     * wrapHeader() — filling in MsgType, BodyLength and CheckSum — and hands the
+     * encoded bytes to the transport. The actual transmission happens in the
+     * transport; the outgoing sequence number is then advanced.
      * @tparam MessageEncoderType message encoder type, e.g. HeartbeatEncoder
      * @param message message whose body has already been encoded
-     * @return total bytes written, header through trailer
      */
     template <typename MessageEncoderType>
-    uint32_t encode(const MessageEncoderType& message)
+    void send(const MessageEncoderType& message)
     {
-        return m_encoder.encode(message);
+        const auto length = m_encoder.encode(message);
+        m_transport(std::span<const uint8_t>{m_buffer.data(), length});
+        ++m_nextOutgoingSeqNum;
     }
 
     [[nodiscard]] milliseconds heartbeatPeriod() const noexcept
@@ -237,19 +268,24 @@ protected:
     // at compile time from the Protocol/Target/Sender template parameters.
     FixPayloadEncoder<Protocol, Target, Sender> m_encoder{};
     Storage m_storage{};
+    Transport m_transport{};
+    std::array<uint8_t, MaxMessageSize> m_buffer{};
 
     State m_state{State::Disconnected};
     uint32_t m_nextOutgoingSeqNum{1};
     uint32_t m_nextExpectedSeqNum{1};
 
     milliseconds m_heartbeatPeriod{DefaultHeartbeatPeriod};
+
     milliseconds m_nowMs{0};
+    milliseconds m_heartbeatTimestamp{0};
 };
 
 /**
  * Fluent builder for a Session. The CompIDs are compile-time template
  * parameters of the session, so the builder takes only the message store
- * (required); the heartbeat period is optional and defaults to
+ * (required); the transport and heartbeat period are optional — the transport
+ * defaults to DiscardTransport and the heartbeat period to
  * DefaultHeartbeatPeriod.
  *
  * @tparam Concrete the session type build() returns — the base Session by
@@ -257,11 +293,12 @@ protected:
  *         from it.
  */
 template <FixedString Protocol, FixedString Sender, FixedString Target,
-          FixMessageHandler HandlerType, FixStorageStrategy Storage>
+          FixMessageHandler HandlerType, FixStorageStrategy Storage, typename Transport>
 template <typename Concrete>
-class Session<Protocol, Sender, Target, HandlerType, Storage>::Builder
+class Session<Protocol, Sender, Target, HandlerType, Storage, Transport>::Builder
 {
     Storage m_storage;
+    Transport m_transport{};
     milliseconds m_heartbeatPeriod{DefaultHeartbeatPeriod};
 
 public:
@@ -271,6 +308,18 @@ public:
     explicit Builder(Storage storage)
         : m_storage(std::move(storage))
     {
+    }
+
+    /**
+     * Sets the transport the session emits encoded messages to. When left unset,
+     * the session encodes but discards (DiscardTransport).
+     * @param transport callable invoked with each finished message's bytes
+     * @return *this, for chaining
+     */
+    Builder& transport(Transport transport)
+    {
+        m_transport = std::move(transport);
+        return *this;
     }
 
     /**
@@ -289,9 +338,25 @@ public:
         Concrete session;
         session.m_heartbeatPeriod = m_heartbeatPeriod;
         session.m_storage = std::move(m_storage);
+        session.m_transport = std::move(m_transport);
         return session;
     }
 };
+
+/**
+ * Base of a concrete role session: a Session whose message handler is the
+ * generated MessageHandler dispatching back to the role itself (CRTP). Factors
+ * out the self-referential base so ClientSession / ServerSession name their
+ * template arguments once instead of repeating the full Session / MessageHandler
+ * instantiation.
+ *
+ * @tparam Role the role class template (e.g. ClientSession), supplied by name
+ */
+template <template <FixedString, FixedString, FixedString, typename, typename> class Role,
+          FixedString Protocol, FixedString Sender, FixedString Target,
+          FixStorageStrategy Storage, typename Transport>
+using RoleSession = Session<Protocol, Sender, Target,
+    MessageHandler<Role<Protocol, Sender, Target, Storage, Transport>>, Storage, Transport>;
 
 }
 

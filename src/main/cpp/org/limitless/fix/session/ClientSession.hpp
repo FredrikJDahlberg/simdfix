@@ -23,12 +23,11 @@ namespace org::limitless::fix::session
  *         the resend / gap-fill path); defaults to a no-op store.
  */
 template <FixedString Protocol, FixedString Sender, FixedString Target,
-          FixStorageStrategy Storage = NullStorage>
-class ClientSession : public Session<Protocol, Sender, Target,
-    MessageHandler<ClientSession<Protocol, Sender, Target, Storage>>, Storage>
+          FixStorageStrategy Storage = NullStorage, typename Transport = DiscardTransport>
+class ClientSession
+    : public RoleSession<ClientSession, Protocol, Sender, Target, Storage, Transport>
 {
-    using Base = Session<Protocol, Sender, Target,
-        MessageHandler<ClientSession<Protocol, Sender, Target, Storage>>, Storage>;
+    using Base = RoleSession<ClientSession, Protocol, Sender, Target, Storage, Transport>;
 
 public:
     using Base::handle;   // keep the inherited overloads visible past the Logon override
