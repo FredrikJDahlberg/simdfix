@@ -50,7 +50,7 @@ set(FIX_HEADERS
         ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp
         ${MAIN_PATH}/session/Session.hpp
         ${MAIN_PATH}/session/ClientSession.hpp ${MAIN_PATH}/session/ServerSession.hpp
-        src/main/cpp/org/limitless/fix/storage/Storage.hpp)
+        ${MAIN_PATH}/storage/Storage.hpp ${MAIN_PATH}/storage/MemoryStorage.hpp)
 add_library(SimdFix INTERFACE)
 add_library(SimdFix::SimdFix ALIAS SimdFix)
 # In-tree builds (tests, benchmarks) see the headers where they live; installed
@@ -205,12 +205,14 @@ add_fix_test(FixedDecimalTest "${TEST_PATH}/utils/FixedDecimalTest.cpp")
 add_fix_test(OptionalIntTest  "${TEST_PATH}/utils/OptionalIntTest.cpp")
 add_fix_test(Uint8x16Test       "${TEST_PATH}/simd/Uint8x16Test.cpp")
 add_fix_test(LinearSearchTest  "${TEST_PATH}/simd/LinearSearchTest.cpp")
+add_fix_test(MemoryStorageTest "${TEST_PATH}/storage/MemoryStorageTest.cpp")
 
 set(FIX_TEST_TARGETS
         PayloadDecoderTest PayloadDecoderFuzzTest
         MessageDecoderTest MessageEncoderTest
         GroupDecoderTest FieldDecoderTest
-        ConversionsTest FixedDecimalTest OptionalIntTest Uint8x16Test LinearSearchTest)
+        ConversionsTest FixedDecimalTest OptionalIntTest Uint8x16Test LinearSearchTest
+        MemoryStorageTest)
 
 add_custom_target(AllTests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
@@ -254,6 +256,7 @@ if(XCRUN)
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/OptionalIntTest.profraw"      $<TARGET_FILE:OptionalIntTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/Uint8x16Test.profraw"         $<TARGET_FILE:Uint8x16Test>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/LinearSearchTest.profraw"    $<TARGET_FILE:LinearSearchTest>
+        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/MemoryStorageTest.profraw"   $<TARGET_FILE:MemoryStorageTest>
         COMMAND ${XCRUN} llvm-profdata merge -sparse ${_PROFRAW_FILES} -o ${COVERAGE_DIR}/coverage.profdata
         COMMAND ${XCRUN} llvm-cov report
             $<TARGET_FILE:${_PRIMARY}>

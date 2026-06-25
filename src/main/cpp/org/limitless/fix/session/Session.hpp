@@ -10,21 +10,15 @@
 #include <cstdint>
 #include <string_view>
 
+#include "org/limitless/fix/storage/Storage.hpp"
 #include "org/limitless/fix/messages/FixMessageHandler.hpp"
 
 namespace org::limitless::fix::session
 {
 
-struct IdleStrategy
-{
-};
-
-struct StorageStrategy
-{
-};
-
 using namespace std::chrono;
 using namespace org::limitless::fix::messages;
+using namespace org::limitless::fix::storage;
 
 /**
  * Describes the message-handler interface the decoder drives: a type the
@@ -56,8 +50,10 @@ concept FixMessageHandler = requires(MessageHandler handler,
  *
  * @tparam HandlerType the message handler being extended, typically
  *         MessageHandler<Role> for the concrete role session
+ * @tparam Storage the message store owned by the session and used by the
+ *         resend / gap-fill path; defaults to a no-op store (no persistence)
  */
-template <FixMessageHandler HandlerType>
+template <FixMessageHandler HandlerType, FixStorageStrategy Storage = NullStorage>
 class Session : public HandlerType
 {
     enum class State : uint8_t
@@ -157,6 +153,8 @@ public:
     }
 
 protected:
+    Storage m_storage{};
+
     State m_state{State::Disconnected};
     uint32_t m_nextOutgoingSeqNum{1};
     uint32_t m_nextExpectedSeqNum{1};
@@ -165,8 +163,8 @@ protected:
     //static constexpr milliseconds HeartbeatPeriodMs;
 };
 
-template <FixMessageHandler HandlerType>
-class Session<HandlerType>::Builder
+template <FixMessageHandler HandlerType, FixStorageStrategy Storage>
+class Session<HandlerType, Storage>::Builder
 {
 
 };
