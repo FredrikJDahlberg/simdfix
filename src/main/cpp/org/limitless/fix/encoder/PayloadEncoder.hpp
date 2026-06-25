@@ -5,6 +5,7 @@
 #ifndef SIMD_FIX_PAYLOAD_ENCODER_HPP
 #define SIMD_FIX_PAYLOAD_ENCODER_HPP
 
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <span>
@@ -86,6 +87,30 @@ public:
     MessageEncoderType& wrapMessage(MessageEncoderType& message) const
     {
         message.wrap(m_buffer, offset());
+        return message;
+    }
+
+    /**
+     * Wraps a message encoder at the body offset and stamps the per-message
+     * session header fields that the compile-time header does not carry:
+     * MsgSeqNum (tag 34) and SendingTime (tag 52). Both must lead the message
+     * body, so this is called before any application fields are encoded. The
+     * BeginString, SenderCompID and TargetCompID are already written from the
+     * encoder's template parameters by wrap().
+     * @tparam MessageEncoderType message encoder type, e.g. LogonEncoder
+     * @param message message encoder to wrap
+     * @param sequenceNumber MsgSeqNum (tag 34) for this message
+     * @param sendingTime SendingTime (tag 52), as time since the Unix epoch
+     * @return message, for chaining
+     */
+    template <typename MessageEncoderType>
+    MessageEncoderType& wrapHeader(MessageEncoderType& message,
+                                   const uint32_t sequenceNumber,
+                                   const std::chrono::milliseconds sendingTime) const
+    {
+        message.wrap(m_buffer, offset());
+        message.sequenceNumber(sequenceNumber);
+        message.sendingTime(sendingTime);
         return message;
     }
 

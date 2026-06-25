@@ -225,6 +225,14 @@ static void generateEncoders(const std::string& fileName,
     out << "        return m_encoder.wrapMessage(message);\n";
     out << "    }\n\n";
 
+    out << "    template <typename MessageEncoderType>\n";
+    out << "    MessageEncoderType& wrapHeader(MessageEncoderType& message,\n";
+    out << "                                   const uint32_t sequenceNumber,\n";
+    out << "                                   const std::chrono::milliseconds sendingTime) const\n";
+    out << "    {\n";
+    out << "        return m_encoder.wrapHeader(message, sequenceNumber, sendingTime);\n";
+    out << "    }\n\n";
+
     out << "    template <EncodableMessage Message>\n";
     out << "    uint32_t encode(const Message& message)\n";
     out << "    {\n";

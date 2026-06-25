@@ -52,6 +52,25 @@ TEST(MessageEncoder, LogonNullEncryption)
               "34=1" SOH "52=20260613-19:26:13.959" SOH "108=30" SOH "10=102" SOH, encoded);
 }
 
+TEST(MessageEncoder, SendingTimeAtEpoch)
+{
+    // Regression: the date-prefix cache must render the Unix epoch (millis == 0)
+    // rather than leaving an uninitialized prefix on the first timestamp encode.
+    std::array<uint8_t, 256> buffer{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    encoder.wrap(0, buffer);
+
+    HeartbeatEncoder heartbeat{};
+    encoder.wrapMessage(heartbeat)
+            .sequenceNumber(1)
+            .sendingTime(std::chrono::milliseconds{0});
+
+    const auto length = encoder.encode(heartbeat);
+    const std::string_view encoded{reinterpret_cast<const char*>(buffer.data()), length};
+
+    EXPECT_NE(std::string_view::npos, encoded.find("52=19700101-00:00:00.000" SOH));
+}
+
 TEST(MessageEncoder, HeartbeatWithHops)
 {
     std::array<uint8_t, 256> buffer{};

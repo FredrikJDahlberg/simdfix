@@ -16,13 +16,19 @@ namespace org::limitless::fix::session
  * admin handling is inherited from Session; application messages fall through to
  * the generated MessageHandler defaults.
  *
+ * @tparam Protocol BeginString (tag 8), e.g. FIXT_1_1
+ * @tparam Sender our SenderCompID (tag 49 on outbound messages)
+ * @tparam Target the counterparty TargetCompID (tag 56 on outbound messages)
  * @tparam Storage the message store, threaded into the base Session (and used by
  *         the resend / gap-fill path); defaults to a no-op store.
  */
-template <FixStorageStrategy Storage = NullStorage>
-class ClientSession : public Session<MessageHandler<ClientSession<Storage>>, Storage>
+template <FixedString Protocol, FixedString Sender, FixedString Target,
+          FixStorageStrategy Storage = NullStorage>
+class ClientSession : public Session<Protocol, Sender, Target,
+    MessageHandler<ClientSession<Protocol, Sender, Target, Storage>>, Storage>
 {
-    using Base = Session<MessageHandler<ClientSession<Storage>>, Storage>;
+    using Base = Session<Protocol, Sender, Target,
+        MessageHandler<ClientSession<Protocol, Sender, Target, Storage>>, Storage>;
 
 public:
     using Base::handle;   // keep the inherited overloads visible past the Logon override

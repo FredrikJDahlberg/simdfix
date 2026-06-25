@@ -834,6 +834,14 @@ public:
         return m_encoder.wrapMessage(message);
     }
 
+    template <typename MessageEncoderType>
+    MessageEncoderType& wrapHeader(MessageEncoderType& message,
+                                   const uint32_t sequenceNumber,
+                                   const std::chrono::milliseconds sendingTime) const
+    {
+        return m_encoder.wrapHeader(message, sequenceNumber, sendingTime);
+    }
+
     template <EncodableMessage Message>
     uint32_t encode(const Message& message)
     {

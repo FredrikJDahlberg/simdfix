@@ -8,6 +8,7 @@
 #include <array>
 #include <cassert>
 #include <cstddef>
+#include <limits>
 #include <span>
 #include <string_view>
 
@@ -28,7 +29,10 @@ class FieldEncoder
     std::span<uint8_t> m_data{};
     uint32_t m_offset{};
     uint32_t m_encodedLength{};
-    int64_t m_cachedDayStartMillis{-1};
+    // Sentinel that aliases no real day window, so the first encodeTimestamp()
+    // always recomputes the date prefix — including for epoch 0 (a window of
+    // [-1, MillisPerDay) would have swallowed the whole first day uninitialized).
+    int64_t m_cachedDayStartMillis{std::numeric_limits<int64_t>::min()};
     std::array<uint8_t, 9> m_datePrefix{};
 
     /**

@@ -74,6 +74,20 @@ Storage
   flyweight within it, so the expensive reads are amortized while the caller
   still sees one message at a time. (`MemoryStorage` implements the cursor
   trivially over its resident vector.)
+- Aeron Archive backend — a `FixStorageStrategy` over Aeron Archive's
+  record/replay (C++ client). Append = `Publication::offer` to a recorded
+  publication; capture the pre-offer `position()` as the message start. Aeron
+  addresses by stream byte-position, not MsgSeqNum, so keep the same
+  seqnum -> position index (`MsgSeqNum -> {recordingId, startPos, length}`) — the
+  mmap'd index above, re-cast. Range read = `startReplay(recordingId, fromPos,
+  len, ...)` then poll the replay Image with a fragment handler: the handler's
+  `(buffer, offset, length)` is a flyweight valid only during the callback and
+  `poll()` delivers a term (packet) at a time, so the flyweight + batched-cursor
+  contracts map natively (no copies). `clear()` = `truncateRecording` / new
+  recording per session. Use `ReplayMerge` for live catch-up on reconnect.
+  Defers to the fault-tolerance bullet: `offer()` back-pressure -> fallible
+  append, durable-before-wire via `getRecordingPosition`, and Aeron Cluster
+  (Raft) for failover.
 - Fault tolerance (later) — fallible returns (`Result`/`expected`),
   durable-append-before-wire, recovery metadata (last seqNum / range as source
   of truth after failover), and replication are deferred.
