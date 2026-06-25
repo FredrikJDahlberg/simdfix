@@ -27,7 +27,7 @@ public:
      * @param logon decoded inbound Logon (the initiator's request)
      * @return Success, or a failure result if authentication is rejected
      */
-    Result handle(LogonDecoder& logon);
+    Result handle(const LogonDecoder& logon);
 };
 
 }

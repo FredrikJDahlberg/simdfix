@@ -34,7 +34,7 @@ public:
      * @param logon decoded inbound Logon (the acceptor's acknowledgement)
      * @return Success, or a failure result if the response is rejected
      */
-    Result handle(LogonDecoder& logon);
+    Result handle(const LogonDecoder& logon);
 };
 
 }

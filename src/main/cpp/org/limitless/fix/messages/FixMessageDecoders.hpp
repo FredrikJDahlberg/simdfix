@@ -126,11 +126,11 @@ public:
     {
     }
 
-    LogonDecoder(const SessionContext* context, const TokenizedMessage& message)
-        : LogonDecoder{}
+    LogonDecoder(const SessionContext* context, const TokenizedMessage& message) :
+        MessageDecoder{context, message},
+        m_hops{m_decoder},
+        m_xmlData{m_decoder}
     {
-        MessageDecoder::wrap(message);
-        MessageDecoder::context(context);
     }
 
     LogonDecoder(const LogonDecoder&) = delete;
@@ -249,11 +249,10 @@ public:
     {
     }
 
-    LogoutDecoder(const SessionContext* context, const TokenizedMessage& message)
-        : LogoutDecoder{}
+    LogoutDecoder(const SessionContext* context, const TokenizedMessage& message) :
+        MessageDecoder{context, message},
+        m_hops{m_decoder}
     {
-        MessageDecoder::wrap(message);
-        MessageDecoder::context(context);
     }
 
     LogoutDecoder(const LogoutDecoder&) = delete;
@@ -357,11 +356,10 @@ public:
     {
     }
 
-    HeartbeatDecoder(const SessionContext* context, const TokenizedMessage& message)
-        : HeartbeatDecoder{}
+    HeartbeatDecoder(const SessionContext* context, const TokenizedMessage& message) :
+        MessageDecoder{context, message},
+        m_hops{m_decoder}
     {
-        MessageDecoder::wrap(message);
-        MessageDecoder::context(context);
     }
 
     HeartbeatDecoder(const HeartbeatDecoder&) = delete;
@@ -465,11 +463,10 @@ public:
     {
     }
 
-    TestRequestDecoder(const SessionContext* context, const TokenizedMessage& message)
-        : TestRequestDecoder{}
+    TestRequestDecoder(const SessionContext* context, const TokenizedMessage& message) :
+        MessageDecoder{context, message},
+        m_hops{m_decoder}
     {
-        MessageDecoder::wrap(message);
-        MessageDecoder::context(context);
     }
 
     TestRequestDecoder(const TestRequestDecoder&) = delete;
@@ -574,11 +571,10 @@ public:
     {
     }
 
-    ResendRequestDecoder(const SessionContext* context, const TokenizedMessage& message)
-        : ResendRequestDecoder{}
+    ResendRequestDecoder(const SessionContext* context, const TokenizedMessage& message) :
+        MessageDecoder{context, message},
+        m_hops{m_decoder}
     {
-        MessageDecoder::wrap(message);
-        MessageDecoder::context(context);
     }
 
     ResendRequestDecoder(const ResendRequestDecoder&) = delete;
@@ -696,11 +692,10 @@ public:
     {
     }
 
-    RejectDecoder(const SessionContext* context, const TokenizedMessage& message)
-        : RejectDecoder{}
+    RejectDecoder(const SessionContext* context, const TokenizedMessage& message) :
+        MessageDecoder{context, message},
+        m_hops{m_decoder}
     {
-        MessageDecoder::wrap(message);
-        MessageDecoder::context(context);
     }
 
     RejectDecoder(const RejectDecoder&) = delete;
@@ -845,11 +840,10 @@ public:
     {
     }
 
-    SequenceResetDecoder(const SessionContext* context, const TokenizedMessage& message)
-        : SequenceResetDecoder{}
+    SequenceResetDecoder(const SessionContext* context, const TokenizedMessage& message) :
+        MessageDecoder{context, message},
+        m_hops{m_decoder}
     {
-        MessageDecoder::wrap(message);
-        MessageDecoder::context(context);
     }
 
     SequenceResetDecoder(const SequenceResetDecoder&) = delete;
@@ -978,11 +972,10 @@ public:
     {
     }
 
-    ExecutionReportDecoder(const SessionContext* context, const TokenizedMessage& message)
-        : ExecutionReportDecoder{}
+    ExecutionReportDecoder(const SessionContext* context, const TokenizedMessage& message) :
+        MessageDecoder{context, message},
+        m_hops{m_decoder}
     {
-        MessageDecoder::wrap(message);
-        MessageDecoder::context(context);
     }
 
     ExecutionReportDecoder(const ExecutionReportDecoder&) = delete;
@@ -1248,11 +1241,10 @@ public:
     {
     }
 
-    NewOrderSingleDecoder(const SessionContext* context, const TokenizedMessage& message)
-        : NewOrderSingleDecoder{}
+    NewOrderSingleDecoder(const SessionContext* context, const TokenizedMessage& message) :
+        MessageDecoder{context, message},
+        m_hops{m_decoder}
     {
-        MessageDecoder::wrap(message);
-        MessageDecoder::context(context);
     }
 
     NewOrderSingleDecoder(const NewOrderSingleDecoder&) = delete;

@@ -192,11 +192,10 @@ using FixedDecimalResult = expected<utils::FixedDecimal, Result>;
 using DataResult = expected<Buffer, Result>;
 
 template <typename T>
-concept DecodableMessage = requires(T decoder, const SessionContext* ctx)
+concept DecodableMessage = requires(T decoder)
 {
     { T::MessageId } -> std::convertible_to<uint16_t>;
     { decoder.validate() } -> std::same_as<Result>;
-    { decoder.context(ctx) };
 };
 
 }

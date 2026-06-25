@@ -49,7 +49,8 @@ set(FIX_HEADERS
         ${MAIN_PATH}/encoder/DataEncoder.hpp ${MAIN_PATH}/encoder/PayloadEncoder.hpp
         ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp
         ${MAIN_PATH}/session/Session.hpp
-        ${MAIN_PATH}/session/ClientSession.hpp ${MAIN_PATH}/session/ServerSession.hpp)
+        ${MAIN_PATH}/session/ClientSession.hpp ${MAIN_PATH}/session/ServerSession.hpp
+        src/main/cpp/org/limitless/fix/storage/Storage.hpp)
 add_library(SimdFix INTERFACE)
 add_library(SimdFix::SimdFix ALIAS SimdFix)
 # In-tree builds (tests, benchmarks) see the headers where they live; installed

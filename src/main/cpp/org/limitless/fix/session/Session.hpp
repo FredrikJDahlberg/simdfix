@@ -15,6 +15,14 @@
 namespace org::limitless::fix::session
 {
 
+struct IdleStrategy
+{
+};
+
+struct StorageStrategy
+{
+};
+
 using namespace std::chrono;
 using namespace org::limitless::fix::messages;
 
@@ -46,11 +54,11 @@ concept FixMessageHandler = requires(MessageHandler handler,
  * messages it owns and leaves application messages (and the one role-specific
  * message, Logon) to the handler below and the concrete role above.
  *
- * @tparam Handler the message handler being extended, typically
+ * @tparam HandlerType the message handler being extended, typically
  *         MessageHandler<Role> for the concrete role session
  */
-template <FixMessageHandler Handler>
-class Session : public Handler
+template <FixMessageHandler HandlerType>
+class Session : public HandlerType
 {
     enum class State : uint8_t
     {
@@ -86,7 +94,9 @@ public:
     // Keep the two-argument dispatcher, the application-message defaults
     // (ExecutionReport, NewOrderSingle), and the Logon default from the handler
     // below visible alongside the admin-message overloads declared here.
-    using Handler::handle;
+    using HandlerType::handle;
+
+    class Builder;
 
     /**
      * Periodic timer tick: drives heartbeat emission and test-request probing
@@ -94,45 +104,50 @@ public:
      * @param elapsed time since the previous tick
      * @return Success, or a failure result if the peer is unresponsive
      */
-    Result heartbeat(const milliseconds elapsed)
+    Result keepAlive(const milliseconds now)
     {
-        (void) elapsed;
+        // if (now - m_nowMs >= HeartbeatPeriodMillis)
+        {
+
+        }
+        m_nowMs = now;
         return Result::Success;
     }
 
-    Result handle(LogoutDecoder& logout)
+    Result handle(const LogoutDecoder& logout)
     {
-        (void) logout;
+        keepAlive(logout.sendingTime());
+
         return Result::Success;
     }
 
-    Result handle(HeartbeatDecoder& heartbeat)
+    Result handle(const HeartbeatDecoder& heartbeat)
     {
-        (void) heartbeat;
+        keepAlive(heartbeat.sendingTime());
         return Result::Success;
     }
 
-    Result handle(TestRequestDecoder& testRequest)
+    Result handle(const TestRequestDecoder& testRequest)
     {
-        (void) testRequest;
+        keepAlive(testRequest.sendingTime());
         return Result::Success;
     }
 
-    Result handle(ResendRequestDecoder& resendRequest)
+    Result handle(const ResendRequestDecoder& resendRequest)
     {
-        (void) resendRequest;
+        keepAlive(resendRequest.sendingTime());
         return Result::Success;
     }
 
-    Result handle(RejectDecoder& reject)
+    Result handle(const RejectDecoder& reject)
     {
-        (void) reject;
+        keepAlive(reject.sendingTime());
         return Result::Success;
     }
 
-    Result handle(SequenceResetDecoder& sequenceReset)
+    Result handle(const SequenceResetDecoder& sequenceReset)
     {
-        (void) sequenceReset;
+        keepAlive(sequenceReset.sendingTime());
         return Result::Success;
     }
 
@@ -146,9 +161,17 @@ protected:
     uint32_t m_nextOutgoingSeqNum{1};
     uint32_t m_nextExpectedSeqNum{1};
 
-    milliseconds m_now{0};
-    milliseconds m_heartBtInt{};
+    milliseconds m_nowMs{0};
+    //static constexpr milliseconds HeartbeatPeriodMs;
 };
+
+template <FixMessageHandler HandlerType>
+class Session<HandlerType>::Builder
+{
+
+};
+
+
 
 }
 

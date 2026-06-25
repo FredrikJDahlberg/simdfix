@@ -31,17 +31,14 @@ private:
 protected:
     FieldDecoder m_decoder{};
 
-    /**
-     * Rebinds the decoder to a new tokenized message.
-     * @param message tokenized message produced by the PayloadDecoder
-     */
-    void wrap(const TokenizedMessage& message)
+public:
+    MessageDecoder() = default;
+
+    MessageDecoder(const SessionContext* context, const TokenizedMessage& message)
+        : m_context{context}
     {
         m_decoder.wrap(message.data, message.fields, message.tags, message.size);
     }
-
-public:
-    MessageDecoder() = default;
 
     /**
      * Reads the MsgType (tag 35) value from the third field. Single-byte
@@ -60,16 +57,6 @@ public:
             type = static_cast<uint16_t>(type | (m_decoder.byteAt(position + 1) << 8));
         }
         return type;
-    }
-
-    /**
-     * Sets the session context used by validate() to validate BeginString,
-     * SenderCompID and TargetCompID.
-     * @param context expected session parameters
-     */
-    void context(const SessionContext* context)
-    {
-        m_context = context;
     }
 
     /**

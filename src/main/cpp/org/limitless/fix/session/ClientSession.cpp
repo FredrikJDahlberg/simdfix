@@ -13,7 +13,7 @@ Result ClientSession::logon()
     return Result::Success;
 }
 
-Result ClientSession::handle(LogonDecoder& logon)
+Result ClientSession::handle(const LogonDecoder& logon)
 {
     // initiator receives the acceptor's Logon acknowledgement -> Active
     (void) logon;

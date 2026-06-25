@@ -26,8 +26,7 @@ public:
         m_context = &context;
     }
 
-    Result handle(const detail::TokenizedMessage& message,
-                  const uint16_t messageType)
+    Result handle(const TokenizedMessage& message, const uint16_t messageType)
     {
         auto status = Result::InvalidMessageType;
         switch (messageType)

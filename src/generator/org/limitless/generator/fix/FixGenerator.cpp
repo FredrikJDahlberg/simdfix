@@ -290,23 +290,17 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "    {\n";
     out << "        m_context = &context;\n";
     out << "    }\n\n";
-    out << "    Result handle(const detail::TokenizedMessage& message,\n";
-    out << "                  const uint16_t messageType)\n";
+    out << "    Result handle(const TokenizedMessage& message, const uint16_t messageType)\n";
     out << "    {\n";
     out << "        auto status = Result::InvalidMessageType;\n";
     out << "        switch (messageType)\n";
     out << "        {\n";
     for (auto& message: messages)
     {
-        // LogonDecoder logon;
-        // logon.context(m_context);
-        // logon.wrap(message);
         auto localName = uncap(message.m_name);
         out << std::format("            case {}Decoder::MessageId:\n", message.m_name);
         out << "            {\n";
         out << std::format("                {}Decoder {}{{m_context, message}};\n", message.m_name, localName);
-        //out << std::format("                {}.context(m_context);\n", localName);
-        //out << std::format("                {}.wrap(message);\n", localName);
         out << std::format("                status = {}.validate();\n", localName);
         out << "                if (status == Result::Success)\n";
         out << "                {\n";
@@ -364,12 +358,19 @@ static void generateConstructors(std::ostream& out, const Record& record, const 
 
     if (record.m_parent == RecordType::Message && codec == "Decoder")
     {
-        out << std::format("    {}{}(const SessionContext* context, const TokenizedMessage& message)\n", record.m_name, codec);
-        out << std::format("        : {}{}{{}}\n", record.m_name, codec);
-        out << "    {\n";
-        out << std::format("        Message{}::wrap(message);\n", codec);
-        out << std::format("        Message{}::context(context);\n", codec);
-        out << "    }\n\n";
+        out << std::format("    {}{}(const SessionContext* context, const TokenizedMessage& message) :\n", record.m_name, codec);
+        out << std::format("        Message{}{{context, message}}{}\n", codec, record.m_records.empty() ? "" : ",");
+        if (!record.m_records.empty())
+        {
+            const auto& back = record.m_records.back();
+            for (auto const& field: record.m_records)
+            {
+                out << std::format("        m_{}{{m_{}}}{}\n",
+                                   uncap(field.m_name), uncap(codec),
+                                   field.m_name != back.m_name ? "," : "");
+            }
+        }
+        out << "    {\n    }\n\n";
     }
 
     if (!record.m_records.empty() || record.m_parent == RecordType::Group)
