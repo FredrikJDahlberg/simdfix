@@ -13,18 +13,21 @@ namespace org::limitless::fix::session
 /**
  * Server-side session. Waits for the initiator's Logon, authenticates it, and
  * replies with its own Logon. All other admin handling is inherited from
- * Session.
+ * Session; application messages fall through to the generated MessageHandler
+ * defaults.
  */
-class ServerSession : public Session<ServerSession>
+class ServerSession : public Session<MessageHandler<ServerSession>>
 {
 public:
+    using Session::handle;   // keep the inherited overloads visible past the Logon override
+
     /**
      * Authenticates the initiator's inbound Logon and, on success, replies with
      * a Logon and transitions the session to Active.
      * @param logon decoded inbound Logon (the initiator's request)
      * @return Success, or a failure result if authentication is rejected
      */
-    Result onLogon(LogonDecoder& logon);
+    Result handle(LogonDecoder& logon);
 };
 
 }

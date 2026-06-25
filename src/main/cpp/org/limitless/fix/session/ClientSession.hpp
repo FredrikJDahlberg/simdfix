@@ -13,11 +13,14 @@ namespace org::limitless::fix::session
 /**
  * Client-side session. Drives the connection and the Logon handshake: it sends
  * the initial Logon, then validates the acceptor's Logon response. All other
- * admin handling is inherited from Session.
+ * admin handling is inherited from Session; application messages fall through to
+ * the generated MessageHandler defaults.
  */
-class ClientSession : public Session<ClientSession>
+class ClientSession : public Session<MessageHandler<ClientSession>>
 {
 public:
+    using Session::handle;   // keep the inherited overloads visible past the Logon override
+
     /**
      * Begins the handshake by emitting the initial Logon and moving to
      * SentLogon.
@@ -31,7 +34,7 @@ public:
      * @param logon decoded inbound Logon (the acceptor's acknowledgement)
      * @return Success, or a failure result if the response is rejected
      */
-    Result onLogon(LogonDecoder& logon);
+    Result handle(LogonDecoder& logon);
 };
 
 }

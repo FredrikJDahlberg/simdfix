@@ -7,7 +7,7 @@
 namespace org::limitless::fix::session
 {
 
-Result ServerSession::onLogon(LogonDecoder& logon)
+Result ServerSession::handle(LogonDecoder& logon)
 {
     // acceptor receives the initiator's Logon, authenticates, replies -> Active
     (void) logon;

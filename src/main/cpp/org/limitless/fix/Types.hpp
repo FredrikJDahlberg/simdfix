@@ -150,46 +150,26 @@ static constexpr std::string_view name(const Result value)
 {
     switch (value)
     {
-        case Result::NullValue:
-            return "NullValue";
-        case Result::Success:
-            return "Success";
-        case Result::MessageFragment:
-            return "MessageFragment";
-        case Result::InvalidBeginString:
-            return "InvalidBeginString";
-        case Result::InvalidCheckSumTag:
-            return "InvalidCheckSumTag";
-        case Result::InvalidBodyLengthTag:
-            return "InvalidBodyLengthTag";
-        case Result::InvalidBodyLength:
-            return "InvalidBodyLength";
-        case Result::InvalidCheckSum:
-            return "InvalidCheckSum";
-        case Result::InvalidTargetCompTag:
-            return "InvalidTargetCompTag";
-        case Result::InvalidTargetCompId:
-            return "InvalidTargetCompId";
-        case Result::InvalidSenderCompTag:
-            return "InvalidSenderCompTag";
-        case Result::InvalidSenderCompId:
-            return "InvalidSenderCompId";
-        case Result::InvalidSequenceNumber:
-            return "InvalidSequenceNumber";
-        case Result::InvalidMessageTypeTag:
-            return "InvalidMessageTypeTag";
-        case Result::InvalidMessageType:
-            return "InvalidMessageType";
-        case Result::InvalidSendingTime:
-            return "InvalidSendingTime";
-        case Result::RequiredFieldMissing:
-            return "RequiredFieldMissing";
-        case Result::InvalidLength:
-            return "InvalidLength";
-        case Result::InvalidValue:
-            return "InvalidValue";
-        default:
-            return "??";
+        case Result::Success: return "Success";
+        case Result::MessageFragment: return "MessageFragment";
+        case Result::InvalidBeginString: return "InvalidBeginString";
+        case Result::InvalidCheckSumTag: return "InvalidCheckSumTag";
+        case Result::InvalidBodyLengthTag: return "InvalidBodyLengthTag";
+        case Result::InvalidBodyLength: return "InvalidBodyLength";
+        case Result::InvalidCheckSum: return "InvalidCheckSum";
+        case Result::InvalidTargetCompTag: return "InvalidTargetCompTag";
+        case Result::InvalidTargetCompId: return "InvalidTargetCompId";
+        case Result::InvalidSenderCompTag: return "InvalidSenderCompTag";
+        case Result::InvalidSenderCompId: return "InvalidSenderCompId";
+        case Result::InvalidSequenceNumber: return "InvalidSequenceNumber";
+        case Result::InvalidMessageTypeTag: return "InvalidMessageTypeTag";
+        case Result::InvalidMessageType: return "InvalidMessageType";
+        case Result::InvalidSendingTime: return "InvalidSendingTime";
+        case Result::RequiredFieldMissing: return "RequiredFieldMissing";
+        case Result::InvalidLength: return "InvalidLength";
+        case Result::InvalidValue: return "InvalidValue";
+        case Result::NullValue: return "NullValue";
+        default: return "??";
     }
 }
 
