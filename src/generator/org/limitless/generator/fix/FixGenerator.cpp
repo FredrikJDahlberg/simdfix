@@ -141,7 +141,7 @@ static void generateTypes(const std::string& fileName,
         generateEnums(out, type);
     }
     out << "} // namespace org::limitless::fix::messages\n\n";
-    out << "#endif //SIMD_FIX_TYPES_HPP\n";
+    out << "#endif //SIMD_FIX_FIX_TYPES_HPP\n";
 
     out.close();
 }
@@ -327,7 +327,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     }
     out << "};\n\n";
     out << "} // namespace org::limitless::fix::messages\n\n";
-    out << "#endif // SIMD_FIX_MESSAGE_HANDLER_HPP\n";
+    out << "#endif //SIMD_FIX_MESSAGE_HANDLER_HPP\n";
 }
 
 static void generateConstructors(std::ostream& out, const Record& record, const std::string& codec)

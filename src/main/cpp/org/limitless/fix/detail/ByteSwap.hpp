@@ -45,4 +45,4 @@ template <typename T>
 
 } // namespace org::limitless::fix::detail
 
-#endif // SIMD_FIX_BYTESWAP_HPP
+#endif //SIMD_FIX_BYTESWAP_HPP

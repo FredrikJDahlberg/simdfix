@@ -5,8 +5,8 @@
 // Uint8x16 and ChecksumAccumulator based on the target platform.
 //
 
-#ifndef SIMD_UNT8X16_H
-#define SIMD_UNT8X16_H
+#ifndef SIMD_FIX_UINT8X16_HPP
+#define SIMD_FIX_UINT8X16_HPP
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 #include "Uint8x16_neon.inl"
@@ -16,4 +16,4 @@
 #error "Unsupported architecture: simdfix requires ARM NEON or x86 SSE4.1"
 #endif
 
-#endif // SIMD_UNT8X16_H
+#endif //SIMD_FIX_UINT8X16_HPP

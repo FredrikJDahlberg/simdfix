@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-04-11.
 //
 
-#ifndef SIMD_FIX_DECODER_HPP
-#define SIMD_FIX_DECODER_HPP
+#ifndef SIMD_FIX_PAYLOAD_DECODER_HPP
+#define SIMD_FIX_PAYLOAD_DECODER_HPP
 
 #include <algorithm>
 #include <array>
@@ -589,4 +589,4 @@ private:
 
 }
 
-#endif //SIMD_FIX_DECODER_H
+#endif //SIMD_FIX_PAYLOAD_DECODER_HPP

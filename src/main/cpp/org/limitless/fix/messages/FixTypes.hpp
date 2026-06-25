@@ -323,4 +323,4 @@ struct Boolean
 
 } // namespace org::limitless::fix::messages
 
-#endif //SIMD_FIX_TYPES_HPP
+#endif //SIMD_FIX_FIX_TYPES_HPP

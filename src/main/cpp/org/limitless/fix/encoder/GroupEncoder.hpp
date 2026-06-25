@@ -58,4 +58,4 @@ protected:
 
 }
 
-#endif //SIMDFIX_GROUPENCODER_HPP
+#endif //SIMD_FIX_GROUP_ENCODER_HPP

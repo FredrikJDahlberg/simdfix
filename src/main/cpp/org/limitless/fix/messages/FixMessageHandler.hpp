@@ -142,4 +142,4 @@ protected:
 
 } // namespace org::limitless::fix::messages
 
-#endif // SIMD_FIX_MESSAGE_HANDLER_HPP
+#endif //SIMD_FIX_MESSAGE_HANDLER_HPP

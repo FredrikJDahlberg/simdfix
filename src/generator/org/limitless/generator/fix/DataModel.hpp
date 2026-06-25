@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-06-06.
 //
 
-#ifndef SIMDFIX_DATA_MODEL_HPP
-#define SIMDFIX_DATA_MODEL_HPP
+#ifndef SIMD_FIX_DATA_MODEL_HPP
+#define SIMD_FIX_DATA_MODEL_HPP
 
 #include <cstring>
 #include <string>
@@ -284,4 +284,4 @@ struct DataModel
 };
 }
 
-#endif //SIMDFIX_DATA_MODEL_HPP
+#endif //SIMD_FIX_DATA_MODEL_HPP

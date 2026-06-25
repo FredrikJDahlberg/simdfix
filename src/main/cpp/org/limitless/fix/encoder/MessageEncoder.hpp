@@ -43,4 +43,4 @@ public:
 
 }
 
-#endif //SIMDFIX_MESSAGE_ENCODER_HPP
+#endif //SIMD_FIX_MESSAGE_ENCODER_HPP

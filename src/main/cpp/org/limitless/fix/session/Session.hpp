@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-06-24.
 //
 
-#ifndef SIMDFIX_SESSION_HPP
-#define SIMDFIX_SESSION_HPP
+#ifndef SIMD_FIX_SESSION_HPP
+#define SIMD_FIX_SESSION_HPP
 
 #include "org/limitless/fix/messages/FixMessageHandler.hpp"
 
@@ -93,4 +93,4 @@ private:
 
 }
 
-#endif //SIMDFIX_SESSION_HPP
+#endif //SIMD_FIX_SESSION_HPP

@@ -154,4 +154,4 @@ public:
 
 #endif // __cplusplus check
 
-#endif // SIMD_FIX_EXPECTED_HPP
+#endif //SIMD_FIX_EXPECTED_HPP

@@ -2,8 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-05-16.
 //
 
-#ifndef SIMD_FIX_LINEAR_HPP
-#define SIMD_FIX_LINEAR_HPP
+#ifndef SIMD_FIX_LINEAR_SEARCH_HPP
+#define SIMD_FIX_LINEAR_SEARCH_HPP
 
 #include <bit>
 
@@ -40,4 +40,4 @@ namespace org::limitless::fix::detail::simd {
 
 }
 
-#endif //SIMD_FIX_LINEAR_HPP
+#endif //SIMD_FIX_LINEAR_SEARCH_HPP
