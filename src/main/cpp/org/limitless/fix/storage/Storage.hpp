@@ -14,8 +14,15 @@ namespace org::limitless::fix::storage
 
 /**
  * One stored outbound message: its sequence number, MsgType, and the raw encoded
- * payload bytes. The payload is a view into store-owned memory and stays valid
- * for as long as the store retains the message.
+ * payload bytes — returned as a flyweight.
+ *
+ * m_payload is a non-owning view into a store-owned buffer and is valid only
+ * until the next call on the store (the next getMessage, or the next advance of
+ * a getMessages range). This is the same one-message-at-a-time contract the
+ * decoder flyweights follow: consume the bytes (e.g. write them to the wire)
+ * before moving on, or copy them out if they must outlive that window. A backing
+ * store is free to keep more resident (an in-memory store keeps everything), but
+ * callers may not rely on more than this minimum.
  */
 struct StoredMessage
 {
@@ -29,8 +36,13 @@ struct StoredMessage
  * Persistence strategy for the resend / gap-fill path: wraps a store of many
  * outbound messages keyed by sequence number. appendMessage persists a message
  * triple; getMessage returns a single stored message and getMessages returns the
- * inclusive [fromSeqNum, toSeqNum] range as a span for replaying a ResendRequest
- * in one call.
+ * inclusive [fromSeqNum, toSeqNum] range for replaying a ResendRequest.
+ *
+ * Returned StoredMessage views are flyweights into store-owned memory, valid only
+ * until the next call on the store (see StoredMessage). A file-backed store reads
+ * in batches and re-points the views as it advances, so the expensive reads are
+ * amortized while the caller still only looks at one message (or one batch) at a
+ * time.
  *
  * This header stays free of the heavy I/O includes a concrete (in-memory or
  * file-backed) store needs; those belong in the store's own translation unit.

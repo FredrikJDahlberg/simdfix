@@ -45,6 +45,38 @@ Session handling
   resend and replay inbound messages after a reconnect.
 - Duplicate & PossDupFlag handling — detect and suppress duplicate
   messages, set PossDupFlag / PossResend on retransmissions.
+- Keep-alive periods — drive the `keepAlive` timer tick from the configured
+  heartbeat period (`DefaultHeartbeatPeriod`, overridable via the `Builder`):
+  emit a Heartbeat when the link is idle, escalate to a TestRequest when a
+  beat is overdue, and mark the session stale after repeated misses.
+- Message handling — route decoded messages by MsgType: classify session vs
+  application messages with `isSessionMessage`, handle admin messages in the
+  session layer and forward application messages to the handler below.
+
+Storage
+-----
+
+- Memory-mapped message store — a `FixStorageStrategy` backed by an mmap'd
+  journal file with an in-memory sequence-number -> file-position index (offset
+  + length), so a single message or a resend range is located by MsgSeqNum
+  without scanning. Append writes the encoded bytes to the journal and records
+  the offset; reads return a flyweight `StoredMessage` viewing the mapped pages
+  directly (zero-copy, no `read()` syscall — paging/readahead is the OS's job).
+- Read API: flyweight getMessage + range cursor — keep `getMessage(seqNum)`
+  returning a single flyweight `StoredMessage` (valid until the next store
+  call), and replace `getMessages(from, to) -> std::span<const StoredMessage>`
+  with a cursor/visitor that yields one `StoredMessage` at a time — a span of N
+  can't express N simultaneously-valid flyweights. e.g.
+  `replay(from, to, visitor)`, or
+  `for (auto c = store.replay(from, to); c.next(); ) send(c.current());`.
+- Batched (packet) range reads — the cursor lets the store own the buffer and
+  refill transparently: read a packet of messages per I/O and re-point the
+  flyweight within it, so the expensive reads are amortized while the caller
+  still sees one message at a time. (`MemoryStorage` implements the cursor
+  trivially over its resident vector.)
+- Fault tolerance (later) — fallible returns (`Result`/`expected`),
+  durable-append-before-wire, recovery metadata (last seqNum / range as source
+  of truth after failover), and replication are deferred.
 
 Continuous integration — hosted NEON runner
 -----

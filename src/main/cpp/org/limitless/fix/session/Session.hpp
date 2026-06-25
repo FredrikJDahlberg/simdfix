@@ -9,6 +9,7 @@
 #include <concepts>
 #include <cstdint>
 #include <string_view>
+#include <utility>
 
 #include "org/limitless/fix/storage/Storage.hpp"
 #include "org/limitless/fix/messages/FixMessageHandler.hpp"
@@ -92,6 +93,10 @@ public:
     // below visible alongside the admin-message overloads declared here.
     using HandlerType::handle;
 
+    // Default heartbeat interval used when a Builder does not override it.
+    static constexpr milliseconds DefaultHeartbeatPeriod{10000};
+
+    template <typename Concrete = Session>
     class Builder;
 
     /**
@@ -102,7 +107,7 @@ public:
      */
     Result keepAlive(const milliseconds now)
     {
-        // if (now - m_nowMs >= HeartbeatPeriodMillis)
+        // if (now - m_nowMs >= m_heartbeatPeriod)
         {
 
         }
@@ -168,6 +173,21 @@ public:
         return m_state;
     }
 
+    [[nodiscard]] std::string_view senderCompId() const noexcept
+    {
+        return m_senderCompId;
+    }
+
+    [[nodiscard]] std::string_view targetCompId() const noexcept
+    {
+        return m_targetCompId;
+    }
+
+    [[nodiscard]] milliseconds heartbeatPeriod() const noexcept
+    {
+        return m_heartbeatPeriod;
+    }
+
 protected:
     Storage m_storage{};
 
@@ -175,17 +195,68 @@ protected:
     uint32_t m_nextOutgoingSeqNum{1};
     uint32_t m_nextExpectedSeqNum{1};
 
+    std::string_view m_senderCompId;
+    std::string_view m_targetCompId;
+    milliseconds m_heartbeatPeriod{DefaultHeartbeatPeriod};
     milliseconds m_nowMs{0};
-    //static constexpr milliseconds HeartbeatPeriodMs;
 };
 
+/**
+ * Fluent builder for a Session. The CompIDs and the message store are required;
+ * the heartbeat period is optional and defaults to DefaultHeartbeatPeriod.
+ *
+ * @tparam Concrete the session type build() returns — the base Session by
+ *         default, or a concrete role session (e.g. ClientSession) that derives
+ *         from it.
+ *
+ * The CompIDs are held as views (consistent with SessionContext), so the strings
+ * they reference must outlive the built session.
+ */
 template <FixMessageHandler HandlerType, FixStorageStrategy Storage>
+template <typename Concrete>
 class Session<HandlerType, Storage>::Builder
 {
+    std::string_view m_senderCompId;
+    std::string_view m_targetCompId;
+    Storage m_storage;
+    milliseconds m_heartbeatPeriod{DefaultHeartbeatPeriod};
 
+public:
+    /**
+     * @param senderCompId our CompID (tag 49 on outbound messages)
+     * @param targetCompId the counterparty CompID (tag 56 on outbound messages)
+     * @param storage the message store the built session takes ownership of
+     */
+    Builder(const std::string_view senderCompId,
+            const std::string_view targetCompId,
+            Storage storage)
+        : m_senderCompId(senderCompId),
+          m_targetCompId(targetCompId),
+          m_storage(std::move(storage))
+    {
+    }
+
+    /**
+     * Overrides the heartbeat period (default DefaultHeartbeatPeriod).
+     * @param period the heartbeat interval
+     * @return *this, for chaining
+     */
+    Builder& heartbeatPeriod(const milliseconds period)
+    {
+        m_heartbeatPeriod = period;
+        return *this;
+    }
+
+    [[nodiscard]] Concrete build()
+    {
+        Concrete session;
+        session.m_senderCompId = m_senderCompId;
+        session.m_targetCompId = m_targetCompId;
+        session.m_heartbeatPeriod = m_heartbeatPeriod;
+        session.m_storage = std::move(m_storage);
+        return session;
+    }
 };
-
-
 
 }
 
