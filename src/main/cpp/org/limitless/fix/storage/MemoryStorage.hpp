@@ -40,8 +40,7 @@ public:
      * @param messageType the message's MsgType
      * @param payload the raw encoded message bytes (copied into the store)
      */
-    void appendMessage(const uint32_t seqNum, const uint16_t messageType,
-                       const std::span<const uint8_t> payload)
+    void appendMessage(const uint32_t seqNum, const uint16_t messageType, const std::span<const uint8_t> payload)
     {
         if (m_messages.empty())
         {
@@ -79,8 +78,7 @@ public:
      *         [fromSeqNum, toSeqNum], clamped to what is held; empty if the
      *         intersection is empty
      */
-    [[nodiscard]] std::span<const StoredMessage> getMessages(const uint32_t fromSeqNum,
-                                                             const uint32_t toSeqNum) const
+    [[nodiscard]] std::span<const StoredMessage> getMessages(const uint32_t fromSeqNum, const uint32_t toSeqNum) const
     {
         if (m_messages.empty() || toSeqNum < fromSeqNum || toSeqNum < m_baseSeqNum)
         {
@@ -93,8 +91,7 @@ public:
         {
             return {};
         }
-        return std::span<const StoredMessage>{m_messages}.subspan(begin - m_baseSeqNum,
-                                                                  end - begin + 1);
+        return std::span<const StoredMessage>{m_messages}.subspan(begin - m_baseSeqNum, end - begin + 1);
     }
 
     void clear()

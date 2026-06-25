@@ -147,6 +147,22 @@ public:
         return Result::Success;
     }
 
+    /**
+     * Classifies a MsgType as a session (administrative) message — one handled
+     * by the session layer itself — versus an application message left to the
+     * handler below.
+     * @param messageId the MsgType value (as produced by the decoder)
+     * @return true for Logon, Logout, Heartbeat, TestRequest, ResendRequest,
+     *         Reject and SequenceReset; false otherwise
+     */
+    [[nodiscard]] static constexpr bool isSessionMessage(const uint16_t messageId) noexcept
+    {
+        return messageId == HeartbeatDecoder::MessageId || messageId == TestRequestDecoder::MessageId ||
+               messageId == ResendRequestDecoder::MessageId || messageId == RejectDecoder::MessageId ||
+               messageId == LogonDecoder::MessageId || messageId == LogoutDecoder::MessageId ||
+               messageId == SequenceResetDecoder::MessageId;
+    }
+
     [[nodiscard]] State state() const noexcept
     {
         return m_state;
