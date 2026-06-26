@@ -91,7 +91,7 @@ public:
         {
             return {};
         }
-        return std::span<const StoredMessage>{m_messages}.subspan(begin - m_baseSeqNum, end - begin + 1);
+        return std::span{m_messages}.subspan(begin - m_baseSeqNum, end - begin + 1);
     }
 
     void clear()

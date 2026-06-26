@@ -13,7 +13,7 @@ A SIMD-accelerated [FIX](https://www.fixtrading.org/standards/fix-sessions-onlin
 
 ## Requirements
 
-- C++23 compiler (Clang 16+ or GCC 13+)
+- C++20 or C++23 compiler (Clang 16+ or GCC 13+)
 - CMake 3.20+
 - ARM (NEON) and INTEL (SSE) targets
 - [Google Test](https://github.com/google/googletest) (for tests)
@@ -90,11 +90,9 @@ Message types (decoders, encoders, handler dispatch) are generated from `src/gen
 cmake --build cmake-build-debug --target GenerateMessages
 ```
 
-Do not hand-edit files under `src/main/cpp/org/limitless/fix/messages/` — they are overwritten by the generator.
+Do not hand-edit files under `src/main/cpp/org/limitless/fix/config/` or `src/main/cpp/org/limitless/fix/messages/` — they are overwritten by the generator.
 
 ## Architecture
-
-![Architecture](doc/architecture.png)
 
 ### Key Components
 

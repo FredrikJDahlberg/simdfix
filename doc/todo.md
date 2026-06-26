@@ -9,12 +9,6 @@ Unsupported FIX data types
 `timestamp`, and `string`. The following standard FIX data types have no
 mapping/`Category` and cannot yet be used in `protocol.xml`:
 
-- ~~`UTCTimeOnly`~~ — done. Primitive type `timeonly`, `Category::UTCTimeOnly`.
-  Decodes "HH:MM:SS" / "HH:MM:SS.sss" to `std::chrono::milliseconds`
-  (millis since midnight). Encodes via `encodeUTCTimeOnly`.
-- ~~`UTCDateOnly`~~ — done. Primitive type `dateonly`, `Category::UTCDateOnly`.
-  Decodes "YYYYMMDD" to `std::chrono::milliseconds` (millis since epoch
-  at midnight UTC). Encodes via `encodeUTCDateOnly`.
 - `LocalMktDate` — same wire format as `UTCDateOnly`, different semantic
   (local timezone). Can share the same `Category::UTCDateOnly` codec.
 - `MonthYear` — "YYYYMM", "YYYYMMDD", or "YYYYMMwN" (6, 8, or 8 bytes).
@@ -62,24 +56,6 @@ Session handling
 Storage
 -----
 
-- Memory-mapped message store — a `FixStorageStrategy` backed by an mmap'd
-  journal file with an in-memory sequence-number -> file-position index (offset
-  + length), so a single message or a resend range is located by MsgSeqNum
-  without scanning. Append writes the encoded bytes to the journal and records
-  the offset; reads return a flyweight `StoredMessage` viewing the mapped pages
-  directly (zero-copy, no `read()` syscall — paging/readahead is the OS's job).
-- Read API: flyweight getMessage + range cursor — keep `getMessage(seqNum)`
-  returning a single flyweight `StoredMessage` (valid until the next store
-  call), and replace `getMessages(from, to) -> std::span<const StoredMessage>`
-  with a cursor/visitor that yields one `StoredMessage` at a time — a span of N
-  can't express N simultaneously-valid flyweights. e.g.
-  `replay(from, to, visitor)`, or
-  `for (auto c = store.replay(from, to); c.next(); ) send(c.current());`.
-- Batched (packet) range reads — the cursor lets the store own the buffer and
-  refill transparently: read a packet of messages per I/O and re-point the
-  flyweight within it, so the expensive reads are amortized while the caller
-  still sees one message at a time. (`MemoryStorage` implements the cursor
-  trivially over its resident vector.)
 - Aeron Archive backend — a `FixStorageStrategy` over Aeron Archive's
   record/replay (C++ client). Append = `Publication::offer` to a recorded
   publication; capture the pre-offer `position()` as the message start. Aeron
@@ -113,14 +89,7 @@ runner instead of the local Mac:
   private repos; configure under Settings -> Actions -> Runners).
 - In .github/workflows/ci.yml, change the arm64 matrix entry from
   `runner: [self-hosted, macOS, ARM64]` / `os: macos` to
-  `runner: ubuntu-24.04-arm` / `os: linux`. Both legs then share the
-  Linux path (apt + clang + g++-14 + the __cpp_concepts workaround); the
-  macOS Homebrew "Install dependencies" step becomes unused and can be
-  removed.
+  `runner: ubuntu-24.04-arm` / `os: linux`. 
 - Decommission the self-hosted runner: remove it under Settings ->
   Actions -> Runners, and stop it on the Mac (`./svc.sh uninstall`, or
   stop `./run.sh`).
-- No source changes required — hosted arm64 Linux uses the same Clang +
-  libstdc++ toolchain as the x86 leg, already covered by the C++23
-  portability fixes (forced standard, __cpp_concepts guard, explicit
-  includes).
