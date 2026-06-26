@@ -16,6 +16,7 @@
 #include "org/limitless/fix/Types.hpp"
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
 #include "org/limitless/fix/storage/Storage.hpp"
+#include "org/limitless/fix/messages/FixEngine.hpp"
 #include "org/limitless/fix/messages/FixMessageHandler.hpp"
 #include "org/limitless/fix/messages/FixMessageEncoders.hpp"
 
@@ -140,12 +141,12 @@ public:
     using HandlerType::handle;
 
     // Upper bound on a single encoded outbound message; sizes the send buffer.
-    static constexpr uint32_t MaxMessageSize{4096};
+    static constexpr uint32_t MaxMessageSize = config::MaxMessageSize;
 
-    static constexpr milliseconds KeepAlivePeriod{100};
+    static constexpr milliseconds KeepAlivePeriod = config::KeepAlivePeriod;
 
     // Default heartbeat interval used when a Builder does not override it.
-    static constexpr milliseconds DefaultHeartbeatPeriod{10000};
+    static constexpr milliseconds DefaultHeartbeatPeriod = config::HeartbeatPeriod;
 
     template <typename Concrete = Session>
     class Builder;

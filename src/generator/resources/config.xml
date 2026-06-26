@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <engine compId="ENGINE">          <!-- the local node; every session's Sender (tag 49 outbound) -->
+        <message maxSize="4096"/>     <!-- bytes:  MaxMessageSize         -->
+        <payload maxFields="256"/>    <!-- count:  PayloadDecoder MaxSize  -->
+        <keepAlive millis="100"/>     <!-- ms:     KeepAlivePeriod         -->
+        <heartbeat millis="10000"/>   <!-- ms:     default HeartBtInt       -->
+    </engine>
+
+    <sessions>
+        <session name="alpha" role="server" beginString="FIXT_1_1" remote="AAA" storage="memory" heartbeat="30000"/>
+        <session name="beta"  role="server" beginString="FIXT_1_1" remote="BBB"/>
+        <session name="gamma" role="client" beginString="FIXT_1_1" remote="VENUE"/>
+    </sessions>
+</config>

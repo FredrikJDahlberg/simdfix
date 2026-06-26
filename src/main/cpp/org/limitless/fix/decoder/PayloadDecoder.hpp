@@ -14,6 +14,7 @@
 
 #include "org/limitless/fix/detail/Tokens.hpp"
 #include "org/limitless/fix/detail/simd/Uint8x16.hpp"
+#include "org/limitless/fix/messages/FixEngine.hpp"
 #include "org/limitless/fix/utils/Conversions.hpp"
 
 namespace org::limitless::fix::decoder {
@@ -57,7 +58,7 @@ concept PayloadHandler = requires(Handler handler, const TokenizedMessage& messa
 template <FixedString BeginString, typename DataFields = NoDataFields>
 class PayloadDecoder
 {
-    static constexpr size_t MaxSize = 256;
+    static constexpr size_t MaxSize = config::MaxFields;
 
     static constexpr uint32_t RequiredFieldCount = 7;
     static constexpr uint32_t MessageFragmentLimit = 32;
