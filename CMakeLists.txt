@@ -25,19 +25,15 @@ if(SIMDFIX_HAS_MSSE41)
     set(SIMDFIX_SSE41_FLAG -msse4.1)
 endif()
 
-include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp
-        ${CMAKE_SOURCE_DIR}/src/test/cpp
-        ${CMAKE_SOURCE_DIR}/src/generator
-        ${CONFIG_GENERATED_DIR})
 set(MAIN_PATH "src/main/cpp/org/limitless/fix")
-set(GEN_PATH "src/main/cpp/org/limitless/fix/generated/messages")
-set(CONFIG_GEN_PATH "src/main/cpp/org/limitless/fix/generated/config")
+set(GEN_PATH "org/limitless/fix/generated/messages")
+set(CONFIG_GEN_PATH "org/limitless/fix/generated/config")
 set(TEST_PATH "src/test/cpp/org/limitless/fix")
 set(GENERATOR_PATH "src/generator/org/limitless/generator/fix/")
 set(PROTOCOL_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/protocol.xml")
 set(CONFIG_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/config.xml")
-set(GENERATED_DIR "${CMAKE_SOURCE_DIR}/${GEN_PATH}")
-set(CONFIG_GENERATED_DIR "${CMAKE_SOURCE_DIR}/${CONFIG_GEN_PATH}")
+set(GENERATED_DIR "${CMAKE_BINARY_DIR}/${GEN_PATH}")
+set(CONFIG_GENERATED_DIR "${CMAKE_BINARY_DIR}/${CONFIG_GEN_PATH}")
 set(GENERATED_HEADERS
         ${GENERATED_DIR}/FixTypes.hpp ${GENERATED_DIR}/FixMessageDecoders.hpp
         ${GENERATED_DIR}/FixMessageEncoders.hpp ${GENERATED_DIR}/FixMessageHandler.hpp
@@ -64,6 +60,7 @@ add_library(SimdFix::SimdFix ALIAS SimdFix)
 # org/limitless/fix/Fix.hpp; anything under org/limitless/fix/detail/ is internal.
 target_include_directories(SimdFix INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp>
+        $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
         $<INSTALL_INTERFACE:include>)
 target_compile_definitions(SimdFix INTERFACE $<$<CONFIG:Debug>:DEBUG_MODE> $<$<CONFIG:Release>:NDEBUG>
 )
@@ -91,6 +88,11 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp/org
             PATTERN "*.hpp"
             PATTERN "*.inl"
             PATTERN "detail" EXCLUDE
+            PATTERN "generated" EXCLUDE
+)
+install(DIRECTORY ${CMAKE_BINARY_DIR}/org
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        FILES_MATCHING PATTERN "*.hpp"
 )
 
 install(EXPORT SimdFixTargets
@@ -108,8 +110,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SimdFixConfig.cmake
 
 add_executable(SimdFixBenchmark ${TEST_PATH}/benchmark/SimdFixBenchmark.cpp)
 target_include_directories(SimdFixBenchmark PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/test/cpp")
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
 target_link_libraries(SimdFixBenchmark PRIVATE SimdFix)
 add_dependencies(SimdFixBenchmark GenerateMessages)
 target_compile_definitions(SimdFixBenchmark PRIVATE $<$<CONFIG:Release>:NDEBUG>)
@@ -159,16 +160,17 @@ set_target_properties(Generator PROPERTIES CXX_STANDARD 23)
 target_compile_options(Generator PRIVATE -O0 -Wall)
 target_include_directories(Generator PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/cpp")
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/generator")
 target_link_libraries(Generator PRIVATE pugixml::pugixml)
 
 add_custom_command(
         OUTPUT ${GENERATED_HEADERS}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_DIR} ${CONFIG_GENERATED_DIR}
         COMMAND $<TARGET_FILE:Generator> ${PROTOCOL_XML} ${GENERATED_DIR} ${CONFIG_XML} ${CONFIG_GENERATED_DIR}
         DEPENDS Generator
                 ${PROTOCOL_XML}
                 ${CONFIG_XML}
-                ${GENERATOR_PATH}/FixGenerator.cpp ${GENERATOR_PATH}/DataModel.hpp
+                ${GENERATOR_PATH}/FixGenerator.cpp ${GENERATOR_PATH}/DataModel.hpp ${GENERATOR_PATH}/ConfigMapping.hpp
         COMMENT "Generating FIX message headers from protocol.xml and config.xml"
         VERBATIM
 )
@@ -277,5 +279,7 @@ add_library(header_test ${FIX_HEADERS} ${GENERATED_HEADERS}
         ${MAIN_PATH}/session/Session.hpp
         ${MAIN_PATH}/session/ClientSession.hpp ${MAIN_PATH}/session/ServerSession.hpp)
 set_source_files_properties(${FIX_HEADERS} ${GENERATED_HEADERS} PROPERTIES LANGUAGE CXX)
-target_include_directories(header_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp)
+target_include_directories(header_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp
+        ${CMAKE_BINARY_DIR})
 add_dependencies(header_test GenerateMessages)
