@@ -4,18 +4,19 @@
 
 #include <gtest/gtest.h>
 
-#include "org/limitless/fix/messages/FixMessageEncoders.hpp"
+#include "org/limitless/fix/generated/messages/FixMessageEncoders.hpp"
 
 namespace org::limitless::fix::encoder {
 
-using namespace fix::messages;
+using namespace fix::generated::config;
+using namespace fix::generated::messages;
 
 #define SOH "\x01"
 
 TEST(MessageEncoder, Logon)
 {
     std::array<uint8_t, 256> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     LogonEncoder logon{};
@@ -35,7 +36,7 @@ TEST(MessageEncoder, Logon)
 TEST(MessageEncoder, LogonNullEncryption)
 {
     std::array<uint8_t, 256> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     LogonEncoder logon{};
@@ -57,7 +58,7 @@ TEST(MessageEncoder, SendingTimeAtEpoch)
     // Regression: the date-prefix cache must render the Unix epoch (millis == 0)
     // rather than leaving an uninitialized prefix on the first timestamp encode.
     std::array<uint8_t, 256> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     HeartbeatEncoder heartbeat{};
@@ -74,7 +75,7 @@ TEST(MessageEncoder, SendingTimeAtEpoch)
 TEST(MessageEncoder, HeartbeatWithHops)
 {
     std::array<uint8_t, 256> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     HeartbeatEncoder heartbeat{};
@@ -103,7 +104,7 @@ TEST(MessageEncoder, HeartbeatWithHops)
 TEST(MessageEncoder, NewOrderSingle)
 {
     std::array<uint8_t, 256> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     NewOrderSingleEncoder order{};
@@ -131,7 +132,7 @@ TEST(MessageEncoder, NewOrderSingle)
 TEST(MessageEncoder, NewOrderSingleWithDateAndTime)
 {
     std::array<uint8_t, 512> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     NewOrderSingleEncoder order{};
@@ -162,7 +163,7 @@ TEST(MessageEncoder, NewOrderSingleWithDateAndTime)
 TEST(MessageEncoder, ResendRequest)
 {
     std::array<uint8_t, 256> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     ResendRequestEncoder resend{};
@@ -182,7 +183,7 @@ TEST(MessageEncoder, ResendRequest)
 TEST(MessageEncoder, Reject)
 {
     std::array<uint8_t, 256> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     RejectEncoder reject{};
@@ -206,7 +207,7 @@ TEST(MessageEncoder, Reject)
 TEST(MessageEncoder, RejectMinimal)
 {
     std::array<uint8_t, 256> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     RejectEncoder reject{};
@@ -225,7 +226,7 @@ TEST(MessageEncoder, RejectMinimal)
 TEST(MessageEncoder, SequenceReset)
 {
     std::array<uint8_t, 256> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     SequenceResetEncoder seqReset{};
@@ -245,7 +246,7 @@ TEST(MessageEncoder, SequenceReset)
 TEST(MessageEncoder, SequenceResetNoGapFill)
 {
     std::array<uint8_t, 256> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     SequenceResetEncoder seqReset{};
@@ -264,7 +265,7 @@ TEST(MessageEncoder, SequenceResetNoGapFill)
 TEST(MessageEncoder, ExecutionReportFill)
 {
     std::array<uint8_t, 512> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     ExecutionReportEncoder report{};
@@ -301,7 +302,7 @@ TEST(MessageEncoder, ExecutionReportFill)
 TEST(MessageEncoder, ExecutionReportMinimal)
 {
     std::array<uint8_t, 512> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     ExecutionReportEncoder report{};
@@ -332,7 +333,7 @@ TEST(MessageEncoder, ExecutionReportMinimal)
 TEST(MessageEncoder, ExecutionReportReject)
 {
     std::array<uint8_t, 512> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
     ExecutionReportEncoder report{};
@@ -366,11 +367,10 @@ TEST(MessageEncoder, ExecutionReportReject)
 TEST(MessageEncoder, LogonWithXmlData)
 {
     std::array<uint8_t, 512> buffer{};
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buffer);
 
-    const std::array<uint8_t, 11> xml = {'<', 'r', 'o', 'o', 't', '/', '>', 't', 'e', 's', 't'};
-
+    constexpr std::array<uint8_t, 11> xml = {'<', 'r', 'o', 'o', 't', '/', '>', 't', 'e', 's', 't'};
     LogonEncoder logon{};
     encoder.wrapMessage(logon)
             .sequenceNumber(1)

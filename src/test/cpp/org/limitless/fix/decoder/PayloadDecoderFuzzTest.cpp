@@ -17,7 +17,8 @@
 #include <gtest/gtest.h>
 
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
-#include "org/limitless/fix/messages/FixTypes.hpp"
+
+#include "org/limitless/fix/generated/messages/FixTypes.hpp"
 
 namespace org::limitless::fix::decoder {
 
@@ -49,7 +50,7 @@ namespace
     ParseResult parseExact(std::span<const uint8_t> bytes)
     {
         std::vector<uint8_t> buffer(bytes.begin(), bytes.end());
-        PayloadDecoder<config::FIXT_1_1, DataFields> decoder;
+        PayloadDecoder<generated::config::FIXT_1_1, DataFields> decoder;
         return decoder.parse(Buffer{buffer.data(), buffer.size()});
     }
 
@@ -127,7 +128,7 @@ TEST(PayloadDecoderFuzz, RandomBody)
 // Reuse one decoder across differently sized messages to surface stale state.
 TEST(PayloadDecoderFuzz, DecoderReuse)
 {
-    PayloadDecoder<config::FIXT_1_1, DataFields> decoder;
+    PayloadDecoder<generated::config::FIXT_1_1, DataFields> decoder;
     const std::vector<uint8_t> logon(ValidLogon.begin(), ValidLogon.end());
     const std::vector<uint8_t> data(ValidData.begin(), ValidData.end());
 

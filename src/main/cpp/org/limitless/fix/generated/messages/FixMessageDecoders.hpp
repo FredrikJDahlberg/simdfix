@@ -4,13 +4,13 @@
 
 #include "org/limitless/fix/detail/Expected.hpp"
 
-#include "org/limitless/fix/config/FixEngine.hpp"
+#include "org/limitless/fix/generated/config/FixEngine.hpp"
+#include "org/limitless/fix/generated/messages/FixTypes.hpp"
 #include "org/limitless/fix/decoder/DataDecoder.hpp"
 #include "org/limitless/fix/decoder/GroupDecoder.hpp"
 #include "org/limitless/fix/decoder/MessageDecoder.hpp"
-#include "org/limitless/fix/messages/FixTypes.hpp"
 
-namespace org::limitless::fix::messages {
+namespace org::limitless::fix::generated::messages {
 
 using config::Protocol;
 using namespace org::limitless::fix::decoder;
@@ -1453,6 +1453,6 @@ public:
 
 };
 
-} // namespace org::limitless::fix::messages
+} // namespace org::limitless::fix::generated::messages
 
 #endif //SIMD_FIX_MESSAGE_DECODERS_HPP

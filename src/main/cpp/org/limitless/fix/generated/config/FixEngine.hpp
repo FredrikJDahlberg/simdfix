@@ -8,7 +8,7 @@
 
 #include "org/limitless/fix/Types.hpp"
 
-namespace org::limitless::fix::config {
+namespace org::limitless::fix::generated::config {
 
 enum class Protocol : uint8_t
 {
@@ -61,6 +61,6 @@ inline constexpr std::uint32_t MaxFields = 256;
 inline constexpr std::chrono::milliseconds KeepAlivePeriod{100};
 inline constexpr std::chrono::milliseconds HeartbeatPeriod{10000};
 
-} // namespace org::limitless::fix::config
+} // namespace org::limitless::fix::generated::config
 
 #endif //SIMD_FIX_ENGINE_HPP

@@ -2,15 +2,14 @@
 #ifndef SIMD_FIX_MESSAGE_ENCODERS_HPP
 #define SIMD_FIX_MESSAGE_ENCODERS_HPP
 
-#include "org/limitless/fix/config/FixEngine.hpp"
+#include "org/limitless/fix/generated/config/FixEngine.hpp"
+#include "org/limitless/fix/generated/messages/FixTypes.hpp"
 #include "org/limitless/fix/encoder/DataEncoder.hpp"
 #include "org/limitless/fix/encoder/GroupEncoder.hpp"
 #include "org/limitless/fix/encoder/MessageEncoder.hpp"
 #include "org/limitless/fix/encoder/PayloadEncoder.hpp"
 
-#include "org/limitless/fix/messages/FixTypes.hpp"
-
-namespace org::limitless::fix::messages {
+namespace org::limitless::fix::generated::messages {
 
 using namespace org::limitless::fix::encoder;
 
@@ -855,6 +854,6 @@ public:
     }
 };
 
-} // namespace org::limitless::fix::messages
+} // namespace org::limitless::fix::generated::messages
 
 #endif //SIMD_FIX_MESSAGE_ENCODERS_HPP

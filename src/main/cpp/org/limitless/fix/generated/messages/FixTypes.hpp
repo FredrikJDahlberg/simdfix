@@ -7,7 +7,7 @@
 
 #include "org/limitless/fix/Types.hpp"
 
-namespace org::limitless::fix::messages {
+namespace org::limitless::fix::generated::messages {
 
 enum class Encryption : uint8_t
 {
@@ -690,6 +690,6 @@ constexpr Boolean from(const std::string_view code, const Boolean)
     return Boolean::Null;
 }
 
-} // namespace org::limitless::fix::messages
+} // namespace org::limitless::fix::generated::messages
 
 #endif //SIMD_FIX_FIX_TYPES_HPP

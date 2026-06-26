@@ -14,19 +14,20 @@
 #include <utility>
 
 #include "org/limitless/fix/Types.hpp"
-#include "org/limitless/fix/config/FixEngine.hpp"
+#include "org/limitless/fix/generated/config/FixEngine.hpp"
+#include "org/limitless/fix/generated/messages/FixMessageHandler.hpp"
+#include "org/limitless/fix/generated/messages/FixMessageEncoders.hpp"
 #include "org/limitless/fix/decoder/PayloadHandler.hpp"
 #include "org/limitless/fix/storage/Storage.hpp"
-#include "org/limitless/fix/messages/FixMessageHandler.hpp"
-#include "org/limitless/fix/messages/FixMessageEncoders.hpp"
 
 namespace org::limitless::fix::session
 {
 
 using namespace std::chrono;
-using namespace org::limitless::fix::messages;
+using namespace org::limitless::fix::generated::config;
+using namespace org::limitless::fix::generated::messages;
 using namespace org::limitless::fix::storage;
-using ::org::limitless::fix::decoder::PayloadHandler;
+using decoder::PayloadHandler;
 
 /**
  * Describes the message-handler interface the decoder drives: a type the
@@ -36,7 +37,7 @@ using ::org::limitless::fix::decoder::PayloadHandler;
  * layered on top of it model this concept.
  */
 template <typename MessageHandler>
-concept FixMessageHandler = requires(MessageHandler handler,
+concept MessageHandlerType = requires(MessageHandler handler,
                                      const TokenizedMessage& message,
                                      const SessionContext& context)
 {
@@ -100,7 +101,7 @@ struct RejectApplication
  *         via the Builder; defaults to RejectApplication (admin-only sessions)
  */
 template <FixedString Protocol, FixedString Sender, FixedString Target,
-          FixMessageHandler HandlerType, FixStorageStrategy Storage = NullStorage,
+          MessageHandlerType HandlerType, FixStorageStrategy Storage = NullStorage,
           typename Transport = DiscardTransport,
           PayloadHandler Application = RejectApplication>
 class Session : public HandlerType
@@ -141,12 +142,12 @@ public:
     using HandlerType::handle;
 
     // Upper bound on a single encoded outbound message; sizes the send buffer.
-    static constexpr uint32_t MaxMessageSize = config::MaxMessageSize;
+    static constexpr uint32_t MaxMessageSize = generated::config::MaxMessageSize;
 
-    static constexpr milliseconds KeepAlivePeriod = config::KeepAlivePeriod;
+    static constexpr milliseconds KeepAlivePeriod = generated::config::KeepAlivePeriod;
 
     // Default heartbeat interval used when a Builder does not override it.
-    static constexpr milliseconds DefaultHeartbeatPeriod = config::HeartbeatPeriod;
+    static constexpr milliseconds DefaultHeartbeatPeriod = generated::config::HeartbeatPeriod;
 
     template <typename Concrete = Session>
     class Builder;
@@ -377,7 +378,7 @@ private:
  *         from it.
  */
 template <FixedString Protocol, FixedString Sender, FixedString Target,
-          FixMessageHandler HandlerType, FixStorageStrategy Storage, typename Transport,
+          MessageHandlerType HandlerType, FixStorageStrategy Storage, typename Transport,
           PayloadHandler Application>
 template <typename Concrete>
 class Session<Protocol, Sender, Target, HandlerType, Storage, Transport, Application>::Builder
@@ -456,7 +457,7 @@ template <template <FixedString, FixedString, FixedString, typename, typename, t
           FixedString Protocol, FixedString Sender, FixedString Target,
           FixStorageStrategy Storage, typename Transport, PayloadHandler Application>
 using RoleSession = Session<Protocol, Sender, Target,
-    MessageHandler<Role<Protocol, Sender, Target, Storage, Transport, Application>>,
+    FixMessageHandler<Role<Protocol, Sender, Target, Storage, Transport, Application>>,
     Storage, Transport, Application>;
 
 }

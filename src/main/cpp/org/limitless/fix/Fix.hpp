@@ -22,8 +22,8 @@
 #include "org/limitless/fix/TokenizedMessage.hpp"
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
 #include "org/limitless/fix/encoder/PayloadEncoder.hpp"
-#include "org/limitless/fix/messages/FixMessageDecoders.hpp"
-#include "org/limitless/fix/messages/FixMessageEncoders.hpp"
-#include "org/limitless/fix/messages/FixMessageHandler.hpp"
+#include "org/limitless/fix/generated/messages/FixMessageDecoders.hpp"
+#include "org/limitless/fix/generated/messages/FixMessageEncoders.hpp"
+#include "org/limitless/fix/generated/messages/FixMessageHandler.hpp"
 
 #endif //SIMD_FIX_FIX_HPP

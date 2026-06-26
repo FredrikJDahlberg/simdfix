@@ -11,13 +11,16 @@
 #include <string_view>
 
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
-#include "org/limitless/fix/messages/FixMessageDecoders.hpp"
-#include "org/limitless/fix/messages/FixMessageEncoders.hpp"
-#include "org/limitless/fix/messages/FixMessageHandler.hpp"
+#include "org/limitless/fix/generated/messages/FixMessageDecoders.hpp"
+#include "org/limitless/fix/generated/messages/FixMessageEncoders.hpp"
+#include "org/limitless/fix/generated/messages/FixMessageHandler.hpp"
+#include "org/limitless/fix/generated/messages/FixTypes.hpp"
 
 #define SOH "\x01"
 
 using namespace org::limitless::fix;
+using namespace org::limitless::fix::generated::config;
+using namespace org::limitless::fix::generated::messages;
 
 static constexpr std::uint8_t LOGIN[] =
     "8=FIXT.1.1" SOH
@@ -140,47 +143,47 @@ static void report(const char* label, const nanoseconds duration, const size_t m
 
 // Applies every getter exposed by LogonDecoder, accumulating the results into
 // a sink so the compiler cannot optimize the field accesses away.
-struct LogonGetterHandler : org::limitless::fix::messages::MessageHandler<LogonGetterHandler>
+struct LogonHandlder : FixMessageHandler<LogonHandlder>
 {
-    using MessageHandler::handle;
+    using FixMessageHandler::handle;
 
     uint64_t sink = 0;
 
-    org::limitless::fix::Result handle(org::limitless::fix::messages::LogonDecoder& logon)
+    Result handle(LogonDecoder& logon)
     {
-        using org::limitless::fix::messages::Encryption;
+        using ::Encryption;
 
         const auto sender = logon.sender().value_or(std::string_view{});
         const auto target = logon.target().value_or(std::string_view{});
         sink += sender.size();
         sink += target.size();
         sink += logon.sequenceNumber().value_or(0);
-        sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
+        sink += static_cast<uint64_t>(logon.sendingTime().value_or(milliseconds{0}).count());
         sink += static_cast<uint64_t>(logon.encryptMethod().value_or(Encryption::None));
         sink += logon.heartbeatInterval().value_or(0);
-        return org::limitless::fix::Result::Success;
+        return ::Result::Success;
     }
 };
 
 // Applies every getter exposed by LogonDecoder, including iterating over the
 // HopsRepeatingGroup, accumulating the results into a sink so the compiler
 // cannot optimize the field accesses away.
-struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<LogonGroupGetterHandler>
+struct LogonGroupGetterHandler : FixMessageHandler<LogonGroupGetterHandler>
 {
-    using MessageHandler::handle;
+    using FixMessageHandler::handle;
 
     uint64_t sink = 0;
 
-    org::limitless::fix::Result handle(org::limitless::fix::messages::LogonDecoder& logon)
+    Result handle(LogonDecoder& logon)
     {
-        using org::limitless::fix::messages::Encryption;
+        using ::Encryption;
 
         const auto sender = logon.sender().value_or(std::string_view{});
         const auto target = logon.target().value_or(std::string_view{});
         sink += sender.size();
         sink += target.size();
         sink += logon.sequenceNumber().value_or(0);
-        sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
+        sink += static_cast<uint64_t>(logon.sendingTime().value_or(milliseconds{0}).count());
         sink += static_cast<uint64_t>(logon.encryptMethod().value_or(Encryption::None));
         sink += logon.heartbeatInterval().value_or(0);
 
@@ -190,26 +193,26 @@ struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<L
         {
             hops.next();
             sink += hops.hopCompID().value_or(std::string_view{}).size();
-            sink += static_cast<uint64_t>(hops.hopSendingTime().value_or(std::chrono::milliseconds{0}).count());
+            sink += static_cast<uint64_t>(hops.hopSendingTime().value_or(milliseconds{0}).count());
         }
-        return org::limitless::fix::Result::Success;
+        return ::Result::Success;
     }
 };
 
-struct LogonDataGetterHandler : org::limitless::fix::messages::MessageHandler<LogonDataGetterHandler>
+struct LogonDataGetterHandler : FixMessageHandler<LogonDataGetterHandler>
 {
-    using MessageHandler::handle;
+    using FixMessageHandler::handle;
 
     uint64_t sink = 0;
 
-    org::limitless::fix::Result handle(org::limitless::fix::messages::LogonDecoder& logon)
+    Result handle(LogonDecoder& logon)
     {
-        using org::limitless::fix::messages::Encryption;
+        using ::Encryption;
 
         sink += logon.sender().value_or(std::string_view{}).size();
         sink += logon.target().value_or(std::string_view{}).size();
         sink += logon.sequenceNumber().value_or(0);
-        sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
+        sink += static_cast<uint64_t>(logon.sendingTime().value_or(milliseconds{0}).count());
         sink += static_cast<uint64_t>(logon.encryptMethod().value_or(Encryption::None));
         sink += logon.heartbeatInterval().value_or(0);
         const auto data = logon.xmlData().get();
@@ -217,14 +220,14 @@ struct LogonDataGetterHandler : org::limitless::fix::messages::MessageHandler<Lo
         {
             sink += data.value().size();
         }
-        return org::limitless::fix::Result::Success;
+        return ::Result::Success;
     }
 };
 
 // COLD: 1 GB buffer — data comes from DRAM for most of the run.
 static void benchColdCache()
 {
-    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
 
     constexpr size_t COLD_SIZE = 1024ULL * 1024 * 1024;
     auto coldBuf = std::make_unique<uint8_t[]>(COLD_SIZE);
@@ -245,7 +248,7 @@ static void benchColdCache()
 // HOT: 256 KB buffer — fits in L2, measures pure compute throughput.
 static void benchHotCache()
 {
-    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -283,7 +286,7 @@ static void benchHotCache()
 // GETTERS: parse + apply every LogonDecoder getter to the message.
 static void benchGetters()
 {
-    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -293,7 +296,7 @@ static void benchGetters()
     constexpr size_t msgsPerPass = HOT_SIZE / LOGIN_LENGTH;
     constexpr size_t hotMsgs = msgsPerPass * HOT_COUNT;
 
-    LogonGetterHandler handler{};
+    LogonHandlder handler{};
     const auto duration = timer([&]
     {
         for (size_t iter = 0; iter < HOT_COUNT; ++iter)
@@ -314,7 +317,7 @@ static void benchGetters()
 // repeating group, to the message.
 static void benchGroups()
 {
-    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -358,7 +361,7 @@ static void benchLogonData()
             return -1;
         }
     };
-    decoder::PayloadDecoder<config::FIXT_1_1, DataFields> decoder;
+    PayloadDecoder<FIXT_1_1, DataFields> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -394,7 +397,7 @@ static void benchLogonData()
 // NOS_HOT: hot-cache decode of NewOrderSingle (tokenization only, no getters).
 static void benchNewOrderSingleHot()
 {
-    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -434,39 +437,35 @@ static void benchNewOrderSingleHot()
 }
 
 // NOS_GETTERS: parse + apply every NewOrderSingleDecoder getter.
-struct NewOrderSingleGetterHandler : org::limitless::fix::messages::MessageHandler<NewOrderSingleGetterHandler>
+struct NewOrderSingleGetterHandler : FixMessageHandler<NewOrderSingleGetterHandler>
 {
-    using MessageHandler::handle;
+    using FixMessageHandler::handle;
 
     uint64_t sink = 0;
 
-    org::limitless::fix::Result handle(org::limitless::fix::messages::NewOrderSingleDecoder& order)
+    Result handle(NewOrderSingleDecoder& order)
     {
-        using namespace org::limitless::fix::messages;
-
         sink += order.clOrdID().value_or(std::string_view{}).size();
         sink += static_cast<uint64_t>(order.handlInst().value_or(HandlInst::AutoPrivate));
         sink += order.symbol().value_or(std::string_view{}).size();
         sink += static_cast<uint64_t>(order.side().value_or(Side::Buy));
-        sink += static_cast<uint64_t>(order.transactTime().value_or(std::chrono::milliseconds{0}).count());
+        sink += static_cast<uint64_t>(order.transactTime().value_or(milliseconds{0}).count());
         sink += order.orderQty().value_or(0);
         sink += static_cast<uint64_t>(order.ordType().value_or(OrdType::Limit));
-        sink += order.price().value_or(utils::FixedDecimal{}).mantissa();
-        return org::limitless::fix::Result::Success;
+        sink += order.price().value_or(org::limitless::fix::utils::FixedDecimal{}).mantissa();
+        return ::Result::Success;
     }
 };
 
 // EXEC_REPORT: parse + apply every ExecutionReportDecoder getter.
-struct ExecutionReportGetterHandler : org::limitless::fix::messages::MessageHandler<ExecutionReportGetterHandler>
+struct ExecutionReportGetterHandler : FixMessageHandler<ExecutionReportGetterHandler>
 {
-    using MessageHandler::handle;
+    using FixMessageHandler::handle;
 
     uint64_t sink = 0;
 
-    org::limitless::fix::Result handle(org::limitless::fix::messages::ExecutionReportDecoder& report)
+    Result handle(ExecutionReportDecoder& report)
     {
-        using namespace org::limitless::fix::messages;
-
         sink += report.orderID().value_or(std::string_view{}).size();
         sink += report.clOrdID().value_or(std::string_view{}).size();
         sink += report.execID().value_or(std::string_view{}).size();
@@ -481,9 +480,9 @@ struct ExecutionReportGetterHandler : org::limitless::fix::messages::MessageHand
         sink += report.leavesQty().value_or(0);
         sink += report.cumQty().value_or(0);
         sink += report.avgPx().value_or(utils::FixedDecimal{}).mantissa();
-        sink += static_cast<uint64_t>(report.transactTime().value_or(std::chrono::milliseconds{0}).count());
+        sink += static_cast<uint64_t>(report.transactTime().value_or(milliseconds{0}).count());
         sink += report.text().value_or(std::string_view{}).size();
-        return org::limitless::fix::Result::Success;
+        return ::Result::Success;
     }
 };
 
@@ -491,15 +490,13 @@ struct ExecutionReportGetterHandler : org::limitless::fix::messages::MessageHand
 // encoder guarantees a valid message with a correct BodyLength and CheckSum.
 static size_t encodeExecutionReport(const std::span<uint8_t> buf)
 {
-    using namespace org::limitless::fix::messages;
-
-    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buf);
 
     ExecutionReportEncoder report{};
     encoder.wrapMessage(report)
             .sequenceNumber(1)
-            .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+            .sendingTime(milliseconds{1'781'378'773'959})
             .orderID("ORDER1")
             .clOrdID("CLORD1")
             .execID("EXEC1")
@@ -514,7 +511,7 @@ static size_t encodeExecutionReport(const std::span<uint8_t> buf)
             .leavesQty(50)
             .cumQty(50)
             .avgPx(utils::FixedDecimal{14950, 0})
-            .transactTime(std::chrono::milliseconds{1'781'378'773'959})
+            .transactTime(milliseconds{1'781'378'773'959})
             .text("FILL");
 
     return encoder.encode(report);
@@ -523,7 +520,7 @@ static size_t encodeExecutionReport(const std::span<uint8_t> buf)
 // ER_HOT: hot-cache decode of ExecutionReport (tokenization only, no getters).
 static void benchExecutionReportHot()
 {
-    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
 
     std::array<uint8_t, 256> msg{};
     const size_t msgLength = encodeExecutionReport(msg);
@@ -568,7 +565,7 @@ static void benchExecutionReportHot()
 // ER_GETTERS: parse + apply every ExecutionReportDecoder getter.
 static void benchExecutionReportGetters()
 {
-    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
 
     std::array<uint8_t, 256> msg{};
     const size_t msgLength = encodeExecutionReport(msg);
@@ -622,7 +619,7 @@ static void benchExecutionReportEncode()
 
 static void benchNewOrderSingleGetters()
 {
-    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -657,8 +654,6 @@ static void benchNewOrderSingleGetters()
 // NOS_ENCODE: encode a NewOrderSingle message repeatedly.
 static void benchNewOrderSingleEncode()
 {
-    using namespace org::limitless::fix::messages;
-
     constexpr size_t HOT_COUNT = 1'000'000;
     std::array<uint8_t, 256> buffer{};
 
@@ -667,18 +662,18 @@ static void benchNewOrderSingleEncode()
     {
         for (size_t i = 0; i < HOT_COUNT; ++i)
         {
-            FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
+            FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
             encoder.wrap(0, buffer);
 
             NewOrderSingleEncoder order{};
             encoder.wrapMessage(order)
                     .sequenceNumber(1)
-                    .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+                    .sendingTime(milliseconds{1'781'378'773'959})
                     .clOrdID("ORDER1")
                     .handlInst(HandlInst::AutoPrivate)
                     .symbol("AAPL")
                     .side(Side::Buy)
-                    .transactTime(std::chrono::milliseconds{1'781'378'773'959})
+                    .transactTime(milliseconds{1'781'378'773'959})
                     .orderQty(100)
                     .ordType(OrdType::Limit)
                     .price(utils::FixedDecimal{15000, 0});
@@ -692,8 +687,6 @@ static void benchNewOrderSingleEncode()
 // ENCODE: encode a Logon message (with a 3-entry HopsRepeatingGroup) repeatedly.
 static void benchEncode()
 {
-    using namespace org::limitless::fix::messages;
-
     constexpr size_t HOT_COUNT = 1'000'000;
     std::array<uint8_t, 256> buffer{};
 
@@ -702,21 +695,21 @@ static void benchEncode()
     {
         for (size_t i = 0; i < HOT_COUNT; ++i)
         {
-            FixPayloadEncoder<config::FIXT_1_1, "SellSide_1", "Buyer"> encoder{};
+            FixPayloadEncoder<FIXT_1_1, "SellSide_1", "Buyer"> encoder{};
             encoder.wrap(0, buffer);
 
             LogonEncoder logon{};
             encoder.wrapMessage(logon)
                     .sequenceNumber(1)
-                    .sendingTime(std::chrono::milliseconds{1'781'378'773'959})
+                    .sendingTime(milliseconds{1'781'378'773'959})
                     .encryptMethod(Encryption::None)
                     .heartbeatInterval(30);
 
             logon
                     .hops(3)
-                    .next().hopCompID("HOP1").hopSendingTime(std::chrono::milliseconds{1'781'378'773'959}).hopRefID(1)
-                    .next().hopCompID("HOP2").hopSendingTime(std::chrono::milliseconds{1'781'378'773'959}).hopRefID(2)
-                    .next().hopCompID("HOP3").hopSendingTime(std::chrono::milliseconds{1'781'378'773'959}).hopRefID(3);
+                    .next().hopCompID("HOP1").hopSendingTime(milliseconds{1'781'378'773'959}).hopRefID(1)
+                    .next().hopCompID("HOP2").hopSendingTime(milliseconds{1'781'378'773'959}).hopRefID(2)
+                    .next().hopCompID("HOP3").hopSendingTime(milliseconds{1'781'378'773'959}).hopRefID(3);
 
             encodedLength = encoder.encode(logon);
         }

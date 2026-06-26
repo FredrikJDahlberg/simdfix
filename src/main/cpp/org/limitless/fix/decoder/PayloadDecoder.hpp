@@ -11,7 +11,7 @@
 #include <cstring>
 #include <span>
 
-#include "org/limitless/fix/config/FixEngine.hpp"
+#include "org/limitless/fix/generated/config/FixEngine.hpp"
 #include "org/limitless/fix/decoder/PayloadHandler.hpp"
 #include "org/limitless/fix/detail/Tokens.hpp"
 #include "org/limitless/fix/detail/simd/Uint8x16.hpp"
@@ -45,7 +45,7 @@ struct NoDataFields
 template <FixedString BeginString, typename DataFields = NoDataFields>
 class PayloadDecoder
 {
-    static constexpr size_t MaxSize = config::MaxFields;
+    static constexpr size_t MaxSize = generated::config::MaxFields;
 
     static constexpr uint32_t RequiredFieldCount = 7;
     static constexpr uint32_t MessageFragmentLimit = 32;

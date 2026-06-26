@@ -17,19 +17,20 @@ namespace org::limitless::fix::session
 {
 
 using namespace std::chrono;
+using namespace org::limitless::fix::generated::config;
 
 #define SOH "\x01"
 
 TEST(Session, BuilderProducesConcreteRole)
 {
-    using Client = ClientSession<config::FIXT_1_1, "CLIENT", "EXCH">;
+    using Client = ClientSession<FIXT_1_1, "CLIENT", "EXCH">;
     auto client = Client::Builder{NullStorage{}}.build();
     static_assert(std::is_same_v<decltype(client), Client>);
     EXPECT_EQ("CLIENT", client.senderCompId());
     EXPECT_EQ("EXCH", client.targetCompId());
     EXPECT_EQ(milliseconds{10000}, client.heartbeatPeriod());   // default constant
 
-    using Server = ServerSession<config::FIXT_1_1, "EXCH", "CLIENT">;
+    using Server = ServerSession<FIXT_1_1, "EXCH", "CLIENT">;
     auto server = Server::Builder{NullStorage{}}
                       .heartbeatPeriod(milliseconds{20000})
                       .build();
@@ -41,7 +42,7 @@ TEST(Session, BuilderProducesConcreteRole)
 
 TEST(Session, MemoryStorageBackedRole)
 {
-    using Client = ClientSession<config::FIXT_1_1, "CLIENT", "EXCH", storage::MemoryStorage>;
+    using Client = ClientSession<FIXT_1_1, "CLIENT", "EXCH", storage::MemoryStorage>;
 
     auto client = Client::Builder{storage::MemoryStorage{}}
                       .heartbeatPeriod(milliseconds{30000})
@@ -50,7 +51,7 @@ TEST(Session, MemoryStorageBackedRole)
     EXPECT_EQ("CLIENT", client.senderCompId());
     EXPECT_EQ(milliseconds{30000}, client.heartbeatPeriod());
 
-    using Server = ServerSession<config::FIXT_1_1, "EXCH", "CLIENT", storage::MemoryStorage>;
+    using Server = ServerSession<FIXT_1_1, "EXCH", "CLIENT", storage::MemoryStorage>;
     auto server = Server::Builder{storage::MemoryStorage{}}.build();
     static_assert(std::is_same_v<decltype(server), Server>);
     EXPECT_EQ("EXCH", server.senderCompId());
@@ -68,7 +69,7 @@ struct CaptureTransport
 TEST(Session, SendRoutesEncodedMessageToTransport)
 {
     std::vector<uint8_t> captured;
-    auto client = ClientSession<config::FIXT_1_1, "SENDER", "TARGET", NullStorage, CaptureTransport>::Builder{NullStorage{}}
+    auto client = ClientSession<FIXT_1_1, "SENDER", "TARGET", NullStorage, CaptureTransport>::Builder{NullStorage{}}
                       .transport(CaptureTransport{&captured})
                       .build();
 
@@ -90,10 +91,10 @@ TEST(Session, SendRoutesEncodedMessageToTransport)
 
 // Standalone application handler — note it does NOT inherit from any session
 // class; it is its own MessageHandler dispatcher and is injected by value.
-class CaptureApplication : public MessageHandler<CaptureApplication>
+class CaptureApplication : public FixMessageHandler<CaptureApplication>
 {
 public:
-    using MessageHandler::handle;
+    using FixMessageHandler::handle;
 
     std::string symbol;
     uint32_t orderQty{};
@@ -117,12 +118,12 @@ TEST(Session, ForwardsApplicationMessageToInjectedHandler)
 {
     // The session owns the seven session messages; NewOrderSingle (35=D) is not
     // one of them, so the switch's default forwards it to the injected handler.
-    using Server = ServerSession<config::FIXT_1_1, "TARGET", "SENDER", NullStorage, DiscardTransport, CaptureApplication>;
+    using Server = ServerSession<FIXT_1_1, "TARGET", "SENDER", NullStorage, DiscardTransport, CaptureApplication>;
     auto server = Server::Builder{NullStorage{}}
                       .application(CaptureApplication{})
                       .build();
 
-    org::limitless::fix::decoder::PayloadDecoder<config::FIXT_1_1> decoder;
+    org::limitless::fix::decoder::PayloadDecoder<FIXT_1_1> decoder;
     const Buffer buffer{NEW_ORDER_SINGLE, sizeof(NEW_ORDER_SINGLE) - 1};
     const auto [processed, status] = decoder.parse(buffer, server);
 

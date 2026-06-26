@@ -5,12 +5,15 @@
 #include <gtest/gtest.h>
 
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
-#include "../../../../../../main/cpp/org/limitless/fix/detail/parser/FieldDecoder.hpp"
+#include "org/limitless/fix/detail/parser/FieldDecoder.hpp"
 #include "org/limitless/fix/decoder/GroupDecoder.hpp"
-#include "org/limitless/fix/messages/FixTypes.hpp"
 #include "org/limitless/fix/utils/Conversions.hpp"
 
+#include "org/limitless/fix/generated/messages/FixTypes.hpp"
+
 namespace org::limitless::fix::decoder {
+
+using namespace org::limitless::fix::generated::config;
 
 #define SOH "\x01"
 
@@ -23,7 +26,7 @@ TEST(GroupDecoder, ScopesFieldLookupToCurrentRepeat)
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
 
-    PayloadDecoder<config::FIXT_1_1> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 
@@ -74,7 +77,7 @@ TEST(GroupDecoder, RewrapWithoutClearDoesNotLeakScopeDepth)
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
 
-    PayloadDecoder<config::FIXT_1_1> decoder;
+    PayloadDecoder<FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 

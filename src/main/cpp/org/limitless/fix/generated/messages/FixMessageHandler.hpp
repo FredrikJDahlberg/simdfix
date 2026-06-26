@@ -2,24 +2,25 @@
 #ifndef SIMD_FIX_MESSAGE_HANDLER_HPP
 #define SIMD_FIX_MESSAGE_HANDLER_HPP
 
-#include "org/limitless/fix/TokenizedMessage.hpp"
-#include "org/limitless/fix/messages/FixMessageDecoders.hpp"
+#include "org/limitless/fix/generated/messages/FixMessageDecoders.hpp"
 
-namespace org::limitless::fix::messages {
+namespace org::limitless::fix::generated::messages {
 
 using fix::Result;
 
-template <typename Handler>
-class MessageHandler
+template <typename MessageHandler>
+class FixMessageHandler
 {
 protected:
     const SessionContext* m_context{};
 
 public:
-    template <typename Event>
-    Result receive(Event&& event)
+    template <typename Message>
+        requires requires(MessageHandler& h, std::remove_reference_t<Message>& m)
+        { { h.handle(m) } -> std::same_as<Result>; }
+    Result receive(Message&& message)
     {
-        return static_cast<Handler*>(this)->handle(std::forward<Event>(event));
+        return static_cast<MessageHandler*>(this)->handle(std::forward<Message>(message));
     }
 
     void setSessionContext(const SessionContext& context)
@@ -140,6 +141,6 @@ protected:
     Result handle(NewOrderSingleDecoder&) { return Result::Success; }
 };
 
-} // namespace org::limitless::fix::messages
+} // namespace org::limitless::fix::generated::messages
 
 #endif //SIMD_FIX_MESSAGE_HANDLER_HPP

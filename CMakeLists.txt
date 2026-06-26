@@ -30,10 +30,10 @@ include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp
         ${CMAKE_SOURCE_DIR}/src/generator
         ${CONFIG_GENERATED_DIR})
 set(MAIN_PATH "src/main/cpp/org/limitless/fix")
-set(GEN_PATH "src/main/cpp/org/limitless/fix/messages")
+set(GEN_PATH "src/main/cpp/org/limitless/fix/generated/messages")
+set(CONFIG_GEN_PATH "src/main/cpp/org/limitless/fix/generated/config")
 set(TEST_PATH "src/test/cpp/org/limitless/fix")
 set(GENERATOR_PATH "src/generator/org/limitless/generator/fix/")
-set(CONFIG_GEN_PATH "src/main/cpp/org/limitless/fix/config")
 set(PROTOCOL_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/protocol.xml")
 set(CONFIG_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/config.xml")
 set(GENERATED_DIR "${CMAKE_SOURCE_DIR}/${GEN_PATH}")

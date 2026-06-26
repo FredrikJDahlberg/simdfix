@@ -6,12 +6,12 @@
 #include <unordered_map>
 #include <variant>
 
-#include "org/limitless/fix/config/FixEngine.hpp"
+#include "org/limitless/fix/generated/config/FixEngine.hpp"
 #include "org/limitless/fix/session/ClientSession.hpp"
 #include "org/limitless/fix/session/ServerSession.hpp"
 #include "org/limitless/fix/storage/MemoryStorage.hpp"
 
-namespace org::limitless::fix::config {
+namespace org::limitless::fix::generated::config {
 
 using namespace org::limitless::fix::session;
 
@@ -30,6 +30,6 @@ using AnySession = std::variant<AlphaSession, BetaSession, GammaSession>;
     return registry;
 }
 
-} // namespace org::limitless::fix::config
+} // namespace org::limitless::fix::generated::config
 
 #endif //SIMD_FIX_CONFIG_HPP
