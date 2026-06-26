@@ -2,6 +2,7 @@
 #ifndef SIMD_FIX_MESSAGE_ENCODERS_HPP
 #define SIMD_FIX_MESSAGE_ENCODERS_HPP
 
+#include "org/limitless/fix/config/FixEngine.hpp"
 #include "org/limitless/fix/encoder/DataEncoder.hpp"
 #include "org/limitless/fix/encoder/GroupEncoder.hpp"
 #include "org/limitless/fix/encoder/MessageEncoder.hpp"
@@ -155,7 +156,7 @@ public:
         return *this;
     }
 
-    LogonEncoder& encryptMethod(const Encryption::Values value)
+    LogonEncoder& encryptMethod(const Encryption value)
     {
         m_encoder.encode<"98", false, Encryption>(value);
         return *this;
@@ -455,13 +456,13 @@ public:
         return *this;
     }
 
-    RejectEncoder& refMsgType(const MessageType::Values value)
+    RejectEncoder& refMsgType(const MessageType value)
     {
         m_encoder.encode<"372", false, MessageType>(value);
         return *this;
     }
 
-    RejectEncoder& sessionRejectReason(const SessionRejectReason::Values value)
+    RejectEncoder& sessionRejectReason(const SessionRejectReason value)
     {
         m_encoder.encode<"373", false, SessionRejectReason>(value);
         return *this;
@@ -521,7 +522,7 @@ public:
         return *this;
     }
 
-    SequenceResetEncoder& gapFillFlag(const GapFillFlag::Values value)
+    SequenceResetEncoder& gapFillFlag(const GapFillFlag value)
     {
         m_encoder.encode<"123", false, GapFillFlag>(value);
         return *this;
@@ -599,13 +600,13 @@ public:
         return *this;
     }
 
-    ExecutionReportEncoder& execType(const ExecType::Values value)
+    ExecutionReportEncoder& execType(const ExecType value)
     {
         m_encoder.encode<"150", true, ExecType>(value);
         return *this;
     }
 
-    ExecutionReportEncoder& ordStatus(const OrdStatus::Values value)
+    ExecutionReportEncoder& ordStatus(const OrdStatus value)
     {
         m_encoder.encode<"39", true, OrdStatus>(value);
         return *this;
@@ -617,7 +618,7 @@ public:
         return *this;
     }
 
-    ExecutionReportEncoder& side(const Side::Values value)
+    ExecutionReportEncoder& side(const Side value)
     {
         m_encoder.encode<"54", true, Side>(value);
         return *this;
@@ -737,7 +738,7 @@ public:
         return *this;
     }
 
-    NewOrderSingleEncoder& handlInst(const HandlInst::Values value)
+    NewOrderSingleEncoder& handlInst(const HandlInst value)
     {
         m_encoder.encode<"21", true, HandlInst>(value);
         return *this;
@@ -749,7 +750,7 @@ public:
         return *this;
     }
 
-    NewOrderSingleEncoder& side(const Side::Values value)
+    NewOrderSingleEncoder& side(const Side value)
     {
         m_encoder.encode<"54", true, Side>(value);
         return *this;
@@ -767,7 +768,7 @@ public:
         return *this;
     }
 
-    NewOrderSingleEncoder& ordType(const OrdType::Values value)
+    NewOrderSingleEncoder& ordType(const OrdType value)
     {
         m_encoder.encode<"40", true, OrdType>(value);
         return *this;
@@ -779,7 +780,7 @@ public:
         return *this;
     }
 
-    NewOrderSingleEncoder& timeInForce(const TimeInForce::Values value)
+    NewOrderSingleEncoder& timeInForce(const TimeInForce value)
     {
         m_encoder.encode<"59", false, TimeInForce>(value);
         return *this;

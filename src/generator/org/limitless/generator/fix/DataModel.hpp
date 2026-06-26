@@ -275,7 +275,6 @@ struct DataModel
     void process(const pugi::xml_document& doc)
     {
         const pugi::xml_node protocol = doc.child("protocol");
-        processVersions(protocol.child("versions"));
         processTypes(protocol.child("types").children());
         processRecords(protocol.select_nodes(".//component"), RecordType::Component);
         processRecords(protocol.select_nodes(".//group"), RecordType::Group);

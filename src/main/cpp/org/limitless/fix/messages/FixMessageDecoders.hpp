@@ -4,6 +4,7 @@
 
 #include "org/limitless/fix/detail/Expected.hpp"
 
+#include "org/limitless/fix/config/FixEngine.hpp"
 #include "org/limitless/fix/decoder/DataDecoder.hpp"
 #include "org/limitless/fix/decoder/GroupDecoder.hpp"
 #include "org/limitless/fix/decoder/MessageDecoder.hpp"
@@ -11,6 +12,7 @@
 
 namespace org::limitless::fix::messages {
 
+using config::Protocol;
 using namespace org::limitless::fix::decoder;
 
 struct NestedGroupDecoder : GroupDecoder
@@ -171,7 +173,7 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] expected<Protocol::Values, Result> beginString() const
+    [[nodiscard]] expected<Protocol, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
@@ -181,7 +183,7 @@ public:
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] expected<MessageType::Values, Result> msgType() const
+    [[nodiscard]] expected<MessageType, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
@@ -206,7 +208,7 @@ public:
         return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
-    [[nodiscard]] expected<Encryption::Values, Result> encryptMethod() const
+    [[nodiscard]] expected<Encryption, Result> encryptMethod() const
     {
         if (m_encryptMethodIndex < 0)
         {
@@ -288,7 +290,7 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] expected<Protocol::Values, Result> beginString() const
+    [[nodiscard]] expected<Protocol, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
@@ -298,7 +300,7 @@ public:
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] expected<MessageType::Values, Result> msgType() const
+    [[nodiscard]] expected<MessageType, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
@@ -395,7 +397,7 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] expected<Protocol::Values, Result> beginString() const
+    [[nodiscard]] expected<Protocol, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
@@ -405,7 +407,7 @@ public:
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] expected<MessageType::Values, Result> msgType() const
+    [[nodiscard]] expected<MessageType, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
@@ -502,7 +504,7 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] expected<Protocol::Values, Result> beginString() const
+    [[nodiscard]] expected<Protocol, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
@@ -512,7 +514,7 @@ public:
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] expected<MessageType::Values, Result> msgType() const
+    [[nodiscard]] expected<MessageType, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
@@ -619,7 +621,7 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] expected<Protocol::Values, Result> beginString() const
+    [[nodiscard]] expected<Protocol, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
@@ -629,7 +631,7 @@ public:
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] expected<MessageType::Values, Result> msgType() const
+    [[nodiscard]] expected<MessageType, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
@@ -739,7 +741,7 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] expected<Protocol::Values, Result> beginString() const
+    [[nodiscard]] expected<Protocol, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
@@ -749,7 +751,7 @@ public:
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] expected<MessageType::Values, Result> msgType() const
+    [[nodiscard]] expected<MessageType, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
@@ -788,7 +790,7 @@ public:
         return m_decoder.valueAt<std::uint32_t>(m_refTagIDIndex);
     }
 
-    [[nodiscard]] expected<MessageType::Values, Result> refMsgType() const
+    [[nodiscard]] expected<MessageType, Result> refMsgType() const
     {
         if (m_refMsgTypeIndex < 0)
         {
@@ -797,7 +799,7 @@ public:
         return m_decoder.enumAt<MessageType>(m_refMsgTypeIndex);
     }
 
-    [[nodiscard]] expected<SessionRejectReason::Values, Result> sessionRejectReason() const
+    [[nodiscard]] expected<SessionRejectReason, Result> sessionRejectReason() const
     {
         if (m_sessionRejectReasonIndex < 0)
         {
@@ -884,7 +886,7 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] expected<Protocol::Values, Result> beginString() const
+    [[nodiscard]] expected<Protocol, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
@@ -894,7 +896,7 @@ public:
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] expected<MessageType::Values, Result> msgType() const
+    [[nodiscard]] expected<MessageType, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
@@ -919,7 +921,7 @@ public:
         return m_decoder.valueAt<std::chrono::milliseconds>(m_sendingTimeIndex);
     }
 
-    [[nodiscard]] expected<GapFillFlag::Values, Result> gapFillFlag() const
+    [[nodiscard]] expected<GapFillFlag, Result> gapFillFlag() const
     {
         if (m_gapFillFlagIndex < 0)
         {
@@ -1066,7 +1068,7 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] expected<Protocol::Values, Result> beginString() const
+    [[nodiscard]] expected<Protocol, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
@@ -1076,7 +1078,7 @@ public:
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] expected<MessageType::Values, Result> msgType() const
+    [[nodiscard]] expected<MessageType, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
@@ -1120,12 +1122,12 @@ public:
         return m_decoder.valueAt<std::string_view>(m_execIDIndex);
     }
 
-    [[nodiscard]] expected<ExecType::Values, Result> execType() const
+    [[nodiscard]] expected<ExecType, Result> execType() const
     {
         return m_decoder.enumAt<ExecType>(m_execTypeIndex);
     }
 
-    [[nodiscard]] expected<OrdStatus::Values, Result> ordStatus() const
+    [[nodiscard]] expected<OrdStatus, Result> ordStatus() const
     {
         return m_decoder.enumAt<OrdStatus>(m_ordStatusIndex);
     }
@@ -1135,7 +1137,7 @@ public:
         return m_decoder.valueAt<std::string_view>(m_symbolIndex);
     }
 
-    [[nodiscard]] expected<Side::Values, Result> side() const
+    [[nodiscard]] expected<Side, Result> side() const
     {
         return m_decoder.enumAt<Side>(m_sideIndex);
     }
@@ -1320,7 +1322,7 @@ public:
         return validateSession();
     }
 
-    [[nodiscard]] expected<Protocol::Values, Result> beginString() const
+    [[nodiscard]] expected<Protocol, Result> beginString() const
     {
         return m_decoder.getEnum<8, true, Protocol, RecordType::Message>();
     }
@@ -1330,7 +1332,7 @@ public:
         return m_decoder.getUint32<9, true, RecordType::Message>();
     }
 
-    [[nodiscard]] expected<MessageType::Values, Result> msgType() const
+    [[nodiscard]] expected<MessageType, Result> msgType() const
     {
         return m_decoder.getEnum<35, true, MessageType, RecordType::Message>();
     }
@@ -1369,7 +1371,7 @@ public:
         return m_decoder.valueAt<std::string_view>(m_clOrdIDIndex);
     }
 
-    [[nodiscard]] expected<HandlInst::Values, Result> handlInst() const
+    [[nodiscard]] expected<HandlInst, Result> handlInst() const
     {
         return m_decoder.enumAt<HandlInst>(m_handlInstIndex);
     }
@@ -1379,7 +1381,7 @@ public:
         return m_decoder.valueAt<std::string_view>(m_symbolIndex);
     }
 
-    [[nodiscard]] expected<Side::Values, Result> side() const
+    [[nodiscard]] expected<Side, Result> side() const
     {
         return m_decoder.enumAt<Side>(m_sideIndex);
     }
@@ -1394,7 +1396,7 @@ public:
         return m_decoder.valueAt<std::uint32_t>(m_orderQtyIndex);
     }
 
-    [[nodiscard]] expected<OrdType::Values, Result> ordType() const
+    [[nodiscard]] expected<OrdType, Result> ordType() const
     {
         return m_decoder.enumAt<OrdType>(m_ordTypeIndex);
     }
@@ -1408,7 +1410,7 @@ public:
         return m_decoder.valueAt<utils::FixedDecimal>(m_priceIndex);
     }
 
-    [[nodiscard]] expected<TimeInForce::Values, Result> timeInForce() const
+    [[nodiscard]] expected<TimeInForce, Result> timeInForce() const
     {
         if (m_timeInForceIndex < 0)
         {

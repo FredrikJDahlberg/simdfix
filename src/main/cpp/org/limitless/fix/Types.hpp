@@ -75,11 +75,10 @@ concept EncodableDuration = !Nullable<T> && requires
 } && std::same_as<T, std::chrono::duration<typename T::rep, typename T::period>>;
 
 template <typename T>
-concept EncodableEnumWrapper = !Nullable<T> && requires
+concept EncodableEnumWrapper = !Nullable<T> && std::is_enum_v<T> && requires(const T value)
 {
-    typename T::Values;
-    T::Codes;
-} && std::is_enum_v<typename T::Values>;
+    { code(value) } -> std::convertible_to<std::string_view>;
+};
 
 template <typename T>
 concept EncodableOptionalInteger = Nullable<T> &&

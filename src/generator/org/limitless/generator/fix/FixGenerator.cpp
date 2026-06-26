@@ -14,7 +14,6 @@ using namespace org::limitless::fix;
 using namespace org::limitless::generator::fix;
 
 static void generateTypes(const std::string& fileName,
-                          const Record& protocol,
                           const std::vector<Record>& enums);
 static void generateDecoders(const std::string& fileName,
                              const std::vector<Record>& records);
@@ -25,7 +24,8 @@ static void generateMessageHandler(const std::string& fileName,
                                    const std::vector<Record>& records);
 
 static void generateEngineConfig(const std::string& fileName,
-                                 const pugi::xml_document& config);
+                                 const pugi::xml_document& config,
+                                 const Record& protocol);
 
 static void generateConfig(const std::string& fileName,
                            const pugi::xml_document& config);
@@ -36,13 +36,11 @@ static void generateRecordEncoders(std::ostream& out, const Record& record);
 int main(int argc, char** argv)
 {
     pugi::xml_document doc;
-    const auto result = doc.load_file(argv[1]);
-    if ((argc != 3 && argc != 5) || !result)
+    if (const auto result = doc.load_file(argv[1]); argc != 5 || !result)
     {
         std::println("XML error: {}, dir = {}, file = {}", result.description(),
                      std::filesystem::current_path().c_str(), argv[1]);
-        std::println("Usage: generator <protocol file> <output directory> "
-                     "[config file] [config output directory]");
+        std::println("Usage: generator <protocol file> <output directory> <config file> <config output directory>");
         return 1;
     }
 
@@ -51,7 +49,7 @@ int main(int argc, char** argv)
 
     std::string typesFile{argv[2]};
     typesFile.append("/FixTypes.hpp");
-    generateTypes(typesFile, model.m_protocol, model.m_enums);
+    generateTypes(typesFile, model.m_enums);
 
     std::string decodersFile{argv[2]};
     decodersFile.append("/FixMessageDecoders.hpp");
@@ -65,76 +63,125 @@ int main(int argc, char** argv)
     encodersFile.append("/FixMessageEncoders.hpp");
     generateEncoders(encodersFile, model.m_records);
 
-    if (argc == 5)
+    pugi::xml_document config;
+    const auto configResult = config.load_file(argv[3]);
+    if (!configResult)
     {
-        pugi::xml_document config;
-        const auto configResult = config.load_file(argv[3]);
-        if (!configResult)
-        {
-            std::println("Config XML error: {}, file = {}", configResult.description(), argv[3]);
-            return 1;
-        }
-        std::filesystem::create_directories(argv[4]);
-
-        std::string engineFile{argv[4]};
-        engineFile.append("/FixEngine.hpp");
-        generateEngineConfig(engineFile, config);
-
-        std::string configFile{argv[4]};
-        configFile.append("/FixConfig.hpp");
-        generateConfig(configFile, config);
+        std::println("Config XML error: {}, file = {}", configResult.description(), argv[3]);
+        return 1;
     }
+    model.processVersions(config.child("config").child("versions"));
+    std::filesystem::create_directories(argv[4]);
+
+    std::string engineFile{argv[4]};
+    engineFile.append("/FixEngine.hpp");
+    generateEngineConfig(engineFile, config, model.m_protocol);
+
+    std::string configFile{argv[4]};
+    configFile.append("/FixConfig.hpp");
+    generateConfig(configFile, config);
 
     return 0;
 }
 
+// Emits Result-style free helpers for a generated enum class:
+//   name()     maps a value to its enumerator identifier,
+//   code()     maps a value to its FIX wire code,
+//   from() maps a FIX wire code back to a value.
+// name()/code() switch on the value, mirroring the name(Result) helper in
+// Types.hpp. from() takes a dummy enum argument so the generic decoder can
+// dispatch to the right overload by argument-dependent lookup.
+static void generateEnumFunctions(std::ostream& out, const std::string& name,
+                                  const std::vector<Field>& fields)
+{
+    out << std::format("constexpr std::string_view name(const {} value)\n", name);
+    out << "{\n";
+    out << "    switch (value)\n    {\n";
+    for (const auto& field : fields)
+    {
+        out << std::format("        case {}::{}: return \"{}\";\n", name, field.m_name, field.m_name);
+    }
+    out << "        default: return \"?\";\n";
+    out << "    }\n}\n\n";
+
+    out << std::format("constexpr std::string_view code(const {} value)\n", name);
+    out << "{\n";
+    out << "    switch (value)\n    {\n";
+    for (const auto& field : fields)
+    {
+        out << std::format("        case {}::{}: return \"{}\";\n", name, field.m_name, field.m_type);
+    }
+    out << "        default: return \"?\";\n";
+    out << "    }\n}\n\n";
+
+    bool hasSingle = false;
+    bool hasMulti = false;
+    for (const auto& field : fields)
+    {
+        if (field.m_name == "Null")
+        {
+            continue;
+        }
+        (field.m_type.size() == 1 ? hasSingle : hasMulti) = true;
+    }
+
+    out << std::format("constexpr {} from(const std::string_view code, const {})\n", name, name);
+    out << "{\n";
+    if (hasSingle)
+    {
+        out << "    if (code.size() == 1)\n    {\n";
+        out << "        switch (code[0])\n        {\n";
+        for (const auto& field : fields)
+        {
+            if (field.m_name == "Null" || field.m_type.size() != 1)
+            {
+                continue;
+            }
+            out << std::format("            case '{}': return {}::{};\n", field.m_type, name, field.m_name);
+        }
+        out << "            default: break;\n        }\n    }\n";
+    }
+    if (hasMulti)
+    {
+        for (const auto& field : fields)
+        {
+            if (field.m_name == "Null" || field.m_type.size() == 1)
+            {
+                continue;
+            }
+            out << std::format("    if (code == \"{}\") return {}::{};\n", field.m_type, name, field.m_name);
+        }
+    }
+    out << std::format("    return {}::Null;\n", name);
+    out << "}\n\n";
+}
+
 static void generateEnums(std::ostream& out, const Record& record)
 {
-    out << std::format("struct {}\n", record.m_name);
+    out << std::format("enum class {} : uint8_t\n", record.m_name);
     out << "{\n";
     const auto end = record.m_fields.end();
-    out << "    enum Values\n    {\n";
     for (auto value = record.m_fields.begin(); value != end; ++value)
     {
-        out << std::format("        {}{}\n", value->m_name, value != end - 1 ? "," : "");
+        out << std::format("    {}{}\n", value->m_name, value != end - 1 ? "," : "");
     }
-    out << "    };\n";
-
-    auto size = record.m_fields.size();
-    out << std::format("    static constexpr std::string_view Codes[{}]  =\n    {{\n", size);
-    for (auto value = record.m_fields.begin(); value != end; ++value)
-    {
-        out << std::format("        \"{}\"{}\n", value->m_type, value != end - 1 ? "," : "");
-    }
-    out << "    };\n";
     out << "};\n\n";
+
+    generateEnumFunctions(out, record.m_name, record.m_fields);
 }
 
 static void generateProtocol(std::ostream& out, const Record& protocol)
 {
-    out << "namespace org::limitless::fix {\n\n";
-    out << "struct Protocol\n{\n";
-    out << "    enum Values\n    {\n";
-    for (const auto& field : protocol.m_fields)
-    {
-        out << std::format("        {},\n", field.m_name);
-    }
-    out << "        Max\n";
-    out << "    };\n";
-
-    auto size = protocol.m_fields.size();
-    out << std::format("    static constexpr std::string_view Codes[{}]  =\n    {{\n", size);
+    out << "enum class Protocol : uint8_t\n{\n";
     const auto end = protocol.m_fields.end();
     for (auto value = protocol.m_fields.begin(); value != end; ++value)
     {
-        out << std::format("        \"{}\"{}\n", value->m_type, value != end - 1 ? "," : "");
+        out << std::format("    {}{}\n", value->m_name, value != end - 1 ? "," : "");
     }
-    out << "    };\n\n";
-    out << "    static constexpr auto code(const Values value)\n";
-    out << "    {\n";
-    out << "        return value >= Null && value < Max ? Codes[value] : Codes[0];\n";
-    out << "    }\n";
     out << "};\n\n";
+
+    generateEnumFunctions(out, "Protocol", protocol.m_fields);
+
     for (const auto& field : protocol.m_fields)
     {
         if (field.m_name != "Null")
@@ -143,11 +190,10 @@ static void generateProtocol(std::ostream& out, const Record& protocol)
                                field.m_name, field.m_type);
         }
     }
-    out << "\n} // namespace org::limitless::fix\n\n";
+    out << "\n";
 }
 
 static void generateTypes(const std::string& fileName,
-                          const Record& protocol,
                           const std::vector<Record>& enums)
 {
     std::ofstream out(fileName);
@@ -163,7 +209,6 @@ static void generateTypes(const std::string& fileName,
     out << "#include <cstdint>\n";
     out << "#include <string_view>\n\n";
     out << "#include \"org/limitless/fix/Types.hpp\"\n\n";
-    generateProtocol(out, protocol);
     out << "namespace org::limitless::fix::messages {\n\n";
     for (const auto& type: enums)
     {
@@ -189,11 +234,13 @@ static void generateDecoders(const std::string& fileName,
     out << "#ifndef SIMD_FIX_MESSAGE_DECODERS_HPP\n";
     out << "#define SIMD_FIX_MESSAGE_DECODERS_HPP\n\n";
     out << "#include \"org/limitless/fix/detail/Expected.hpp\"\n\n";
+    out << "#include \"org/limitless/fix/config/FixEngine.hpp\"\n";
     out << "#include \"org/limitless/fix/decoder/DataDecoder.hpp\"\n";
     out << "#include \"org/limitless/fix/decoder/GroupDecoder.hpp\"\n";
     out << "#include \"org/limitless/fix/decoder/MessageDecoder.hpp\"\n";
     out << "#include \"org/limitless/fix/messages/FixTypes.hpp\"\n\n";
     out << "namespace org::limitless::fix::messages {\n\n";
+    out << "using config::Protocol;\n";
     out << "using namespace org::limitless::fix::decoder;\n\n";
     for (auto& record: records)
     {
@@ -218,6 +265,7 @@ static void generateEncoders(const std::string& fileName,
     out << "// Generated by Generator from protocol.xml. Do not edit by hand.\n";
     out << "#ifndef SIMD_FIX_MESSAGE_ENCODERS_HPP\n";
     out << "#define SIMD_FIX_MESSAGE_ENCODERS_HPP\n\n";
+    out << "#include \"org/limitless/fix/config/FixEngine.hpp\"\n";
     out << "#include \"org/limitless/fix/encoder/DataEncoder.hpp\"\n";
     out << "#include \"org/limitless/fix/encoder/GroupEncoder.hpp\"\n";
     out << "#include \"org/limitless/fix/encoder/MessageEncoder.hpp\"\n";
@@ -305,19 +353,23 @@ static std::string cap(const std::string& value)
  * sizes, timing). Kept free of session includes so the engine headers
  * (Session/PayloadDecoder) can consume the constants without a cycle.
  */
-static void generateEngineConfig(const std::string& fileName, const pugi::xml_document& config)
+static void generateEngineConfig(const std::string& fileName,
+                                 const pugi::xml_document& config,
+                                 const Record& protocol)
 {
     std::ofstream out(fileName);
     out << "// Generated by Generator from config.xml. Do not edit by hand.\n";
     out << "#ifndef SIMD_FIX_ENGINE_HPP\n";
     out << "#define SIMD_FIX_ENGINE_HPP\n\n";
     out << "#include <chrono>\n";
-    out << "#include <cstdint>\n\n";
+    out << "#include <cstdint>\n";
+    out << "#include <string_view>\n\n";
     out << "#include \"org/limitless/fix/Types.hpp\"\n\n";
-    out << "namespace org::limitless::fix::config {\n\n";
 
+    out << "namespace org::limitless::fix::config {\n\n";
+    generateProtocol(out, protocol);
     const auto engine = config.child("config").child("engine");
-    out << std::format("inline constexpr FixedString EngineCompId{{\"{}\"}};\n",
+    out << std::format("inline constexpr FixedString EngineCompId{{\"{}\"}};\n\n",
                        engine.attribute("compId").as_string());
     out << std::format("inline constexpr std::uint32_t MaxMessageSize = {};\n",
                        engine.child("message").attribute("maxSize").as_uint());
@@ -575,7 +627,7 @@ static bool isRequiredCacheableField(const org::limitless::generator::fix::Field
 static std::string fieldReturnType(const org::limitless::generator::fix::Field& field)
 {
     const auto isEnum = field.m_category == Category::Enum;
-    return isEnum ? std::format("{}::Values", field.m_type)
+    return isEnum ? field.m_type
                   : std::string{type(field.m_category)};
 }
 
@@ -755,7 +807,7 @@ static void generateFieldEncoders(std::ostream& out, const Record& record)
         {
             const auto isEnum = field.m_category == Category::Enum;
             const auto category = isEnum ?
-                                      std::format("{}::Values", field.m_type) :
+                                      field.m_type :
                                       std::string{type(field.m_category)};
             out << std::format("    {}Encoder& {}(const {} value)\n",
                                record.m_name, uncap(field.m_name), category);

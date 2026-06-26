@@ -27,7 +27,8 @@ endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp
         ${CMAKE_SOURCE_DIR}/src/test/cpp
-        ${CMAKE_SOURCE_DIR}/src/generator)
+        ${CMAKE_SOURCE_DIR}/src/generator
+        ${CONFIG_GENERATED_DIR})
 set(MAIN_PATH "src/main/cpp/org/limitless/fix")
 set(GEN_PATH "src/main/cpp/org/limitless/fix/messages")
 set(TEST_PATH "src/test/cpp/org/limitless/fix")
@@ -75,7 +76,6 @@ target_link_options(SimdFix INTERFACE
         $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>
 )
 
-# --- Install / packaging --------------------------------------------------
 # Makes the header-only library consumable via find_package(SimdFix). Public
 # headers install under <prefix>/include preserving the org/limitless/fix tree.
 # detail/ is excluded: all public API signatures use opaque types; the detail
@@ -105,7 +105,6 @@ configure_package_config_file(
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SimdFixConfig.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SimdFix)
-# --------------------------------------------------------------------------
 
 add_executable(SimdFixBenchmark ${TEST_PATH}/benchmark/SimdFixBenchmark.cpp)
 target_include_directories(SimdFixBenchmark PRIVATE

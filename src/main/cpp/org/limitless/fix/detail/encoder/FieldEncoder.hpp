@@ -261,18 +261,18 @@ public:
 
     /**
      * Writes "TAG=VALUE" followed by SOH, where VALUE is the FIX string code
-     * for the given enum value, looked up in WrapperType::Codes. Null values
-     * are skipped for optional fields; required fields assert non-null.
+     * for the given enum value, obtained from the enum's code() helper. Null
+     * values are skipped for optional fields; required fields assert non-null.
      * @tparam Tag tag number to write
      * @tparam Required whether a null value is a programming error
-     * @tparam WrapperType enum wrapper type whose Codes table is used for the mapping
+     * @tparam WrapperType scoped enum type whose code() helper is used for the mapping
      * @param value enum value to write
      */
     template <FixedString Tag, bool Required, typename WrapperType>
         requires EncodableEnumWrapper<WrapperType>
-    void encode(const typename WrapperType::Values value)
+    void encode(const WrapperType value)
     {
-        if (value == static_cast<typename WrapperType::Values>(0))
+        if (value == WrapperType::Null)
         {
             if constexpr (Required)
             {
@@ -280,7 +280,7 @@ public:
             }
             return;
         }
-        encode<Tag, std::string_view>(WrapperType::Codes[static_cast<size_t>(value)]);
+        encode<Tag, std::string_view>(code(value));
     }
 
     /**

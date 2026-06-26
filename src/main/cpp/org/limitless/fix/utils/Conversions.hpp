@@ -727,58 +727,18 @@ inline void writeDateOnly(const int64_t days, uint8_t* dst)
 }
 
 /**
- * Builds a 256-entry byte->value table for an enum whose Codes are all single
- * bytes, mapping each code's byte to its enum value and every other byte to
- * Null. The returned flag reports whether the code set is single-byte; when it
- * is false the table is unusable and callers fall back to a linear scan.
- * @tparam Enum enum wrapper type exposing a Codes array and a Values enum
- * @return {table, singleByte} pair
- */
-template <typename Enum>
-[[nodiscard]] constexpr std::pair<std::array<typename Enum::Values, 256>, bool> makeByteTable()
-{
-    std::array<typename Enum::Values, 256> table{};
-    table.fill(Enum::Values::Null);
-    for (std::size_t value = 1; value < std::size(Enum::Codes); ++value)
-    {
-        if (Enum::Codes[value].size() != 1)
-        {
-            return {table, false};
-        }
-        table[static_cast<uint8_t>(Enum::Codes[value][0])] = static_cast<Enum::Values>(value);
-    }
-    return {table, true};
-}
-
-/**
- * Maps a FIX field's string code to the corresponding enum value via
- * Enum::Codes. Single-byte code sets (the common case) resolve through a
- * compile-time byte table in O(1); enums with any multi-byte code fall back to
- * a linear scan.
- * @tparam Enum enum wrapper type exposing a Codes array and a Values enum,
- *              including Values::Null
+ * Maps a FIX field's string code to the corresponding enum value by delegating
+ * to the enum's generated from() helper. The dummy Enum{} argument selects
+ * the right overload through argument-dependent lookup, keeping this lookup
+ * generic over any generated enum.
+ * @tparam Enum scoped enum type with a generated from() helper
  * @param code string code to look up
- * @return the matching enum value, or Enum::Values::Null if code is not found
+ * @return the matching enum value, or Enum::Null if code is not found
  */
 template <typename Enum>
-[[nodiscard]] Enum::Values find(const std::string_view code)
+[[nodiscard]] constexpr Enum find(const std::string_view code)
 {
-    static constexpr auto built = makeByteTable<Enum>();
-    if constexpr (built.second)
-    {
-        return code.size() == 1 ? built.first[static_cast<uint8_t>(code[0])] : Enum::Values::Null;
-    }
-    else
-    {
-        const auto end = Enum::Codes + std::size(Enum::Codes);
-        const auto found = std::find(Enum::Codes, end, code);
-        if (found != end)
-        {
-            auto index = std::distance(Enum::Codes, found);
-            return static_cast<Enum::Values>(index);
-        }
-        return Enum::Values::Null;
-    }
+    return from(code, Enum{});
 }
 
 }

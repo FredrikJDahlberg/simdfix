@@ -444,12 +444,12 @@ public:
      * @return converted enum value
      */
     template <typename Enum>
-    [[nodiscard]] constexpr expected<typename Enum::Values, Result> enumAt(const int8_t index) const
+    [[nodiscard]] constexpr expected<Enum, Result> enumAt(const int8_t index) const
     {
         const auto& field = m_fields[index];
         const auto code = std::string_view{reinterpret_cast<const char*>(m_data.data() + field.m_position), field.m_length};
         const auto value = utils::find<Enum>(code);
-        if (value == Enum::Values::Null)
+        if (value == Enum::Null)
         {
             return unexpected{Result::InvalidValue};
         }
@@ -619,12 +619,12 @@ public:
      * utils::find.
      * @tparam Tag tag number to read
      * @tparam Required whether a missing field is an error
-     * @tparam Enum enum type whose Codes table is used for the mapping
+     * @tparam Enum enum type whose from() helper is used for the mapping
      * @tparam Parent context the tag is being looked up in
      * @return field value, or Result::RequiredFieldMissing/Success if absent
      */
     template <int32_t Tag, bool Required, typename Enum, RecordType Parent>
-    [[nodiscard]] constexpr expected<typename Enum::Values, Result> getEnum() const
+    [[nodiscard]] constexpr expected<Enum, Result> getEnum() const
     {
         const auto index = findIndex<Tag, Parent>();
         if (index >= 0)
@@ -632,7 +632,7 @@ public:
             const auto& field = m_fields[index];
             const auto code = std::string_view{reinterpret_cast<const char*>(m_data.data() + field.m_position), field.m_length};
             const auto value = utils::find<Enum>(code);
-            if (value == Enum::Values::Null)
+            if (value == Enum::Null)
             {
                 return unexpected{Result::InvalidValue};
             }

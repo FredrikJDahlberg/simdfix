@@ -156,7 +156,7 @@ struct LogonGetterHandler : org::limitless::fix::messages::MessageHandler<LogonG
         sink += target.size();
         sink += logon.sequenceNumber().value_or(0);
         sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
-        sink += logon.encryptMethod().value_or(Encryption::None);
+        sink += static_cast<uint64_t>(logon.encryptMethod().value_or(Encryption::None));
         sink += logon.heartbeatInterval().value_or(0);
         return org::limitless::fix::Result::Success;
     }
@@ -181,7 +181,7 @@ struct LogonGroupGetterHandler : org::limitless::fix::messages::MessageHandler<L
         sink += target.size();
         sink += logon.sequenceNumber().value_or(0);
         sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
-        sink += logon.encryptMethod().value_or(Encryption::None);
+        sink += static_cast<uint64_t>(logon.encryptMethod().value_or(Encryption::None));
         sink += logon.heartbeatInterval().value_or(0);
 
         auto& hops = logon.hops();
@@ -210,7 +210,7 @@ struct LogonDataGetterHandler : org::limitless::fix::messages::MessageHandler<Lo
         sink += logon.target().value_or(std::string_view{}).size();
         sink += logon.sequenceNumber().value_or(0);
         sink += static_cast<uint64_t>(logon.sendingTime().value_or(std::chrono::milliseconds{0}).count());
-        sink += logon.encryptMethod().value_or(Encryption::None);
+        sink += static_cast<uint64_t>(logon.encryptMethod().value_or(Encryption::None));
         sink += logon.heartbeatInterval().value_or(0);
         const auto data = logon.xmlData().get();
         if (data.has_value())
@@ -224,7 +224,7 @@ struct LogonDataGetterHandler : org::limitless::fix::messages::MessageHandler<Lo
 // COLD: 1 GB buffer — data comes from DRAM for most of the run.
 static void benchColdCache()
 {
-    decoder::PayloadDecoder<FIXT_1_1> decoder;
+    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
 
     constexpr size_t COLD_SIZE = 1024ULL * 1024 * 1024;
     auto coldBuf = std::make_unique<uint8_t[]>(COLD_SIZE);
@@ -245,7 +245,7 @@ static void benchColdCache()
 // HOT: 256 KB buffer — fits in L2, measures pure compute throughput.
 static void benchHotCache()
 {
-    decoder::PayloadDecoder<FIXT_1_1> decoder;
+    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -283,7 +283,7 @@ static void benchHotCache()
 // GETTERS: parse + apply every LogonDecoder getter to the message.
 static void benchGetters()
 {
-    decoder::PayloadDecoder<FIXT_1_1> decoder;
+    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -314,7 +314,7 @@ static void benchGetters()
 // repeating group, to the message.
 static void benchGroups()
 {
-    decoder::PayloadDecoder<FIXT_1_1> decoder;
+    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -358,7 +358,7 @@ static void benchLogonData()
             return -1;
         }
     };
-    decoder::PayloadDecoder<FIXT_1_1, DataFields> decoder;
+    decoder::PayloadDecoder<config::FIXT_1_1, DataFields> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -394,7 +394,7 @@ static void benchLogonData()
 // NOS_HOT: hot-cache decode of NewOrderSingle (tokenization only, no getters).
 static void benchNewOrderSingleHot()
 {
-    decoder::PayloadDecoder<FIXT_1_1> decoder;
+    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -493,7 +493,7 @@ static size_t encodeExecutionReport(const std::span<uint8_t> buf)
 {
     using namespace org::limitless::fix::messages;
 
-    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
     encoder.wrap(0, buf);
 
     ExecutionReportEncoder report{};
@@ -523,7 +523,7 @@ static size_t encodeExecutionReport(const std::span<uint8_t> buf)
 // ER_HOT: hot-cache decode of ExecutionReport (tokenization only, no getters).
 static void benchExecutionReportHot()
 {
-    decoder::PayloadDecoder<FIXT_1_1> decoder;
+    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
 
     std::array<uint8_t, 256> msg{};
     const size_t msgLength = encodeExecutionReport(msg);
@@ -568,7 +568,7 @@ static void benchExecutionReportHot()
 // ER_GETTERS: parse + apply every ExecutionReportDecoder getter.
 static void benchExecutionReportGetters()
 {
-    decoder::PayloadDecoder<FIXT_1_1> decoder;
+    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
 
     std::array<uint8_t, 256> msg{};
     const size_t msgLength = encodeExecutionReport(msg);
@@ -622,7 +622,7 @@ static void benchExecutionReportEncode()
 
 static void benchNewOrderSingleGetters()
 {
-    decoder::PayloadDecoder<FIXT_1_1> decoder;
+    decoder::PayloadDecoder<config::FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -667,7 +667,7 @@ static void benchNewOrderSingleEncode()
     {
         for (size_t i = 0; i < HOT_COUNT; ++i)
         {
-            FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
+            FixPayloadEncoder<config::FIXT_1_1, "TARGET", "SENDER"> encoder{};
             encoder.wrap(0, buffer);
 
             NewOrderSingleEncoder order{};
@@ -702,7 +702,7 @@ static void benchEncode()
     {
         for (size_t i = 0; i < HOT_COUNT; ++i)
         {
-            FixPayloadEncoder<FIXT_1_1, "SellSide_1", "Buyer"> encoder{};
+            FixPayloadEncoder<config::FIXT_1_1, "SellSide_1", "Buyer"> encoder{};
             encoder.wrap(0, buffer);
 
             LogonEncoder logon{};
