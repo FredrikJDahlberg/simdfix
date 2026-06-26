@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "org/limitless/fix/decoder/PayloadDecoder.hpp"
 #include "org/limitless/fix/session/ClientSession.hpp"
 #include "org/limitless/fix/session/ServerSession.hpp"
 #include "org/limitless/fix/storage/MemoryStorage.hpp"
@@ -55,22 +56,6 @@ TEST(Session, MemoryStorageBackedRole)
     EXPECT_EQ("EXCH", server.senderCompId());
 }
 
-TEST(Session, IsSessionMessageClassifiesAdminMessages)
-{
-    using Client = ClientSession<FIXT_1_1, "CLIENT", "EXCH">;
-    EXPECT_TRUE(Client::isSessionMessage(LogonDecoder::MessageId));
-    EXPECT_TRUE(Client::isSessionMessage(LogoutDecoder::MessageId));
-    EXPECT_TRUE(Client::isSessionMessage(HeartbeatDecoder::MessageId));
-    EXPECT_TRUE(Client::isSessionMessage(TestRequestDecoder::MessageId));
-    EXPECT_TRUE(Client::isSessionMessage(ResendRequestDecoder::MessageId));
-    EXPECT_TRUE(Client::isSessionMessage(RejectDecoder::MessageId));
-    EXPECT_TRUE(Client::isSessionMessage(SequenceResetDecoder::MessageId));
-
-    EXPECT_FALSE(Client::isSessionMessage(ExecutionReportDecoder::MessageId));
-    EXPECT_FALSE(Client::isSessionMessage(NewOrderSingleDecoder::MessageId));
-}
-
-// Named transport policy: captures the bytes the session emits.
 struct CaptureTransport
 {
     std::vector<uint8_t>* captured;
@@ -101,6 +86,49 @@ TEST(Session, SendRoutesEncodedMessageToTransport)
     EXPECT_NE(std::string_view::npos,
               encoded.find("49=SENDER" SOH "56=TARGET" SOH
                            "34=1" SOH "52=20260613-19:26:13.959" SOH));
+}
+
+// Standalone application handler — note it does NOT inherit from any session
+// class; it is its own MessageHandler dispatcher and is injected by value.
+class CaptureApplication : public MessageHandler<CaptureApplication>
+{
+public:
+    using MessageHandler::handle;
+
+    std::string symbol;
+    uint32_t orderQty{};
+
+    Result handle(NewOrderSingleDecoder& nos)
+    {
+        const auto sym = nos.symbol().value();
+        symbol.assign(reinterpret_cast<const char*>(sym.data()), sym.size());
+        orderQty = nos.orderQty().value();
+        return Result::Success;
+    }
+};
+
+static constexpr std::uint8_t NEW_ORDER_SINGLE[] =
+    "8=FIXT.1.1" SOH "9=0129" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+    "34=1" SOH "52=20260613-19:26:13.959" SOH "11=ORDER1" SOH "21=1" SOH
+    "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH "38=100" SOH
+    "40=2" SOH "44=15000" SOH "10=126" SOH;
+
+TEST(Session, ForwardsApplicationMessageToInjectedHandler)
+{
+    // The session owns the seven session messages; NewOrderSingle (35=D) is not
+    // one of them, so the switch's default forwards it to the injected handler.
+    using Server = ServerSession<FIXT_1_1, "TARGET", "SENDER", NullStorage, DiscardTransport, CaptureApplication>;
+    auto server = Server::Builder{NullStorage{}}
+                      .application(CaptureApplication{})
+                      .build();
+
+    org::limitless::fix::decoder::PayloadDecoder<FIXT_1_1> decoder;
+    const Buffer buffer{NEW_ORDER_SINGLE, sizeof(NEW_ORDER_SINGLE) - 1};
+    const auto [processed, status] = decoder.parse(buffer, server);
+
+    EXPECT_EQ(Result::Success, status);
+    EXPECT_EQ("AAPL", server.application().symbol);   // dispatched to the injected handler
+    EXPECT_EQ(100u, server.application().orderQty);
 }
 
 }

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <concepts>
 #include <cstring>
 #include <span>
 
@@ -26,6 +27,19 @@ struct NoDataFields
     {
         return -1;
     }
+};
+
+/**
+ * Constrains the Handler passed to PayloadDecoder::parse(): once a buffer is
+ * tokenized, the decoder hands the whole TokenizedMessage to the handler via
+ * handle(message), expecting a Result back. The handler recovers the MsgType
+ * itself with message.messageId(). The generated MessageHandler and the session
+ * engine layered on it both model this concept.
+ */
+template <typename Handler>
+concept PayloadHandler = requires(Handler handler, const TokenizedMessage& message)
+{
+    { handler.handle(message) } -> std::same_as<Result>;
 };
 
 /**
@@ -102,15 +116,16 @@ public:
     }
 
     /**
-     * Tokenizes buffer and, on success, dispatches the decoded message to
-     * handler by MsgType.
+     * Tokenizes buffer and, on success, hands the whole TokenizedMessage to
+     * handler. The handler recovers the MsgType with message.messageId() and
+     * dispatches accordingly.
      * @param buffer raw FIX message bytes
      * @param handler receives the tokenized message via handle(); see
-     *        MessageHandler
+     *        PayloadHandler
      * @return Result::Success and handler's status, or the tokenizer's
      *         failure status if parsing failed
      */
-    template <typename Handler>
+    template <PayloadHandler Handler>
     ParseResult parse(const Buffer buffer, Handler& handler)
     {
         auto result = parse(buffer);
@@ -119,14 +134,8 @@ public:
             return { result.m_processed, result.m_value };
         }
 
-        const auto& msgTypeField = m_fields[MessageTypePosition];
-        uint16_t messageType = buffer[msgTypeField.m_position];
-        if (msgTypeField.m_length >= 2 && buffer[msgTypeField.m_position + 1] != FieldEnd)
-        {
-            messageType = static_cast<uint16_t>(messageType | (buffer[msgTypeField.m_position + 1] << 8));
-        }
         const TokenizedMessage message{buffer, {m_fields.data(), m_count}, {m_tags.data(), m_count}, static_cast<int32_t>(m_count)};
-        result.m_value = handler.handle(message, messageType);
+        result.m_value = handler.handle(message);
         return result;
     }
 

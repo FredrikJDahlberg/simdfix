@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "org/limitless/fix/Types.hpp"
+#include "org/limitless/fix/decoder/PayloadDecoder.hpp"
 #include "org/limitless/fix/storage/Storage.hpp"
 #include "org/limitless/fix/messages/FixMessageHandler.hpp"
 #include "org/limitless/fix/messages/FixMessageEncoders.hpp"
@@ -24,21 +25,21 @@ namespace org::limitless::fix::session
 using namespace std::chrono;
 using namespace org::limitless::fix::messages;
 using namespace org::limitless::fix::storage;
+using ::org::limitless::fix::decoder::PayloadHandler;
 
 /**
  * Describes the message-handler interface the decoder drives: a type the
  * PayloadDecoder can dispatch a tokenized message to (see
- * PayloadDecoder::parse, which calls handler.handle(message, messageType)) and
- * bind a SessionContext to. Both the generated MessageHandler and the session
- * engine layered on top of it model this concept.
+ * PayloadDecoder::parse, which calls handler.handle(message)) and bind a
+ * SessionContext to. Both the generated MessageHandler and the session engine
+ * layered on top of it model this concept.
  */
 template <typename MessageHandler>
 concept FixMessageHandler = requires(MessageHandler handler,
                                      const TokenizedMessage& message,
-                                     const uint16_t messageType,
                                      const SessionContext& context)
 {
-    { handler.handle(message, messageType) } -> std::same_as<Result>;
+    { handler.handle(message) } -> std::same_as<Result>;
     { handler.setSessionContext(context) };
 };
 
@@ -53,15 +54,30 @@ struct DiscardTransport
 };
 
 /**
+ * Default application handler: rejects every message the session layer does not
+ * own. Lets a Session be instantiated without an application handler (admin-only
+ * use); a real handler is supplied via the Session's Application template
+ * parameter and Builder::application().
+ */
+struct RejectApplication
+{
+    [[nodiscard]] Result handle(const TokenizedMessage&) const noexcept
+    {
+        return Result::InvalidMessageType;
+    }
+};
+
+/**
  * Role-agnostic half of the FIX session layer: the state machine, sequence-number
  * bookkeeping, and the admin-message handling (Heartbeat, TestRequest, Logout,
  * Reject, ResendRequest, SequenceReset) that is identical for initiator and
  * acceptor.
  *
  * Layered onto a message handler: Session derives from the handler the decoder
- * dispatches to, so it is itself a FixMessageHandler. It overloads the admin
- * messages it owns and leaves application messages (and the one role-specific
- * message, Logon) to the handler below and the concrete role above.
+ * dispatches to, so it is itself a FixMessageHandler. It owns the session
+ * (admin) messages, dispatches the role-specific Logon to the concrete role
+ * above (CRTP), and forwards every application message to the injected
+ * Application handler.
  *
  * Identity (BeginString and the two CompIDs) is a compile-time fact carried by
  * the owned encoder rather than runtime state: the session holds a
@@ -78,10 +94,14 @@ struct DiscardTransport
  * @tparam Transport the outbound transport policy: a callable invoked with each
  *         finished message's bytes. Stored by value and called directly, so the
  *         transmission inlines; defaults to DiscardTransport (no transmission)
+ * @tparam Application the application-message handler: a PayloadHandler the
+ *         session forwards every non-session message to. Owned by value and set
+ *         via the Builder; defaults to RejectApplication (admin-only sessions)
  */
 template <FixedString Protocol, FixedString Sender, FixedString Target,
           FixMessageHandler HandlerType, FixStorageStrategy Storage = NullStorage,
-          typename Transport = DiscardTransport>
+          typename Transport = DiscardTransport,
+          PayloadHandler Application = RejectApplication>
 class Session : public HandlerType
 {
     enum class State : uint8_t
@@ -117,9 +137,6 @@ class Session : public HandlerType
     }
 
 public:
-    // Keep the two-argument dispatcher, the application-message defaults
-    // (ExecutionReport, NewOrderSingle), and the Logon default from the handler
-    // below visible alongside the admin-message overloads declared here.
     using HandlerType::handle;
 
     // Upper bound on a single encoded outbound message; sizes the send buffer.
@@ -132,6 +149,77 @@ public:
 
     template <typename Concrete = Session>
     class Builder;
+
+    Result handle(const TokenizedMessage& message)
+    {
+        auto status = Result::InvalidMessageType;
+        switch (message.messageId())
+        {
+            case LogonDecoder::MessageId:
+            {
+                LogonDecoder logon{this->m_context, message};
+                status = this->receive(logon);
+                break;
+            }
+            case LogoutDecoder::MessageId:
+            {
+                LogoutDecoder logout{this->m_context, message};
+                status = handle(logout);
+                break;
+            }
+            case HeartbeatDecoder::MessageId:
+            {
+                HeartbeatDecoder heartbeat{this->m_context, message};
+                status = handle(heartbeat);
+                break;
+            }
+            case TestRequestDecoder::MessageId:
+            {
+                TestRequestDecoder testRequest{this->m_context, message};
+                status = handle(testRequest);
+                break;
+            }
+            case ResendRequestDecoder::MessageId:
+            {
+                ResendRequestDecoder resendRequest{this->m_context, message};
+                status = handle(resendRequest);
+                break;
+            }
+            case RejectDecoder::MessageId:
+            {
+                RejectDecoder reject{this->m_context, message};
+                status = handle(reject);
+                break;
+            }
+            case SequenceResetDecoder::MessageId:
+            {
+                SequenceResetDecoder sequenceReset{this->m_context, message};
+                status = handle(sequenceReset);
+                break;
+            }
+            default:
+                // Not a session message: forward it to the injected application
+                // handler, which validates and dispatches to its typed handler.
+                status = m_application.handle(message);
+                break;
+        }
+        return status;
+    }
+
+    /**
+     * Binds the per-session validation context and propagates it to the injected
+     * application handler, so the messages it dispatches validate against the
+     * same CompID / protocol expectations.
+     * @param context the per-session expectations checked by validate()
+     */
+    void setSessionContext(const SessionContext& context)
+    {
+        HandlerType::setSessionContext(context);
+        if constexpr (requires { m_application.setSessionContext(context); })
+        {
+            m_application.setSessionContext(context);
+        }
+    }
 
     /**
      * Periodic timer tick: drives heartbeat emission and test-request probing
@@ -154,59 +242,6 @@ public:
             doWork = true;
         }
         return doWork;
-    }
-
-    Result handle(const LogoutDecoder& logout)
-    {
-        keepAlive(logout.sendingTime());
-
-        return Result::Success;
-    }
-
-    Result handle(const HeartbeatDecoder& heartbeat)
-    {
-        keepAlive(heartbeat.sendingTime());
-        return Result::Success;
-    }
-
-    Result handle(const TestRequestDecoder& testRequest)
-    {
-        keepAlive(testRequest.sendingTime());
-        return Result::Success;
-    }
-
-    Result handle(const ResendRequestDecoder& resendRequest)
-    {
-        keepAlive(resendRequest.sendingTime());
-        return Result::Success;
-    }
-
-    Result handle(const RejectDecoder& reject)
-    {
-        keepAlive(reject.sendingTime());
-        return Result::Success;
-    }
-
-    Result handle(const SequenceResetDecoder& sequenceReset)
-    {
-        keepAlive(sequenceReset.sendingTime());
-        return Result::Success;
-    }
-
-    /**
-     * Classifies a MsgType as a session (administrative) message — one handled
-     * by the session layer itself — versus an application message left to the
-     * handler below.
-     * @param messageId the MsgType value (as produced by the decoder)
-     * @return true for Logon, Logout, Heartbeat, TestRequest, ResendRequest,
-     *         Reject and SequenceReset; false otherwise
-     */
-    [[nodiscard]] static constexpr bool isSessionMessage(const uint16_t messageId) noexcept
-    {
-        return messageId == HeartbeatDecoder::MessageId || messageId == TestRequestDecoder::MessageId ||
-               messageId == ResendRequestDecoder::MessageId || messageId == RejectDecoder::MessageId ||
-               messageId == LogonDecoder::MessageId || messageId == LogoutDecoder::MessageId ||
-               messageId == SequenceResetDecoder::MessageId;
     }
 
     [[nodiscard]] State state() const noexcept
@@ -263,12 +298,60 @@ public:
         return m_heartbeatPeriod;
     }
 
-protected:
+    [[nodiscard]] Application& application() noexcept
+    {
+        return m_application;
+    }
+
+    [[nodiscard]] const Application& application() const noexcept
+    {
+        return m_application;
+    }
+
+    Result handle(const LogoutDecoder& logout)
+    {
+        keepAlive(logout.sendingTime());
+
+        return Result::Success;
+    }
+
+    Result handle(const HeartbeatDecoder& heartbeat)
+    {
+        keepAlive(heartbeat.sendingTime());
+        return Result::Success;
+    }
+
+    Result handle(const TestRequestDecoder& testRequest)
+    {
+        keepAlive(testRequest.sendingTime());
+        return Result::Success;
+    }
+
+    Result handle(const ResendRequestDecoder& resendRequest)
+    {
+        keepAlive(resendRequest.sendingTime());
+        return Result::Success;
+    }
+
+    Result handle(const RejectDecoder& reject)
+    {
+        keepAlive(reject.sendingTime());
+        return Result::Success;
+    }
+
+    Result handle(const SequenceResetDecoder& sequenceReset)
+    {
+        keepAlive(sequenceReset.sendingTime());
+        return Result::Success;
+    }
+
+private:
     // Single source of truth for BeginString/SenderCompID/TargetCompID; baked in
     // at compile time from the Protocol/Target/Sender template parameters.
     FixPayloadEncoder<Protocol, Target, Sender> m_encoder{};
     Storage m_storage{};
     Transport m_transport{};
+    Application m_application{};
     std::array<uint8_t, MaxMessageSize> m_buffer{};
 
     State m_state{State::Disconnected};
@@ -293,12 +376,14 @@ protected:
  *         from it.
  */
 template <FixedString Protocol, FixedString Sender, FixedString Target,
-          FixMessageHandler HandlerType, FixStorageStrategy Storage, typename Transport>
+          FixMessageHandler HandlerType, FixStorageStrategy Storage, typename Transport,
+          PayloadHandler Application>
 template <typename Concrete>
-class Session<Protocol, Sender, Target, HandlerType, Storage, Transport>::Builder
+class Session<Protocol, Sender, Target, HandlerType, Storage, Transport, Application>::Builder
 {
     Storage m_storage;
     Transport m_transport{};
+    Application m_application{};
     milliseconds m_heartbeatPeriod{DefaultHeartbeatPeriod};
 
 public:
@@ -323,6 +408,19 @@ public:
     }
 
     /**
+     * Sets the application handler the session forwards every non-session
+     * message to. When left unset, those messages are rejected
+     * (RejectApplication).
+     * @param application the application PayloadHandler, taken by value
+     * @return *this, for chaining
+     */
+    Builder& application(Application application)
+    {
+        m_application = std::move(application);
+        return *this;
+    }
+
+    /**
      * Overrides the heartbeat period (default DefaultHeartbeatPeriod).
      * @param period the heartbeat interval
      * @return *this, for chaining
@@ -339,6 +437,7 @@ public:
         session.m_heartbeatPeriod = m_heartbeatPeriod;
         session.m_storage = std::move(m_storage);
         session.m_transport = std::move(m_transport);
+        session.m_application = std::move(m_application);
         return session;
     }
 };
@@ -352,11 +451,12 @@ public:
  *
  * @tparam Role the role class template (e.g. ClientSession), supplied by name
  */
-template <template <FixedString, FixedString, FixedString, typename, typename> class Role,
+template <template <FixedString, FixedString, FixedString, typename, typename, typename> class Role,
           FixedString Protocol, FixedString Sender, FixedString Target,
-          FixStorageStrategy Storage, typename Transport>
+          FixStorageStrategy Storage, typename Transport, PayloadHandler Application>
 using RoleSession = Session<Protocol, Sender, Target,
-    MessageHandler<Role<Protocol, Sender, Target, Storage, Transport>>, Storage, Transport>;
+    MessageHandler<Role<Protocol, Sender, Target, Storage, Transport, Application>>,
+    Storage, Transport, Application>;
 
 }
 

@@ -23,17 +23,16 @@ namespace org::limitless::fix::session
  *         the resend / gap-fill path); defaults to a no-op store.
  */
 template <FixedString Protocol, FixedString Sender, FixedString Target,
-          FixStorageStrategy Storage = NullStorage, typename Transport = DiscardTransport>
+          FixStorageStrategy Storage = NullStorage, typename Transport = DiscardTransport,
+          PayloadHandler Application = RejectApplication>
 class ClientSession
-    : public RoleSession<ClientSession, Protocol, Sender, Target, Storage, Transport>
+    : public RoleSession<ClientSession, Protocol, Sender, Target, Storage, Transport, Application>
 {
-    using Base = RoleSession<ClientSession, Protocol, Sender, Target, Storage, Transport>;
+    using Base = RoleSession<ClientSession, Protocol, Sender, Target, Storage, Transport, Application>;
 
 public:
     using Base::handle;   // keep the inherited overloads visible past the Logon override
-
-    // Builds a ClientSession (not just the base Session).
-    using Builder = typename Base::template Builder<ClientSession>;
+    using Builder = Base::template Builder<ClientSession>;
 
     /**
      * Begins the handshake by emitting the initial Logon and moving to

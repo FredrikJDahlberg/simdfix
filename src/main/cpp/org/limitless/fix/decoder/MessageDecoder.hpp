@@ -34,8 +34,7 @@ protected:
 public:
     MessageDecoder() = default;
 
-    MessageDecoder(const SessionContext* context, const TokenizedMessage& message)
-        : m_context{context}
+    MessageDecoder(const SessionContext* context, const TokenizedMessage& message) : m_context{context}
     {
         m_decoder.wrap(message.data, message.fields, message.tags, message.size);
     }

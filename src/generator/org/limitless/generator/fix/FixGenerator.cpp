@@ -287,6 +287,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "using fix::Result;\n\n";
     out << "template <typename Handler>\n";
     out << "class MessageHandler\n{\n";
+    out << "protected:\n";
     out << "    const SessionContext* m_context{};\n\n";
     out << "public:\n";
     out << "    template <typename Event>\n";
@@ -298,10 +299,10 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "    {\n";
     out << "        m_context = &context;\n";
     out << "    }\n\n";
-    out << "    Result handle(const TokenizedMessage& message, const uint16_t messageType)\n";
+    out << "    Result handle(const TokenizedMessage& message)\n";
     out << "    {\n";
     out << "        auto status = Result::InvalidMessageType;\n";
-    out << "        switch (messageType)\n";
+    out << "        switch (message.messageId())\n";
     out << "        {\n";
     for (auto& message: messages)
     {

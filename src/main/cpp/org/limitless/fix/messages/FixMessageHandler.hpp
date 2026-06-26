@@ -12,6 +12,7 @@ using fix::Result;
 template <typename Handler>
 class MessageHandler
 {
+protected:
     const SessionContext* m_context{};
 
 public:
@@ -26,10 +27,10 @@ public:
         m_context = &context;
     }
 
-    Result handle(const TokenizedMessage& message, const uint16_t messageType)
+    Result handle(const TokenizedMessage& message)
     {
         auto status = Result::InvalidMessageType;
-        switch (messageType)
+        switch (message.messageId())
         {
             case LogonDecoder::MessageId:
             {

@@ -74,7 +74,6 @@ TEST(MessageDecoder, Logout)
 
         Result handle(LogoutDecoder&)
         {
-            std::printf("Found Logout\n");
             found = true;
             return Result::Success;
         }
@@ -109,7 +108,6 @@ TEST(MessageDecoder, MessageFragment)
 
         Result handle(LogoutDecoder&)
         {
-            std::printf("Found Logout\n");
             found = true;
             return Result::Success;
         }
@@ -145,7 +143,6 @@ TEST(MessageDecoder, HopGroup1)
 
         Result handle(LogoutDecoder& logout)
         {
-            std::printf("Got logout\n");
             auto& group = logout.hops();
             const auto count = group.count();
             EXPECT_EQ(2UL, count);
@@ -191,10 +188,8 @@ TEST(MessageDecoder, HopGroup2)
 
         Result handle(LogoutDecoder& logout)
         {
-            std::printf("Got logout\n");
             auto& group = logout.hops();
             const auto count = group.count();
-            std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2UL, count);
             group.next();
             std::string empty{};
@@ -224,10 +219,8 @@ TEST(MessageDecoder, HopGroup3)
 
         Result handle(LogoutDecoder& logout)
         {
-            std::printf("Got logout\n");
             auto& group = logout.hops();
             const auto count = group.count();//.value_or(0);
-            std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2UL, count);
             group.next();
             std::string empty{};
@@ -261,10 +254,8 @@ TEST(MessageDecoder, InvalidGroupCount)
 
         Result handle(LogoutDecoder& logout)
         {
-            std::printf("Got logout\n");
             auto& group = logout.hops();
             const auto count = group.count();
-            std::printf("Group hops=%d\n", count);
             EXPECT_EQ(2UL, count);
             group.next();
             EXPECT_EQ("20", toString(group.hopCompID().value()));

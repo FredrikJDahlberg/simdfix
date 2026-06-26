@@ -52,6 +52,12 @@ Session handling
 - Message handling — route decoded messages by MsgType: classify session vs
   application messages with `isSessionMessage`, handle admin messages in the
   session layer and forward application messages to the handler below.
+- Export StorageType / TransportType from `Session` — expose the `Storage` and
+  `Transport` template parameters as public nested aliases (inherited by
+  `ClientSession` / `ServerSession`), so downstream/generic callers can name
+  `SessionType::StorageType` etc. Note this does not simplify the role classes'
+  own CRTP handler base (the role is incomplete in its base-clause); it is purely
+  for consumers of a fully-formed session type.
 
 Storage
 -----
