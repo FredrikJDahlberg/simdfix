@@ -202,31 +202,6 @@ enum class Presence
 using FieldSpan = std::span<Field>;
 using TagSpan = std::span<uint16_t>;
 
-struct TokenizedMessage
-{
-    Buffer data;
-    FieldSpan fields;
-    TagSpan tags;
-    int32_t size;
-
-    /**
-     * Reads the MsgType (tag 35) as the encoded value each generated decoder
-     * exposes as its MessageId: a single byte, or two bytes packed
-     * low-byte-first for two-character MsgTypes (e.g. "AB" -> 'A' | 'B' << 8).
-     * @return the message id, matching <Message>Decoder::MessageId
-     */
-    [[nodiscard]] uint16_t messageId() const
-    {
-        const auto& field = fields[MessageTypePosition];
-        uint16_t id = data[field.m_position];
-        if (field.m_length >= 2 && data[field.m_position + 1] != FieldEnd)
-        {
-            id = static_cast<uint16_t>(id | (data[field.m_position + 1] << 8));
-        }
-        return id;
-    }
-};
-
 }
 
 #endif //SIMD_FIX_DETAIL_TOKENS_HPP

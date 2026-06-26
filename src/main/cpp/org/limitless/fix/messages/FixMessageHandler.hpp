@@ -2,7 +2,7 @@
 #ifndef SIMD_FIX_MESSAGE_HANDLER_HPP
 #define SIMD_FIX_MESSAGE_HANDLER_HPP
 
-#include "org/limitless/fix/detail/Tokens.hpp"
+#include "org/limitless/fix/TokenizedMessage.hpp"
 #include "org/limitless/fix/messages/FixMessageDecoders.hpp"
 
 namespace org::limitless::fix::messages {

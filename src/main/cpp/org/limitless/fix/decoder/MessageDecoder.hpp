@@ -9,13 +9,14 @@
 #include "org/limitless/fix/detail/Expected.hpp"
 #include <span>
 
+#include "org/limitless/fix/TokenizedMessage.hpp"
 #include "org/limitless/fix/detail/Tokens.hpp"
-#include "../detail/decoder/FieldDecoder.hpp"
+#include "../detail/parser/FieldDecoder.hpp"
 
 namespace org::limitless::fix::decoder {
 
 using namespace org::limitless::fix::detail;
-using namespace org::limitless::fix::detail::decoder;
+using namespace org::limitless::fix::detail::parser;
 
 /**
  * Base for generated message decoders (e.g. LogonDecoder, LogoutDecoder).

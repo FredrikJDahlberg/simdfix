@@ -32,16 +32,21 @@ set(MAIN_PATH "src/main/cpp/org/limitless/fix")
 set(GEN_PATH "src/main/cpp/org/limitless/fix/messages")
 set(TEST_PATH "src/test/cpp/org/limitless/fix")
 set(GENERATOR_PATH "src/generator/org/limitless/generator/fix/")
+set(CONFIG_GEN_PATH "src/main/cpp/org/limitless/fix/config")
 set(PROTOCOL_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/protocol.xml")
+set(CONFIG_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/config.xml")
 set(GENERATED_DIR "${CMAKE_SOURCE_DIR}/${GEN_PATH}")
+set(CONFIG_GENERATED_DIR "${CMAKE_SOURCE_DIR}/${CONFIG_GEN_PATH}")
 set(GENERATED_HEADERS
         ${GENERATED_DIR}/FixTypes.hpp ${GENERATED_DIR}/FixMessageDecoders.hpp
-        ${GENERATED_DIR}/FixMessageEncoders.hpp ${GENERATED_DIR}/FixMessageHandler.hpp)
+        ${GENERATED_DIR}/FixMessageEncoders.hpp ${GENERATED_DIR}/FixMessageHandler.hpp
+        ${CONFIG_GENERATED_DIR}/FixEngine.hpp ${CONFIG_GENERATED_DIR}/FixConfig.hpp)
 set(FIX_HEADERS
-        ${MAIN_PATH}/Fix.hpp ${MAIN_PATH}/Types.hpp ${MAIN_PATH}/detail/Tokens.hpp
+        ${MAIN_PATH}/Fix.hpp ${MAIN_PATH}/Types.hpp ${MAIN_PATH}/TokenizedMessage.hpp ${MAIN_PATH}/detail/Tokens.hpp
         ${MAIN_PATH}/utils/Conversions.hpp ${MAIN_PATH}/utils/FixedDecimal.hpp ${MAIN_PATH}/utils/OptionalInt.hpp
-        ${MAIN_PATH}/decoder/PayloadDecoder.hpp ${MAIN_PATH}/decoder/MessageDecoder.hpp
-        ${MAIN_PATH}/detail/decoder/FieldDecoder.hpp
+        ${MAIN_PATH}/decoder/PayloadDecoder.hpp ${MAIN_PATH}/decoder/PayloadHandler.hpp
+        ${MAIN_PATH}/decoder/MessageDecoder.hpp
+        ${MAIN_PATH}/detail/parser/FieldDecoder.hpp
         ${MAIN_PATH}/decoder/DataDecoder.hpp ${MAIN_PATH}/decoder/GroupDecoder.hpp
         ${MAIN_PATH}/detail/Expected.hpp ${MAIN_PATH}/detail/ByteSwap.hpp
         ${MAIN_PATH}/detail/simd/Uint8x16.hpp
@@ -160,11 +165,12 @@ target_link_libraries(Generator PRIVATE pugixml::pugixml)
 
 add_custom_command(
         OUTPUT ${GENERATED_HEADERS}
-        COMMAND $<TARGET_FILE:Generator> ${PROTOCOL_XML} ${GENERATED_DIR}
+        COMMAND $<TARGET_FILE:Generator> ${PROTOCOL_XML} ${GENERATED_DIR} ${CONFIG_XML} ${CONFIG_GENERATED_DIR}
         DEPENDS Generator
                 ${PROTOCOL_XML}
+                ${CONFIG_XML}
                 ${GENERATOR_PATH}/FixGenerator.cpp ${GENERATOR_PATH}/DataModel.hpp
-        COMMENT "Generating FIX message headers from protocol.xml"
+        COMMENT "Generating FIX message headers from protocol.xml and config.xml"
         VERBATIM
 )
 add_custom_target(GenerateMessages DEPENDS ${GENERATED_HEADERS})

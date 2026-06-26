@@ -8,13 +8,13 @@
 #include <algorithm>
 #include <array>
 #include <bit>
-#include <concepts>
 #include <cstring>
 #include <span>
 
+#include "org/limitless/fix/config/FixEngine.hpp"
+#include "org/limitless/fix/decoder/PayloadHandler.hpp"
 #include "org/limitless/fix/detail/Tokens.hpp"
 #include "org/limitless/fix/detail/simd/Uint8x16.hpp"
-#include "org/limitless/fix/messages/FixEngine.hpp"
 #include "org/limitless/fix/utils/Conversions.hpp"
 
 namespace org::limitless::fix::decoder {
@@ -28,19 +28,6 @@ struct NoDataFields
     {
         return -1;
     }
-};
-
-/**
- * Constrains the Handler passed to PayloadDecoder::parse(): once a buffer is
- * tokenized, the decoder hands the whole TokenizedMessage to the handler via
- * handle(message), expecting a Result back. The handler recovers the MsgType
- * itself with message.messageId(). The generated MessageHandler and the session
- * engine layered on it both model this concept.
- */
-template <typename Handler>
-concept PayloadHandler = requires(Handler handler, const TokenizedMessage& message)
-{
-    { handler.handle(message) } -> std::same_as<Result>;
 };
 
 /**

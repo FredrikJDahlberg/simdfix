@@ -5,13 +5,13 @@
 #include <gtest/gtest.h>
 
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
-#include "../../../../../../main/cpp/org/limitless/fix/detail/decoder/FieldDecoder.hpp"
+#include "../../../../../../main/cpp/org/limitless/fix/detail/parser/FieldDecoder.hpp"
 #include "org/limitless/fix/messages/FixTypes.hpp"
 #include "org/limitless/fix/utils/Conversions.hpp"
 
 namespace org::limitless::fix::decoder {
 
-using namespace org::limitless::fix::detail::decoder;
+using namespace org::limitless::fix::detail::parser;
 
 #define SOH "\x01"
 

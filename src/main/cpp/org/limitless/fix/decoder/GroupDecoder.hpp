@@ -5,11 +5,11 @@
 #ifndef SIMD_FIX_GROUP_DECODER_HPP
 #define SIMD_FIX_GROUP_DECODER_HPP
 
-#include "../detail/decoder/FieldDecoder.hpp"
+#include "../detail/parser/FieldDecoder.hpp"
 
 namespace org::limitless::fix::decoder {
 
-using namespace org::limitless::fix::detail::decoder;
+using namespace org::limitless::fix::detail::parser;
 
 /**
  * Iterates the repeating entries of a FIX repeating group. Wraps the

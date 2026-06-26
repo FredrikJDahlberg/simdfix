@@ -19,6 +19,7 @@
 #define SIMD_FIX_FIX_HPP
 
 #include "org/limitless/fix/Types.hpp"
+#include "org/limitless/fix/TokenizedMessage.hpp"
 #include "org/limitless/fix/decoder/PayloadDecoder.hpp"
 #include "org/limitless/fix/encoder/PayloadEncoder.hpp"
 #include "org/limitless/fix/messages/FixMessageDecoders.hpp"
