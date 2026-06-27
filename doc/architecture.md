@@ -13,6 +13,22 @@ The gateway is a pipeline of four cooperating subsystems, each with a distinct r
 
 All intra-host communication uses Aeron IPC (shared memory ring buffers). No message crosses a TCP socket between any two components on the same node.
 
+### 2.1.1 Deployment Requirements
+
+The gateway is designed for bare-metal Linux with dedicated CPU cores, but it is a supported requirement to run in virtualized and containerized environments (cloud VMs, Docker, Kubernetes), subject to the constraints below.
+
+| Requirement | Bare-metal | Cloud VM / container |
+|-------------|-----------|----------------------|
+| Linux kernel ≥ 6.1 with `io_uring` | required | required |
+| `CAP_SYS_NICE`, `CAP_IPC_LOCK`, `CAP_NET_ADMIN` | implicit | must be granted explicitly |
+| `/dev/shm` ≥ 1 GB | host default | must be configured (`--shm-size`) |
+| Huge pages pre-allocated on host | `vm.nr_hugepages` in sysctl | host-level only; cannot be done from within a container |
+| CPU isolation (`isolcpus`, `nohz_full`) | kernel boot parameter | not available on vCPU; use cgroup `cpuset` instead |
+| PTP or invariant TSC clock source | hardware-provided | provider-dependent; verify before deployment |
+| No vCPU steal on busy-spin cores | guaranteed | requires bare-metal or dedicated-host instance |
+
+Cloud and containerized deployments must satisfy all rows marked "required" and address the remaining rows through configuration. See [virtual.md](virtual.md) for step-by-step instructions, and § 2.12 for the issues each requirement mitigates.
+
 ---
 
 ## 2.2 Thread Topology
@@ -403,113 +419,118 @@ All streams share a single Aeron Media Driver instance on the host. The media dr
 
 ## 2.11 Latency Budget and Throughput
 
-### 2.11.1 End-to-End Latency
-
-The table below covers the **leader hot path** for a `NewOrderSingle` that passes both risk checks. Raft replication latency (2–5 µs) adds to the cluster stage on committed messages.
-
-| Stage | Thread | Typical |
-|-------|--------|---------|
-| TCP receive → SPSC write | Core 1 (io_uring) | 0.5 µs |
-| SPSC read → Aeron offer | Core 2 (FIX Session) | 0.5 µs |
-| Aeron IPC → Java dispatch | Core 3 (Cluster) | 0.5 µs |
-| Raft commit (3-node, co-lo) | Core 3 | 2–5 µs |
-| Java → stream 2 → AppWorker | Core 7 | 0.5 µs |
-w| SIMD decode NOS (tokenize + getters) | Core 7 | **~130 ns** |
-| Fast risk check (atomic loads) | Core 7 | ~30 ns |
-| Risk Thread RPC (in-flight slot wait + response) | Core 8 | **100–500 ms** |
-| SPSC → EgressWorker | Core 9 | ~150 ns |
-| FIX encode NOS (sell-side order) | Core 9 | **~37 ns** |
-| io_uring send → NIC | Core 10 | 0.5 µs |
-
-Decode and encode figures are measured values from `SimdFixBenchmark` (release build, ARM NEON, Apple M1 Pro): NOS GETTERS 128.5 ns, NOS ENCODE 37.3 ns. The risk RPC dominates the end-to-end budget by six orders of magnitude. All pipeline stages outside the risk call total under 10 µs; the individual order latency is determined almost entirely by the risk system RTT plus any queuing delay waiting for a free in-flight slot.
+End-to-end latency estimates and throughput analysis are in [estimated-performance.md](estimated-performance.md). The risk system RPC (100–500 ms) dominates the latency budget by six orders of magnitude; all other pipeline stages total under 10 µs. System throughput is bounded by Little's Law applied to the risk slot limit: at the current configuration of 25 outstanding requests the ceiling ranges from 50 orders/sec (500 ms RTT) to 500 orders/sec (50 ms RTT).
 
 ---
 
-### 2.11.2 Throughput Analysis
+## 2.12 Cloud and Virtualized Environments
 
-The system throughput ceiling is set by the risk system, which is the sole bottleneck. All other pipeline stages have headroom orders of magnitude above the risk-constrained limit.
-
-#### Risk System: Little's Law
-
-By Little's Law, in a stable system the average throughput λ, average number of in-flight requests N, and average service time W are related by:
-
-```
-N = λ × W   →   λ = N / W   (orders/sec)
-```
-
-The table below gives the throughput ceiling for combinations of outstanding-request limit and risk system RTT. The current system is configured for 25 outstanding requests; the table shows neighbouring values to illustrate sensitivity.
-
-| Outstanding \ RTT | 1 ms | 50 ms | 100 ms | 250 ms | 500 ms |
-|-------------------|-----:|------:|-------:|-------:|-------:|
-| **10** | 10 000 | 200 | 100 | 40 | 20 |
-| **50** | 50 000 | 1 000 | 500 | 200 | 100 |
-| **100 ★** | **100 000** | **2 000** | **1 000** | **400** | **200** |
-
-All figures are orders/sec per gateway instance. The ★ row represents the theoretical optimum for this architecture: 100 outstanding requests against a risk system with 1 ms RTT. At that operating point the Raft commit ceiling (≈ 50 000 ops/sec) becomes the binding constraint before the risk system does — see the headroom table below.
-
-The outstanding-request limit and the risk system RTT are the only two levers available to change this ceiling without modifying the rest of the pipeline. Halving the RTT doubles throughput; doubling the outstanding limit doubles throughput. Multiple independent gateway instances scale linearly, subject to the risk system's own concurrency capacity.
-
-#### Queuing: Slot Wait Time
-
-When the risk system RTT is variable, orders arriving faster than the risk system can clear them accumulate in the inbound SPSC. The time an order waits for a free slot is:
-
-```
-slot_wait ≈ (in_flight / N) × avg_RTT
-```
-
-At steady-state throughput equal to the ceiling (all N slots continuously occupied), the average slot wait approaches zero — each slot is freed just as a new order needs it. When the order arrival rate exceeds the ceiling, the SPSC fills and back-pressure propagates to the client TCP socket (§ 2.9.3).
-
-#### Other Pipeline Stages: Headroom
-
-The following figures show headroom at two reference points: the current production configuration (25 outstanding, 100 ms RTT = 250 orders/sec) and the theoretical optimum row (100 outstanding ★, 1 ms RTT = 100 000 orders/sec).
-
-| Stage | Capacity | Headroom @ 250/sec | Headroom @ 100 000/sec |
-|-------|----------:|-------------------:|-----------------------:|
-| io_uring TCP receive | > 500 000 frames/sec | > 2 000× | ~5× |
-| Aeron IPC (aeron:ipc) | > 5 000 000 msgs/sec | > 20 000× | ~50× |
-| Raft commit (3-node co-lo) | ~ 50 000 ops/sec | ~ 200× | **< 1× ⚠** |
-| simdfix SIMD decode | > 1 000 000 msgs/sec | > 4 000× | ~10× |
-| io_uring TCP send (egress) | > 500 000 frames/sec | > 2 000× | ~5× |
-
-At the optimum row the Raft commit ceiling (≈ 50 000 ops/sec) becomes the bottleneck before the risk system does. Reaching 100 000 orders/sec would require either a higher-throughput consensus layer or sharding clients across multiple independent cluster instances. At all other entries in the table Raft provides comfortable headroom.
-
-#### Summary
-
-Throughput scales linearly with both the outstanding-request limit and the inverse of the risk RTT. At the current configuration of 25 outstanding requests, the ceiling ranges from 50 orders/sec (500 ms RTT) to 500 orders/sec (50 ms RTT). The theoretical optimum of 100 outstanding requests at 1 ms RTT yields 100 000 orders/sec, at which point the Raft commit ceiling becomes the binding constraint rather than the risk system. Individual order latency is not improved by raising the concurrency limit — each order still waits one full RTT for a risk response — but the pipeline never idles: all N slots progress through the risk system in parallel at all times.
+The gateway is designed for bare-metal deployment with dedicated, isolated CPU cores, direct hardware access, and predictable memory subsystem behaviour. Running in a cloud or containerized environment degrades several of these assumptions. This section catalogs the specific issues and their impact.
 
 ---
 
-#### 2.11.3 Per-Client Throughput
+### 2.12.1 vCPU Preemption and CPU Steal
 
-Because orders from the same client are checked in sequence, each client is limited to one outstanding risk request at a time regardless of the global slot count. Per-client throughput is therefore:
+**Issue**: Cloud VMs run on vCPUs — logical threads multiplexed across physical cores by the hypervisor. The hypervisor may preempt a vCPU at any moment to service another tenant, introducing *CPU steal time*: periods during which the guest OS believes it is running but the physical core is allocated elsewhere. On commodity cloud instances, steal commonly reaches 5–20% under contention.
 
-```
-per-client throughput = 1 / RTT
-```
+**Impact on this system**:
+- Busy-spin threads (Cores 1, 7, 8, 9, 10) stall invisibly during steal, inflating every stage of the latency budget by an unpredictable amount.
+- The Risk Thread's 25-slot event loop continues spinning but makes no progress during steal. In-flight risk requests accumulate latency; the effective RTT seen by the gateway increases.
+- Aeron Cluster heartbeats may be delayed, triggering spurious Raft elections if steal exceeds the election timeout.
+- `isolcpus`, `nohz_full`, and `rcu_nocbs` kernel boot parameters, which eliminate OS scheduler interference, are ineffective on vCPUs because the hypervisor scheduler operates below the guest kernel.
 
-| RTT | Per-client throughput |
-|-----|-----------------------:|
-| 1 ms | 1 000 orders/sec |
-| 50 ms | 20 orders/sec |
-| 100 ms | 10 orders/sec |
-| 500 ms | 2 orders/sec |
+**Mitigation**: Use bare-metal cloud instances (AWS `metal`, GCP `n2-metal`, Azure `Lsv3`) or VM types with pinned, dedicated physical cores and NUMA-aware placement. Disable SMT (hyperthreading) at the hypervisor level for the cores used by busy-spin threads.
 
-#### Aggregate Throughput as a Function of Client Count
+---
 
-Let C be the number of concurrently active clients (each submitting orders at the maximum per-client rate) and N the global outstanding-slot limit. The aggregate throughput is:
+### 2.12.2 io_uring Restrictions
 
-```
-aggregate throughput = min(C, N) / RTT
-```
+**Issue**: `io_uring` with `IORING_SETUP_SQPOLL` spawns a kernel thread that busy-polls the submission queue, requiring `CAP_SYS_NICE` and kernel 5.10 or later. Several environments restrict or disable io_uring entirely:
 
-When C < N each client occupies its own slot and the global limit is not reached; the system is **client-count limited**. When C ≥ N the global limit fills and additional clients yield no further aggregate gain; the system is **slot-limited**.
+- **Docker / containerd**: default seccomp profiles block many io_uring opcodes. `IORING_OP_RECV`, `IORING_OP_SEND`, and `IORING_SETUP_SQPOLL` are restricted or absent in the default allowlist.
+- **Kubernetes**: pods run with restricted seccomp by default since Kubernetes 1.27. Privileged containers or a custom seccomp profile are required.
+- **AWS Lambda / GCP Cloud Run**: io_uring is unavailable in serverless runtimes.
+- **Managed kernel versions**: some cloud providers run kernels older than 5.10 (the minimum for stable `IORING_SETUP_SQPOLL` behaviour), particularly on long-term-support distributions.
 
-| Active clients (C) | Outstanding limit (N) | RTT = 100 ms | Limiting factor |
-|--------------------|----------------------:|-------------:|-----------------|
-| 5 | 25 | 50 orders/sec | Client count |
-| 10 | 25 | 100 orders/sec | Client count |
-| 25 | 25 | 250 orders/sec | Slot limit |
-| 100 | 25 | 250 orders/sec | Slot limit |
-| 100 | 100 ★ | 1 000 orders/sec | Slot limit |
+**Impact**: If io_uring is unavailable or restricted, the ingress and egress reactors must fall back to `epoll` + `recvmsg`/`sendmsg`, adding one syscall per receive and eliminating zero-copy registered buffers. This adds 1–3 µs per message on the TCP I/O path.
 
-The figures in the aggregate throughput table in § 2.11.2 assume C ≥ N — enough concurrently active clients to keep all slots occupied. When the client population is small (C < N), the aggregate throughput is C × (1/RTT) and the outstanding-slot limit has no effect.
+**Mitigation**: Require kernel ≥ 5.10, grant `CAP_SYS_NICE` and `CAP_NET_ADMIN`, and supply a custom seccomp profile that permits all required io_uring opcodes. Do not run this workload in a serverless or restricted container environment.
+
+**Fallback when io_uring is not available**: Two replacements are practical, in order of preference:
+
+1. **`epoll` + `SO_BUSY_POLL` / `SO_PREFER_BUSY_POLL`** — the socket busy-polls the NIC ring buffer before sleeping, recovering most of the latency benefit of SQPOLL without requiring `CAP_SYS_NICE` or a custom seccomp profile. Available on Linux ≥ 3.11; works in any standard container environment. Performance within 1–2 µs of io_uring SQPOLL for single-connection workloads.
+
+2. **`AF_XDP` (XDP sockets)** — true kernel-bypass receive on environments with an XDP-capable vNIC driver (AWS ENA ≥ 5.10, GCP gVNIC, Azure DPDK-backed NIC). Requires `CAP_BPF` and `CAP_NET_ADMIN`. Eliminates the socket stack entirely on the receive path; comparable to DPDK in latency. Higher operational complexity: BPF programs must be loaded and pinned at startup.
+
+See [virtual.md](virtual.md) for implementation details.
+
+---
+
+### 2.12.3 Shared Memory and Huge Pages
+
+**Issue**: Aeron IPC relies on large memory-mapped files under `/dev/shm`. Two constraints apply in containerized environments:
+
+- **`/dev/shm` size limit**: Docker sets `/dev/shm` to 64 MB by default. Aeron's default term buffer size is 16 MB per stream; with six IPC streams and three term buffers each, the media driver requires roughly 6 × 3 × 16 MB = 288 MB of shared memory before accounting for the log meta-data and archive regions. This exceeds the Docker default by 4×.
+- **Huge pages**: `vm.nr_hugepages` is a host-level kernel parameter. It is not namespaced; a container cannot configure huge pages independently of the host. On VMs where the host does not pre-allocate huge pages, Aeron falls back to 4 KB pages, increasing TLB pressure and adding ~5–10% latency on the Aeron IPC path.
+
+**Mitigation**: Set `--shm-size=4g` on Docker containers. Pre-allocate huge pages at VM boot time (`vm.nr_hugepages=512` for 1 GB of 2 MB pages). On Kubernetes, request `hugepages-2Mi` in the pod resource spec and use a `hugetlb` volume.
+
+---
+
+### 2.12.4 Network Latency and Overlay Networking
+
+**Issue**: Cloud networking introduces two sources of latency not present in bare-metal co-location:
+
+- **vNIC overhead**: the virtual NIC adds a software path between the guest TCP stack and the physical NIC, typically adding 20–100 µs compared to kernel-bypass on bare metal.
+- **Overlay encapsulation**: VPC networks in most cloud providers use VXLAN or Geneve encapsulation for tenant isolation, adding a per-packet encapsulation/decapsulation step in the host kernel. This adds 5–20 µs on the inter-VM path.
+
+**Impact on the Raft cluster**: each Raft log replication round-trip between cluster nodes traverses the overlay network. At 50–100 µs per round-trip (vs. 2–5 µs on bare-metal co-lo), the commit latency stage in the end-to-end budget grows from ~5 µs to ~100 µs — moving it from negligible to the second-largest contributor after the risk RPC.
+
+**Impact on the sell-side connection**: the egress TCP connection to the sell-side gateway, if it crosses a VPC boundary, also incurs this overhead. If the sell-side gateway is co-located with the gateway on bare metal or in the same physical rack, the VPC path is avoided.
+
+**Mitigation**: Place all three cluster nodes in the same cloud availability zone and, where supported, in a placement group or proximity placement group to minimise physical distance. Use SR-IOV or DPDK-backed vNICs (AWS ENA, GCP gVNIC, Azure DPDK) to reduce vNIC overhead. Consider a dedicated interconnect (AWS Direct Connect, GCP Interconnect) if the sell-side gateway is in a separate environment.
+
+---
+
+### 2.12.5 JVM Stability Under Hypervisor Scheduling
+
+**Issue**: The Java Aeron Cluster process relies on ZGC maintaining GC pause budgets under 1 ms. ZGC's concurrent marking and relocation threads compete with the guest OS for CPU time. Under vCPU steal:
+
+- ZGC's concurrent phase may be paused mid-cycle. When the vCPU resumes, the GC phase continues, but the elapsed wall-clock time counts against the pause budget — the application thread may stall longer than ZGC's own measurements report.
+- The election timeout safety margin (§ 3.9) assumes GC pauses stay under 1 ms. On a VM with frequent steal, observed GC pauses (from the application's perspective) can reach 5–20 ms, triggering spurious Raft elections.
+- `-XX:+AlwaysPreTouch` touches all heap pages at JVM startup to avoid page-fault latency at runtime. On a VM with memory overcommit, the host may page out these memory regions under pressure, reintroducing page faults.
+
+**Mitigation**: Allocate the JVM on a VM with dedicated physical cores and memory that is not overcommitted. Increase the Raft election timeout to 3–5× the observed worst-case GC pause on the target infrastructure. Disable memory overcommit at the hypervisor level for VM memory regions mapped by the JVM heap.
+
+---
+
+### 2.12.6 Clock Sources and Time Synchronisation
+
+**Issue**: Aeron Cluster requires that `cluster.timeMs()` advances monotonically and is reasonably synchronised across nodes so that timer deadlines (heartbeat, test-request) fire at predictable times. In virtualized environments, two clock problems arise:
+
+- **TSC instability**: the x86 Time Stamp Counter (`rdtsc`) is used by `clock_gettime(CLOCK_MONOTONIC)` via the VDSO. On VMs where vCPUs are migrated between physical cores, the TSC may jump or skew. Most modern hypervisors expose an invariant TSC (`constant_tsc`, `nonstop_tsc` in `/proc/cpuinfo`), but this must be verified.
+- **NTP jitter**: inter-node clock synchronisation via NTP typically achieves 1–10 ms accuracy on cloud VMs. Aeron Cluster's deterministic timer logic (`cluster.scheduleTimer`) is based on `cluster.timeMs()` which ultimately derives from the system clock. A 10 ms clock skew between nodes means heartbeat timers may fire up to 10 ms early or late relative to the leader's expectation.
+
+**Mitigation**: Use PTP (Precision Time Protocol, IEEE 1588) where the cloud provider supports hardware timestamping (AWS Time Sync Service with PTP, GCP VM clock sync). Verify `constant_tsc` and `nonstop_tsc` are set. Set Raft heartbeat intervals and timer deadlines with sufficient margin above the observed NTP accuracy.
+
+---
+
+### 2.12.7 Capability and Kernel Parameter Requirements
+
+The following table summarises the system requirements that are unavailable or restricted in standard cloud and container environments, with the consequence if each is absent.
+
+| Requirement | Bare metal | Cloud VM | Container | Consequence if absent |
+|-------------|:----------:|:--------:|:---------:|----------------------|
+| `isolcpus` / `nohz_full` | Available | Unavailable | Unavailable | OS scheduler interferes with busy-spin threads; jitter on every pipeline stage |
+| `IORING_SETUP_SQPOLL` | Available | Available (Linux ≥ 5.10) | Restricted (seccomp) | Fallback to `epoll`; +1–3 µs per TCP I/O |
+| `CAP_SYS_NICE` | Implicit | Available (privileged) | Requires explicit grant | SQPOLL thread cannot set RT priority |
+| Huge pages (2 MB) | Available | Requires host config | Requires host config + pod spec | +5–10% Aeron IPC latency |
+| `/dev/shm` ≥ 1 GB | Implicit | Available | Requires `--shm-size` | Aeron media driver fails to allocate term buffers |
+| Dedicated physical cores | Inherent | Metal instances only | Never | vCPU steal causes unpredictable latency across all stages |
+| PTP clock sync | Available | Provider-dependent | N/A | Timer skew up to 10 ms; spurious Raft elections possible |
+
+---
+
+## 2.13 Mitigating Virtual Environment Issues
+
+Step-by-step configuration instructions for satisfying the deployment requirements in § 2.1.1 on cloud VMs and containerized infrastructure are in [virtual.md](virtual.md). Mitigations are ordered from highest to lowest impact: instance selection and CPU isolation first (addressing vCPU steal), followed by io_uring capabilities, shared memory, network placement, JVM tuning, clock synchronisation, and a pre-deployment validation checklist.

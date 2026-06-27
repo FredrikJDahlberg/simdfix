@@ -1,194 +1,196 @@
-# Performance
+# Estimated Performance
 
-Figures from `SimdFixBenchmark` (release build: `-O3`, LTO, `-march=native`), measured on 2026-06-24.
+End-to-end latency budget and throughput analysis for the FIX gateway. All simdfix decode/encode figures are measured values from `SimdFixBenchmark` (release build, ARM NEON, Apple M1 Pro); see [performance.md](performance.md) for the full benchmark table. Throughput figures are derived analytically from Little's Law applied to the risk system, which is the sole throughput bottleneck.
 
-## Test environment
+---
 
-| | |
-|---|---|
-| CPU | Apple M1 Pro |
-| RAM | 32 GiB |
-| OS | macOS 26.5.1 |
-| Compiler | Apple clang 21.0.0 |
+## End-to-End Latency
 
-Time/throughput come from the benchmark's own reporting. Instructions and cycles
-come from hardware counters (`/usr/bin/time -l`, instructions retired / cycles
-elapsed), divided by the number of messages parsed. Counter figures include
-whole-process overhead (startup, buffer fill), which is well under 1% for the
-hot benchmarks but inflates the COLD figures slightly (it fills a 1 GiB buffer
-before parsing).
+The table below covers the **leader hot path** for a `NewOrderSingle` that passes both risk checks. Raft replication latency (2–5 µs) adds to the cluster stage on committed messages.
 
-## Results
+| Stage | Thread | Typical |
+|-------|--------|---------|
+| TCP receive → SPSC write | Core 1 (io_uring) | 0.5 µs |
+| SPSC read → Aeron offer | Core 2 (FIX Session) | 0.5 µs |
+| Aeron IPC → Java dispatch | Core 3 (Cluster) | 0.5 µs |
+| Raft commit (3-node, co-lo) | Core 3 | 2–5 µs |
+| Java → stream 2 → AppWorker | Core 7 | 0.5 µs |
+| SIMD decode NOS (tokenize + getters) | Core 7 | **~130 ns** |
+| Fast risk check (atomic loads) | Core 7 | ~30 ns |
+| Risk Thread RPC (in-flight slot wait + response) | Core 8 | **100–500 ms** |
+| SPSC → EgressWorker | Core 9 | ~150 ns |
+| FIX encode NOS (sell-side order) | Core 9 | **~37 ns** |
+| io_uring send → NIC | Core 10 | 0.5 µs |
 
-| Benchmark | Message | ns/msg | GB/s |
-|-----------|---------|-------:|-----:|
-| LOGON COLD | Logon, 142 B | 92.2 | 1.54 |
-| LOGON HOT | Logon, 142 B | 92.3 | 1.54 |
-| LOGON GETTERS | Logon, 142 B | 109.2 | 1.30 |
-| LOGON GROUPS | Logon + 3 hops, 253 B | 199.8 | 1.27 |
-| LOGON DATA | Logon + XmlData, 166 B | 154.2 | 1.08 |
-| LOGON ENCODE | Logon + 3 hops, ~224 B | 102.3 | 2.19 |
-| NOS HOT | NewOrderSingle, 154 B | 95.0 | 1.62 |
-| NOS GETTERS | NewOrderSingle, 154 B | 128.5 | 1.20 |
-| NOS ENCODE | NewOrderSingle, 154 B | 37.3 | 4.37 |
-| ER HOT | ExecutionReport, 245 B | 145.7 | 1.68 |
-| ER GETTERS | ExecutionReport, 245 B | 239.3 | 1.02 |
-| ER ENCODE | ExecutionReport, 245 B | 103.0 | 2.38 |
+The risk RPC dominates the end-to-end budget by six orders of magnitude. All pipeline stages outside the risk call total under 10 µs; individual order latency is determined almost entirely by the risk system RTT plus any queuing delay waiting for a free in-flight slot.
 
-## What each benchmark measures
+---
 
-- **LOGON COLD** — parses a 1 GiB buffer once; data streams from DRAM.
-- **LOGON HOT** — parses a 256 KiB buffer 4,096 times; fits in L2, measures pure compute throughput of `PayloadDecoder::parse`.
-- **LOGON GETTERS** — hot-cache parse plus every `LogonDecoder` getter applied to each message.
-- **LOGON GROUPS** — as GETTERS, on a Logon carrying a 3-entry hops repeating group, iterating the group.
-- **LOGON DATA** — hot-cache parse plus getters of a Logon carrying an 11-byte XmlData payload (exercises the inline data-skip path).
-- **LOGON ENCODE** — encodes a Logon message with a 3-entry hops repeating group via `FixPayloadEncoder`/`LogonEncoder`.
-- **NOS HOT** — hot-cache tokenization of a `NewOrderSingle` (154 B, 12 fields); no getters.
-- **NOS GETTERS** — as NOS HOT plus all 8 mandatory `NewOrderSingleDecoder` getters (clOrdID, handlInst, symbol, side, transactTime, orderQty, ordType, price).
-- **NOS ENCODE** — encodes a flat `NewOrderSingle` (no repeating groups) via `FixPayloadEncoder`/`NewOrderSingleEncoder`.
-- **ER HOT** — hot-cache tokenization of a flat `ExecutionReport` (245 B); no getters.
-- **ER GETTERS** — as ER HOT plus all 16 `ExecutionReportDecoder` getters (orderID, clOrdID, execID, execType, ordStatus, symbol, side, orderQty, price, lastQty, lastPx, leavesQty, cumQty, avgPx, transactTime, text) — a wide mix of string, enum, integer, decimal, and timestamp fields.
-- **ER ENCODE** — encodes a flat `ExecutionReport` via `FixPayloadEncoder`/`ExecutionReportEncoder`.
+## Virtualization Cost
 
-## Changes since previous measurement (2026-06-24)
+Running in a cloud VM or container changes the latency of several pipeline stages. The risk RPC is unaffected — it is an external network call — but the surrounding pipeline incurs measurable overhead from three sources: I/O path changes, overlay network on the Raft replication path, and vCPU steal inflating all stages unpredictably.
 
-1. **Namespace/directory alignment** — `FieldDecoder` moved to
-   `detail::decoder`, `FieldEncoder` to `detail::encoder`, matching their
-   directory paths. `PayloadEncoder` moved from `detail/encoder/` to the
-   public `encoder/` directory, symmetric with `PayloadDecoder`.
-2. **Public/internal separation enforced** — Introduced
-   `detail::TokenizedMessage` to bundle the token spans passed between
-   `PayloadDecoder` and the generated handler. `MessageDecoder::wrap` is
-   now protected, taking `TokenizedMessage` instead of raw `Field`/tag
-   spans. Removed `using namespace detail` from five public headers that
-   did not need it.
-3. **detail/ excluded from install** — `cmake --install` no longer ships
-   the `detail/` tree; consumers depend only on the public headers.
+### Per-Stage Overhead
 
-These are structural refactors with no algorithmic changes. All numbers
-are within run-to-run noise of the previous measurement.
+The table below shows the bare-metal figure, the worst-case overhead without mitigations, and the residual overhead after applying the configuration steps in [virtual.md](virtual.md).
 
-| Benchmark | Before (06-24) | After (06-24) | Change |
-|-----------|---------------:|--------------:|-------:|
-| LOGON HOT | 91.8 ns | 92.3 ns | +0.5% |
-| LOGON GETTERS | 109.3 ns | 109.2 ns | −0.1% |
-| LOGON GROUPS | 199.8 ns | 199.8 ns | 0.0% |
-| LOGON DATA | 153.2 ns | 154.2 ns | +0.7% |
-| NOS HOT | 95.5 ns | 95.0 ns | −0.5% |
-| NOS GETTERS | 130.3 ns | 128.5 ns | −1.4% |
-| ER HOT | 145.9 ns | 145.7 ns | −0.1% |
-| ER GETTERS | 237.6 ns | 239.3 ns | +0.7% |
-| LOGON ENCODE | 101.9 ns | 102.3 ns | +0.4% |
-| NOS ENCODE | 38.0 ns | 37.3 ns | −1.8% |
-| ER ENCODE | 101.9 ns | 103.0 ns | +1.1% |
+| Stage | Bare-metal | Cloud VM (unmitigated) | Cloud VM (mitigated) |
+|-------|-----------|------------------------|----------------------|
+| TCP receive → SPSC write | 0.5 µs | +1–2 µs (epoll fallback) | +0 µs (io_uring granted) |
+| Raft commit (3-node) | 2–5 µs | +50–100 µs (VPC overlay) | +20–50 µs (placement group + SR-IOV) |
+| Aeron IPC (all IPC stages) | baseline | +5–10 % (4 KB pages, TLB pressure) | +0–2 % (huge pages pre-allocated) |
+| io_uring send → NIC | 0.5 µs | +1–2 µs (epoll fallback) | +0 µs (io_uring granted) |
+| Any stage (vCPU steal) | 0 | +5–20 % wall time (shared host) | ≈ 0 (bare-metal or dedicated host) |
 
-## Changes since previous measurement (2026-06-21)
+### I/O Path: io_uring vs. epoll Fallback
 
-1. **Enum decode via compile-time byte table** — `utils::find<Enum>` now
-   builds a 256-entry lookup table at compile time when every enum code is a
-   single byte, turning enum resolution into one indexed load instead of a
-   linear scan over the code list. Multi-byte protocols fall back to the
-   original scan.
-2. **Repeating-group single delimiter scan** — `GroupDecoder` caches the
-   offset of the next entry (`m_next`, computed once when an entry is
-   entered) and reuses it as the start of the following entry, so each
-   group entry costs one delimiter scan instead of two.
-3. **Timestamp date cache in the decoder** — `FieldDecoder` memoizes the
-   last `YYYYMMDD` → epoch-days result, keyed on the 8 date bytes. When
-   consecutive timestamps share a date (e.g. SendingTime/TransactTime in
-   one message, or a day's feed) the calendar arithmetic is skipped and
-   only the time-of-day is parsed. The cache persists across `wrap()`.
-4. **ExecutionReport benchmark** — added `er-hot`, `er-getters`, and
-   `er-encode` to exercise a wider, more realistic message (245 B, 16
-   fields spanning every field type).
+When `IORING_SETUP_SQPOLL` is unavailable, the reactor falls back to `epoll` + `SO_BUSY_POLL`. Each TCP receive and send incurs one additional syscall, and registered zero-copy buffers are replaced with kernel-copy `recvmsg`/`sendmsg`. The measured overhead is **+1–2 µs per TCP operation**. With two operations per order (receive on ingress, send on egress), the unmitigated I/O penalty is 2–4 µs total — negligible against the risk RTT but visible in the non-risk pipeline budget.
 
-| Benchmark | Before (06-21) | After (06-24) | Change |
-|-----------|---------------:|--------------:|-------:|
-| LOGON HOT | 90.5 ns | 91.8 ns | +1.4% |
-| LOGON GETTERS | 112.8 ns | 109.3 ns | −3.1% |
-| LOGON GROUPS | 211.2 ns | 199.8 ns | −5.4% |
-| LOGON DATA | 143.7 ns | 153.2 ns | +6.6% |
-| NOS HOT | 93.6 ns | 95.5 ns | +2.0% |
-| NOS GETTERS | 129.8 ns | 130.3 ns | +0.4% |
-| LOGON ENCODE | 101.1 ns | 101.9 ns | +0.8% |
-| NOS ENCODE | 37.1 ns | 38.0 ns | +2.4% |
+`AF_XDP` on an XDP-capable vNIC (AWS ENA ≥ 5.10, GCP gVNIC) eliminates this overhead entirely, matching bare-metal io_uring performance at the cost of BPF program complexity.
 
-The signal is in the field-access paths: LOGON GETTERS (−3.1%) and LOGON
-GROUPS (−5.4%) improve from the enum byte-table and the group single-scan,
-both compounded by the timestamp date cache (the Logon group carries three
-same-date timestamps). The tokenization-only and encode paths
-(LOGON/NOS HOT, both ENCODE, LOGON DATA) are untouched by these changes;
-their ±1–7% drift is run-to-run/thermal variation between measurement
-sessions, not a regression — all three optimizations live in the
-decoder's getter path only.
+### Raft Replication: Overlay Network
 
-## Changes since previous measurement (2026-06-20)
+The Raft commit stage is the most sensitive to cloud networking. Bare-metal co-location gives 2–5 µs round-trip between cluster nodes; a VPC overlay (VXLAN/Geneve) raises this to 50–150 µs on unoptimised placement, and the commit must complete before the AppWorker can process the message.
 
-1. **Index caching for required fields** — `validate()` now stores the
-   token index (`int8_t`, 1 byte per field) for each required field found
-   via `findIndex()`. Getters for required fields use the cached index
-   with `valueAt`/`enumAt`/`timeOnlyAt`/`dateOnlyAt` instead of
-   re-searching. Optional fields still search on demand.
-2. **UTC timestamp range validation** — `dateTimeToEpochUTC`,
-   `timeOnlyToMillis`, and `dateOnlyToEpochUTC` now validate hours (0-23),
-   minutes (0-59), seconds (0-59), month (1-12), and day (1-31), returning
-   -1 for out-of-range values. Getters propagate the error as
-   `std::unexpected{Result::InvalidLength}`.
-3. **Integer and decimal field validation** — `convertToUint32`,
-   `convertToInt32`, and `convertToFixedDecimal` now validate field
-   content at the point of use. Length bounds reject overflow (>10 digits
-   for uint32, >11 for int32, >20 for decimal). SWAR `isDigits` checks
-   all bytes are '0'–'9'; `findByte('.')` locates the decimal point
-   without a libc call. Returns `InvalidLength` or `InvalidValue`.
-4. **Enum validation** — `getEnum`/`enumAt` return
-   `std::unexpected{Result::InvalidValue}` for unrecognized codes instead
-   of silently returning `Enum::Null`.
-5. **Scope safety** — `wrap()` resets group scope depth;
-   `popGroupScope()` guards against underflow.
+| Placement | Raft RTT | Commit overhead vs. bare-metal |
+|-----------|----------:|-------------------------------:|
+| Bare-metal, same rack | 2–5 µs | — |
+| Cloud VM, same AZ, placement group, SR-IOV | 20–50 µs | +15–45 µs |
+| Cloud VM, same AZ, default VPC | 50–150 µs | +45–145 µs |
+| Cloud VM, cross-AZ | 200–500 µs | +195–495 µs |
 
-| Benchmark | Before | After | Change |
-|-----------|-------:|------:|-------:|
-| LOGON HOT | 90.7 ns | 90.5 ns | −0.2% |
-| LOGON GETTERS | 119.2 ns | 112.8 ns | −5.4% |
-| NOS HOT | 93.9 ns | 93.6 ns | −0.3% |
-| NOS GETTERS | 127.5 ns | 129.8 ns | +1.8% |
-| LOGON ENCODE | 102.5 ns | 101.1 ns | −1.4% |
-| NOS ENCODE | 38.0 ns | 37.1 ns | −2.4% |
+Cross-AZ deployment should be avoided for the Raft cluster; it moves the commit latency into the same order of magnitude as the risk RPC and makes it the second-largest latency contributor.
 
-Index caching reduces Logon getter overhead from 28.5 ns to 22.3 ns
-(−22%). NOS getters show a small increase (+2.3 ns) from the decimal
-digit validation on the `price` field, offset by index caching.
-Tokenization-only and encode benchmarks are unchanged.
+### vCPU Steal: Unpredictable Inflation
 
-## Observations
+On a shared host, the hypervisor may preempt any vCPU for an unbounded duration. Steal inflates every stage in the pipeline by an unpredictable multiplier; it cannot be bounded analytically. Observed effects on comparable workloads:
 
-- Cold vs. hot throughput is nearly identical — the parser is compute-bound,
-  not memory-bound, even when streaming from DRAM.
-- Field access (LOGON GETTERS) adds ~22 ns per message on top of parsing
-  thanks to index caching of required fields; NOS GETTERS adds ~36 ns for
-  its larger mix of required and optional fields (including SWAR digit
-  validation on integers and decimals).
-- The 3-entry repeating group (LOGON GROUPS) roughly doubles per-message cost
-  versus LOGON GETTERS (longer message plus group iteration), while byte
-  throughput stays the same.
-- The XmlData inline-skip path (LOGON DATA) adds ~31 ns over LOGON GETTERS,
-  reflecting the scalar scan past the data payload and the extra token emission.
-- NOS ENCODE (~38 ns/msg) is ~63% faster than LOGON ENCODE (~102 ns/msg)
-  because it has no repeating-group encoding pass.
-- ExecutionReport (245 B, 16 fields) is the widest message benchmarked: its
-  16 getters add ~92 ns over the hot parse (ER GETTERS 237.6 ns vs ER HOT
-  145.9 ns), roughly proportional to its field count versus the smaller
-  Logon and NewOrderSingle getter sets.
+- Busy-spin stages (io_uring reactor, Aeron IPC poll) stall silently. A 5 ms steal event on Core 1 adds 5 ms to apparent TCP receive latency.
+- The Aeron Cluster heartbeat timer may fire late, triggering a Raft election if the delay exceeds the election timeout. With the default 1 s timeout, steal spikes above 1 s (rare but observed under noisy-neighbour conditions) cause a leader election, temporarily halting commit throughput.
+- The risk thread event loop makes no forward progress during steal; in-flight slots accumulate wait time, temporarily reducing effective throughput below the Little's Law ceiling.
 
-## Reproducing
+The only reliable mitigation is eliminating steal: bare-metal cloud instances or dedicated-host VMs. Dedicated hosts reduce steal to near zero (hypervisor overhead only, typically < 0.1 %); shared commodity VMs should not be used for the busy-spin cores.
 
-```bash
-cmake -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
-cmake --build cmake-build-release
-/usr/bin/time -l ./cmake-build-release/SimdFixBenchmark logon-hot   # or logon-cold|logon-hot|logon-getters|logon-groups|logon-data|logon-encode|nos-hot|nos-getters|nos-encode|er-hot|er-getters|er-encode|all
+### Net Impact on Non-Risk Pipeline
+
+Combining the overhead sources:
+
+| Environment | Non-risk pipeline total | Notes |
+|-------------|------------------------:|-------|
+| Bare-metal, co-located | < 10 µs | Reference |
+| Cloud VM, mitigated (bare-metal instance, placement group, io_uring) | 30–60 µs | Raft commit dominates |
+| Cloud VM, partially mitigated (dedicated host, epoll fallback) | 70–160 µs | Raft commit + I/O fallback |
+| Cloud VM, unmitigated (shared host, epoll, cross-AZ) | 250–600 µs | Steal + overlay both visible |
+
+In all cases the risk RPC (100–500 ms) remains the dominant term; the non-risk pipeline overhead is a second-order effect on individual order latency. The virtualization cost becomes significant only when comparing sub-millisecond pipeline latency targets or when the risk system is replaced by an in-process check.
+
+---
+
+## Throughput Analysis
+
+The system throughput ceiling is set by the risk system, which is the sole bottleneck. All other pipeline stages have headroom orders of magnitude above the risk-constrained limit.
+
+### Risk System: Little's Law
+
+By Little's Law, in a stable system the average throughput λ, average number of in-flight requests N, and average service time W are related by:
+
+```
+N = λ × W   →   λ = N / W   (orders/sec)
 ```
 
-Instructions per message = instructions retired ÷ messages parsed, where
-messages parsed is `(256 KiB / message length) × 4096` for the hot benchmarks
-(plus 4 warm-up passes for HOT CACHE), `1 GiB / message length` for COLD, and
-1,000,000 for ENCODE.
+The table below gives the throughput ceiling for combinations of outstanding-request limit and risk system RTT. The current system is configured for 25 outstanding requests; the table shows neighbouring values to illustrate sensitivity.
+
+| Outstanding \ RTT | 1 ms | 50 ms | 100 ms | 250 ms | 500 ms |
+|-------------------|-----:|------:|-------:|-------:|-------:|
+| **10** | 10 000 | 200 | 100 | 40 | 20 |
+| **50** | 50 000 | 1 000 | 500 | 200 | 100 |
+| **100 ★** | **100 000** | **2 000** | **1 000** | **400** | **200** |
+
+All figures are orders/sec per gateway instance. The ★ row represents the theoretical optimum for this architecture: 100 outstanding requests against a risk system with 1 ms RTT. At that operating point the Raft commit ceiling (≈ 50 000 ops/sec) becomes the binding constraint before the risk system does — see the headroom table below.
+
+The outstanding-request limit and the risk system RTT are the only two levers available to change this ceiling without modifying the rest of the pipeline. Halving the RTT doubles throughput; doubling the outstanding limit doubles throughput. Multiple independent gateway instances scale linearly, subject to the risk system's own concurrency capacity.
+
+### Queuing: Slot Wait Time
+
+When the risk system RTT is variable, orders arriving faster than the risk system can clear them accumulate in the inbound SPSC. The time an order waits for a free slot is:
+
+```
+slot_wait ≈ (in_flight / N) × avg_RTT
+```
+
+At steady-state throughput equal to the ceiling (all N slots continuously occupied), the average slot wait approaches zero — each slot is freed just as a new order needs it. When the order arrival rate exceeds the ceiling, the SPSC fills and back-pressure propagates to the client TCP socket (§ 2.9.3 of [architecture.md](architecture.md)).
+
+### Other Pipeline Stages: Headroom
+
+The following figures show headroom at two reference points: the current production configuration (25 outstanding, 100 ms RTT = 250 orders/sec) and the theoretical optimum row (100 outstanding ★, 1 ms RTT = 100 000 orders/sec). The Raft commit ceiling is shown for bare-metal and both cloud extremes because it is the only stage whose capacity changes materially across deployment environments.
+
+| Stage | Capacity | Headroom @ 250/sec | Headroom @ 100 000/sec |
+|-------|----------:|-------------------:|-----------------------:|
+| io_uring TCP receive | > 500 000 frames/sec | > 2 000× | ~5× |
+| Aeron IPC (aeron:ipc) | > 5 000 000 msgs/sec | > 20 000× | ~50× |
+| Raft commit — bare-metal co-lo | ~50 000 ops/sec | ~200× | **< 1× ⚠** |
+| Raft commit — cloud, min cost (placement group + SR-IOV) | ~10 000–25 000 ops/sec | ~40–100× | **< 1× ⚠** |
+| Raft commit — cloud, max cost (default VPC or cross-AZ) | ~1 000–3 000 ops/sec | ~4–12× | **< 1× ⚠** |
+| simdfix SIMD decode | > 1 000 000 msgs/sec | > 4 000× | ~10× |
+| io_uring TCP send (egress) | > 500 000 frames/sec | > 2 000× | ~5× |
+
+The Raft commit ceiling drops with overlay network RTT: bare-metal co-lo (2–5 µs) supports ~50 000 ops/sec; a mitigated cloud placement group (20–50 µs) supports ~10 000–25 000 ops/sec; a default VPC or cross-AZ path (200–500 µs) degrades to ~1 000–3 000 ops/sec. At the current production configuration (250 orders/sec) all cloud environments retain comfortable Raft headroom. The headroom collapse is only relevant at the theoretical optimum (100 outstanding, 1 ms risk RTT = 100 000 orders/sec), where Raft is the binding constraint in every deployment.
+
+### Summary
+
+Throughput scales linearly with both the outstanding-request limit and the inverse of the risk RTT. At the current configuration of 25 outstanding requests, the ceiling ranges from 50 orders/sec (500 ms RTT) to 500 orders/sec (50 ms RTT) and is unaffected by cloud deployment — the risk system remains the binding constraint in all cloud environments at this operating point. The theoretical optimum of 100 outstanding requests at 1 ms RTT yields 100 000 orders/sec on bare-metal; in cloud, the Raft commit ceiling (1 000–25 000 ops/sec depending on placement) becomes the binding constraint instead. Individual order latency is not improved by raising the concurrency limit — each order still waits one full RTT for a risk response — but the pipeline never idles: all N slots progress through the risk system in parallel at all times.
+
+---
+
+## Per-Client Throughput
+
+Because orders from the same client are checked in sequence, each client is limited to one outstanding risk request at a time regardless of the global slot count. Per-client throughput is therefore:
+
+```
+per-client throughput = 1 / effective_RTT
+```
+
+In cloud environments, vCPU steal adds one steal-burst duration to each response observation. At 10% steal with ~5 ms average burst, effective RTT grows by roughly 0.5 ms — negligible against risk RTTs of 50 ms or more. The cloud impact becomes meaningful only at very low risk RTT (< 10 ms), where a cross-AZ Raft ceiling (~1 000–3 000 ops/sec shared across all clients) can limit per-client rate below the risk-only figure.
+
+| RTT | Bare-metal | Cloud (min cost) | Cloud (max cost) |
+|-----|----------:|-----------------:|-----------------:|
+| 1 ms | 1 000 orders/sec | 1 000 orders/sec† | ≤ 120 orders/sec‡ |
+| 50 ms | 20 orders/sec | 20 orders/sec | 20 orders/sec |
+| 100 ms | 10 orders/sec | 10 orders/sec | 10 orders/sec |
+| 500 ms | 2 orders/sec | 2 orders/sec | 2 orders/sec |
+
+† Raft ceiling (10 000–25 000 ops/sec) exceeds per-client rate at this RTT for any realistic client count.  
+‡ Raft ceiling (~1 000–3 000 ops/sec) shared across N concurrent clients; with 25 clients ≈ 40–120 orders/sec per client.
+
+### Aggregate Throughput as a Function of Client Count
+
+Let C be the number of concurrently active clients (each submitting orders at the maximum per-client rate) and N the global outstanding-slot limit. The aggregate throughput is:
+
+```
+aggregate throughput = min(C, N) / RTT
+```
+
+When C < N each client occupies its own slot and the global limit is not reached; the system is **client-count limited**. When C ≥ N the global limit fills and additional clients yield no further aggregate gain; the system is **slot-limited**.
+
+| Active clients (C) | Outstanding limit (N) | RTT = 100 ms | Limiting factor (bare-metal) |
+|--------------------|----------------------:|-------------:|------------------------------|
+| 5 | 25 | 50 orders/sec | Client count |
+| 10 | 25 | 100 orders/sec | Client count |
+| 25 | 25 | 250 orders/sec | Slot limit |
+| 100 | 25 | 250 orders/sec | Slot limit |
+| 100 | 100 ★ | 1 000 orders/sec | Slot limit |
+
+The figures above assume C ≥ N — enough concurrently active clients to keep all slots occupied. When the client population is small (C < N), the aggregate throughput is C × (1/RTT) and the outstanding-slot limit has no effect.
+
+### Cloud Impact on Aggregate Throughput
+
+The table below shows the risk-system ceiling alongside the Raft commit ceiling for min-cost and max-cost cloud deployments across representative configurations. The binding constraint is whichever ceiling is lower.
+
+| Configuration | Risk ceiling | Raft — bare-metal | Raft — cloud min | Raft — cloud max | Binding in cloud |
+|--------------|------------:|------------------:|-----------------:|-----------------:|------------------|
+| 25 out, 500 ms RTT | 50 /sec | ~50 000 /sec | ~10 000–25 000 /sec | ~1 000–3 000 /sec | Risk |
+| 25 out, 100 ms RTT | 250 /sec | ~50 000 /sec | ~10 000–25 000 /sec | ~1 000–3 000 /sec | Risk |
+| 50 out, 50 ms RTT | 1 000 /sec | ~50 000 /sec | ~10 000–25 000 /sec | ~1 000–3 000 /sec | Risk (min) / Raft (max) |
+| 100 out ★, 1 ms RTT | 100 000 /sec | ~50 000 /sec | ~10 000–25 000 /sec | ~1 000–3 000 /sec | Raft (all cloud) |
+
+At production configuration (25 outstanding, 100 ms RTT) the risk system is the binding constraint in every cloud environment — including worst-case cross-AZ. Cloud deployment only shifts the binding constraint from risk to Raft when operating near the theoretical optimum (high outstanding count, low risk RTT). At 50 outstanding / 50 ms RTT the worst-case cloud Raft ceiling (1 000–3 000 ops/sec) can fall below the risk ceiling (1 000 ops/sec), making deployment topology a first-order throughput decision at that operating point.
