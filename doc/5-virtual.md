@@ -1,28 +1,28 @@
-# Virtual and Cloud Environments
+# Chapter 5: Virtual and Cloud Environments
 
-## Overview
+## 5.1 Overview
 
 The gateway is designed for bare-metal Linux with dedicated, isolated CPU cores, hardware-direct I/O, and a kernel that the operator controls entirely. Cloud VMs and containerised deployments relax or remove all three of those assumptions. This document describes the resulting constraints and provides step-by-step configuration to recover as much of the bare-metal operating envelope as the environment permits.
 
-### Compute: vCPU Preemption and CPU Steal
+### 5.1.1 Compute: vCPU Preemption and CPU Steal
 
 Cloud VMs run on vCPUs — logical threads multiplexed across physical cores by the hypervisor. The hypervisor may preempt a vCPU at any moment to service another tenant, introducing *CPU steal time*. On commodity instances, steal commonly reaches 5–20 % under contention.
 
 Impact on this system: busy-spin threads stall invisibly, inflating every stage of the latency budget by an unpredictable amount; the risk thread's event loop makes no progress during steal, so in-flight risk RTT grows; Aeron Cluster heartbeats may be delayed, triggering spurious Raft elections. Kernel boot parameters (`isolcpus`, `nohz_full`, `rcu_nocbs`) that eliminate OS scheduler interference are ineffective on vCPUs because the hypervisor scheduler operates below the guest kernel.
 
-### I/O: io_uring Restrictions
+### 5.1.2 I/O: io_uring Restrictions
 
 `io_uring` with `IORING_SETUP_SQPOLL` requires `CAP_SYS_NICE` and kernel ≥ 5.10. Default seccomp profiles in Docker and Kubernetes block several required opcodes. Serverless runtimes disable io_uring entirely. When io_uring is unavailable, `epoll` + `SO_BUSY_POLL` is the primary fallback; `AF_XDP` is the secondary fallback on XDP-capable vNICs. See the [io_uring section](#io_uring-capabilities-and-seccomp) for details and fallback implementations.
 
-### Memory: Shared Memory and Huge Pages
+### 5.1.3 Memory: Shared Memory and Huge Pages
 
 Aeron IPC requires large memory-mapped regions under `/dev/shm`. Docker defaults this to 64 MB; the media driver needs at minimum 288 MB (six streams × three 16 MB term buffers) plus archive headroom — provision at least 1 GB. Huge pages (`vm.nr_hugepages`) are a host-level kernel parameter that cannot be set from inside a container; the host must pre-allocate them before the gateway starts.
 
-### Network: Overlay Latency
+### 5.1.4 Network: Overlay Latency
 
 VPC networks in most cloud providers use VXLAN or Geneve encapsulation for tenant isolation, adding 5–20 µs per inter-VM packet. This is negligible for client TCP traffic but becomes the second-largest contributor to end-to-end latency on the Raft replication path between cluster nodes (100 µs vs. 2–5 µs on bare-metal co-lo). Place all cluster nodes in the same availability zone within a placement group and use SR-IOV or accelerated vNIC drivers to minimise this.
 
-### Summary
+### 5.1.5 Summary
 
 | Challenge | Primary mitigation | Bare-metal equivalent |
 |-----------|-------------------|-----------------------|
@@ -37,7 +37,7 @@ The configuration steps below address each row in impact order. All shell comman
 
 ---
 
-## Instance and Host Selection
+## 5.2 Instance and Host Selection
 
 The most effective mitigation is eliminating the hypervisor from the critical path entirely.
 
@@ -55,7 +55,7 @@ Disable SMT (hyperthreading) at the hypervisor or BIOS level for physical cores 
 
 ---
 
-## CPU Isolation Without `isolcpus`
+## 5.3 CPU Isolation Without `isolcpus`
 
 On cloud VMs where kernel boot parameters cannot be changed, CPU isolation must be approximated through OS-level mechanisms.
 
@@ -85,7 +85,7 @@ Requires `CAP_SYS_NICE` or `RLIMIT_RTPRIO` set to a non-zero value. On Kubernete
 
 ---
 
-## io_uring: Capabilities and Seccomp
+## 5.4 io_uring: Capabilities and Seccomp
 
 Grant the required Linux capabilities and supply a permissive seccomp profile. The minimum capability set for full io_uring operation is:
 
@@ -130,7 +130,7 @@ if (fd < 0)
                              + " — run with CAP_SYS_NICE or disable SQPOLL");
 ```
 
-### Fallback: `epoll` + `SO_BUSY_POLL`
+### 5.4.1 Fallback: `epoll` + `SO_BUSY_POLL`
 
 Use this when io_uring SQPOLL cannot be enabled (seccomp restriction, missing capability, kernel < 5.10, or serverless runtime).
 
@@ -151,7 +151,7 @@ ioctl(epfd, EPIOCSPARAMS, &budget);   // EPIOCGPARAMS / EPIOCSPARAMS
 
 No additional Linux capabilities are required. The reactor loop is otherwise identical to the io_uring path: edge-triggered `EPOLLIN`/`EPOLLOUT`, non-blocking `recvmsg`/`sendmsg`, read/write until `EAGAIN`. Zero-copy registered buffers are not available; the kernel copies each message through a kernel buffer (typically one extra copy per syscall). Expected overhead vs. io_uring SQPOLL: **+1–2 µs per message** on a local socket path.
 
-### Fallback: `AF_XDP`
+### 5.4.2 Fallback: `AF_XDP`
 
 Use this on GCP VMs with a gVNIC driver (kernel ≥ 5.10) when both io_uring SQPOLL and `SO_BUSY_POLL` are insufficient. `AF_XDP` bypasses the kernel socket stack entirely on the receive path, delivering packets directly to a user-space ring buffer.
 
@@ -183,7 +183,7 @@ At runtime, replace the io_uring reactor with a single thread that polls the `AF
 
 ---
 
-## Shared Memory and Huge Pages
+## 5.5 Shared Memory and Huge Pages
 
 **Sizing `/dev/shm`**: compute the required size as `streams × term_buffers × term_size + archive`. With default Aeron settings (16 MB term buffers, 3 terms per stream, 6 streams) plus the Raft log archive:
 
@@ -242,7 +242,7 @@ This is a best-effort fallback; the kernel may not honour it under memory pressu
 
 ---
 
-## Network Configuration
+## 5.6 Network Configuration
 
 **Placement**: co-locate all three cluster nodes in the same availability zone and, where supported, within a placement group or proximity placement group. This minimises physical distance and reduces VPC round-trip latency for Raft replication.
 
@@ -275,7 +275,7 @@ Use pod anti-affinity to guarantee that each cluster node pod lands on a differe
 
 ---
 
-## Aeron and JVM Tuning for Cloud
+## 5.7 Aeron and JVM Tuning for Cloud
 
 **Raft election timeout**: increase to account for vCPU steal and GC pause variability. Measure the worst-case observed GC pause on the target instance type under load and set the timeout to at least 5×:
 
@@ -315,7 +315,7 @@ Use pod anti-affinity to guarantee that each cluster node pod lands on a differe
 
 ---
 
-## Clock Synchronisation
+## 5.8 Clock Synchronisation
 
 Verify the clock source is the invariant TSC and that PTP is active before starting the cluster:
 
@@ -353,7 +353,7 @@ For 5 ms NTP accuracy: heartbeat interval ≥ 15 ms, election timeout ≥ 5 s.
 
 ---
 
-## Validation Checklist
+## 5.9 Validation Checklist
 
 Run the following checks on the target environment before deploying to production.
 

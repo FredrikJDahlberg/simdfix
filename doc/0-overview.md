@@ -1,0 +1,15 @@
+# Overview
+
+**simdfix** is a SIMD-accelerated FIX protocol gateway built in C++23 and Java 21. It accepts buy-side client connections over FIX, sequences all inbound messages through an Aeron Raft cluster for durability and consistency, performs pre-trade risk validation against an external risk system, and routes approved orders to a sell-side gateway over a bi-directional FIX session.
+
+At startup a **DB Server** connects to a relational database via ODBC and loads the reference data — instruments, clients, risk parameters, and session configuration — into the gateway processes before any external connection is opened. No real-time traffic is accepted until this population step completes.
+
+This document is divided into the following chapters:
+
+- **Chapter 1: Background** — the FIX protocol wire format, session layer, and sequence number model; Aeron IPC, SBE, and Aeron Cluster; distributed systems fundamentals including the replicated state machine model, snapshots, and determinism constraints.
+- **Chapter 2: Architecture** — system overview, thread topology, process and core assignment, and the complete data flow from buy-side TCP through the cluster to the sell-side gateway. Covers each subsystem in turn: Ingress FIX Session, Aeron Cluster sequencer, Application Engine, Risk Thread, Egress FIX Session, and DB Server. Includes the Aeron IPC stream map, language boundary encoding, latency budget, and cloud deployment constraints.
+- **Chapter 3: Estimated Performance** — end-to-end latency budget for the leader hot path; virtualisation overhead per stage; throughput analysis using Little's Law applied to the risk system; per-client and aggregate throughput as a function of client count and cloud deployment topology.
+- **Chapter 4: Failover** — fresh-start sequence including DB population and external connection order; what survives and what is lost across a crash boundary; Raft failure detection and election; FIX session resumption including sequence number continuity and gap handling; C++ process restart behaviour; in-flight order fate table; failover timing budget.
+- **Chapter 5: Virtual and Cloud Environments** — impact of vCPU steal, io_uring restrictions, shared memory limits, overlay network latency, and clock drift on gateway operation; step-by-step configuration for instance selection, CPU isolation, io_uring capabilities, shared memory, network placement, JVM tuning, clock synchronisation, and a pre-deployment validation checklist.
+- **Chapter 6: Detailed Component Architecture** — implementation-level detail for each major component. §6.1 covers the Clustered Service Sequencer: Raft log mechanics, global sequence number and timestamp assignment, the `FixClusteredService` session state machine, `MemoryStorage` and ResendRequest servicing, multi-session sequencing, stream 2 command generation, snapshot and log replay, and determinism constraints. §6.2 covers the C++ FIX Session Handler: its design as a cluster-driven proxy with no local state machine, the structural admission filter, shadow state, the SBE-to-FIX-frame encoding sequence, and failover behaviour.
+

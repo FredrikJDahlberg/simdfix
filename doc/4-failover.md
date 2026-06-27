@@ -1,6 +1,67 @@
-# Chapter 3: Failover
+# Chapter 4: Failover
 
-## 3.1 Overview
+## 4.0 Fresh Start
+
+A fresh start is a first-time boot with no prior Raft log, no cluster snapshot, and no replicated FIX session state. All sequence counters begin at zero and no `MemoryStorage` entries exist. This section describes the startup sequence. For failover from a crash, see §4.1 onwards.
+
+### 4.0.1 Startup Order
+
+The gateway processes must start in a specific order to ensure that reference data is in place and outbound routing is ready before inbound client traffic is accepted.
+
+```
+1.  Start aeronmd (Aeron Media Driver, Cores 11–14)
+    · All IPC ring buffers allocated under /dev/shm/aeron
+    · Must be running before any gateway process connects
+
+2.  Start Cluster (Java, Cores 3–6)
+    · Three nodes start; ConsensusModule holds election
+    · Leader publishes CONNECT → C++ AppWorker (stream 2)
+    · Cluster begins accepting messages on stream 1
+
+3.  DB Server loads reference data
+    · Connects to database via ODBC
+    · Loads instruments, clients, risk parameters, session config
+      in a single pass
+    · Populates all gateway processes with the reference data
+    · All processes must acknowledge receipt before proceeding
+    · No external connections are opened until this step completes
+
+4.  Risk system connection
+    · How the Risk Thread establishes its connection to the
+      external risk system is not specified here; this depends
+      on the risk platform's session management protocol.
+
+5.  Connect the outgoing gateway (Egress, Core 9)
+    · EgressWorker opens TCP connection to the sell-side gateway
+    · FIX Logon sent with MsgSeqNum = 1
+    · Session must be ACTIVE before buy-side clients are admitted
+
+6.  Connect the incoming gateway (Ingress, Cores 1–2)
+    · TCP acceptor opened; buy-side clients may now connect
+    · First inbound Logon triggers FixClusteredService to send
+      Logon acknowledgement (outboundSeqNum = 1, inboundSeqNum = 1)
+```
+
+Reference data is loaded once before any external connection is opened. No instrument lookups, client validation, or risk limit checks can succeed without it, so all three external connections (risk system, sell-side gateway, buy-side clients) depend on step 3 completing successfully. The sell-side gateway is then connected before buy-side clients so that the order routing path is fully operational before any order can arrive.
+
+### 4.0.2 Initial Sequence State
+
+On a fresh start all FIX sequence counters are initialised to zero in the cluster:
+
+| Counter | Initial value | First outbound value |
+|---------|--------------|----------------------|
+| `outboundSeqNum` | 0 | 1 (Logon) |
+| `inboundSeqNum` | 0 | 1 (client Logon expected) |
+
+No `MemoryStorage` entries exist; a `ResendRequest` for any range before the session begins cannot be serviced.
+
+### 4.0.3 Cluster Quorum on Fresh Start
+
+All three cluster nodes must reach quorum before the leader publishes `CONNECT`. If fewer than two nodes are reachable, the cluster blocks in candidate state and neither C++ process accepts work. The startup procedure requires all three nodes to be started before buy-side clients are admitted.
+
+---
+
+## 4.1 Overview
 
 The cluster runs three nodes. At any moment one node is the **leader** — it holds the open client TCP connections, publishes commands to its local C++ workers, and sends to the sell-side gateway. The other two nodes are **followers** — they apply the same Raft log entries and maintain warm-standby state, but their TCP stacks are idle and their C++ workers discard all non-structural commands.
 
@@ -8,7 +69,7 @@ A failover is triggered when followers stop receiving Raft heartbeats from the l
 
 ---
 
-## 3.2 What Survives a Crash
+## 4.2 What Survives a Crash
 
 The Raft log is the durability boundary. Anything committed (acknowledged by a quorum of two or more nodes) is guaranteed to be present on the new leader. Anything not yet committed is lost.
 
@@ -33,7 +94,7 @@ The Raft log is the durability boundary. Anything committed (acknowledged by a q
 
 ---
 
-## 3.3 Failure Detection and Election
+## 4.3 Failure Detection and Election
 
 Aeron Cluster uses a heartbeat-based failure detector. The leader publishes a Raft heartbeat to followers at a configurable interval (default 250 ms). A follower starts an election if it receives no heartbeat for an election timeout period (default 1000 ms, randomised per node to avoid split votes).
 
@@ -57,7 +118,7 @@ The election completes in one round-trip between B and C when no split-vote occu
 
 ---
 
-## 3.4 Failover Sequence
+## 4.4 Failover Sequence
 
 The timeline below shows the sequence of events from crash detection to full FIX session resumption. Time values are illustrative; actual timing depends on election timeout configuration and network RTT between cluster nodes.
 
@@ -100,7 +161,7 @@ Node A (crashed)         Node B (new leader)              Buy-side client
                                                            ── If gap detected:
                                                            Client sends
                                                            ResendRequest
-                                                           (see §3.5)
+                                                           (see §4.5)
 
                          t=828ms  FixClusteredService receives
                                   client Logon response (committed)
@@ -112,16 +173,16 @@ Node A (crashed)         Node B (new leader)              Buy-side client
 
 ---
 
-## 3.5 FIX Session Resumption
+## 4.5 FIX Session Resumption
 
-### 3.5.1 Sequence Number Continuity
+### 4.5.1 Sequence Number Continuity
 
 The new leader resumes the FIX session with the sequence numbers that were committed at the time of the crash. The outbound Logon carries:
 
 - `MsgSeqNum` (tag 34) = `outboundSeqNum + 1` — the next outbound sequence the new leader will use.
 - `NextExpectedMsgSeqNum` (tag 789, FIX 4.4) = `inboundSeqNum + 1` — the next inbound sequence the new leader expects from the client.
 
-### 3.5.2 Client-Side Gap Detection
+### 4.5.2 Client-Side Gap Detection
 
 Messages sent by the old leader that were in its TCP send buffer at the time of the crash may or may not have been received by the client, depending on where the TCP connection was cut.
 
@@ -131,17 +192,17 @@ Messages sent by the old leader that were in its TCP send buffer at the time of 
 
 **Case C — client missed messages the old leader committed and sent**: the client sends a `ResendRequest` for the missing range. The new leader services it from `MemoryStorage` (last 2500 outbound messages). For session-level messages in the resend range (heartbeats, test requests), the leader emits a SequenceReset-GapFill instead of retransmitting them. Application messages (ExecutionReport, etc.) are retransmitted with `PossDupFlag=Y` (tag 43 = Y).
 
-### 3.5.3 Inbound Gap at Client
+### 4.5.3 Inbound Gap at Client
 
 If the client had sent messages that reached the old leader's TCP stack but never made it into the Raft log, those messages are permanently lost from the cluster's perspective. The new leader expects `inboundSeqNum + 1` from the client; if the client's next message carries a higher sequence number, the new leader sends a `ResendRequest` to the client for the missing range. The client retransmits with `PossDupFlag=Y`.
 
 ---
 
-## 3.6 C++ Process Restart on the New Leader
+## 4.6 C++ Process Restart on the New Leader
 
 The C++ processes on the new leader (Ingress, Application, Egress) have been running throughout — they were just in follower mode with no TCP connections and with the AppWorker discarding SEND commands.
 
-### 3.6.1 AppWorker (Core 7)
+### 4.6.1 AppWorker (Core 7)
 
 On receiving the `CONNECT` command the AppWorker:
 
@@ -151,23 +212,23 @@ On receiving the `CONNECT` command the AppWorker:
 
 The AppWorker holds no durable state; there is nothing to recover.
 
-### 3.6.2 Risk Thread (Core 8)
+### 4.6.2 Risk Thread (Core 8)
 
 The Risk Thread on the new leader has zero in-flight requests at the point of failover — it was idle during follower operation. It begins accepting orders from the SPSC immediately after the AppWorker activates.
 
 Orders that were in-flight in the old leader's Risk Thread at the time of the crash are lost. From the cluster's perspective those orders were in the `FORWARD_APP` dispatch path and were never committed as outbound messages. The client will either retransmit them (if it does not receive an ExecutionReport within its timeout) or the session-level ResendRequest exchange will cause the cluster to determine that no outbound ExecutionReport was ever sent for those orders, triggering client-side retransmission.
 
-### 3.6.3 Ingress (Cores 1–2)
+### 4.6.3 Ingress (Cores 1–2)
 
 The new leader's Ingress process accepts the client TCP reconnection via the cluster's shared VIP address (or DNS failover). It begins forwarding frames to the cluster via stream 1 as soon as the TCP connection is accepted.
 
-### 3.6.4 EgressWorker (Core 9)
+### 4.6.4 EgressWorker (Core 9)
 
 The EgressWorker on the new leader reconnects to the sell-side gateway using a standard FIX Logon. The sell-side gateway sees a disconnection from the old leader's TCP connection and then a new inbound FIX session from the new leader. Any orders sent by the old leader's Egress to the sell-side gateway but not yet acknowledged (via ExecutionReport) are handled by the sell-side gateway's own cancel-on-disconnect policy or by the gateway's FIX ResendRequest to the sell-side.
 
 ---
 
-## 3.7 In-Flight Orders at Crash Time
+## 4.7 In-Flight Orders at Crash Time
 
 The fate of an order depends on how far it had progressed through the pipeline at the moment of the crash.
 
@@ -185,7 +246,7 @@ The fate of an order depends on how far it had progressed through the pipeline a
 
 ---
 
-## 3.8 Follower Divergence Prevention During Failover
+## 4.8 Follower Divergence Prevention During Failover
 
 During the election window there is no leader. The cluster stops committing new log entries. The Aeron ingress channel accepts no new messages from the C++ Ingress processes (the `offer()` call returns `NOT_CONNECTED` or `BACK_PRESSURED`). The C++ Ingress thread sees back-pressure, which propagates to the client TCP socket as described in § 2.9.3.
 
@@ -193,7 +254,7 @@ Once a new leader is elected and commits its first no-op log entry (a standard R
 
 ---
 
-## 3.9 Failover Timing Budget
+## 4.9 Failover Timing Budget
 
 | Event | Duration |
 |-------|----------|
@@ -207,3 +268,78 @@ Once a new leader is elected and commits its first no-op log entry (a standard R
 | **Total (election timeout dominates)** | **~500–1100 ms** |
 
 The election timeout is the dominant term. It can be reduced at the cost of increased sensitivity to transient slowdowns — a GC pause longer than the election timeout on the leader triggers a spurious election. With ZGC and a 6 GB heap, GC pauses are consistently under 1 ms, so an election timeout of 500 ms provides a comfortable margin without materially increasing failover time.
+
+---
+
+## 4.10 External Connection Failures
+
+External connection failures are distinct from cluster failover: the Raft cluster and all three nodes remain healthy. Only an external TCP connection is lost. The two external TCP connections — the buy-side client and the sell-side exchange — have opposite recovery behaviours.
+
+### 4.10.1 Buy-side Client Disconnect
+
+The gateway is the FIX acceptor for buy-side clients. When a client's TCP connection drops the gateway takes no outbound action:
+
+```
+Client disconnects (TCP RST / timeout)
+    │
+    ├─ Reactor (Core 1): CQE signals ECONNRESET / EOF on client fd.
+    │   Closes fd. Removes fd from registered buffer set.
+    │
+    ├─ FIX Session (Core 2): detects fd closure.
+    │   Publishes disconnect notification to cluster (stream 1).
+    │
+    └─ FixClusteredService: commits disconnect.
+        SessionPhase → DISCONNECTED.
+        Heartbeat and test-request timers cancelled.
+        inboundSeqNum / outboundSeqNum / MemoryStorage: preserved unchanged.
+```
+
+The TCP acceptor remains open throughout. All committed session state is preserved in the cluster. The gateway waits indefinitely for the client to reconnect. No reconnect timer fires; no Logout is sent; no alert is emitted beyond normal operational logging.
+
+When the client reconnects and sends a Logon, the sequence picks up from §4.5 (FIX Session Resumption). The cluster resumes from the committed `inboundSeqNum` and `outboundSeqNum` exactly as in a cluster failover resumption.
+
+**In-flight orders at disconnect time.** Orders that had been committed to the Raft log as `FORWARD_APP` but not yet returned from the risk system, and orders for which the cluster had emitted `SEND` but the TCP bytes had not been flushed before the connection dropped, are handled identically to the crash case described in §4.7. The client's own timeout-and-retransmit behaviour drives recovery.
+
+### 4.10.2 Sell-side Exchange Disconnect
+
+The gateway is the FIX initiator toward the sell-side exchange. When the exchange connection drops the EgressWorker immediately attempts to reconnect, cycling through the configured endpoint list in priority order:
+
+```
+Exchange connection drops (TCP RST / FIX Logout from exchange / timeout)
+    │
+    ├─ io_uring Egress Reactor (Core 10): CQE signals disconnect on exchange fd.
+    │   Closes fd. Notifies EgressWorker via event flag.
+    │
+    ├─ EgressWorker (Core 9): receives disconnect notification.
+    │   Suspends processing of stream 4 (no new orders sent during reconnect).
+    │   Selects next endpoint from priority list (primary → secondary → …).
+    │
+    ├─ TCP connect attempt to selected endpoint.
+    │   ├─ Success: sends FIX Logon (initiator). Waits for Logon-Ack.
+    │   │   On Logon-Ack: session ACTIVE on alternate endpoint.
+    │   │   Resumes processing stream 4.
+    │   └─ Failure (refused / timeout): selects next endpoint. Repeats.
+    │       If all endpoints exhausted: waits a configured back-off interval,
+    │       then restarts from the top of the priority list.
+    │
+    └─ Cluster: not notified of the disconnect. Cluster state is unaffected.
+        Buy-side sessions remain ACTIVE throughout.
+        RISK_APPROVED commands continue to accumulate on stream 4.
+        Back-pressure on stream 4 propagates to the AppWorker SPSC once the
+        EgressWorker's send queue is full (see §2.9.3).
+```
+
+The reconnect sequence is entirely local to the EgressWorker; it does not involve the cluster or modify any cluster-committed state. The sell-side FIX session sequence numbers are maintained by the EgressWorker locally and are negotiated with the exchange during the Logon handshake. If the exchange detects a sequence gap it sends a `ResendRequest`; the EgressWorker services it from its local outbound message buffer.
+
+**In-flight orders at disconnect time.** Orders sent to the exchange but not yet acknowledged by an `ExecutionReport` are subject to the exchange's cancel-on-disconnect policy. The EgressWorker does not automatically retransmit them after reconnect — retransmission is driven by the exchange's `ResendRequest` (for messages the exchange received) or by the client's timeout-and-retransmit (for orders the exchange never saw). The EgressWorker maintains its own outbound buffer (separate from `MemoryStorage` in the cluster) for this purpose.
+
+### 4.10.3 Comparison
+
+| Property | Buy-side disconnect | Sell-side disconnect |
+|----------|--------------------|--------------------|
+| Gateway role | Acceptor (passive) | Initiator (active) |
+| Recovery action | Wait for client to reconnect | Connect to next endpoint immediately |
+| Cluster state affected | `SessionPhase → DISCONNECTED` | No change |
+| Sequence numbers | Preserved in cluster, resumed on reconnect | Maintained locally in EgressWorker; negotiated at Logon |
+| Buy-side sessions during outage | Remain ACTIVE; new orders queue at stream 4 back-pressure | Remain ACTIVE; new orders queue at stream 4 back-pressure |
+| Order fate | See §4.7 | Exchange cancel-on-disconnect policy + ResendRequest |

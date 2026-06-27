@@ -1,10 +1,10 @@
-# Estimated Performance
+# Chapter 3: Estimated Performance
 
 End-to-end latency budget and throughput analysis for the FIX gateway. All simdfix decode/encode figures are measured values from `SimdFixBenchmark` (release build, ARM NEON, Apple M1 Pro); see [performance.md](performance.md) for the full benchmark table. Throughput figures are derived analytically from Little's Law applied to the risk system, which is the sole throughput bottleneck.
 
 ---
 
-## End-to-End Latency
+## 3.1 End-to-End Latency
 
 The table below covers the **leader hot path** for a `NewOrderSingle` that passes both risk checks. Raft replication latency (2–5 µs) adds to the cluster stage on committed messages.
 
@@ -26,11 +26,11 @@ The risk RPC dominates the end-to-end budget by six orders of magnitude. All pip
 
 ---
 
-## Virtualization Cost
+## 3.2 Virtualization Cost
 
 Running in a cloud VM or container changes the latency of several pipeline stages. The risk RPC is unaffected — it is an external network call — but the surrounding pipeline incurs measurable overhead from three sources: I/O path changes, overlay network on the Raft replication path, and vCPU steal inflating all stages unpredictably.
 
-### Per-Stage Overhead
+### 3.2.1 Per-Stage Overhead
 
 The table below shows the bare-metal figure, the worst-case overhead without mitigations, and the residual overhead after applying the configuration steps in [virtual.md](virtual.md).
 
@@ -42,13 +42,13 @@ The table below shows the bare-metal figure, the worst-case overhead without mit
 | io_uring send → NIC | 0.5 µs | +1–2 µs (epoll fallback) | +0 µs (io_uring granted) |
 | Any stage (vCPU steal) | 0 | +5–20 % wall time (shared host) | ≈ 0 (bare-metal or dedicated host) |
 
-### I/O Path: io_uring vs. epoll Fallback
+### 3.2.2 I/O Path: io_uring vs. epoll Fallback
 
 When `IORING_SETUP_SQPOLL` is unavailable, the reactor falls back to `epoll` + `SO_BUSY_POLL`. Each TCP receive and send incurs one additional syscall, and registered zero-copy buffers are replaced with kernel-copy `recvmsg`/`sendmsg`. The measured overhead is **+1–2 µs per TCP operation**. With two operations per order (receive on ingress, send on egress), the unmitigated I/O penalty is 2–4 µs total — negligible against the risk RTT but visible in the non-risk pipeline budget.
 
 `AF_XDP` on a GCP gVNIC (kernel ≥ 5.10) eliminates this overhead entirely, matching bare-metal io_uring performance at the cost of BPF program complexity.
 
-### Raft Replication: Overlay Network
+### 3.2.3 Raft Replication: Overlay Network
 
 The Raft commit stage is the most sensitive to cloud networking. Bare-metal co-location gives 2–5 µs round-trip between cluster nodes; a VPC overlay (VXLAN/Geneve) raises this to 50–150 µs on unoptimised placement, and the commit must complete before the AppWorker can process the message.
 
@@ -61,7 +61,7 @@ The Raft commit stage is the most sensitive to cloud networking. Bare-metal co-l
 
 Cross-AZ deployment should be avoided for the Raft cluster; it moves the commit latency into the same order of magnitude as the risk RPC and makes it the second-largest latency contributor.
 
-### vCPU Steal: Unpredictable Inflation
+### 3.2.4 vCPU Steal: Unpredictable Inflation
 
 On a shared host, the hypervisor may preempt any vCPU for an unbounded duration. Steal inflates every stage in the pipeline by an unpredictable multiplier; it cannot be bounded analytically. Observed effects on comparable workloads:
 
@@ -71,7 +71,7 @@ On a shared host, the hypervisor may preempt any vCPU for an unbounded duration.
 
 The only reliable mitigation is eliminating steal: bare-metal cloud instances or dedicated-host VMs. Dedicated hosts reduce steal to near zero (hypervisor overhead only, typically < 0.1 %); shared commodity VMs should not be used for the busy-spin cores.
 
-### Net Impact on Non-Risk Pipeline
+### 3.2.5 Net Impact on Non-Risk Pipeline
 
 Combining the overhead sources:
 
@@ -86,11 +86,11 @@ In all cases the risk RPC (100–500 ms) remains the dominant term; the non-risk
 
 ---
 
-## Throughput Analysis
+## 3.3 Throughput Analysis
 
 The system throughput ceiling is set by the risk system, which is the sole bottleneck. All other pipeline stages have headroom orders of magnitude above the risk-constrained limit.
 
-### Risk System: Little's Law
+### 3.3.1 Risk System: Little's Law
 
 By Little's Law, in a stable system the average throughput λ, average number of in-flight requests N, and average service time W are related by:
 
@@ -110,7 +110,7 @@ All figures are orders/sec per gateway instance. The ★ row represents the theo
 
 The outstanding-request limit and the risk system RTT are the only two levers available to change this ceiling without modifying the rest of the pipeline. Halving the RTT doubles throughput; doubling the outstanding limit doubles throughput. Multiple independent gateway instances scale linearly, subject to the risk system's own concurrency capacity.
 
-### Queuing: Slot Wait Time
+### 3.3.2 Queuing: Slot Wait Time
 
 When the risk system RTT is variable, orders arriving faster than the risk system can clear them accumulate in the inbound SPSC. The time an order waits for a free slot is:
 
@@ -120,7 +120,7 @@ slot_wait ≈ (in_flight / N) × avg_RTT
 
 At steady-state throughput equal to the ceiling (all N slots continuously occupied), the average slot wait approaches zero — each slot is freed just as a new order needs it. When the order arrival rate exceeds the ceiling, the SPSC fills and back-pressure propagates to the client TCP socket (§ 2.9.3 of [architecture.md](architecture.md)).
 
-### Other Pipeline Stages: Headroom
+### 3.3.3 Other Pipeline Stages: Headroom
 
 The following figures show headroom at two reference points: the current production configuration (25 outstanding, 100 ms RTT = 250 orders/sec) and the theoretical optimum row (100 outstanding ★, 1 ms RTT = 100 000 orders/sec). The Raft commit ceiling is shown for bare-metal and both cloud extremes because it is the only stage whose capacity changes materially across deployment environments.
 
@@ -136,13 +136,13 @@ The following figures show headroom at two reference points: the current product
 
 The Raft commit ceiling drops with overlay network RTT: bare-metal co-lo (2–5 µs) supports ~50 000 ops/sec; a mitigated cloud placement group (20–50 µs) supports ~10 000–25 000 ops/sec; a default VPC or cross-AZ path (200–500 µs) degrades to ~1 000–3 000 ops/sec. At the current production configuration (250 orders/sec) all cloud environments retain comfortable Raft headroom. The headroom collapse is only relevant at the theoretical optimum (100 outstanding, 1 ms risk RTT = 100 000 orders/sec), where Raft is the binding constraint in every deployment.
 
-### Summary
+### 3.3.4 Summary
 
 Throughput scales linearly with both the outstanding-request limit and the inverse of the risk RTT. At the current configuration of 25 outstanding requests, the ceiling ranges from 50 orders/sec (500 ms RTT) to 500 orders/sec (50 ms RTT) and is unaffected by cloud deployment — the risk system remains the binding constraint in all cloud environments at this operating point. The theoretical optimum of 100 outstanding requests at 1 ms RTT yields 100 000 orders/sec on bare-metal; in cloud, the Raft commit ceiling (1 000–25 000 ops/sec depending on placement) becomes the binding constraint instead. Individual order latency is not improved by raising the concurrency limit — each order still waits one full RTT for a risk response — but the pipeline never idles: all N slots progress through the risk system in parallel at all times.
 
 ---
 
-## Per-Client Throughput
+## 3.4 Per-Client Throughput
 
 Because orders from the same client are checked in sequence, each client is limited to one outstanding risk request at a time regardless of the global slot count. Per-client throughput is therefore:
 
@@ -162,7 +162,7 @@ In cloud environments, vCPU steal adds one steal-burst duration to each response
 † Raft ceiling (10 000–25 000 ops/sec) exceeds per-client rate at this RTT for any realistic client count.  
 ‡ Raft ceiling (~1 000–3 000 ops/sec) shared across N concurrent clients; with 25 clients ≈ 40–120 orders/sec per client.
 
-### Aggregate Throughput as a Function of Client Count
+### 3.4.1 Aggregate Throughput as a Function of Client Count
 
 Let C be the number of concurrently active clients (each submitting orders at the maximum per-client rate) and N the global outstanding-slot limit. The aggregate throughput is:
 
@@ -182,7 +182,7 @@ When C < N each client occupies its own slot and the global limit is not reached
 
 The figures above assume C ≥ N — enough concurrently active clients to keep all slots occupied. When the client population is small (C < N), the aggregate throughput is C × (1/RTT) and the outstanding-slot limit has no effect.
 
-### Cloud Impact on Aggregate Throughput
+### 3.4.2 Cloud Impact on Aggregate Throughput
 
 The table below shows the risk-system ceiling alongside the Raft commit ceiling for min-cost and max-cost cloud deployments across representative configurations. The binding constraint is whichever ceiling is lower.
 

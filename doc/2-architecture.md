@@ -7,9 +7,10 @@ The gateway is a pipeline of four cooperating subsystems, each with a distinct r
 | Subsystem | Language | Role |
 |-----------|----------|------|
 | **FIX Gateway** | C++23 | Accepts TCP connections from buy-side clients. Drives socket I/O through `io_uring`. Runs the FIX session layer using simdfix for frame detection and field decoding. Handles both directions of the client TCP connection: inbound orders and outbound execution reports, heartbeats, and session messages. |
-| **Aeron Cluster** | Java 21 | Receives raw FIX frames from all gateway nodes and sequences them through a Raft consensus log. Assigns a monotonically increasing, cluster-global sequence number to every message. Owns all FIX session-layer state: sequence numbers, heartbeat timers, resend buffers. |
+| **Aeron Cluster** | Java 21 | Receives SBE-encoded messages from all gateway nodes and sequences them through a Raft consensus log. Assigns a monotonically increasing, cluster-global sequence number to every message. Owns all FIX session-layer state: sequence numbers, heartbeat timers, resend buffers. |
 | **Application Engine** | C++23 | Subscribes to the cluster's ordered output. Decodes application-layer FIX messages using simdfix, performs a fast in-process risk check, then hands orders off to a dedicated risk thread for external validation before routing approved orders to the sell-side gateway. |
 | **Risk System** | External | A slow, synchronous external service (mainframe or proprietary risk platform). Contacted per-order via a blocking RPC call. Approval or rejection determines whether the order is forwarded to the sell-side gateway. |
+| **DB Server** | C++ | Loads reference data (instruments, clients, risk parameters, session configuration) from a relational database via ODBC and provides it to the gateway processes. Not in the real-time processing path. |
 
 All intra-host communication uses Aeron IPC (shared memory ring buffers). No message crosses a TCP socket between any two components on the same node.
 
@@ -48,16 +49,16 @@ Each box represents a pinned OS thread on an isolated CPU core. Arrows labelled 
 ║  │  Core 1                │ ────────► │  Core 2                     │   ║
 ║  │  io_uring Reactor      │           │  FIX Session                │   ║
 ║  │                        │ ◄──────── │                             │   ║
-║  │  · IORING_OP_RECV (rx) │  TX SPSC  │  · FrameScanner (simdfix)   │   ║
+║  │  · IORING_OP_RECV (rx) │  TX SPSC  │  · PayloadDecoder (simdfix) │   ║
 ║  │  · IORING_OP_SEND (tx) │           │  · Session state machine    │   ║
 ║  │  · Registered buffers  │           │  · Admission / rate limit   │   ║
-║  │  · CQE busy-spin       │           │  · Outbound FIX formatting  │   ║
+║  │  · CQE busy-spin       │           │  · FIX encode / decode      │   ║
 ║  └────────────────────────┘           └─────────────────────────────┘   ║
 ║                                             │                 ▲          ║
 ╚═════════════════════════════════════════════╪═════════════════╪══════════╝
                                               │                 │
                                aeron:ipc stream 1    aeron:ipc stream 6
-                               (inbound FIX →)       (← outbound FIX cmds)
+                               (inbound SBE →)       (← outbound SBE cmds)
                                               │                 │
   ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ C++ / Java boundary ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═
                                               │                 │
@@ -93,11 +94,11 @@ Each box represents a pinned OS thread on an isolated CPU core. Arrows labelled 
 ║                                                                           ║
 ║  ┌──────────────────────────────────────┐                                ║
 ║  │  Core 7                              │──► aeron:ipc stream 6          ║
-║  │  AppWorker                           │    (outbound FIX to clients)   ║
+║  │  AppWorker                           │    (outbound SBE cmds)         ║
 ║  │                                      │                                ║
 ║  │  · Aeron IPC subscriber (stream 2)   │                                ║
 ║  │  · Command dispatch                  │                                ║
-║  │  · PayloadDecoder (simdfix NEON)     │                                ║
+║  │  · SBE decoder                       │                                ║
 ║  │  · Fast risk check (< 100 ns)        │                                ║
 ║  └──────────────────────────────────────┘                                ║
 ║                    │ SPSC (order + decoded fields)                        ║
@@ -124,12 +125,14 @@ Each box represents a pinned OS thread on an isolated CPU core. Arrows labelled 
 ║  │  EgressWorker               │        │  io_uring Reactor           │ ║
 ║  │                             │        │                             │ ║
 ║  │  · Order routing            │        │  · SQE submission           │ ║
-║  │  · FIX encode (simdfix)     │        │  · CQE drain (exec reports) │ ║
+║  │  · FIX encode / decode      │        │  · CQE drain (exec reports) │ ║
 ║  │  · Egress risk accounting   │        │  · Registered send buffers  │ ║
 ║  └─────────────────────────────┘        └─────────────────────────────┘ ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
-                     │
-                     │  TCP (FIX)
+                     ▲
+                     │  TCP (FIX)  — bi-directional
+                     │  outbound: NewOrderSingle, cancel/replace
+                     │  inbound:  ExecutionReport
                      ▼
            Sell-side Gateway
 
@@ -142,6 +145,15 @@ Each box represents a pinned OS thread on an isolated CPU core. Arrows labelled 
                               │  · Per-order approval              │
                               │  · Credit limit, position check    │
                               └─────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │  DB Server                                    Database               │
+    │                                                                      │
+    │  · Connects to database via ODBC ◄──────────────────────────────    │
+    │  · Loads reference data once at startup                             │
+    │  · Instruments, clients, risk params, session config                │
+    │  · Populates gateway processes before any external connections      │
+    └──────────────────────────────────────────────────────────────────────┘
 ```
 
 **Aeron Media Driver** (`aeronmd`) runs as a separate process pinned to Cores 11–14, managing all IPC ring buffers and acting as the shared-memory intermediary between all four processes.
@@ -189,22 +201,26 @@ Capacity on both queues is sized to absorb a full burst across all connected ses
 
 ### 2.4.3 FIX Session Thread (Core 2): Inbound Path
 
-On the receive side, the session thread runs simdfix's `FrameScanner` on each byte span: a NEON SIMD scan for SOH (`0x01`) delimiters that locates complete FIX frames without field-level parsing. Parsing at this stage is intentionally minimal — only enough to verify that `8=FIX` appears at the start and `10=` appears at the end.
+On the receive side, the session thread runs simdfix's `PayloadDecoder` on each byte span: a NEON SIMD scan for SOH (`0x01`) delimiters that locates complete FIX frames and decodes each field into the **FIX internal format** — a compact representation of field tags and values that the session layer state machine consumes directly. The session layer never operates on raw FIX bytes. All FIX encoding and decoding for the client-facing path is performed by the FIX Session component; no other component in the pipeline parses FIX text.
 
 Session-layer admission decisions (rate limiting, maximum frame size) are made here. All other session state — sequence numbers, heartbeat timers, resend logic — is owned by the Java `FixClusteredService` and is authoritative only after Raft commits the message.
 
-Complete frames are offered to the Aeron IPC publication (stream 1) as `{ uint64 sessionId | uint16 length | uint8[] rawFix }`. The offer call is non-blocking; if the ring is full, back-pressure propagates to the SPSC consumer loop, which naturally throttles the reactor's receive submissions.
+The gateway is the FIX **acceptor** for buy-side clients: it never initiates a connection outbound to a client. When a client TCP connection drops, the cluster sets `SessionPhase` to `DISCONNECTED` and the TCP acceptor remains open. The gateway waits passively for the client to reconnect and re-initiate the Logon sequence. No reconnect timer, no outbound dial attempt.
+
+Frames that pass admission are SBE-encoded and offered to the Aeron IPC publication (stream 1). The offer call is non-blocking; if the ring is full, back-pressure propagates to the SPSC consumer loop, which naturally throttles the reactor's receive submissions.
 
 ### 2.4.4 FIX Session Thread (Core 2): Outbound Path
 
-The session thread also subscribes to Aeron IPC stream 6, which carries outbound FIX messages routed back from the Application Engine. These include:
+The session thread subscribes to Aeron IPC stream 6, which carries commands emitted by the cluster after committing each log entry. These commands are the sole source of truth for what the handler must send and what local state it must update.
 
-- Session-layer messages generated by the cluster: Logon acknowledgement, Heartbeat, TestRequest, Logout, Reject, SequenceReset, ResendRequest responses.
-- Application-layer messages relayed from the exchange: ExecutionReport, OrderCancelReject.
+The C++ session handler does **not** contain a session state machine. The session state machine — sequence number tracking, heartbeat and test-request timers, ResendRequest servicing, SessionPhase transitions — resides entirely in `FixClusteredService` inside the Aeron Cluster. The handler's local state is a shadow of the cluster's committed state and is updated exclusively by commands arriving on stream 6. This is the property that makes failover seamless: the new leader's cluster already holds the authoritative state, so the handler on the new node simply starts consuming stream 6 from the same committed position.
 
-On each stream 6 message the session thread writes the pre-encoded FIX bytes into the TX SPSC toward the reactor, tagging them with the destination `sessionId`. The reactor submits the send to the client's file descriptor via `IORING_OP_SEND`.
+Commands arriving on stream 6 are SBE-encoded and include:
 
-No FIX encoding happens in the session thread on the outbound path. All FIX encoding — for both session-layer and application-layer outbound messages — is performed by the AppWorker in the Application Process before the bytes reach stream 6. The session thread is a transparent conduit on the send side: it reads pre-encoded FIX bytes from the stream 6 subscription and forwards them to the TX SPSC without inspection.
+- Session-layer outputs: Logon acknowledgement, Heartbeat, TestRequest, Logout, Reject, SequenceReset, ResendRequest responses.
+- Application-layer relays from the exchange: ExecutionReport, OrderCancelReject.
+
+On receiving a command the handler decodes the SBE discriminator and payload, updates its shadow state (e.g. advances local `sessionPhase` to ACTIVE), FIX-encodes the outbound frame, and writes it to the TX SPSC toward the reactor. The reactor submits the send via `IORING_OP_SEND`. No outbound FIX frame is ever produced by the handler without a prior cluster command; the handler is purely reactive to committed cluster output.
 
 ---
 
@@ -219,7 +235,7 @@ The Java Aeron Cluster is the **single source of truth** for the order of every 
 
 ### 2.5.2 Sequence Number Assignment
 
-`ConsensusModule` appends each inbound FIX frame to the Raft log and assigns it a `clusterSessionPosition` — a monotonically increasing byte offset in the log that uniquely identifies the message across all time and all nodes. `FixClusteredService.onSessionMessage()` fires on every node in commit order, carrying this position in the `Header` parameter.
+`ConsensusModule` appends each inbound SBE message to the Raft log and assigns it a `clusterSessionPosition` — a monotonically increasing byte offset in the log that uniquely identifies the message across all time and all nodes. `FixClusteredService.onSessionMessage()` fires on every node in commit order, carrying this position in the `Header` parameter.
 
 The Java service maintains its own `inboundSeqNum` counter (the FIX application-layer sequence number) and increments it on each committed message. This counter is part of the cluster snapshot and survives failover exactly.
 
@@ -240,7 +256,7 @@ After processing each committed message, the Java service emits a command to the
 
 | Command | Trigger | Payload |
 |---------|---------|---------|
-| `FORWARD_APP` | Inbound application message (D, F, G, …) | raw FIX bytes |
+| `FORWARD_APP` | Inbound application message (D, F, G, …) | SBE-encoded application message |
 | `SEND` | Outbound message ready for TCP | SBE-encoded message + outbound seq |
 | `RESEND` | ResendRequest being serviced | SBE-encoded message with PossDupFlag |
 | `GAP_FILL` | Session messages skipped in resend | begin/end seq range |
@@ -249,7 +265,7 @@ After processing each committed message, the Java service emits a command to the
 | `CONNECT` | Node elected leader | SenderCompID / TargetCompID |
 | `DISCONNECT` | Node lost leadership | — |
 
-`FORWARD_APP` carries inbound application-layer content for the C++ risk and routing engine. `RISK_APPROVED` and `RISK_REJECTED` are emitted after the cluster commits the risk response from stream 7 to the Raft log; no state change in the application layer is triggered before this commit. `SEND` and `RESEND` carry SBE-encoded outbound messages — the Java cluster never produces FIX text; all FIX encoding is done by the C++ AppWorker before the bytes reach the client TCP socket.
+`FORWARD_APP` carries the inbound application-layer message as an SBE-encoded payload — the FIX session component decoded the FIX text and the cluster re-encodes the relevant fields into SBE before publishing. `RISK_APPROVED` and `RISK_REJECTED` are emitted after the cluster commits the risk response from stream 7 to the Raft log; no state change in the application layer is triggered before this commit. `SEND` and `RESEND` carry SBE-encoded outbound messages; the Java cluster never produces FIX text. All FIX encoding and decoding on the client-facing path is done exclusively by the FIX Session component (Core 2).
 
 ---
 
@@ -259,14 +275,14 @@ After processing each committed message, the Java service emits a command to the
 
 The AppWorker busy-spins on stream 2, polling up to 10 commands per duty cycle. On a `FORWARD_APP` command it:
 
-1. Passes the raw FIX bytes to `PayloadDecoder`, which uses simdfix's NEON-accelerated tokenizer to locate all field offsets without copying the data.
+1. Decodes the SBE payload to extract the application message fields.
 2. Dispatches to `FixMessageHandler<AppHandler>` via CRTP — the handler fires `onNewOrderSingle`, `onOrderCancelRequest`, etc. with fully decoded accessor objects.
 3. Runs a fast in-process risk check (position and rate-limit accounting using atomic loads, < 100 ns).
 4. If the in-process check passes, enqueues the decoded order into the SPSC toward the Risk Thread.
 
-On `RISK_APPROVED` the AppWorker encodes an `OrderCommand` and publishes it on stream 4 to the EgressWorker. On `RISK_REJECTED` it publishes a reject command on stream 3 to the Java cluster, which encodes a FIX `ExecutionReport` with `OrdStatus=Rejected` for delivery to the client. Both carry the `clusterSessionPosition` of the original order as an idempotency key.
+On `RISK_APPROVED` the AppWorker encodes an `OrderCommand` and publishes it on stream 4 to the EgressWorker. On `RISK_REJECTED` it publishes a reject command on stream 3 to the Java cluster, which triggers a FIX `ExecutionReport` with `OrdStatus=Rejected` for delivery to the client. Both carry the `clusterSessionPosition` of the original order as an idempotency key.
 
-On `SEND` and `RESEND` commands the AppWorker decodes the SBE payload to extract the message fields, encodes a FIX text frame using simdfix's `PayloadEncoder`, and publishes the result on stream 6 toward the Ingress FIX Session thread. This covers both session-layer messages (Logon, Heartbeat, Reject, Logout) and application-layer messages (ExecutionReport) that have been routed back through the cluster from the sell-side gateway. The risk path is not touched.
+On `SEND` and `RESEND` commands the AppWorker publishes the SBE payload on stream 6 toward the Ingress FIX Session thread. The FIX Session component translates the SBE to FIX internal format, the session state machine processes it, and the session thread FIX-encodes the outbound frame for the client TCP socket. This covers both session-layer messages (Logon, Heartbeat, Reject, Logout) and application-layer messages (ExecutionReport) routed back from the sell-side gateway. The risk path is not touched.
 
 The AppWorker is intentionally **stateless between leader elections**. It holds no persistent position state of its own. On a `DISCONNECT` command it resets its transient decode state; on a `CONNECT` command it resumes. Durable state lives exclusively in the Java cluster.
 
@@ -311,7 +327,9 @@ The SPSC between AppWorker and Risk Thread carries decoded order fields (clOrdId
 
 ---
 
-## 2.7 Egress Path
+## 2.7 Egress / Sell-side Gateway Interface
+
+The Egress process owns the sell-side FIX session — the single persistent TCP connection to the exchange. This session is **bi-directional**: the EgressWorker sends outbound orders and receives inbound execution reports over the same connection, with a dedicated FIX encode / decode component (simdfix) handling both directions.
 
 ### 2.7.1 EgressWorker (Core 9)
 
@@ -322,9 +340,17 @@ The EgressWorker subscribes to stream 4 (approved `OrderCommand` entries publish
 3. Encodes a FIX `NewOrderSingle` (or cancel/replace) using simdfix's `PayloadEncoder`.
 4. Writes the encoded bytes to the SPSC toward the io_uring Egress Reactor.
 
-Execution reports from the sell-side gateway travel in the opposite direction: the reactor drains the receive CQEs, the EgressWorker decodes the report with simdfix, updates position, and publishes the encoded client-side FIX `ExecutionReport` on stream 5 (back to the Application Engine, which routes it to the correct client session via stream 6 → Ingress → client TCP).
+Execution reports from the sell-side gateway travel in the opposite direction on the same TCP connection: the reactor drains the receive CQEs, the EgressWorker decodes the report with simdfix's `PayloadDecoder`, updates position, and publishes the encoded client-side FIX `ExecutionReport` on stream 5 (back to the Application Engine, which routes it to the correct client session via stream 6 → Ingress FIX Session → client TCP).
 
-### 2.7.2 SPSC Queue: EgressWorker → io_uring Reactor (Core 10)
+### 2.7.2 Sell-side Endpoint Failover
+
+The gateway is the FIX **initiator** toward the sell-side exchange: it is responsible for establishing and re-establishing the TCP connection. The EgressWorker maintains a prioritised list of exchange endpoints (primary, secondary, …) sourced from session configuration loaded by the DB Server at startup.
+
+When the exchange connection drops — TCP RST, connection refused, or a FIX Logout initiated by the exchange — the EgressWorker does not wait for the exchange to reconnect. It immediately begins cycling through the endpoint list, attempting the next endpoint in priority order until a TCP connection is accepted. On each successful TCP connect it initiates a FIX Logon. The exchange responds with a Logon-Ack, and the session becomes ACTIVE on the alternate endpoint without any change to the cluster's committed state or to any buy-side session.
+
+Orders that were in the EgressWorker's send queue at the moment of disconnect are not automatically retransmitted. The exchange's cancel-on-disconnect policy and the normal client-side timeout-and-retransmit cycle determine the outcome of those orders. See §4.10.2 for the detailed disconnect and reconnect sequence.
+
+### 2.7.3 SPSC Queue: EgressWorker → io_uring Reactor (Core 10)
 
 The egress reactor mirrors the ingress reactor: it submits `IORING_OP_SEND` operations from pre-registered buffers, batch-drains completion events, and refills the SPSC consumer position. It is the only thread that calls into the kernel for network I/O on the exchange-facing path.
 
@@ -336,7 +362,7 @@ There are two language boundaries in the system.
 
 ### 2.8.1 C++ → Java (Ingress, Stream 1)
 
-The FIX Session thread publishes raw FIX text bytes into an Aeron IPC ring buffer. No serialization format is applied — the bytes are the FIX wire format verbatim, prefixed with a `uint64 sessionId` and a `uint16 length`. Java reads these using an Aeron `DirectBuffer` (off-heap, no GC pressure) and a targeted byte scanner (`FixHeaderScanner`) that extracts only `MsgType` (tag 35) and `MsgSeqNum` (tag 34) from the raw bytes without a full parse.
+The FIX Session thread SBE-encodes each validated FIX frame and publishes it to the Aeron IPC ring buffer on stream 1. Java reads the message using an Aeron `DirectBuffer` (off-heap, no GC pressure) and an SBE-generated flyweight decoder to extract `MsgType`, `MsgSeqNum`, and the FIX payload. Raw FIX bytes are never published directly to the cluster.
 
 ### 2.8.2 Java → C++ (Application, Streams 2 and 3)
 
@@ -346,19 +372,18 @@ Commands from Java to the C++ AppWorker use a compact binary envelope:
 Byte 0:      discriminator (CMD_FORWARD_APP, CMD_SEND, CMD_RESEND, …)
 Bytes 1–N:   payload (command-specific, fixed layout per discriminator)
 ```
+For `FORWARD_APP` the payload is an **SBE-encoded application message** — the cluster re-encodes the fields decoded by the FIX Session component into a typed SBE flyweight. For `SEND` and `RESEND` the payload is likewise SBE-encoded, carrying message type, sequence number, instrument, quantities, and timestamps. The C++ AppWorker decodes these SBE payloads; it never parses or produces FIX text. Java never produces FIX text.
 
-For `FORWARD_APP` the payload is raw inbound FIX bytes. For `SEND` and `RESEND` the payload is an **SBE-encoded message** — the cluster populates the relevant fields (message type, sequence number, instrument, quantities, timestamps) into a typed SBE flyweight and publishes the binary result. The C++ AppWorker decodes this SBE payload and encodes the outbound FIX text frame using simdfix's `PayloadEncoder`. Java never produces FIX text.
-
-Stream 3 carries responses in the same envelope format in the opposite direction (C++ → Java).
+Stream 3 carries SBE-encoded responses from the C++ AppWorker to the Java cluster in the same binary envelope format (discriminator byte + SBE payload).
 
 ### 2.8.3 What Crosses the Boundary
 
 The language boundary is deliberately asymmetric in format:
 
-- **Inbound direction (C++ → Java)**: raw FIX text bytes. Java extracts only `MsgType` and `MsgSeqNum` with a targeted scanner; it never fully parses FIX.
-- **Outbound direction (Java → C++)**: SBE for messages to be sent to clients; raw FIX bytes for `FORWARD_APP` messages to be decoded by C++. Java populates typed SBE fields; C++ owns all FIX text production.
+- **Inbound direction (C++ → Java, stream 1)**: SBE-encoded messages. The FIX Session component decodes the FIX text into internal format, the session state machine processes it, and the session thread re-encodes the application-layer fields as SBE for publication on stream 1. Java decodes the SBE flyweight to extract `MsgType`, `MsgSeqNum`, session identity, and application fields. Raw FIX bytes are never published to the cluster.
+- **Outbound direction (Java → C++)**: SBE for all command payloads on stream 2. The AppWorker decodes SBE; it never touches FIX text. FIX encoding for the client-facing path is performed exclusively by the FIX Session component after it receives the outbound SBE payload on stream 6.
 
-The SBE schema therefore governs two distinct uses: outbound message encoding on stream 2, and cluster snapshot serialization. C++ never participates in Raft consensus or FIX session state management. Java never produces FIX wire format.
+The SBE schema therefore governs three distinct uses: inbound message encoding on stream 1, outbound message encoding on stream 2, and cluster snapshot serialization. C++ never participates in Raft consensus or FIX session state management. Java never produces FIX wire format.
 
 ---
 
@@ -384,7 +409,7 @@ Orders from the **same client** are checked in strict arrival sequence: the Risk
 
 Orders from **different clients** may be in-flight simultaneously (up to 25 globally) and their responses may arrive out of order. Because each response is individually committed to the Raft log via stream 7, `RISK_APPROVED` and `RISK_REJECTED` commands on stream 2 arrive in Raft-commit order, not response-receipt order. The EgressWorker and sell-side gateway identify each order independently by `clOrdId` and tolerate cross-client reordering on stream 4.
 
-The `clusterSessionPosition` carried in each stream 7 response serves as the idempotency key. If the TCP connection to the risk system drops mid-flight, the Risk Thread publishes `RISK_REJECTED` responses for all unreceived requests via stream 7; the cluster commits the rejections and the AppWorker delivers `ExecutionReport` with `OrdStatus=Rejected` for each. On process failover, outstanding risk requests are identified from the Raft log as `FORWARD_APP` entries with no corresponding committed `RISK_APPROVED` or `RISK_REJECTED`; the new Risk Thread re-submits them to the risk system using the `clusterSessionPosition` as an idempotency key.
+The `clusterSessionPosition` carried in each SBE-encoded stream 7 response serves as the idempotency key. Risk responses on stream 7 are SBE-encoded; the cluster decodes them as typed flyweights before committing to the Raft log. If the TCP connection to the risk system drops mid-flight, the Risk Thread publishes SBE-encoded `RISK_REJECTED` responses for all unreceived requests via stream 7; the cluster commits the rejections and the AppWorker delivers `ExecutionReport` with `OrdStatus=Rejected` for each. On process failover, outstanding risk requests are identified from the Raft log as `FORWARD_APP` entries with no corresponding committed `RISK_APPROVED` or `RISK_REJECTED`; the new Risk Thread re-submits them to the risk system using the `clusterSessionPosition` as an idempotency key.
 
 ### 2.9.3 Back-Pressure Propagation
 
@@ -413,16 +438,20 @@ No thread is blocked. Core 8 spins on its event loop even when all 25 slots are 
 ## 2.10 Aeron IPC Stream Map
 
 ```
-Stream 1  C++ Ingress → Java Cluster       raw inbound FIX bytes (per frame)
-Stream 2  Java Cluster → C++ AppWorker     ordered commands
-                                             · FORWARD_APP: raw inbound FIX bytes
+Stream 1  C++ Ingress → Java Cluster       SBE-encoded inbound messages (one per FIX frame)
+Stream 2  Java Cluster → C++ AppWorker     ordered commands (all payloads SBE-encoded)
+                                             · FORWARD_APP: SBE-encoded application message
                                              · SEND/RESEND:  SBE-encoded outbound message
                                              · GAP_FILL, CONNECT, DISCONNECT: control
-Stream 3  C++ AppWorker → Java Cluster     sent-reports, reject commands
+Stream 3  C++ AppWorker → Java Cluster     application messages: sent-reports, reject commands
 Stream 4  C++ AppWorker → C++ Egress       approved OrderCommands (on RISK_APPROVED from stream 2)
-Stream 5  C++ Egress → Java Cluster        execution reports (for client routing)
-Stream 6  C++ AppWorker → C++ Ingress      FIX-encoded outbound frames for client TCP
-Stream 7  C++ Risk Thread → Java Cluster   risk responses (approved/rejected + correlationId + clusterSessionPosition)
+Stream 5  C++ Egress → Java Cluster        application messages: execution reports (for client routing)
+Stream 6  C++ AppWorker → C++ Ingress      SBE-encoded outbound commands for FIX Session component
+Stream 7  C++ Risk Thread → Java Cluster   application messages: SBE-encoded risk responses (approved/rejected + correlationId + clusterSessionPosition)
+
+Streams entering the cluster fall into two categories: **stream 1** carries inbound client messages (SBE-encoded, one per FIX frame received from a buy-side client); **streams 3, 5, and 7** carry application-layer feedback from the C++ processing tier — acknowledgements, reject commands, execution reports, and risk decisions. All payloads on all four inbound streams are SBE-encoded; the application state machine consumes only SBE from the cluster (stream 2) and produces only SBE to the cluster (streams 3 and 7). No raw FIX bytes are ever published to the cluster on any stream.
+
+The Aeron IPC streams cover only intra-host communication between the four gateway processes. The two external TCP connections — buy-side clients (handled by the Ingress FIX Session, Core 2) and the sell-side gateway (handled by the Egress FIX Session, Core 9) — are not Aeron streams. Both FIX sessions are bi-directional: the Ingress session receives orders and sends execution reports and session messages to clients; the Egress session sends orders and receives execution reports from the exchange. All FIX encoding and decoding on both connections is performed by the respective FIX Session component using simdfix.
 ```
 
 All streams share a single Aeron Media Driver instance on the host. The media driver is launched before any gateway process and exits last. Its `aeron.dir` (`/dev/shm/aeron`) is mapped into every process's address space at startup.
@@ -509,7 +538,7 @@ See [virtual.md](virtual.md) for implementation details.
 **Issue**: The Java Aeron Cluster process relies on ZGC maintaining GC pause budgets under 1 ms. ZGC's concurrent marking and relocation threads compete with the guest OS for CPU time. Under vCPU steal:
 
 - ZGC's concurrent phase may be paused mid-cycle. When the vCPU resumes, the GC phase continues, but the elapsed wall-clock time counts against the pause budget — the application thread may stall longer than ZGC's own measurements report.
-- The election timeout safety margin (§ 3.9) assumes GC pauses stay under 1 ms. On a VM with frequent steal, observed GC pauses (from the application's perspective) can reach 5–20 ms, triggering spurious Raft elections.
+- The election timeout safety margin (§ 4.9) assumes GC pauses stay under 1 ms. On a VM with frequent steal, observed GC pauses (from the application's perspective) can reach 5–20 ms, triggering spurious Raft elections.
 - `-XX:+AlwaysPreTouch` touches all heap pages at JVM startup to avoid page-fault latency at runtime. On a VM with memory overcommit, the host may page out these memory regions under pressure, reintroducing page faults.
 
 **Mitigation**: Allocate the JVM on a VM with dedicated physical cores and memory that is not overcommitted. Increase the Raft election timeout to 3–5× the observed worst-case GC pause on the target infrastructure. Disable memory overcommit at the hypervisor level for VM memory regions mapped by the JVM heap.
@@ -546,3 +575,30 @@ The following table summarises the system requirements that are unavailable or r
 ## 2.13 Mitigating Virtual Environment Issues
 
 Step-by-step configuration instructions for satisfying the deployment requirements in § 2.1.1 on cloud VMs and containerized infrastructure are in [virtual.md](virtual.md). Mitigations are ordered from highest to lowest impact: instance selection and CPU isolation first (addressing vCPU steal), followed by io_uring capabilities, shared memory, network placement, JVM tuning, clock synchronisation, and a pre-deployment validation checklist.
+
+---
+
+## 2.14 Database Server
+
+### 2.14.1 Role
+
+The DB Server is a lightweight C++ process responsible for loading the reference data that the gateway requires before it can process any traffic. It connects to a relational database using ODBC, loads the required data in a single pass at startup, and populates the gateway processes. Once population is complete the DB Server's startup role is finished; no further database queries occur on the real-time path.
+
+### 2.14.2 Reference Data
+
+The reference data loaded at startup includes:
+
+| Category | Examples |
+|----------|----------|
+| Instruments | Symbol, ISIN, tick size, lot size, currency, exchange routing key |
+| Clients | Session identifiers, SenderCompID / TargetCompID pairs, rate limits |
+| Risk parameters | Per-client position limits, notional caps, order rate ceilings |
+| Session configuration | Heartbeat interval, max message size, resend buffer depth |
+
+### 2.14.3 Database Connectivity
+
+The DB Server communicates with the database exclusively via ODBC. The choice of ODBC allows the gateway to be database-agnostic: any relational database with a conformant ODBC driver (Oracle, PostgreSQL, MS SQL Server, etc.) can be used without changes to the gateway code. The ODBC connection is opened once at startup and closed after the reference data load is complete.
+
+### 2.14.4 Delivery to Gateway Processes
+
+The mechanism by which the DB Server delivers the loaded reference data to the gateway processes is not specified here. The requirement is that all gateway processes have received and acknowledged the reference data before any external connection (sell-side gateway, buy-side clients, risk system) is established. See §4.0.1 for the startup sequence.
