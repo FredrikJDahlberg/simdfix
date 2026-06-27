@@ -1,4 +1,4 @@
-# Chapter 2: Architecture
+remo# Chapter 2: Architecture
 
 ## 2.1 System Overview
 
@@ -14,21 +14,141 @@ The gateway is a pipeline of four cooperating subsystems, each with a distinct r
 
 All intra-host communication uses Aeron IPC (shared memory ring buffers). No message crosses a TCP socket between any two components on the same node.
 
-### 2.1.1 Deployment Requirements
+### 2.1.1 CPU
 
-The gateway is designed for bare-metal Linux with dedicated CPU cores, but it is a supported requirement to run in virtualized and containerized environments (cloud VMs, Docker, Kubernetes), subject to the constraints below.
+**Architecture.** simdfix uses ARM NEON intrinsics for SIMD-accelerated SOH delimiter scanning and field decoding. The gateway requires an **ARM64 CPU with NEON support** (standard on all ARMv8-A and later cores). An x86-64 port would require substituting AVX2 equivalents in the simdfix SIMD paths; no such port exists currently.
 
-| Requirement | Bare-metal | Cloud VM / container |
-|-------------|-----------|----------------------|
-| Linux kernel ≥ 6.1 with `io_uring` | required | required |
-| `CAP_SYS_NICE`, `CAP_IPC_LOCK`, `CAP_NET_ADMIN` | implicit | must be granted explicitly |
-| `/dev/shm` ≥ 1 GB | host default | must be configured (`--shm-size`) |
-| Huge pages pre-allocated on host | `vm.nr_hugepages` in sysctl | host-level only; cannot be done from within a container |
-| CPU isolation (`isolcpus`, `nohz_full`) | kernel boot parameter | not available on vCPU; use cgroup `cpuset` instead |
-| PTP or invariant TSC clock source | hardware-provided | provider-dependent; verify before deployment |
-| No vCPU steal on busy-spin cores | guaranteed | requires bare-metal or dedicated-host instance |
+**Core count.** The gateway pins 14 threads to Cores 1–14. Core 0 is left to the OS for interrupt handling, kernel threads, and non-isolated housekeeping. The minimum usable core count is therefore **15 physical cores**. 16 or more cores are recommended to avoid contention on Core 0 under heavy interrupt load.
 
-Cloud and containerized deployments must satisfy all rows marked "required" and address the remaining rows through configuration. See [virtual.md](virtual.md) for step-by-step instructions, and § 2.12 for the issues each requirement mitigates.
+**Clock speed.** Busy-spin throughput scales directly with single-thread frequency. A base clock of **≥ 3.0 GHz** is required; ≥ 3.5 GHz is recommended. Turbo/boost frequencies are not relied upon — the gateway must meet its latency budget at the guaranteed base clock with frequency scaling disabled.
+
+**Cache.** The hot working set for each pipeline stage fits in L1/L2, but the aggregate working set across all 14 cores — SPSC ring buffers, Aeron IPC ring buffers, simdfix token arrays, and JVM object graphs — requires substantial L3. **≥ 32 MB L3 cache** is required; ≥ 64 MB is recommended for multi-session deployments. Cache misses on the SPSC producer/consumer cache lines are the primary source of latency variance at the nanosecond scale.
+
+**Memory bandwidth.** SPSC queues and Aeron IPC ring buffers are sequential in memory but accessed from multiple cores simultaneously. Aggregate read/write bandwidth across all 14 pinned cores requires **≥ 100 GB/s** of memory bandwidth (measured, not peak-spec). Multi-channel DDR5 configurations (≥ 4 channels) are required to meet this figure on ARM64 server platforms.
+
+**Reference platforms.** The following ARM64 platforms have been validated or are representative targets:
+
+| Platform | ISA | Cores | Base GHz | L3 | Memory BW | Notes |
+|----------|-----|------:|----------:|---:|----------:|-------|
+| AWS Graviton4 (c8g) | ARM64 | 96 | 3.1 | 36 MB | 537 GB/s | Preferred cloud target |
+| AWS Graviton3 (c7g) | ARM64 | 64 | 2.6 | 32 MB | 300 GB/s | Cloud target |
+| Ampere Altra Max | ARM64 | 128 | 3.0 | 64 MB | 409 GB/s | Bare-metal cloud alternative |
+| Intel Xeon w9-3595X | x86-64 | 60 | 2.5 | 300 MB | 332 GB/s | Bare-metal; requires AVX2 simdfix port |
+| Intel Xeon 6980P | x86-64 | 128 | 2.0 | 504 MB | 307 GB/s | High-core-count bare-metal; requires AVX2 port |
+
+**Frequency scaling.** CPU frequency scaling must be disabled on Cores 1–14. A frequency step on a busy-spinning core causes a latency spike that is indistinguishable from a stall. Set the `performance` governor or pin frequency via `cpufreq-set` before starting the gateway. The OS-facing Core 0 may use any governor.
+
+**Hyper-threading.** Hyper-threading (SMT) should be disabled system-wide, or at minimum on Cores 1–14. Two logical cores sharing physical execution resources (ALUs, L1 cache, TLB) cause unpredictable latency jitter on busy-spin loops, even when both logical cores are isolated.
+
+**NUMA.** All 15 gateway cores should reside on a **single NUMA node**. Cross-NUMA memory access adds 40–100 ns per cache miss to SPSC traversal and Aeron IPC ring buffer reads. Verify with `numactl --hardware` before deployment; on a multi-socket system pin all processes to one socket with `numactl --cpunodebind=0 --membind=0`.
+
+### 2.1.2 Memory
+
+> **Review required.** The figures below are estimates based on typical session counts and workload profiles. Actual requirements depend on the number of concurrent FIX sessions, `MemoryStorage` depth, Aeron IPC buffer sizing, Raft log retention period, and JVM GC behaviour under production load. Profile a representative workload against a staging deployment before finalising hardware provisioning.
+
+| Allocation | Minimum | Required (4×) | Notes |
+|------------|---------|---------------|-------|
+| JVM heap (Cluster process) | 6 GB | 24 GB | ZGC; set `-Xms24g -Xmx24g` (pre-committed) |
+| JVM off-heap / NIO buffers | 1 GB | 4 GB | Aeron DirectBuffers, archive I/O staging |
+| Aeron IPC ring buffers (`/dev/shm`) | 1 GB | 4 GB | Configurable; all 7 IPC streams share this pool |
+| C++ process working set | 512 MB | 2 GB | SPSC queues, simdfix decode buffers, MemoryStorage shadow |
+| OS, kernel, and interrupts | 2 GB | 8 GB | headroom for page tables, slab, and IRQ stacks |
+| **Total** | **~11 GB** | **~42 GB** | **64 GB physical RAM required** |
+
+The required column is 4× the calculated minimum in every row. Memory pressure on a low-latency system manifests as latency spikes, not as errors: a page fault on an isolated core stalls the busy-spin loop for tens of microseconds; a JVM GC triggered by heap exhaustion can pause all Java threads. The 4× rule ensures no allocation category can approach saturation under normal operating conditions.
+
+Huge pages must be pre-allocated at host level before any gateway process starts. Aeron Media Driver uses `mmap(MAP_HUGETLB)` for its IPC buffers by default; at least **2 GB of 2 MB huge pages** must be available at the required sizing. Set `vm.nr_hugepages = 1024` in `/etc/sysctl.conf` (1024 × 2 MB = 2 GB). Transparent Huge Pages (THP) must be **disabled** (`echo never > /sys/kernel/mm/transparent_hugepage/enabled`); THP's background compaction thread introduces unpredictable latency spikes on isolated cores.
+
+Swap must be disabled or locked out for the gateway processes. Memory locking (`CAP_IPC_LOCK`, `mlockall(MCL_CURRENT | MCL_FUTURE)`) prevents pages from being evicted while a busy-spin loop is running.
+
+### 2.1.3 Storage
+
+Aeron Archive writes the Raft log and cluster snapshots to NVMe. Every Raft commit requires a durable write to the log before the leader can acknowledge quorum; NVMe write latency adds directly to the Raft commit time and therefore to end-to-end order latency.
+
+| Requirement | Minimum | Recommended | Notes |
+|-------------|---------|-------------|-------|
+| Device type | SSD (SATA or NVMe) | NVMe PCIe 4.0 | HDD is not suitable; SATA SSD is acceptable for development and non-latency-critical deployments; NVMe required for production |
+| Capacity | ≥ 256 GB | ≥ 400 GB | 256 GB accommodates the Raft log and snapshots under typical retention; 400 GB provides the 4× headroom applied to all other resources |
+| Sequential write throughput | ≥ 500 MB/s | ≥ 2 GB/s | Raft log is purely sequential; sustained throughput matters under log catch-up after follower restart |
+| Write latency (p99) | ≤ 500 µs | ≤ 100 µs | Each Raft commit stalls until the write completes; p99 directly sets the commit latency floor |
+| Write latency (p999) | ≤ 2 ms | ≤ 500 µs | Must remain well below the election timeout (500 ms); spikes above 1 ms are visible in commit tail latency |
+| Write endurance | ≥ 1 DWPD | ≥ 3 DWPD | Raft log is write-heavy; consumer drives (< 0.3 DWPD) wear prematurely under sustained commit load |
+| Power loss protection | — | Required | Enterprise drives with capacitor-backed write cache; without PLP, `barrier=0` is unsafe |
+| Mount | Dedicated volume | Dedicated volume | Sharing with OS disk risks I/O priority inversion during log writes |
+
+**Reference drives.** The following enterprise NVMe devices meet all requirements:
+
+| Drive | Form factor | Write BW | Write p99 | DWPD | PLP |
+|-------|-------------|----------:|----------:|-----:|-----|
+| Samsung PM9A3 | U.2 / E1.S | 2.0 GB/s | ~80 µs | 3 | Yes |
+| Micron 9400 Pro | U.2 | 2.0 GB/s | ~70 µs | 3 | Yes |
+| Kioxia CM7-V | U.2 / E3.S | 2.5 GB/s | ~60 µs | 3 | Yes |
+| Intel Optane P5800X | U.2 | 2.0 GB/s | ~15 µs | 100 | Yes |
+
+Intel Optane (3D XPoint) offers write latency an order of magnitude lower than NAND-based NVMe and is the preferred choice where p99 Raft commit time is a primary concern. Optane production availability is limited; PM9A3 or Micron 9400 are the practical default choices.
+
+The Aeron Archive directory should be on a filesystem mounted with `noatime,nodiratime`. On Linux, `ext4` with `data=writeback` and `barrier=0` (safe only on drives with power loss protection) reduces commit latency by avoiding journal barriers on each write.
+
+### 2.1.4 Network
+
+**Topology.** Each gateway node has three logical network roles:
+
+| Role | Traffic | Recommended NIC |
+|------|---------|-----------------|
+| Buy-side ingress | Client TCP connections (FIX 4.2/4.4) | Dedicated 10 GbE |
+| Sell-side egress | Exchange TCP connection (FIX) | Shared with ingress or dedicated |
+| Cluster replication | Raft log replication between 3 nodes | Dedicated low-latency NIC (RDMA-capable preferred) |
+
+Sharing the buy-side and cluster NICs is possible but risks TCP receive interrupt storms from client connections disrupting the Raft heartbeat path. A separate cluster replication NIC with interrupt affinity pinned to Core 0 is the preferred configuration.
+
+**Interrupt affinity.** NIC receive interrupts from all interfaces must be steered away from Cores 1–14. Use `irqbalance` with an exclusion mask, or set `/proc/irq/<N>/smp_affinity` manually after bringing up each interface. An interrupt firing on Core 2 during a NEON decode loop adds 1–5 µs of jitter to that decode.
+
+**Cluster node placement.** The three Raft nodes must be co-located on the same physical network segment. Raft commit RTT is 2 × network RTT between leader and followers; at bare-metal co-lo this is 2–5 µs. Cross-rack adds 10–20 µs; cross-AZ (cloud) adds 200–500 µs and must be avoided. See §3.2.3 for the throughput impact.
+
+### 2.1.5 Operating System and Kernel
+
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| Linux kernel | 6.1 | 6.6 LTS |
+| `io_uring` operation set | `IORING_OP_RECV`, `IORING_OP_SEND`, `IORING_SETUP_SQPOLL` | same |
+| Kernel boot parameters | `isolcpus=1-14 nohz_full=1-14 rcu_nocbs=1-14` | + `irqaffinity=0` |
+| Linux capabilities (gateway processes) | `CAP_SYS_NICE`, `CAP_IPC_LOCK`, `CAP_NET_ADMIN` | same |
+| THP | disabled | disabled |
+| NUMA balancing (`numa_balancing`) | disabled | disabled |
+| Kernel RCU grace periods on isolated cores | disabled (via `rcu_nocbs`) | same |
+
+The `nohz_full` parameter suppresses the periodic scheduler tick on isolated cores, eliminating a source of ~4 µs jitter that fires once per millisecond. `rcu_nocbs` offloads RCU callbacks from isolated cores to Core 0. Both are required on cores running busy-spin loops (Cores 1, 2, 7, 8, 9, 10).
+
+### 2.1.6 Java Runtime
+
+| Requirement | Value |
+|-------------|-------|
+| JDK version | Java 21 (LTS) |
+| Garbage collector | ZGC (`-XX:+UseZGC -XX:+ZGenerational`) |
+| Heap | `-Xms24g -Xmx24g` (pre-committed; no growth pauses) |
+| GC pause target | `-XX:MaxGCPauseMillis=1` |
+| Thread pinning | `--enable-preview` not required; Aeron uses raw threads |
+| JVM affinity | Cluster JVM pinned to Cores 3–6 via `numactl` or JVM launcher wrapper |
+
+ZGC pause time must remain well below the Raft election timeout (500 ms by default). With a 6 GB heap and ZGC Generational, observed p99 pause times are under 1 ms. G1GC and Parallel GC must not be used; their stop-the-world pauses can exceed the election timeout under heap pressure and trigger a spurious leader election.
+
+### 2.1.7 Virtual and Cloud Environments
+
+The gateway can run in cloud VMs and containers, subject to the constraints below. All rows must be satisfied before production traffic is accepted.
+
+| Requirement | Bare-metal | Cloud VM | Container |
+|-------------|-----------|----------|-----------|
+| `IORING_SETUP_SQPOLL` | available | requires `CAP_SYS_NICE`; verify per-hypervisor | requires `CAP_SYS_NICE`; verify |
+| `/dev/shm` ≥ 1 GB | OS default | default sufficient | must set `--shm-size=1g` |
+| Huge pages | `vm.nr_hugepages` in sysctl | host-level sysctl; applies to all VMs on host | host-level only; not configurable inside container |
+| CPU isolation (`isolcpus`) | kernel boot param | not available on vCPU; use cgroup `cpuset` | `cpuset` cgroup |
+| vCPU steal on busy-spin cores | zero (physical core) | zero only on bare-metal or dedicated-host instance | zero only on dedicated host |
+| Cluster node placement | same rack | same AZ + placement group; SR-IOV for Raft NIC | same AZ; host networking preferred |
+| Invariant TSC / PTP clock | hardware-provided | provider-dependent; verify `clocksource=tsc` is stable | inherits from host |
+
+For cloud deployments, bare-metal instances (AWS c7g.metal, GCP c3-highcpu-176, Azure Mbsv3) or dedicated-host VM instances are required for Cores 1–14. Shared-tenancy vCPUs introduce steal that cannot be bounded and will cause latency spikes indistinguishable from component failures.
+
+See Chapter 5 for step-by-step configuration instructions for each cloud environment.
 
 ---
 

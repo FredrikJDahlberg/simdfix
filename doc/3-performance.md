@@ -2,6 +2,8 @@
 
 End-to-end latency budget and throughput analysis for the FIX gateway. All simdfix decode/encode figures are measured values from `SimdFixBenchmark` (release build, ARM NEON, Apple M1 Pro); see [performance.md](performance.md) for the full benchmark table. Throughput figures are derived analytically from Little's Law applied to the risk system, which is the sole throughput bottleneck.
 
+**Assumed hardware.** The latency figures in §3.1 assume the production hardware profile defined in §2.1.1–§2.1.3: ARM64 CPU (≥ 3.0 GHz base clock, ≥ 32 MB L3, ≥ 100 GB/s memory bandwidth), 64 GB RAM with huge pages pre-allocated, and an enterprise NVMe SSD (write p99 ≤ 100 µs) for the Raft log. The Raft replication figures (2–5 µs) assume bare-metal co-located cluster nodes on a dedicated low-latency network segment. Deployments that meet only the minimum hardware requirements (§2.1.1–§2.1.3 minimum columns) should expect higher latency, particularly at the Raft commit stage; see §3.2 for the per-stage impact of suboptimal hardware and cloud deployments.
+
 ---
 
 ## 3.1 End-to-End Latency

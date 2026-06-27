@@ -78,6 +78,17 @@ Every message committed to the Raft log receives a **`clusterSessionPosition`**:
 - **Failover recovery.** On process restart, the cluster replays the Raft log from the last snapshot position. Outstanding risk requests are identified as `FORWARD_APP` log entries with no corresponding committed `RISK_APPROVED` or `RISK_REJECTED` at a higher position. The new Risk Thread re-submits them using the original `clusterSessionPosition` as the correlation anchor.
 - **Resend deduplication.** `MemoryStorage` indexes outbound messages by `clusterSessionPosition`, allowing the cluster to detect and suppress duplicate `SEND` commands that arrive because an AppWorker replayed from an earlier log position.
 
+**Dual sequence numbering.** Every received message carries two independent sequence numbers that serve different purposes:
+
+| Number | Scope | Assigned by | Used for |
+|--------|-------|-------------|----------|
+| `clusterSessionPosition` | Global — all sessions combined | `ConsensusModule` at commit time | Idempotency, failover correlation, risk response matching |
+| `inboundSeqNum` (FIX tag 34) | Per-connection — one counter per external FIX session | `FixClusteredService` per `SessionState` entry | FIX gap detection, ResendRequest range, session-level acknowledgement |
+
+The two numbers are independent. A message arriving on the buy-side client session might receive global position 10042 and per-connection sequence 17; the next message arriving on the sell-side session might receive global position 10043 and per-connection sequence 892. The global position imposes a total order across all connections simultaneously; the per-connection sequence number tracks continuity within a single FIX session as required by the FIX protocol.
+
+On failover both numbers are recovered from cluster state: the global position from the Raft log tail (the next committed entry continues from the highest position), and the per-connection sequences from the `inboundSeqNum`/`outboundSeqNum` fields in each `SessionState` snapshot entry.
+
 ---
 
 ### 6.1.5 Timestamp Assignment
@@ -166,13 +177,34 @@ If the requested range extends beyond what `MemoryStorage` holds, the cluster fa
 
 ### 6.1.8 Multi-Session Sequencing
 
-A single `FixClusteredService` instance handles all connected FIX sessions across all Ingress nodes. Each FIX client session is identified by an Aeron `sessionId` embedded in the SBE message header on stream 1.
+`FixClusteredService` maintains a session context for **every external FIX connection** — not only buy-side client sessions, but also the sell-side exchange session. In the minimum deployment there are at least two contexts: one for the buy-side client and one for the sell-side exchange. In practice there will be one sell-side context plus one context per connected buy-side client.
 
-The service maintains a `Map<Long, SessionState>` keyed by `sessionId`. Each entry holds the per-session `inboundSeqNum`, `outboundSeqNum`, `sessionPhase`, and associated timers. Session entries are created on `CONNECT` and removed on `DISCONNECT`.
+The service maintains a `Map<Long, SessionState>` keyed by a `sessionId` that is unique per external connection. Each entry holds:
 
-Total ordering across sessions is provided by the Raft log: if two Ingress nodes publish simultaneously on their respective stream 1 publications, the `ConsensusModule` on the leader serialises them into adjacent log entries. The order in which they are serialised is the authoritative order for the entire cluster lifetime — followers apply them in the same order, and the new leader after a failover replays them in the same order.
+```
+inboundSeqNum:   int64         — last committed inbound FIX sequence number
+outboundSeqNum:  int64         — last committed outbound FIX sequence number
+sessionPhase:    SessionPhase  — current state in the session state machine
+sessionRole:     SessionRole   — ACCEPTOR (buy-side) or INITIATOR (sell-side)
+memoryStorage:   MemoryStorage — outbound message buffer for ResendRequest
+heartbeatTimer:  int64         — correlationId of active heartbeat timer (0 if none)
+testReqTimer:    int64         — correlationId of active test-request timer (0 if none)
+```
 
-This means that even in a multi-node Ingress deployment, there is no cross-session race: every FIX message from every client is committed to a unique, globally ordered position before any application processing occurs.
+The `sessionRole` field distinguishes the two session types. Buy-side (acceptor) sessions wait for the client to send a Logon; sell-side (initiator) sessions emit the Logon themselves after `CONNECT`. The phase transition diagrams differ accordingly, but the underlying state fields — sequence numbers, timers, `MemoryStorage` — are identical in structure. Both session types are replicated across all Raft nodes and included in the cluster snapshot.
+
+This is the property that makes sell-side failover as clean as buy-side failover: when a new leader is elected, it inherits the committed sell-side `outboundSeqNum` and `inboundSeqNum` from the cluster state and uses them immediately when establishing the new exchange connection, without requiring any local recovery on the EgressWorker.
+
+**Session map at startup (minimum configuration):**
+
+| sessionId | Role | CompID pair | Notes |
+|-----------|------|-------------|-------|
+| `SELL_SIDE` (well-known constant) | INITIATOR | GatewayCompID / ExchangeCompID | Sell-side exchange session |
+| per buy-side client | ACCEPTOR | ClientCompID / GatewayCompID | One entry per connected client |
+
+The sell-side `sessionId` is a well-known constant agreed at configuration time, not an Aeron-assigned value, because the sell-side connection is initiated by the gateway rather than received on a shared Aeron ingress channel.
+
+Total ordering across all sessions is provided by the Raft log: every message from every external connection — buy-side and sell-side — is committed to a unique `clusterSessionPosition` before any application processing occurs. Concurrent messages from different connections are serialised by the `ConsensusModule` on the leader and applied in the same order on every node.
 
 ---
 
@@ -327,3 +359,565 @@ On `onRoleChange(LEADER)` the cluster publishes `CONNECT` on stream 6. The handl
 3. Begins offering inbound frames from newly accepted connections on stream 1.
 
 The handler does not need to recover any prior state — it inherits the session's committed state entirely from the cluster's subsequent stream 6 commands. The first command after `CONNECT` is typically `SEND Logon` (the cluster-initiated outbound Logon to the reconnecting client), which the handler encodes and sends verbatim.
+
+---
+
+## 6.3 Session Component (Ingress Process)
+
+### 6.3.1 Role and Internal Structure
+
+The Session Component is the C++ Ingress process. It is the gateway's sole point of contact with buy-side clients over TCP and the sole producer of SBE-encoded inbound messages on stream 1. Internally it is two cooperating threads connected by a pair of SPSC queues:
+
+```
+TCP (buy-side clients)
+        │ inbound FIX bytes
+        ▼
+┌───────────────────────┐  RX SPSC  ┌─────────────────────────────┐
+│  Core 1               │ ────────► │  Core 2                     │
+│  io_uring Reactor     │           │  FIX Session Handler        │
+│                       │ ◄──────── │                             │
+│  · TCP accept/recv    │  TX SPSC  │  · PayloadDecoder (SIMD)    │
+│  · Registered buffers │           │  · Admission filter         │
+│  · SQPOLL kernel poll │           │  · SBE encode → stream 1    │
+│  · CQE busy-spin      │           │  · stream 6 poll → FIX enc  │
+└───────────────────────┘           └─────────────────────────────┘
+        ▲ outbound FIX bytes
+        │
+  TX SPSC → Core 1 → IORING_OP_SEND
+```
+
+§6.2 describes the design principles of the FIX Session Handler as a cluster-driven proxy. This section covers the implementation detail of both threads and their interaction.
+
+### 6.3.2 Ingress Reactor (Core 1)
+
+The reactor is a single-threaded busy-spin loop that owns all TCP file descriptors. It never blocks and never allocates heap memory. The default implementation uses **epoll** with non-blocking sockets and `SO_BUSY_POLL`; on bare-metal deployments **io_uring** with `IORING_SETUP_SQPOLL` and registered buffers is available as a higher-performance alternative (see §6.3.2.1).
+
+**Accept path.** A non-blocking listen socket is registered with `epoll_ctl(EPOLL_CTL_ADD, EPOLLIN | EPOLLET)`. When `epoll_wait` returns an event on the listen socket, the reactor calls `accept4(SOCK_NONBLOCK)` in a loop until it returns `EAGAIN`, accepting all pending connections in a single wake-up. Each accepted fd is set to `O_NONBLOCK`, has `TCP_NODELAY` and `SO_BUSY_POLL` applied, and is registered with `epoll_ctl(EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLET)`. The fd is recorded in a flat `fd → SessionContext*` table for O(1) lookup.
+
+**Reactor loop.** The reactor calls `epoll_wait(epfd, events, MAX_EVENTS, 0)` with a timeout of zero on every iteration — non-blocking poll. When no events are ready it returns immediately with `n = 0` and the loop spins. `SO_BUSY_POLL` on each accepted fd instructs the NIC driver to busy-poll the receive queue for a configurable number of microseconds before returning to the kernel, reducing interrupt-driven wakeup latency to near-zero at the cost of CPU.
+
+```cpp
+while (running) {
+    int n = epoll_wait(epfd, events, MAX_EVENTS, /*timeout=*/0);
+    for (int i = 0; i < n; ++i) {
+        int  fd  = events[i].data.fd;
+        auto ev  = events[i].events;
+        if (fd == listenFd)                  { acceptAll();          }
+        else if (ev & (EPOLLHUP | EPOLLERR)) { handleDisconnect(fd); }
+        else {
+            if (ev & EPOLLIN)  { drainReceive(fd); }
+            if (ev & EPOLLOUT) { flushPendingSend(fd); }
+        }
+    }
+    drainTxSpsc();   // submit any outbound data Core 2 has queued
+}
+```
+
+**Receive path.** `drainReceive(fd)` calls `recv(fd, buf, BUF_SIZE, MSG_DONTWAIT)` in a loop until `EAGAIN`. Each successful `recv` writes an `RxSpan { buf_ptr, length, fd }` to the RX SPSC toward Core 2. The receive buffer is a fixed-size slab allocated at startup; the same buffer is reused across calls. Core 2 must copy or fully process each span before returning control — the buffer is overwritten on the next receive.
+
+**Send path.** `drainTxSpsc()` drains entries from the TX SPSC and calls `send(fd, buf, len, MSG_DONTWAIT)` for each. If `send` returns `EAGAIN` (kernel send buffer full), the unsent remainder is held in a per-fd pending send slot and `EPOLLOUT` is armed on the fd via `epoll_ctl(EPOLL_CTL_MOD)`. `flushPendingSend(fd)` is called when `EPOLLOUT` fires, resuming the stalled send. Once the pending send is drained, `EPOLLOUT` is disarmed.
+
+**Disconnect handling.** `EPOLLRDHUP` or a zero-length `recv` signals a clean client close. `EPOLLERR` or a negative `recv`/`send` result signals an error. In either case the reactor calls `epoll_ctl(EPOLL_CTL_DEL)`, closes the fd, removes it from the fd table, and writes an `RxSpan { nullptr, 0, fd }` sentinel to the RX SPSC. Core 2 interprets the null sentinel as a disconnect for that session.
+
+#### 6.3.2.1 io_uring on Bare Metal
+
+On bare-metal deployments where `CAP_SYS_NICE` and kernel ≥ 6.1 are available, the reactor can be replaced with an io_uring implementation that eliminates syscall overhead and kernel data copies on the hot path:
+
+| Mechanism | epoll (default) | io_uring (bare metal) |
+|-----------|----------------|----------------------|
+| Receive syscall overhead | `recv()` per burst | Zero (`IORING_SETUP_SQPOLL`) |
+| Data copy on receive | Kernel → user buffer on each `recv` | None — registered buffers filled in place |
+| Send syscall overhead | `send()` per frame | Zero — SQE submission only |
+| Accept | `accept4()` per connection | `IORING_OP_ACCEPT` with multishot |
+| Capability required | None | `CAP_SYS_NICE` for SQPOLL |
+
+The io_uring reactor uses `IORING_SETUP_SQPOLL` (kernel SQ polling thread), `io_uring_register_buffers` (fixed registered buffer pool), `IORING_RECV_MULTISHOT` (one SQE serves multiple receives), and `IORING_OP_SEND` with the registered buffer index. Core 2 reads directly from the registered buffer without an extra copy. On the M1 Pro the measured receive-to-SPSC latency is approximately 150 ns with io_uring vs. 400 ns with epoll, a difference that is visible at the sub-microsecond pipeline budget level.
+
+Select the io_uring reactor by setting `reactor.mode = io_uring` in the gateway configuration. The epoll reactor is the default and is required in virtualised environments where `IORING_SETUP_SQPOLL` is not available.
+
+### 6.3.3 SPSC Queue Layout
+
+Both SPSC queues use the same layout:
+
+```cpp
+struct alignas(64) SpscQueue {
+    alignas(64) std::atomic<uint64_t> head;   // written by producer
+    alignas(64) std::atomic<uint64_t> tail;   // written by consumer
+    Entry slots[CAPACITY];
+};
+```
+
+Head and tail are on separate cache lines to prevent false sharing between the producer (Core 1) and consumer (Core 2) on the RX queue, and vice versa on the TX queue. The producer writes with `std::memory_order_release`; the consumer reads with `std::memory_order_acquire`, establishing a happens-before relationship without a full memory fence on either path.
+
+**RX SPSC entry:**
+```cpp
+struct RxSpan {
+    const uint8_t* buf;   // pointer into registered buffer pool (or nullptr for disconnect)
+    uint32_t       len;   // bytes valid at buf
+    int32_t        fd;    // source file descriptor
+};
+```
+
+**TX SPSC entry:**
+```cpp
+struct TxSpan {
+    const uint8_t* buf;   // pointer into registered buffer pool
+    uint32_t       len;   // bytes to send
+    int32_t        fd;    // destination file descriptor
+};
+```
+
+Capacity is sized to absorb a worst-case burst: peak client count × maximum FIX frame size × burst depth. In practice the queues are sized at 4096 entries each; at 512 bytes per FIX frame that is 2 MB of logical buffering per direction.
+
+### 6.3.4 PayloadDecoder: SIMD Frame Detection
+
+`PayloadDecoder` operates on each `RxSpan` delivered by the RX SPSC. It has two phases: SOH scan and field decode.
+
+**SOH scan.** The scanner uses ARM NEON to locate SOH (`0x01`) delimiter bytes 16 at a time:
+
+```cpp
+const uint8x16_t soh = vdupq_n_u8(0x01);
+
+for (size_t i = 0; i + 16 <= len; i += 16) {
+    uint8x16_t chunk = vld1q_u8(buf + i);
+    uint8x16_t eq    = vceqq_u8(chunk, soh);
+    uint64_t   mask  = vget_lane_u64(vreinterpret_u64_u8(vshrn_n_u16(
+                           vreinterpretq_u16_u8(eq), 4)), 0);
+    // each nibble in mask corresponds to one byte in chunk
+    while (mask) {
+        int pos = __builtin_ctzll(mask) >> 2;
+        tokens[tokenCount++] = { i + pos, ... };
+        mask &= mask - 1;
+    }
+}
+```
+
+Each SOH position marks the end of one `tag=value` field. The scan fills a `TokenArray` — a flat array of `(offset, length)` pairs — at the rate of one NEON instruction per 16 bytes of input. On the M1 Pro this processes approximately 10 GB/s, consuming a maximum-length FIX frame (typically 200–500 bytes) in under 50 ns.
+
+**Frame boundary detection.** A complete FIX frame begins with `8=FIX` and ends with `10=NNN|`. The scanner maintains a lightweight state machine across `RxSpan` boundaries to handle frames that span multiple TCP receive buffers. When a complete frame is detected, the token array is handed to the field decoder.
+
+**Field decode.** The field decoder iterates the token array and, for each `(tag, value)` pair, performs:
+
+1. Tag parse: integer parse of the tag number from the byte range. Tags are at most 4 digits; this is a 4-branch switch or SWAR integer parse.
+2. Value parse: type-specific decode depending on the tag:
+   - `MsgType` (tag 35): single character or short string → enum lookup
+   - `MsgSeqNum` (tag 34): integer parse
+   - `SenderCompID` (tag 49), `TargetCompID` (tag 56): string copy into FIX internal format buffer
+   - Application fields (tag 55 symbol, tag 38 qty, tag 44 price, etc.): type-specific parse into the internal format field union
+
+The output is a `FIXMessage` in FIX internal format: a fixed-size struct of decoded field values with a presence bitmask indicating which tags were found in the frame.
+
+### 6.3.5 Inbound Pipeline: Frame to Stream 1
+
+For each complete `FIXMessage` produced by `PayloadDecoder`:
+
+```
+1. Admission check:
+   a. Frame size ≤ maximum configured size.
+   b. Checksum arithmetic: sum of all bytes before tag 10 mod 256 == tag 10 value.
+   c. fd is in the known-connection table (i.e. a CONNECT has been received for it).
+   → If any check fails: discard silently. No response sent. No cluster notification.
+
+2. SBE encode:
+   Extract MsgType, MsgSeqNum, SenderCompID, TargetCompID, and application fields.
+   Write into SBE flyweight layout in the Aeron publication claim buffer.
+
+3. Aeron offer (stream 1):
+   publication.offer(claimBuffer, offset, length)
+   → Returns: BACK_PRESSURED | NOT_CONNECTED | CLOSED | position
+
+4. If BACK_PRESSURED:
+   Spin on offer until it succeeds.
+   The spin on offer blocks Core 2 from draining the RX SPSC.
+   The stalled RX SPSC consumer stops the reactor from re-arming receives.
+   The reactor's registered receive buffers fill and TCP flow control kicks in.
+   → Back-pressure propagates from the cluster ring to the buy-side TCP socket.
+```
+
+Step 4 is the back-pressure chain. No explicit flow control message is sent; the TCP window naturally closes as the kernel receive buffers fill behind the stalled reactor.
+
+### 6.3.6 Outbound Pipeline: Stream 6 to TCP
+
+Core 2 runs a concurrent polling loop on Aeron stream 6 interleaved with its RX SPSC drain. Each fragment received from stream 6:
+
+```
+1. Decode SBE discriminator byte.
+2. Decode clusterSessionPosition from the envelope header.
+3. Decode SBE payload into FIX internal format fields.
+4. Update shadowPhase if the discriminator implies a state change.
+5. Encode outbound FIX frame using PayloadEncoder:
+   a. Claim TX SPSC slot.
+   b. Write Standard Header into claim slot buffer (BeginString, BodyLength
+      placeholder, MsgType, SenderCompID, TargetCompID, MsgSeqNum, SendingTime).
+   c. Write body fields.
+   d. Write CheckSum trailer.
+   e. Back-fill BodyLength.
+6. Release TX SPSC slot → Core 1 picks up and submits IORING_OP_SEND.
+```
+
+The outbound path never blocks. If the TX SPSC is full (Core 1 is not draining fast enough), step 5a spins. In practice the TX SPSC drains faster than it fills — a single `IORING_OP_SEND` submission takes under 100 ns, and outbound FIX frames arrive at most once per committed cluster entry.
+
+### 6.3.7 Multi-Session Multiplexing
+
+The reactor accepts connections from multiple buy-side clients on the same listen socket. Each client fd gets a `sessionTag` — a compact integer assigned at accept time. The `sessionTag` is embedded in the `RxSpan.fd` field and passed through to the SBE message on stream 1, where it becomes the Aeron `sessionId` that the cluster uses to route commands back on stream 6.
+
+Core 2 maintains a `fd → SessionContext` table:
+
+```cpp
+struct SessionContext {
+    int32_t      fd;
+    uint32_t     sessionTag;
+    SessionPhase shadowPhase;
+    uint32_t     partialFrameOffset;  // for frames spanning RxSpan boundaries
+    uint8_t      partialFrameBuf[MAX_FIX_FRAME];
+};
+```
+
+Multiple sessions share the same `PayloadDecoder` instance but each has its own `partialFrameOffset` and `partialFrameBuf` to handle TCP fragmentation independently. The token array is allocated on the stack per decode call; there is no heap allocation on the decode path.
+
+---
+
+## 6.4 Application Component (Application Process)
+
+### 6.4.1 Role and Internal Structure
+
+The Application Component is the C++ application process. It receives ordered commands from the cluster on stream 2 and is the pipeline stage that performs application-level decision-making: dispatching order events, running fast pre-checks, and managing the external risk system interaction. It consists of two threads:
+
+```
+stream 2 (cluster → AppWorker)
+        │
+        ▼
+┌───────────────────────────────┐
+│  Core 7                       │──► stream 3 (reject commands → cluster)
+│  AppWorker                    │──► stream 4 (approved OrderCommand → Egress)
+│                               │──► stream 6 (SEND/RESEND → Ingress FIX Session)
+│  · stream 2 busy-spin poll    │
+│  · Command dispatch (CRTP)    │
+│  · SBE decode (zero-copy)     │
+│  · Fast risk check (< 100 ns) │
+└───────────────────────────────┘
+        │ SPSC (OrderRecord)
+        ▼
+┌───────────────────────────────┐
+│  Core 8                       │──► stream 7 (risk responses → cluster)
+│  Risk Thread                  │◄──► Risk System (proprietary TCP, 100–500 ms)
+│                               │
+│  · 25-slot correlation table  │
+│  · Per-client FIFO queues     │
+│  · Multiplexed RPC            │
+└───────────────────────────────┘
+```
+
+### 6.4.2 AppWorker Duty Cycle
+
+The AppWorker executes a tight busy-spin loop on Core 7. Each iteration:
+
+```
+1. Poll stream 2 (up to 10 fragments per poll call).
+   For each fragment: dispatch on discriminator byte.
+
+2. No fragments: continue spinning — no yield, no sleep.
+```
+
+The fragment limit of 10 per poll prevents a burst of cluster commands from starving the stream 6 publication path (outbound direction). After processing 10 fragments the loop re-enters its top, checking all subscriptions again.
+
+**Command dispatch.** The discriminator byte in the stream 2 envelope selects the handler:
+
+| Discriminator | Handler |
+|---------------|---------|
+| `FORWARD_APP` | Decode SBE payload → fast risk → SPSC to Risk Thread |
+| `RISK_APPROVED` | Encode `OrderCommand` → publish on stream 4 |
+| `RISK_REJECTED` | Encode reject → publish on stream 3 |
+| `SEND` / `RESEND` | Forward SBE payload → publish on stream 6 |
+| `GAP_FILL` | Forward sequence range → publish on stream 6 |
+| `CONNECT` | Reset transient state; activate processing |
+| `DISCONNECT` | Suppress all non-structural output; clear transient state |
+
+### 6.4.3 SBE Decode: Zero-Copy Flyweight
+
+`FORWARD_APP` payload decoding uses a generated SBE flyweight decoder that overlays the Aeron `DirectBuffer` directly — no copy of the message bytes is made. The flyweight exposes field accessors as inline functions:
+
+```cpp
+NewOrderSingleDecoder nos;
+nos.wrapAndApplyHeader(buffer, offset, length);
+
+ClOrdId  clOrdId  = nos.clOrdId();   // returns StringView into DirectBuffer
+Side     side     = nos.side();       // returns enum from uint8
+Qty      qty      = nos.orderQty();   // returns int64 scaled fixed-decimal
+Price    price    = nos.price();      // returns int64 scaled fixed-decimal
+Symbol   symbol   = nos.symbol();     // returns StringView
+```
+
+All accessors are `[[nodiscard]] constexpr` and resolve at compile time to a single memory read at a fixed offset from the flyweight base. There is no tag scanning, no string parsing, and no heap allocation on this path.
+
+The CRTP dispatch template `FixMessageHandler<AppHandler>` selects the correct flyweight type from the SBE `templateId` field in the message header and invokes the corresponding `onNewOrderSingle`, `onOrderCancelRequest`, or `onOrderCancelReplaceRequest` method on the `AppHandler` implementation.
+
+### 6.4.4 Fast Risk Check
+
+Before enqueuing an order to the Risk Thread, the AppWorker performs an in-process pre-check using atomic load operations on shared position and rate counters. The check is designed to reject obviously invalid orders without consuming a risk slot:
+
+```cpp
+bool AppHandler::fastRiskCheck(const NewOrderSingleDecoder& nos) {
+    auto& limits = riskLimits[nos.symbol()];
+    int64_t pos     = limits.netPosition.load(std::memory_order_relaxed);
+    int64_t notional = limits.notionalUsed.load(std::memory_order_relaxed);
+    int64_t rate    = limits.ordersThisSecond.load(std::memory_order_relaxed);
+
+    return pos     + nos.sideSign() * nos.orderQty() <= limits.maxNetPosition
+        && notional + nos.price() * nos.orderQty()    <= limits.maxNotional
+        && rate                                        <  limits.maxOrderRate;
+}
+```
+
+All three reads are `memory_order_relaxed` — they read the last value visible to this core without a fence. A stale read is acceptable: the fast check is a best-effort filter, not a guarantee. The external risk system provides the authoritative decision. The check is bounded at **under 100 ns** (three cache-warm atomic loads).
+
+Orders that fail the fast check are rejected immediately without entering the Risk Thread. The AppWorker publishes a reject command on stream 3; the cluster commits it and emits `SEND ExecutionReport(Rejected)` on stream 2.
+
+### 6.4.5 SPSC to Risk Thread: OrderRecord
+
+Orders that pass the fast check are written to the SPSC between Core 7 and Core 8:
+
+```cpp
+struct OrderRecord {
+    uint64_t clusterSessionPosition;  // idempotency key from stream 2 envelope
+    uint64_t sessionId;               // identifies the buy-side client session
+    ClOrdId  clOrdId;                 // client order ID
+    Symbol   symbol;                  // instrument
+    Side     side;                    // buy / sell
+    Qty      orderQty;                // quantity (scaled integer)
+    Price    price;                   // limit price (scaled integer, 0 for market)
+    OrdType  ordType;                 // market / limit / stop
+};
+```
+
+The record contains decoded field values, not raw FIX bytes or SBE bytes. The Risk Thread requires no FIX or SBE awareness. The `clusterSessionPosition` is the anchor that connects the risk response back to the originating order in the Raft log.
+
+If the SPSC is full (all 25 risk slots are occupied and the Risk Thread is not draining), the AppWorker spins on the SPSC write. This stalls the stream 2 poll loop, which causes Aeron back-pressure to build on the cluster's stream 2 publication. The cluster's conductor thread detects the back-pressure and stops committing new messages until the publication clears. This is the back-pressure chain from the external risk system to the Raft log.
+
+### 6.4.6 Risk Thread Event Loop
+
+The Risk Thread on Core 8 runs a single-threaded event loop with three phases executed in sequence on each iteration:
+
+**Phase 1 — Send.** If the global in-flight count is below 25, drain the inbound SPSC:
+
+```
+For each OrderRecord from SPSC:
+    if inFlightByClient[sessionId] is occupied:
+        push to pendingByClient[sessionId]   // preserve per-client order
+    else:
+        correlationId = nextCorrelationId()
+        correlationTable[correlationId % 25] = { record, clusterSessionPosition }
+        inFlightByClient[sessionId]          = correlationId
+        send risk request to Big Iron:       // proprietary TCP frame
+            { correlationId, symbol, side, qty, price, clOrdId }
+        inFlightCount++
+
+if inFlightCount == 25: skip to Phase 2 (no more sends until a slot frees)
+```
+
+**Phase 2 — Receive.** Poll the risk system TCP socket for responses (non-blocking `recv`):
+
+```
+For each response received:
+    correlationId = response.correlationId
+    record        = correlationTable[correlationId % 25]
+    result        = response.approved ? APPROVED : REJECTED
+
+    remove correlationTable[correlationId % 25]
+    remove inFlightByClient[record.sessionId]
+    inFlightCount--
+
+    publish on stream 7 → cluster:
+        { correlationId, clusterSessionPosition, result, reasonCode }
+
+    if pendingByClient[record.sessionId] non-empty:
+        dispatch head of queue immediately (without waiting for SPSC)
+        → re-enters Phase 1 logic for that order only
+```
+
+The cluster receives the stream 7 message, commits it to the Raft log, and emits `RISK_APPROVED` or `RISK_REJECTED` on stream 2 back to the AppWorker. No application state changes before this commit.
+
+**Phase 3 — Back-pressure.** If `inFlightCount == 25`, Phase 1 is skipped. The SPSC from the AppWorker stops being drained. The AppWorker's SPSC write spins, stalling its stream 2 poll, which propagates back-pressure to the cluster.
+
+### 6.4.7 Per-Client Order Serialisation
+
+The `inFlightByClient` and `pendingByClient` structures enforce that at most one risk request per client session is in-flight at any time:
+
+```
+inFlightByClient:  HashMap<sessionId, correlationId>  — size ≤ 25
+pendingByClient:   HashMap<sessionId, Queue<OrderRecord>>
+```
+
+When a response arrives for client A, the Risk Thread immediately dispatches the head of `pendingByClient[A]` (if non-empty) before returning to the main send loop. This minimises head-of-line blocking within a single client's order stream. Across different clients, responses arrive and are dispatched independently in whatever order the risk system returns them.
+
+The per-client serialisation guarantee is what makes risk evaluation correct: the risk system always sees orders from a given client in the order they were committed to the Raft log, and it accumulates position against the result of every prior order for that client before approving or rejecting the next.
+
+### 6.4.8 SEND and RESEND Handling
+
+When the cluster emits `SEND` or `RESEND` on stream 2 (for session-layer or application-layer messages routed back to a buy-side client), the AppWorker does not decode or modify the payload. It reads the SBE envelope from stream 2 and publishes it verbatim on stream 6 toward the Ingress FIX Session component. The FIX Session component (Core 2) decodes the SBE, encodes the FIX frame, and delivers it to the client's TCP connection.
+
+The AppWorker is the routing hop between the cluster's ordered output and the session handler; it does not participate in the content of outbound session or application messages.
+
+---
+
+## 6.5 Egress Component (Egress Process)
+
+### 6.5.1 Role and Internal Structure
+
+The Egress Component is the C++ egress process. It owns the sell-side FIX session — the single persistent, bi-directional TCP connection to the exchange — and is the only process that sends orders to and receives execution reports from the sell-side gateway. It consists of two cooperating threads:
+
+```
+stream 4 (AppWorker → EgressWorker: approved OrderCommands)
+        │
+        ▼
+┌───────────────────────────────┐  TX SPSC  ┌─────────────────────────────┐
+│  Core 9                       │ ────────► │  Core 10                    │
+│  EgressWorker                 │           │  Egress Reactor             │
+│                               │ ◄──────── │                             │
+│  · stream 4 subscriber        │  RX SPSC  │  · epoll event loop         │
+│  · Egress risk accounting     │           │  · Single exchange TCP fd   │
+│  · FIX encode (PayloadEncoder)│           │  · recv / send              │
+│  · FIX decode (PayloadDecoder)│           │  · SO_BUSY_POLL             │
+│  · Endpoint failover          │           │  · io_uring on bare metal   │
+│  · stream 5 publisher         │           └─────────────────────────────┘
+└───────────────────────────────┘                       │  ▲
+                                              TCP send  │  │ TCP recv
+                                              (orders)  │  │ (exec reports)
+                                                        ▼  │
+                                              Sell-side Exchange
+```
+
+Unlike the ingress reactor, which manages many client fds, the egress reactor manages a **single TCP connection** to the exchange at any time. This simplifies the event loop considerably — there is no fd routing table, no per-connection partial-frame buffer complexity across multiple sessions, and no accept path in normal operation.
+
+### 6.5.2 Egress Reactor (Core 10)
+
+The egress reactor uses the same epoll-based design as the ingress reactor (§6.3.2), with three differences reflecting the single-connection, initiator role:
+
+**Connect path.** The reactor is responsible for establishing the TCP connection. It calls `connect(fd, endpoint, ...)` in non-blocking mode and monitors the fd with `EPOLLOUT` to detect completion. On `EPOLLOUT` after a `connect`, it checks `getsockopt(SO_ERROR)` to confirm success, then arms `EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLET` for normal operation and signals the EgressWorker that the connection is ready.
+
+**Single-fd loop.** With only one exchange fd active, the `epoll_wait` loop is simplified: there is no fd dispatch table. Events on the single registered fd are handled directly:
+
+```cpp
+while (running) {
+    int n = epoll_wait(epfd, &event, 1, /*timeout=*/0);
+    if (n > 0) {
+        auto ev = event.events;
+        if (ev & (EPOLLHUP | EPOLLERR | EPOLLRDHUP)) { handleDisconnect(); }
+        else {
+            if (ev & EPOLLIN)  { drainReceive(); }
+            if (ev & EPOLLOUT) { flushPendingSend(); }
+        }
+    }
+    drainTxSpsc();   // forward encoded FIX frames from Core 9
+}
+```
+
+**Reconnect path.** On disconnect the reactor closes the fd, removes it from epoll, and signals the EgressWorker via a flag. The EgressWorker selects the next endpoint from its priority list and instructs the reactor to initiate a new `connect`. The reactor creates a fresh non-blocking socket, registers it with epoll, and initiates the connect. No existing state is carried from the old fd.
+
+**io_uring on bare metal.** The same io_uring alternative described in §6.3.2.1 applies to the egress reactor. With a single fd the io_uring advantage is less pronounced than on the ingress (fewer concurrent receives), but the registered-buffer zero-copy benefit on the receive path (execution reports) is still measurable under high fill rates. Configure with `egress.reactor.mode = io_uring`.
+
+### 6.5.3 EgressWorker: Outbound Path (Orders)
+
+The EgressWorker busy-spins on stream 4, which carries `OrderCommand` entries published by the AppWorker after the cluster commits `RISK_APPROVED`. For each `OrderCommand`:
+
+```
+1. Decode the OrderCommand SBE payload:
+   { clusterSessionPosition, sessionId, clOrdId, symbol, side, qty, price, ordType }
+
+2. Egress risk check (position and notional accounting):
+   net_position[symbol]  += side_sign × qty
+   notional_used[symbol] += price × qty
+   If either breaches the egress limit: drop order, publish reject on stream 5.
+
+3. Route to SellSideSession:
+   Look up the active SellSideSession via hash on symbol or client.
+
+4. FIX encode using PayloadEncoder:
+   a. Write Standard Header (MsgType=D, SenderCompID, TargetCompID,
+      MsgSeqNum = sellSideSession.nextOutboundSeqNum++, SendingTime).
+   b. Write body: ClOrdId, Symbol, Side, OrderQty, Price, OrdType, TransactTime.
+   c. Write CheckSum trailer; back-fill BodyLength.
+
+5. Write TxSpan { buf_ptr, length, exchangeFd } to TX SPSC → Egress Reactor.
+```
+
+The egress risk check (step 2) uses non-atomic counters — there is only one writer and one reader (both on Core 9). It is an egress-side position gate, not a substitute for the external risk system. Its counters are updated by ExecutionReport fills (step covered in §6.5.4), ensuring position tracks actual fills rather than pending orders.
+
+The sell-side FIX session sequence numbers are owned by the cluster, not by Core 9. The EgressWorker reads the current `outboundSeqNum` from the `SEND` command envelope emitted by the cluster on stream 2; it writes this sequence number into the FIX Standard Header verbatim. It does not maintain its own sequence counter. After sending, it publishes a sent-confirmation back to the cluster on stream 3 so the cluster can advance `outboundSeqNum` in the committed log. On reconnect the cluster supplies the correct `outboundSeqNum` in the first `SEND Logon` command, and the exchange continues from that position.
+
+### 6.5.4 EgressWorker: Inbound Path (Execution Reports)
+
+Execution reports arrive from the exchange on the same TCP connection and travel in the opposite direction. The Egress Reactor delivers received bytes to the EgressWorker via the RX SPSC. The EgressWorker decodes each report using `PayloadDecoder`:
+
+```
+1. PayloadDecoder: SIMD SOH scan → token array → field decode.
+   Extract: MsgType (tag 35), ExecType (tag 150), OrdStatus (tag 39),
+            ClOrdId (tag 11), Symbol (tag 55), LastQty (tag 32),
+            LastPx (tag 31), CumQty (tag 14), LeavesQty (tag 151).
+
+2. Sequence number validation:
+   Check inbound MsgSeqNum (tag 34) against sellSideSession.nextInboundSeqNum.
+   Gap → send ResendRequest to exchange. Duplicate → discard.
+
+3. Position update (for fills):
+   If ExecType = TRADE (F): adjust position counters.
+   If ExecType = CANCELED / REJECTED: release reserved notional.
+
+4. SBE encode ExecutionReport for the cluster:
+   Write into Aeron publication claim buffer (stream 5).
+   Carry: clOrdId (matches original OrderCommand), sessionId (buy-side routing),
+          execType, ordStatus, lastQty, lastPx, cumQty, leavesQty.
+
+5. Publish on stream 5 → Aeron Cluster.
+   The cluster routes the ExecutionReport to the correct buy-side client session
+   via stream 2 SEND command → stream 6 → Ingress FIX Session → client TCP.
+```
+
+The buy-side routing key is `clOrdId`, which maps back to the `sessionId` of the originating buy-side client. The EgressWorker maintains a `clOrdId → sessionId` table populated when each order is sent in step 5 of §6.5.3. On receiving the ExecutionReport, it looks up the buy-side `sessionId` and embeds it in the stream 5 SBE message.
+
+### 6.5.5 Endpoint Failover
+
+The EgressWorker maintains a prioritised endpoint list loaded from session configuration at startup:
+
+```
+endpoints:
+  - host: primary.exchange.com   port: 9000   priority: 1
+  - host: backup.exchange.com    port: 9000   priority: 2
+  - host: dr.exchange.com        port: 9001   priority: 3
+```
+
+On disconnect the EgressWorker executes the following reconnect loop, always beginning at the top of the priority list:
+
+```
+currentIndex = 0
+loop:
+    endpoint = endpoints[currentIndex]
+    signal reactor: connect to endpoint
+    wait for connect result (timeout: connectTimeoutMs)
+    if connected:
+        send FIX Logon (MsgSeqNum negotiated or reset)
+        wait for Logon-Ack (timeout: logonTimeoutMs)
+        if Logon-Ack received → session ACTIVE, resume stream 4 processing
+        else → disconnect; advance currentIndex
+    else:
+        advance currentIndex
+    if currentIndex == endpoints.size():
+        currentIndex = 0
+        sleep backoffMs   // back-off before cycling again
+```
+
+During the reconnect window, stream 4 is not drained. `OrderCommand` entries accumulate in the Aeron IPC ring. Back-pressure builds on the AppWorker's stream 4 publication after the ring fills, which propagates back to the risk slot mechanism and ultimately to the buy-side TCP receive window. No orders are lost — they queue in Aeron IPC until the exchange connection is restored.
+
+### 6.5.6 Outbound Message Buffer
+
+The EgressWorker maintains a local circular buffer of the last N outbound FIX messages encoded for the exchange (the sell-side equivalent of `MemoryStorage` in the cluster). This buffer is used to service the exchange's `ResendRequest` during reconnect sequence negotiation.
+
+```
+sellSideOutboundBuffer: CircularBuffer<EncodedFIXMessage, N>
+  indexed by sellSide MsgSeqNum
+  capacity N = 2500 messages (same as cluster MemoryStorage)
+```
+
+When the exchange sends a `ResendRequest`, the EgressWorker reads the requested range from `sellSideOutboundBuffer` and retransmits with `PossDupFlag=Y` (tag 43=Y). Session-level messages (Heartbeat, TestRequest) within the resend range are replaced by a SequenceReset-GapFill, consistent with standard FIX ResendRequest servicing.
+
+The buffer is local to Core 9 and is not replicated or snapshotted. On cluster failover (new leader), the new leader's EgressWorker starts with an empty buffer and negotiates sequence continuity with the exchange via the Logon handshake. If the exchange requests a range the new EgressWorker cannot service, it sends a SequenceReset-Reset to re-synchronise sequence numbers.
