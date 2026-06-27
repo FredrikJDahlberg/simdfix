@@ -46,7 +46,7 @@ The table below shows the bare-metal figure, the worst-case overhead without mit
 
 When `IORING_SETUP_SQPOLL` is unavailable, the reactor falls back to `epoll` + `SO_BUSY_POLL`. Each TCP receive and send incurs one additional syscall, and registered zero-copy buffers are replaced with kernel-copy `recvmsg`/`sendmsg`. The measured overhead is **+1–2 µs per TCP operation**. With two operations per order (receive on ingress, send on egress), the unmitigated I/O penalty is 2–4 µs total — negligible against the risk RTT but visible in the non-risk pipeline budget.
 
-`AF_XDP` on an XDP-capable vNIC (AWS ENA ≥ 5.10, GCP gVNIC) eliminates this overhead entirely, matching bare-metal io_uring performance at the cost of BPF program complexity.
+`AF_XDP` on a GCP gVNIC (kernel ≥ 5.10) eliminates this overhead entirely, matching bare-metal io_uring performance at the cost of BPF program complexity.
 
 ### Raft Replication: Overlay Network
 

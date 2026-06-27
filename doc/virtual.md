@@ -26,12 +26,12 @@ VPC networks in most cloud providers use VXLAN or Geneve encapsulation for tenan
 
 | Challenge | Primary mitigation | Bare-metal equivalent |
 |-----------|-------------------|-----------------------|
-| vCPU steal | Bare-metal / dedicated-host instance | `isolcpus` + `nohz_full` |
+| vCPU steal | GCP sole-tenant node or Bare Metal Solution | `isolcpus` + `nohz_full` |
 | io_uring SQPOLL unavailable | Grant `CAP_SYS_NICE`; fallback to `SO_BUSY_POLL` | Available by default |
 | `/dev/shm` too small | `--shm-size=2g` / `emptyDir` | Host default sufficient |
 | No huge pages in container | Pre-allocate on host; K8s `hugepages-2Mi` resource | `vm.nr_hugepages` in sysctl |
-| Overlay network latency | Placement group + SR-IOV / `hostNetwork: true` | Physical co-location |
-| Clock drift | PTP on Nitro/Nitro-compatible; tune `chrony` | Hardware TSC + PTP |
+| Overlay network latency | Compact placement policy + gVNIC / `hostNetwork: true` | Physical co-location |
+| Clock drift | GCP VM PTP (`/dev/ptp0`); tune `chrony` against `metadata.google.internal` | Hardware TSC + PTP |
 
 The configuration steps below address each row in impact order. All shell commands and YAML examples are tested against Linux 6.1+ with Kubernetes 1.28+ and Docker 24+.
 
@@ -41,15 +41,15 @@ The configuration steps below address each row in impact order. All shell comman
 
 The most effective mitigation is eliminating the hypervisor from the critical path entirely.
 
-**Bare-metal cloud instances** give the full set of kernel parameters, no vCPU steal, and hardware-level CPU isolation. Recommended options:
+**Bare-metal and sole-tenant options** give the full set of kernel parameters, no vCPU steal, and hardware-level CPU isolation. Recommended GCP options in order of preference:
 
-| Provider | Instance type | Notes |
-|----------|--------------|-------|
-| AWS | `c5n.metal`, `m5zn.metal`, `c6i.metal` | ENA networking; choose `c5n` for highest network bandwidth |
-| GCP | `c3-standard-*` on sole-tenant nodes | Sole-tenant avoids co-tenancy; request NUMA-aware placement |
-| Azure | `Mv2`-series dedicated host | Lsv3 bare-metal for NVMe-backed archive |
+| Option | Notes |
+|--------|-------|
+| Bare Metal Solution (`o3-*` project) | No hypervisor; full kernel control including `isolcpus`; requires GCP Bare Metal Solution project enablement |
+| `c3-standard-*` on sole-tenant nodes | NUMA-aware placement; sole-tenant eliminates co-tenancy; physical core pinning via vCPU topology |
+| `c3d-standard-*` on sole-tenant nodes | AMD EPYC Genoa; higher memory bandwidth; latency comparable to `c3` |
 
-**Dedicated hosts / sole-tenant nodes** provide physical host exclusivity without bare-metal instance pricing when full bare-metal is not available. vCPU steal drops to near zero because no other tenants share the physical host, though the hypervisor layer itself still adds a thin scheduling overhead.
+**Sole-tenant nodes** provide physical host exclusivity without Bare Metal Solution overhead. vCPU steal drops to near zero because no other tenants share the physical host, though the hypervisor layer itself still adds a thin scheduling overhead.
 
 Disable SMT (hyperthreading) at the hypervisor or BIOS level for physical cores allocated to busy-spin threads. Sibling threads competing for the same execution units degrade pipeline throughput even when vCPU steal is zero.
 
@@ -153,7 +153,7 @@ No additional Linux capabilities are required. The reactor loop is otherwise ide
 
 ### Fallback: `AF_XDP`
 
-Use this on cloud VMs with an XDP-capable vNIC driver (AWS ENA on kernel ≥ 5.10, GCP gVNIC, Azure DPDK-backed NIC) when both io_uring SQPOLL and `SO_BUSY_POLL` are insufficient. `AF_XDP` bypasses the kernel socket stack entirely on the receive path, delivering packets directly to a user-space ring buffer.
+Use this on GCP VMs with a gVNIC driver (kernel ≥ 5.10) when both io_uring SQPOLL and `SO_BUSY_POLL` are insufficient. `AF_XDP` bypasses the kernel socket stack entirely on the receive path, delivering packets directly to a user-space ring buffer.
 
 Required capabilities: `CAP_BPF` and `CAP_NET_ADMIN`.
 
@@ -246,23 +246,21 @@ This is a best-effort fallback; the kernel may not honour it under memory pressu
 
 **Placement**: co-locate all three cluster nodes in the same availability zone and, where supported, within a placement group or proximity placement group. This minimises physical distance and reduces VPC round-trip latency for Raft replication.
 
-| Provider | Placement construct | Expected intra-group RTT |
-|----------|--------------------:|------------------------:|
-| AWS | Cluster placement group | < 25 µs |
-| GCP | Compact placement policy | < 50 µs |
-| Azure | Proximity placement group | < 50 µs |
+| Placement | Expected intra-cluster RTT |
+|-----------|---------------------------:|
+| Compact placement policy (same zone) | < 50 µs |
+| Same zone, no placement policy | 50–150 µs |
+| Cross-zone (same region) | 200–500 µs |
 
-**SR-IOV / accelerated networking**: enable provider-specific accelerated NIC drivers to bypass the software vNIC layer:
+**gVNIC (virtio-net replacement)**: enable GCP's gVNIC driver at VM creation to bypass the default virtio-net software path:
 
 ```bash
-# AWS — verify ENA driver is active
-ethtool -i eth0 | grep driver   # should show ena
+# Enable gVNIC at VM creation
+gcloud compute instances create INSTANCE_NAME \
+  --network-interface=nic-type=GVNIC
 
-# GCP — enable gVNIC at VM creation
-gcloud compute instances create ... --network-interface=nic-type=GVNIC
-
-# Azure — enable accelerated networking on the NIC
-az network nic update --accelerated-networking true ...
+# Verify gVNIC driver is active on the running instance
+ethtool -i eth0 | grep driver   # should show gvnic
 ```
 
 **Kubernetes host networking**: to bypass the pod overlay (CNI), run gateway pods with `hostNetwork: true`. This places the pod directly on the node's network namespace, eliminating the VXLAN/Geneve encapsulation penalty:
@@ -329,9 +327,8 @@ cat /sys/devices/system/clocksource/clocksource0/current_clocksource
 # Verify invariant TSC flags
 grep -m1 "constant_tsc\|nonstop_tsc" /proc/cpuinfo
 
-# AWS: use Amazon Time Sync with PTP
-# The PTP hardware clock is available at /dev/ptp0 on Nitro instances
-cat /sys/class/ptp/ptp0/clock_name   # expected: KVM virtual PTP
+# GCP: PTP hardware clock available on C3 and N2 instance families
+cat /sys/class/ptp/ptp0/clock_name   # expected: Google Compute Engine Virtual PTP
 
 # Check synchronisation offset (should be < 100 µs for PTP)
 chronyc tracking | grep "RMS offset"
@@ -341,7 +338,7 @@ Configure `chrony` for tight synchronisation:
 
 ```ini
 # /etc/chrony.conf
-server 169.254.169.123 prefer iburst minpoll 0 maxpoll 0  # AWS Time Sync
+server metadata.google.internal prefer iburst minpoll 0 maxpoll 0  # GCP Time Sync
 makestep 0.1 3
 maxdistance 1.0
 ```

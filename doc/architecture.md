@@ -75,15 +75,17 @@ Each box represents a pinned OS thread on an isolated CPU core. Arrows labelled 
 ║  │  · Resend buffer (MemoryStorage, last 2500 messages)             │   ║
 ║  │  · Deterministic time: cluster.timeMs() only                     │   ║
 ║  │  · Snapshot to Aeron Archive on NVMe                             │   ║
+║  │  · Commits risk responses (stream 7) → RISK_APPROVED/REJECTED    │   ║
 ║  └───────────────────────────────────────────────────────────────────┘   ║
 ║                │                                         ▲               ║
 ╚════════════════╪═════════════════════════════════════════╪══════════════╝
                  │                                         │
-       aeron:ipc stream 2                       aeron:ipc stream 3
-       ordered commands (FORWARD_APP,           sent-reports and
-       CONNECT, DISCONNECT)                     reject commands
-                 │                              (C++ → Java for
-  ═ ═ ═ ═ ═ ═ ═ ╪ ═ ═ ═ ═ ═ ═ ═ C++ / Java boundary ═ outbound seq)
+       aeron:ipc stream 2                       aeron:ipc streams 3 + 7
+       ordered commands (FORWARD_APP,           stream 3: sent-reports,
+       RISK_APPROVED, RISK_REJECTED,              reject commands
+       CONNECT, DISCONNECT)                     stream 7: risk responses
+                 │                              (both C++ → Java)
+  ═ ═ ═ ═ ═ ═ ═ ╪ ═ ═ ═ ═ ═ ═ ═ C++ / Java boundary ═ ═ ═ ═ ═ ═ ═ ═ ═
                  │                                         │
                  ▼                                         │
 ╔═══════════════════════════════════════════════════════════════════════════╗
@@ -107,9 +109,10 @@ Each box represents a pinned OS thread on an isolated CPU core. Arrows labelled 
 ║  │  · Drains order SPSC (if slots free) │◄────────────────────────────── ║
 ║  │  · Max 25 outstanding requests       │   approved / rejected          ║
 ║  │  · Correlation ID table              │   (100–500 ms per response)    ║
+║  │  · Publishes responses → stream 7    │                                ║
 ║  └──────────────────────────────────────┘                                ║
 ║                    │ aeron:ipc stream 4            ▲ (exec reports,      ║
-║                    │ (approved order commands)     │  stream 5)          ║
+║                    │ (AppWorker: approved orders)  │  stream 5)          ║
 ╚════════════════════╪══════════════════════════════╪════════════════════════╝
                      │                              │
                      ▼                              │
@@ -241,10 +244,12 @@ After processing each committed message, the Java service emits a command to the
 | `SEND` | Outbound message ready for TCP | SBE-encoded message + outbound seq |
 | `RESEND` | ResendRequest being serviced | SBE-encoded message with PossDupFlag |
 | `GAP_FILL` | Session messages skipped in resend | begin/end seq range |
+| `RISK_APPROVED` | Risk response committed to Raft log — approved | correlationId + clusterSessionPosition |
+| `RISK_REJECTED` | Risk response committed to Raft log — rejected | correlationId + clusterSessionPosition + reason code |
 | `CONNECT` | Node elected leader | SenderCompID / TargetCompID |
 | `DISCONNECT` | Node lost leadership | — |
 
-`FORWARD_APP` carries inbound application-layer content for the C++ risk and routing engine. `SEND` and `RESEND` carry SBE-encoded outbound messages — the Java cluster never produces FIX text; all FIX encoding is done by the C++ AppWorker before the bytes reach the client TCP socket.
+`FORWARD_APP` carries inbound application-layer content for the C++ risk and routing engine. `RISK_APPROVED` and `RISK_REJECTED` are emitted after the cluster commits the risk response from stream 7 to the Raft log; no state change in the application layer is triggered before this commit. `SEND` and `RESEND` carry SBE-encoded outbound messages — the Java cluster never produces FIX text; all FIX encoding is done by the C++ AppWorker before the bytes reach the client TCP socket.
 
 ---
 
@@ -259,6 +264,8 @@ The AppWorker busy-spins on stream 2, polling up to 10 commands per duty cycle. 
 3. Runs a fast in-process risk check (position and rate-limit accounting using atomic loads, < 100 ns).
 4. If the in-process check passes, enqueues the decoded order into the SPSC toward the Risk Thread.
 
+On `RISK_APPROVED` the AppWorker encodes an `OrderCommand` and publishes it on stream 4 to the EgressWorker. On `RISK_REJECTED` it publishes a reject command on stream 3 to the Java cluster, which encodes a FIX `ExecutionReport` with `OrdStatus=Rejected` for delivery to the client. Both carry the `clusterSessionPosition` of the original order as an idempotency key.
+
 On `SEND` and `RESEND` commands the AppWorker decodes the SBE payload to extract the message fields, encodes a FIX text frame using simdfix's `PayloadEncoder`, and publishes the result on stream 6 toward the Ingress FIX Session thread. This covers both session-layer messages (Logon, Heartbeat, Reject, Logout) and application-layer messages (ExecutionReport) that have been routed back through the cluster from the sell-side gateway. The risk path is not touched.
 
 The AppWorker is intentionally **stateless between leader elections**. It holds no persistent position state of its own. On a `DISCONNECT` command it resets its transient decode state; on a `CONNECT` command it resumes. Durable state lives exclusively in the Java cluster.
@@ -268,17 +275,21 @@ The AppWorker is intentionally **stateless between leader elections**. It holds 
 tThe Risk Thread is the architectural accommodation for an external risk system that cannot be made asynchronous. It dedicates a full isolated core to managing up to **25 concurrent in-flight requests** to the risk platform using a multiplexed, correlation-ID-based protocol over a single persistent TCP connection.
 
 ```
-AppWorker               Risk Thread                         Big Iron
-    │                        │                                  │
-    │── SPSC: order ────────►│                                  │
-    │                        │── request (correlId=1) ─────────►│
-    │── SPSC: order ────────►│── request (correlId=2) ─────────►│  (up to 25
-    │── SPSC: order ────────►│── request (correlId=3) ─────────►│   in-flight)
-    │                        │                                  │
-    │                        │◄─ response (correlId=2, pass) ───│
-    │                        │── OrderCommand → stream 4         │
-    │                        │◄─ response (correlId=1, reject) ─│
-    │                        │── reject cmd → stream 3           │
+AppWorker          Risk Thread            Cluster (Raft)       Big Iron
+    │                   │                       │                  │
+    │── SPSC: order ───►│                       │                  │
+    │                   │── request (c=1) ──────────────────────►│
+    │── SPSC: order ───►│── request (c=2) ──────────────────────►│  (up to 25
+    │── SPSC: order ───►│── request (c=3) ──────────────────────►│   in-flight)
+    │                   │                       │                  │
+    │                   │◄─ response (c=2, pass)────────────────── │
+    │                   │── stream 7 ──────────►│ (Raft commit)   │
+    │◄── RISK_APPROVED (stream 2) ─────────────│                  │
+    │── OrderCommand → stream 4                 │                  │
+    │                   │◄─ response (c=1, reject) ───────────────│
+    │                   │── stream 7 ──────────►│ (Raft commit)   │
+    │◄── RISK_REJECTED (stream 2) ─────────────│                  │
+    │── reject cmd → stream 3 ─────────────────►│                 │
 ```
 
 The Risk Thread runs a single-threaded event loop on Core 8. A critical constraint shapes its design: **orders from the same client must be checked in sequence**. The risk system evaluates each order against the client's running position; if two orders for the same client are in-flight simultaneously, both see the same pre-trade position and both may be approved even if together they breach the limit. The Risk Thread enforces per-client serialisation using two data structures:
@@ -291,12 +302,12 @@ The event loop has three phases:
 1. **Send phase**: drain the inbound SPSC while the global in-flight count is below 25. For each order:
    - If `inFlightByClient` already contains the order's `sessionId`: push the order to `pendingByClient[sessionId]` and continue draining.
    - Otherwise: send the request to the risk system, assign a `correlationId`, record `inFlightByClient[sessionId] = correlationId`, and store the order in `correlationTable[correlationId % 25]`.
-2. **Receive phase**: poll the risk system TCP connection for responses. Each response carries the `correlationId` of the answered request. Look up the pending order in `correlationTable`, remove the entry, erase `sessionId` from `inFlightByClient` (decrementing global count), and publish the result. Then check `pendingByClient[sessionId]`: if non-empty, immediately dispatch the next queued order for that client without waiting for the SPSC.
+2. **Receive phase**: poll the risk system TCP connection for responses. Each response carries the `correlationId` of the answered request. Look up the pending order in `correlationTable`, remove the entry, erase `sessionId` from `inFlightByClient` (decrementing global count), and publish the risk response — approved or rejected, with the original `clusterSessionPosition` — to the cluster via stream 7. The cluster commits the response to the Raft log and emits `RISK_APPROVED` or `RISK_REJECTED` on stream 2; the AppWorker applies the result only after that commit. Then check `pendingByClient[sessionId]`: if non-empty, immediately dispatch the next queued order for that client without waiting for the SPSC.
 3. **Back-pressure**: when all 25 global slots are occupied, the send phase is skipped entirely. The inbound SPSC stops being drained.
 
 Across different clients, responses may arrive out of order. This is acceptable: the EgressWorker and the sell-side gateway identify each order independently by `clOrdId`.
 
-The SPSC between AppWorker and Risk Thread carries decoded order fields (clOrdId, side, quantity, price, symbol) rather than raw FIX bytes, so the Risk Thread needs no FIX awareness. On an approved result it encodes an `OrderCommand` and writes it to stream 4. On a rejection it writes a reject command back to the Java service (stream 3) for encoding as a FIX `ExecutionReport` with `OrdStatus=Rejected`.
+The SPSC between AppWorker and Risk Thread carries decoded order fields (clOrdId, side, quantity, price, symbol) rather than raw FIX bytes, so the Risk Thread needs no FIX awareness. On receiving any result — approved or rejected — it publishes the response to the cluster via stream 7, carrying the `correlationId` and the original order's `clusterSessionPosition`. The cluster commits the response to the Raft log before any state change is triggered. Outstanding risk requests are recoverable on failover as the set of `FORWARD_APP` entries in the Raft log with no corresponding committed `RISK_APPROVED` or `RISK_REJECTED`; no separate journal is required.
 
 ---
 
@@ -304,7 +315,7 @@ The SPSC between AppWorker and Risk Thread carries decoded order fields (clOrdId
 
 ### 2.7.1 EgressWorker (Core 9)
 
-The EgressWorker subscribes to stream 4 (approved order commands from the Risk Thread) and polls execution reports arriving from the sell-side gateway TCP session. For each order command it:
+The EgressWorker subscribes to stream 4 (approved `OrderCommand` entries published by the AppWorker after the cluster commits `RISK_APPROVED`) and polls execution reports arriving from the sell-side gateway TCP session. For each order command it:
 
 1. Performs a final egress-side risk check (net position and notional value accounting, updated by fill events).
 2. Routes to the appropriate `SellSideSession` via a hash lookup on instrument or client.
@@ -371,9 +382,9 @@ These characteristics are irreconcilable with a sub-microsecond hot path. The de
 
 Orders from the **same client** are checked in strict arrival sequence: the Risk Thread holds subsequent orders for a client in `pendingByClient` until the outstanding request for that client returns. This guarantees that the risk system evaluates each order against the position already committed by all preceding orders from that client.
 
-Orders from **different clients** may be in-flight simultaneously (up to 25 globally) and their responses may arrive out of order. The Risk Thread makes no cross-client ordering guarantee to downstream consumers: `OrderCommand` entries on stream 4 arrive in response-receipt order. The EgressWorker and sell-side gateway identify each order independently by `clOrdId` and tolerate cross-client reordering.
+Orders from **different clients** may be in-flight simultaneously (up to 25 globally) and their responses may arrive out of order. Because each response is individually committed to the Raft log via stream 7, `RISK_APPROVED` and `RISK_REJECTED` commands on stream 2 arrive in Raft-commit order, not response-receipt order. The EgressWorker and sell-side gateway identify each order independently by `clOrdId` and tolerate cross-client reordering on stream 4.
 
-The `clusterSessionPosition` from the Aeron log header (carried through the command envelope) serves as an idempotency key. If the TCP connection to the risk system drops mid-flight, any in-flight requests whose responses have not been received are treated as rejected, and the connection is re-established. The Risk Thread does not retry automatically; the client receives an `ExecutionReport` with `OrdStatus=Rejected` and `OrdRejReason=Other` for each dropped in-flight order.
+The `clusterSessionPosition` carried in each stream 7 response serves as the idempotency key. If the TCP connection to the risk system drops mid-flight, the Risk Thread publishes `RISK_REJECTED` responses for all unreceived requests via stream 7; the cluster commits the rejections and the AppWorker delivers `ExecutionReport` with `OrdStatus=Rejected` for each. On process failover, outstanding risk requests are identified from the Raft log as `FORWARD_APP` entries with no corresponding committed `RISK_APPROVED` or `RISK_REJECTED`; the new Risk Thread re-submits them to the risk system using the `clusterSessionPosition` as an idempotency key.
 
 ### 2.9.3 Back-Pressure Propagation
 
@@ -408,9 +419,10 @@ Stream 2  Java Cluster → C++ AppWorker     ordered commands
                                              · SEND/RESEND:  SBE-encoded outbound message
                                              · GAP_FILL, CONNECT, DISCONNECT: control
 Stream 3  C++ AppWorker → Java Cluster     sent-reports, reject commands
-Stream 4  C++ Risk Thread → C++ Egress     approved OrderCommands
+Stream 4  C++ AppWorker → C++ Egress       approved OrderCommands (on RISK_APPROVED from stream 2)
 Stream 5  C++ Egress → Java Cluster        execution reports (for client routing)
 Stream 6  C++ AppWorker → C++ Ingress      FIX-encoded outbound frames for client TCP
+Stream 7  C++ Risk Thread → Java Cluster   risk responses (approved/rejected + correlationId + clusterSessionPosition)
 ```
 
 All streams share a single Aeron Media Driver instance on the host. The media driver is launched before any gateway process and exits last. Its `aeron.dir` (`/dev/shm/aeron`) is mapped into every process's address space at startup.
@@ -439,7 +451,7 @@ The gateway is designed for bare-metal deployment with dedicated, isolated CPU c
 - Aeron Cluster heartbeats may be delayed, triggering spurious Raft elections if steal exceeds the election timeout.
 - `isolcpus`, `nohz_full`, and `rcu_nocbs` kernel boot parameters, which eliminate OS scheduler interference, are ineffective on vCPUs because the hypervisor scheduler operates below the guest kernel.
 
-**Mitigation**: Use bare-metal cloud instances (AWS `metal`, GCP `n2-metal`, Azure `Lsv3`) or VM types with pinned, dedicated physical cores and NUMA-aware placement. Disable SMT (hyperthreading) at the hypervisor level for the cores used by busy-spin threads.
+**Mitigation**: Use GCP Bare Metal Solution (`o3-*`) or sole-tenant nodes (`c3-standard-*`, `c3d-standard-*`) with NUMA-aware placement. Bare Metal Solution eliminates the hypervisor entirely; sole-tenant nodes reduce steal to near zero. Disable SMT (hyperthreading) at the hypervisor level for the cores used by busy-spin threads.
 
 ---
 
@@ -449,7 +461,7 @@ The gateway is designed for bare-metal deployment with dedicated, isolated CPU c
 
 - **Docker / containerd**: default seccomp profiles block many io_uring opcodes. `IORING_OP_RECV`, `IORING_OP_SEND`, and `IORING_SETUP_SQPOLL` are restricted or absent in the default allowlist.
 - **Kubernetes**: pods run with restricted seccomp by default since Kubernetes 1.27. Privileged containers or a custom seccomp profile are required.
-- **AWS Lambda / GCP Cloud Run**: io_uring is unavailable in serverless runtimes.
+- **GCP Cloud Run / Cloud Functions**: io_uring is unavailable in serverless runtimes.
 - **Managed kernel versions**: some cloud providers run kernels older than 5.10 (the minimum for stable `IORING_SETUP_SQPOLL` behaviour), particularly on long-term-support distributions.
 
 **Impact**: If io_uring is unavailable or restricted, the ingress and egress reactors must fall back to `epoll` + `recvmsg`/`sendmsg`, adding one syscall per receive and eliminating zero-copy registered buffers. This adds 1–3 µs per message on the TCP I/O path.
@@ -460,7 +472,7 @@ The gateway is designed for bare-metal deployment with dedicated, isolated CPU c
 
 1. **`epoll` + `SO_BUSY_POLL` / `SO_PREFER_BUSY_POLL`** — the socket busy-polls the NIC ring buffer before sleeping, recovering most of the latency benefit of SQPOLL without requiring `CAP_SYS_NICE` or a custom seccomp profile. Available on Linux ≥ 3.11; works in any standard container environment. Performance within 1–2 µs of io_uring SQPOLL for single-connection workloads.
 
-2. **`AF_XDP` (XDP sockets)** — true kernel-bypass receive on environments with an XDP-capable vNIC driver (AWS ENA ≥ 5.10, GCP gVNIC, Azure DPDK-backed NIC). Requires `CAP_BPF` and `CAP_NET_ADMIN`. Eliminates the socket stack entirely on the receive path; comparable to DPDK in latency. Higher operational complexity: BPF programs must be loaded and pinned at startup.
+2. **`AF_XDP` (XDP sockets)** — true kernel-bypass receive on GCP VMs with a gVNIC driver (kernel ≥ 5.10). Requires `CAP_BPF` and `CAP_NET_ADMIN`. Eliminates the socket stack entirely on the receive path; comparable to DPDK in latency. Higher operational complexity: BPF programs must be loaded and pinned at startup.
 
 See [virtual.md](virtual.md) for implementation details.
 
@@ -488,7 +500,7 @@ See [virtual.md](virtual.md) for implementation details.
 
 **Impact on the sell-side connection**: the egress TCP connection to the sell-side gateway, if it crosses a VPC boundary, also incurs this overhead. If the sell-side gateway is co-located with the gateway on bare metal or in the same physical rack, the VPC path is avoided.
 
-**Mitigation**: Place all three cluster nodes in the same cloud availability zone and, where supported, in a placement group or proximity placement group to minimise physical distance. Use SR-IOV or DPDK-backed vNICs (AWS ENA, GCP gVNIC, Azure DPDK) to reduce vNIC overhead. Consider a dedicated interconnect (AWS Direct Connect, GCP Interconnect) if the sell-side gateway is in a separate environment.
+**Mitigation**: Place all three cluster nodes in the same GCP zone within a compact placement policy to minimise physical distance. Enable gVNIC (`--network-interface=nic-type=GVNIC`) to reduce vNIC overhead. Consider GCP Cloud Interconnect if the sell-side gateway is in a separate environment.
 
 ---
 
@@ -511,7 +523,7 @@ See [virtual.md](virtual.md) for implementation details.
 - **TSC instability**: the x86 Time Stamp Counter (`rdtsc`) is used by `clock_gettime(CLOCK_MONOTONIC)` via the VDSO. On VMs where vCPUs are migrated between physical cores, the TSC may jump or skew. Most modern hypervisors expose an invariant TSC (`constant_tsc`, `nonstop_tsc` in `/proc/cpuinfo`), but this must be verified.
 - **NTP jitter**: inter-node clock synchronisation via NTP typically achieves 1–10 ms accuracy on cloud VMs. Aeron Cluster's deterministic timer logic (`cluster.scheduleTimer`) is based on `cluster.timeMs()` which ultimately derives from the system clock. A 10 ms clock skew between nodes means heartbeat timers may fire up to 10 ms early or late relative to the leader's expectation.
 
-**Mitigation**: Use PTP (Precision Time Protocol, IEEE 1588) where the cloud provider supports hardware timestamping (AWS Time Sync Service with PTP, GCP VM clock sync). Verify `constant_tsc` and `nonstop_tsc` are set. Set Raft heartbeat intervals and timer deadlines with sufficient margin above the observed NTP accuracy.
+**Mitigation**: Use GCP's PTP hardware clock (`/dev/ptp0`, available on C3 and N2 instance families) and configure `chrony` against `metadata.google.internal`. Verify `constant_tsc` and `nonstop_tsc` are set in `/proc/cpuinfo`. Set Raft heartbeat intervals and timer deadlines with sufficient margin above the observed NTP accuracy.
 
 ---
 
