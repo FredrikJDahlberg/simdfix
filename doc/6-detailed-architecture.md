@@ -4,6 +4,21 @@ This chapter provides implementation-level detail for each major component in th
 
 ---
 
+## 6.0 Dependencies
+
+The gateway uses two Real Logic libraries throughout.
+
+**Aeron** (`io.aeron:aeron-all` / C++ `aeron` CMake target) provides the IPC and UDP transport, the Cluster consensus module, and the Archive recording layer. It is a first-class dependency on both the Java cluster side and the C++ process side.
+
+**Agrona** (`org.agrona:agrona` / C++ headers bundled with the Aeron client) is Aeron's own support library. It provides the `OneToOneRingBuffer` used for all intra-process inter-thread queues in this gateway, along with `AtomicBuffer`, `UnsafeBuffer`, and the lock-free utilities that underpin Aeron's own internal ring buffers. Agrona is a **transitive dependency of Aeron** — it is already present on both the Java classpath and the C++ include path whenever Aeron is linked. No separate dependency declaration is required; the Agrona headers are part of the Aeron C++ client distribution and the Agrona JAR is pulled in by `aeron-all`.
+
+| Library | Artifact / target | Language | Used for |
+|---------|-------------------|----------|----------|
+| Aeron | `io.aeron:aeron-all` / `aeron` | Java + C++ | IPC, UDP transport, Cluster, Archive |
+| Agrona | transitive via Aeron | Java + C++ | `OneToOneRingBuffer`, `AtomicBuffer`, lock-free primitives |
+
+---
+
 ## 6.1 Clustered Service Sequencer
 
 ### 6.1.1 Role and Positioning
@@ -891,7 +906,7 @@ When a command arrives on stream 6, the handler executes the following fixed seq
        b. Write body fields from the SBE payload.
        c. Write Trailer (CheckSum).
        d. Back-fill BodyLength.
-6. Write encoded byte span and destination fd to TX SPSC → reactor.
+6. Write TxDescriptor { buf, len, fd } to TX ring → reactor.
 ```
 
 Step 3 (SBE → FIX internal format) is required because `PayloadEncoder` operates on FIX internal format fields, not directly on SBE. This is the translation step noted in §2.4.4. An alternative design (a dedicated SBE-aware encoder path) would eliminate the intermediate format at the cost of a more complex encoder interface.
@@ -916,24 +931,24 @@ The handler does not need to recover any prior state — it inherits the session
 
 ### 6.3.1 Role and Internal Structure
 
-The Session Component is the C++ Ingress process. It is the gateway's sole point of contact with buy-side clients over TCP and the sole producer of SBE-encoded inbound messages on stream 1. Internally it is two cooperating threads connected by a pair of SPSC queues:
+The Session Component is the C++ Ingress process. It is the gateway's sole point of contact with buy-side clients over TCP and the sole producer of SBE-encoded inbound messages on stream 1. Internally it is two cooperating threads connected by a pair of Agrona `OneToOneRingBuffer` queues:
 
 ```
 TCP (buy-side clients)
         │ inbound FIX bytes
         ▼
-┌───────────────────────┐  RX SPSC  ┌─────────────────────────────┐
+┌───────────────────────┐  RX Ring  ┌─────────────────────────────┐
 │  Core 1               │ ────────► │  Core 2                     │
 │  io_uring Reactor     │           │  FIX Session Handler        │
 │                       │ ◄──────── │                             │
-│  · TCP accept/recv    │  TX SPSC  │  · PayloadDecoder (SIMD)    │
+│  · TCP accept/recv    │  TX Ring  │  · PayloadDecoder (SIMD)    │
 │  · Registered buffers │           │  · Admission filter         │
 │  · SQPOLL kernel poll │           │  · SBE encode → stream 1    │
 │  · CQE busy-spin      │           │  · stream 6 poll → FIX enc  │
 └───────────────────────┘           └─────────────────────────────┘
         ▲ outbound FIX bytes
         │
-  TX SPSC → Core 1 → IORING_OP_SEND
+  TX Ring → Core 1 → IORING_OP_SEND
 ```
 
 §6.2 describes the design principles of the FIX Session Handler as a cluster-driven proxy. This section covers the implementation detail of both threads and their interaction.
@@ -959,15 +974,15 @@ while (running) {
             if (ev & EPOLLOUT) { flushPendingSend(fd); }
         }
     }
-    drainTxSpsc();   // submit any outbound data Core 2 has queued
+    drainTxRing();   // submit any outbound data Core 2 has queued
 }
 ```
 
-**Receive path.** `drainReceive(fd)` calls `recv(fd, buf, BUF_SIZE, MSG_DONTWAIT)` in a loop until `EAGAIN`. Each successful `recv` writes an `RxSpan { buf_ptr, length, fd }` to the RX SPSC toward Core 2. The receive buffer is a fixed-size slab allocated at startup; the same buffer is reused across calls. Core 2 must copy or fully process each span before returning control — the buffer is overwritten on the next receive.
+**Receive path.** `drainReceive(fd)` calls `recv(fd, buf, BUF_SIZE, MSG_DONTWAIT)` in a loop until `EAGAIN`. Each successful `recv` writes an `RxDescriptor { buf_ptr, length, fd }` to the RX ring toward Core 2 via `rxRing.write(MSG_RX_DATA, ...)`. The receive buffer is a fixed-size slab; Core 2 must consume the descriptor before the reactor's next `recv` on the same fd overwrites that buffer slot (on the epoll path). On the io_uring registered-buffer path the slot is not reused until Core 2 signals completion.
 
-**Send path.** `drainTxSpsc()` drains entries from the TX SPSC and calls `send(fd, buf, len, MSG_DONTWAIT)` for each. If `send` returns `EAGAIN` (kernel send buffer full), the unsent remainder is held in a per-fd pending send slot and `EPOLLOUT` is armed on the fd via `epoll_ctl(EPOLL_CTL_MOD)`. `flushPendingSend(fd)` is called when `EPOLLOUT` fires, resuming the stalled send. Once the pending send is drained, `EPOLLOUT` is disarmed.
+**Send path.** `drainTxRing()` polls the TX ring and calls `send(fd, buf, len, MSG_DONTWAIT)` for each `TxDescriptor`. If `send` returns `EAGAIN` (kernel send buffer full), the unsent remainder is held in a per-fd pending send slot and `EPOLLOUT` is armed on the fd via `epoll_ctl(EPOLL_CTL_MOD)`. `flushPendingSend(fd)` is called when `EPOLLOUT` fires, resuming the stalled send. Once the pending send is drained, `EPOLLOUT` is disarmed.
 
-**Disconnect handling.** `EPOLLRDHUP` or a zero-length `recv` signals a clean client close. `EPOLLERR` or a negative `recv`/`send` result signals an error. In either case the reactor calls `epoll_ctl(EPOLL_CTL_DEL)`, closes the fd, removes it from the fd table, and writes an `RxSpan { nullptr, 0, fd }` sentinel to the RX SPSC. Core 2 interprets the null sentinel as a disconnect for that session.
+**Disconnect handling.** `EPOLLRDHUP` or a zero-length `recv` signals a clean client close. `EPOLLERR` or a negative `recv`/`send` result signals an error. In either case the reactor calls `epoll_ctl(EPOLL_CTL_DEL)`, closes the fd, removes it from the fd table, and writes an `MSG_RX_DISCONNECT` message (`RxDisconnect { fd }`) to the RX ring. Core 2 interprets this as a disconnect for that session.
 
 #### 6.3.2.1 io_uring on Bare Metal
 
@@ -981,47 +996,69 @@ On bare-metal deployments where `CAP_SYS_NICE` and kernel ≥ 6.1 are available,
 | Accept | `accept4()` per connection | `IORING_OP_ACCEPT` with multishot |
 | Capability required | None | `CAP_SYS_NICE` for SQPOLL |
 
-The io_uring reactor uses `IORING_SETUP_SQPOLL` (kernel SQ polling thread), `io_uring_register_buffers` (fixed registered buffer pool), `IORING_RECV_MULTISHOT` (one SQE serves multiple receives), and `IORING_OP_SEND` with the registered buffer index. Core 2 reads directly from the registered buffer without an extra copy. On the M1 Pro the measured receive-to-SPSC latency is approximately 150 ns with io_uring vs. 400 ns with epoll, a difference that is visible at the sub-microsecond pipeline budget level.
+The io_uring reactor uses `IORING_SETUP_SQPOLL` (kernel SQ polling thread), `io_uring_register_buffers` (fixed registered buffer pool), `IORING_RECV_MULTISHOT` (one SQE serves multiple receives), and `IORING_OP_SEND` with the registered buffer index. Core 2 reads directly from the registered buffer without an extra copy. On the M1 Pro the measured receive-to-ring latency is approximately 150 ns with io_uring vs. 400 ns with epoll, a difference that is visible at the sub-microsecond pipeline budget level.
 
 Select the io_uring reactor by setting `reactor.mode = io_uring` in the gateway configuration. The epoll reactor is the default and is required in virtualised environments where `IORING_SETUP_SQPOLL` is not available.
 
-### 6.3.3 SPSC Queue Layout
+### 6.3.3 Ring Buffer Layout
 
-Both SPSC queues use the same layout:
+Both inter-thread queues use **`aeron::concurrent::ringbuffer::OneToOneRingBuffer`** from the Agrona C++ library. Agrona's ring provides cache-line-padded head and tail counters, `memory_order_release`/`acquire` semantics, variable-length message framing with alignment padding, and a `MessageHandler` polling interface — eliminating the need for a hand-rolled SPSC implementation.
+
+Each ring is backed by a heap-allocated `AtomicBuffer` sized to absorb a worst-case burst. The ring buffer header occupies the first `RingBufferDescriptor::TRAILER_LENGTH` bytes of the backing store; the remaining bytes are the message region. In practice the backing store is sized at 256 KB per direction, providing headroom for bursts of several hundred maximum-length FIX frames.
+
+**Buffer-descriptor message pattern.** The rings carry *descriptors*, not raw bytes. Raw receive bytes live in the registered buffer pool (io_uring path) or a thread-local slab (epoll path); raw send bytes live in an encoding slab owned by Core 2. Copying them through the ring would defeat the zero-copy purpose of the io_uring registered-buffer path. Only the 16-byte descriptor is written into the ring:
 
 ```cpp
-struct alignas(64) SpscQueue {
-    alignas(64) std::atomic<uint64_t> head;   // written by producer
-    alignas(64) std::atomic<uint64_t> tail;   // written by consumer
-    Entry slots[CAPACITY];
-};
-```
+// Message type IDs written into the ring (msgTypeId field of Agrona record header)
+static constexpr int32_t MSG_RX_DATA       = 1;  // inbound data available
+static constexpr int32_t MSG_RX_DISCONNECT = 2;  // client closed connection
+static constexpr int32_t MSG_TX_DATA       = 3;  // outbound frame ready to send
 
-Head and tail are on separate cache lines to prevent false sharing between the producer (Core 1) and consumer (Core 2) on the RX queue, and vice versa on the TX queue. The producer writes with `std::memory_order_release`; the consumer reads with `std::memory_order_acquire`, establishing a happens-before relationship without a full memory fence on either path.
-
-**RX SPSC entry:**
-```cpp
-struct RxSpan {
-    const uint8_t* buf;   // pointer into registered buffer pool (or nullptr for disconnect)
+// RX ring payload (MSG_RX_DATA): pointer into registered buffer pool + metadata
+struct RxDescriptor {
+    const uint8_t* buf;   // pointer into registered buffer pool; valid until next recv on fd
     uint32_t       len;   // bytes valid at buf
     int32_t        fd;    // source file descriptor
 };
-```
 
-**TX SPSC entry:**
-```cpp
-struct TxSpan {
-    const uint8_t* buf;   // pointer into registered buffer pool
+// RX ring payload (MSG_RX_DISCONNECT): sentinel — Core 2 tears down the session
+struct RxDisconnect {
+    int32_t fd;
+};
+
+// TX ring payload (MSG_TX_DATA): pointer into encoding slab + metadata
+struct TxDescriptor {
+    const uint8_t* buf;   // pointer into Core 2 encoding slab; valid until Core 1 completes send
     uint32_t       len;   // bytes to send
     int32_t        fd;    // destination file descriptor
 };
 ```
 
-Capacity is sized to absorb a worst-case burst: peak client count × maximum FIX frame size × burst depth. In practice the queues are sized at 4096 entries each; at 512 bytes per FIX frame that is 2 MB of logical buffering per direction.
+**Write path (Core 1 → RX ring):**
+```cpp
+RxDescriptor desc{ recvBuf, bytesRead, fd };
+rxRing.write(MSG_RX_DATA,
+             AtomicBuffer{ reinterpret_cast<uint8_t*>(&desc), sizeof(desc) },
+             0, sizeof(desc));
+```
+
+**Poll path (Core 2 draining RX ring):**
+```cpp
+rxRing.poll(
+    [](int32_t msgTypeId, AtomicBuffer& buf, int32_t offset, int32_t length) {
+        if (msgTypeId == MSG_RX_DATA) {
+            auto& d = *reinterpret_cast<RxDescriptor*>(buf.buffer() + offset);
+            processFrame(d.buf, d.len, d.fd);     // raw bytes read directly from pool
+        } else if (msgTypeId == MSG_RX_DISCONNECT) {
+            auto& d = *reinterpret_cast<RxDisconnect*>(buf.buffer() + offset);
+            tearDownSession(d.fd);
+        }
+    },
+    FRAGMENT_LIMIT);
 
 ### 6.3.4 PayloadDecoder: SIMD Frame Detection
 
-`PayloadDecoder` operates on each `RxSpan` delivered by the RX SPSC. It has two phases: SOH scan and field decode.
+`PayloadDecoder` operates on each `RxDescriptor` delivered by the RX ring. It has two phases: SOH scan and field decode.
 
 **SOH scan.** The scanner uses ARM NEON to locate SOH (`0x01`) delimiter bytes 16 at a time:
 
@@ -1085,8 +1122,8 @@ Both events are SBE-encoded and published on stream 1 via the same `AeronCluster
 
 4. If BACK_PRESSURED:
    Spin on offer until it succeeds.
-   The spin on offer blocks Core 2 from draining the RX SPSC.
-   The stalled RX SPSC consumer stops the reactor from re-arming receives.
+   The spin on offer blocks Core 2 from polling the RX ring.
+   The stalled RX ring consumer stops the reactor from re-arming receives.
    The reactor's registered receive buffers fill and TCP flow control kicks in.
    → Back-pressure propagates from the cluster ring to the buy-side TCP socket.
 ```
@@ -1095,7 +1132,7 @@ Step 4 is the back-pressure chain. No explicit flow control message is sent; the
 
 ### 6.3.6 Outbound Pipeline: Stream 6 to TCP
 
-Core 2 runs a concurrent polling loop on Aeron stream 6 interleaved with its RX SPSC drain. Each fragment received from stream 6:
+Core 2 runs a concurrent polling loop on Aeron stream 6 interleaved with its RX ring poll. Each fragment received from stream 6:
 
 ```
 1. Decode SBE discriminator byte.
@@ -1103,22 +1140,21 @@ Core 2 runs a concurrent polling loop on Aeron stream 6 interleaved with its RX 
 3. Decode SBE payload into FIX internal format fields.
 4. Update shadowPhase if the discriminator implies a state change.
 5. Encode outbound FIX frame using PayloadEncoder:
-   a. Claim TX SPSC slot.
-   b. Write Standard Header into claim slot buffer (BeginString, BodyLength
-      placeholder, MsgType, SenderCompID, TargetCompID, MsgSeqNum, SendingTime).
+   a. Claim a slot in the encoding slab (pre-allocated per-frame buffer).
+   b. Write Standard Header into the slot (BeginString, BodyLength placeholder,
+      MsgType, SenderCompID, TargetCompID, MsgSeqNum, SendingTime).
    c. Write body fields.
-   d. Write CheckSum trailer.
-   e. Back-fill BodyLength.
-6. Release TX SPSC slot → Core 1 picks up and submits IORING_OP_SEND.
+   d. Write CheckSum trailer; back-fill BodyLength.
+6. Write TxDescriptor { buf, len, fd } to TX ring → Core 1 picks up and submits IORING_OP_SEND.
 ```
 
-The outbound path never blocks. If the TX SPSC is full (Core 1 is not draining fast enough), step 5a spins. In practice the TX SPSC drains faster than it fills — a single `IORING_OP_SEND` submission takes under 100 ns, and outbound FIX frames arrive at most once per committed cluster entry.
+The outbound path never blocks. If the TX ring is full (Core 1 is not draining fast enough), `txRing.write()` returns `INSUFFICIENT_CAPACITY` and step 6 spins. In practice the TX ring drains faster than it fills — a single `IORING_OP_SEND` submission takes under 100 ns, and outbound FIX frames arrive at most once per committed cluster entry.
 
 ### 6.3.7 Multi-Session Multiplexing
 
 The reactor accepts connections from multiple buy-side clients on the same listen socket. Each client fd gets a `sessionTag` — a compact integer assigned at accept time. The `sessionTag` is embedded in the `RxSpan.fd` field and passed through to the SBE message on stream 1, where it becomes the Aeron `sessionId` that the cluster uses to route commands back on stream 6.
 
-Core 2 maintains a `fd → SessionContext` table:
+Core 2 maintains a `fd → SessionContext` table. Each context stores the `fd` field that is embedded in `RxDescriptor` messages to route received frames to the correct session:
 
 ```cpp
 struct SessionContext {
@@ -1153,7 +1189,7 @@ stream 2 (cluster → AppWorker)
 │  · SBE decode (zero-copy)     │
 │  · Fast risk check (< 100 ns) │
 └───────────────────────────────┘
-        │ SPSC (OrderRecord)
+        │ Ring (OrderRecord)
         ▼
 ┌───────────────────────────────┐
 │  Core 8                       │──► stream 7 (risk responses → cluster)
@@ -1182,7 +1218,7 @@ The fragment limit of 10 per poll prevents a burst of cluster commands from star
 
 | Discriminator | Handler |
 |---------------|---------|
-| `FORWARD_APP` | Decode SBE payload → fast risk → SPSC to Risk Thread |
+| `FORWARD_APP` | Decode SBE payload → fast risk → ring to Risk Thread |
 | `RISK_APPROVED` | Encode `OrderCommand` → publish on stream 4 |
 | `RISK_REJECTED` | Encode reject → publish on stream 3 |
 | `SEND` / `RESEND` | Forward SBE payload → publish on stream 6 |
@@ -1230,9 +1266,9 @@ All three reads are `memory_order_relaxed` — they read the last value visible 
 
 Orders that fail the fast check are rejected immediately without entering the Risk Thread. The AppWorker publishes a reject command on stream 3; the cluster commits it and emits `SEND ExecutionReport(Rejected)` on stream 2.
 
-### 6.4.5 SPSC to Risk Thread: OrderRecord
+### 6.4.5 Ring Buffer to Risk Thread: OrderRecord
 
-Orders that pass the fast check are written to the SPSC between Core 7 and Core 8:
+Orders that pass the fast check are written to an Agrona `OneToOneRingBuffer` between Core 7 and Core 8. Unlike the ingress RX/TX rings, this ring carries the full decoded record as the message payload — there is no separate buffer pool because the data is already decoded field values, not raw bytes:
 
 ```cpp
 struct OrderRecord {
@@ -1247,18 +1283,29 @@ struct OrderRecord {
 };
 ```
 
-The record contains decoded field values, not raw FIX bytes or SBE bytes. The Risk Thread requires no FIX or SBE awareness. The `clusterSessionPosition` is the anchor that connects the risk response back to the originating order in the Raft log.
+The Risk Thread polls the ring using Agrona's `MessageHandler` callback:
 
-If the SPSC is full (all 25 risk slots are occupied and the Risk Thread is not draining), the AppWorker spins on the SPSC write. This stalls the stream 2 poll loop, which causes Aeron back-pressure to build on the cluster's stream 2 publication. The cluster's conductor thread detects the back-pressure and stops committing new messages until the publication clears. This is the back-pressure chain from the external risk system to the Raft log.
+```cpp
+orderRing.poll(
+    [this](int32_t, AtomicBuffer& buf, int32_t offset, int32_t) {
+        auto& rec = *reinterpret_cast<const OrderRecord*>(buf.buffer() + offset);
+        dispatchToRiskSystem(rec);
+    },
+    FRAGMENT_LIMIT);
+```
+
+The record contains decoded field values; the Risk Thread requires no FIX or SBE awareness. The `clusterSessionPosition` is the anchor that connects the risk response back to the originating order in the Raft log.
+
+If the ring is full (all 25 risk slots are occupied and the Risk Thread is not draining), `orderRing.write()` returns `INSUFFICIENT_CAPACITY` and the AppWorker spins retrying. This stalls the stream 2 poll loop, causing Aeron back-pressure to build on the cluster's stream 2 publication. The cluster's conductor thread detects the back-pressure and stops committing new messages until the ring clears. This is the back-pressure chain from the external risk system to the Raft log.
 
 ### 6.4.6 Risk Thread Event Loop
 
 The Risk Thread on Core 8 runs a single-threaded event loop with three phases executed in sequence on each iteration:
 
-**Phase 1 — Send.** If the global in-flight count is below 25, drain the inbound SPSC:
+**Phase 1 — Send.** If the global in-flight count is below 25, poll the inbound ring:
 
 ```
-For each OrderRecord from SPSC:
+For each OrderRecord from ring:
     if inFlightByClient[sessionId] is occupied:
         push to pendingByClient[sessionId]   // preserve per-client order
     else:
@@ -1288,13 +1335,13 @@ For each response received:
         { correlationId, clusterSessionPosition, result, reasonCode }
 
     if pendingByClient[record.sessionId] non-empty:
-        dispatch head of queue immediately (without waiting for SPSC)
+        dispatch head of queue immediately (without waiting for ring)
         → re-enters Phase 1 logic for that order only
 ```
 
 The cluster receives the stream 7 message, commits it to the Raft log, and emits `RISK_APPROVED` or `RISK_REJECTED` on stream 2 back to the AppWorker. No application state changes before this commit.
 
-**Phase 3 — Back-pressure.** If `inFlightCount == 25`, Phase 1 is skipped. The SPSC from the AppWorker stops being drained. The AppWorker's SPSC write spins, stalling its stream 2 poll, which propagates back-pressure to the cluster.
+**Phase 3 — Back-pressure.** If `inFlightCount == 25`, Phase 1 is skipped. The ring from the AppWorker stops being polled. `orderRing.write()` returns `INSUFFICIENT_CAPACITY` and the AppWorker spins retrying, stalling its stream 2 poll, which propagates back-pressure to the cluster.
 
 ### 6.4.7 Per-Client Order Serialisation
 
@@ -1327,11 +1374,11 @@ The Egress Component is the C++ egress process. It owns the sell-side FIX sessio
 stream 4 (AppWorker → EgressWorker: approved OrderCommands)
         │
         ▼
-┌───────────────────────────────┐  TX SPSC  ┌─────────────────────────────┐
+┌───────────────────────────────┐  TX Ring  ┌─────────────────────────────┐
 │  Core 9                       │ ────────► │  Core 10                    │
 │  EgressWorker                 │           │  Egress Reactor             │
 │                               │ ◄──────── │                             │
-│  · stream 4 subscriber        │  RX SPSC  │  · epoll event loop         │
+│  · stream 4 subscriber        │  RX Ring  │  · epoll event loop         │
 │  · Egress risk accounting     │           │  · Single exchange TCP fd   │
 │  · FIX encode (PayloadEncoder)│           │  · recv / send              │
 │  · FIX decode (PayloadDecoder)│           │  · SO_BUSY_POLL             │
@@ -1395,7 +1442,7 @@ The EgressWorker busy-spins on stream 4, which carries `OrderCommand` entries pu
    b. Write body: ClOrdId, Symbol, Side, OrderQty, Price, OrdType, TransactTime.
    c. Write CheckSum trailer; back-fill BodyLength.
 
-5. Write TxSpan { buf_ptr, length, exchangeFd } to TX SPSC → Egress Reactor.
+5. Write TxDescriptor { buf_ptr, length, exchangeFd } to TX ring → Egress Reactor.
 ```
 
 The egress risk check (step 2) uses non-atomic counters — there is only one writer and one reader (both on Core 9). It is an egress-side position gate, not a substitute for the external risk system. Its counters are updated by ExecutionReport fills (step covered in §6.5.4), ensuring position tracks actual fills rather than pending orders.
@@ -1404,7 +1451,7 @@ The sell-side FIX session sequence numbers are owned by the cluster, not by Core
 
 ### 6.5.4 EgressWorker: Inbound Path (Execution Reports)
 
-Execution reports arrive from the exchange on the same TCP connection and travel in the opposite direction. The Egress Reactor delivers received bytes to the EgressWorker via the RX SPSC. The EgressWorker decodes each report using `PayloadDecoder`:
+Execution reports arrive from the exchange on the same TCP connection and travel in the opposite direction. The Egress Reactor delivers received-byte descriptors to the EgressWorker via the RX ring. The EgressWorker polls the ring and decodes each report using `PayloadDecoder`:
 
 ```
 1. PayloadDecoder: SIMD SOH scan → token array → field decode.
