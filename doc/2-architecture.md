@@ -30,8 +30,9 @@ All intra-host communication uses Aeron IPC (shared memory ring buffers). No mes
 
 | Platform | ISA | Cores | Base GHz | L3 | Memory BW | Notes |
 |----------|-----|------:|----------:|---:|----------:|-------|
-| AWS Graviton4 (c8g) | ARM64 | 96 | 3.1 | 36 MB | 537 GB/s | Preferred cloud target |
-| AWS Graviton3 (c7g) | ARM64 | 64 | 2.6 | 32 MB | 300 GB/s | Cloud target |
+| Google Axion (C4A) | ARM64 | up to 192 | ~3.1 | 36 MB | 537 GB/s | GCP production target; see §2.1.7 for VM sizing |
+| AWS Graviton4 (c8g) | ARM64 | 96 | 3.1 | 36 MB | 537 GB/s | AWS production target |
+| AWS Graviton3 (c7g) | ARM64 | 64 | 2.6 | 32 MB | 300 GB/s | AWS alternative |
 | Ampere Altra Max | ARM64 | 128 | 3.0 | 64 MB | 409 GB/s | Bare-metal cloud alternative |
 | Intel Xeon w9-3595X | x86-64 | 60 | 2.5 | 300 MB | 332 GB/s | Bare-metal; requires AVX2 simdfix port |
 | Intel Xeon 6980P | x86-64 | 128 | 2.0 | 504 MB | 307 GB/s | High-core-count bare-metal; requires AVX2 port |
@@ -146,9 +147,40 @@ The gateway can run in cloud VMs and containers, subject to the constraints belo
 | Cluster node placement | same rack | same AZ + placement group; SR-IOV for Raft NIC | same AZ; host networking preferred |
 | Invariant TSC / PTP clock | hardware-provided | provider-dependent; verify `clocksource=tsc` is stable | inherits from host |
 
-For cloud deployments, bare-metal instances (AWS c7g.metal, GCP c3-highcpu-176, Azure Mbsv3) or dedicated-host VM instances are required for Cores 1–14. Shared-tenancy vCPUs introduce steal that cannot be bounded and will cause latency spikes indistinguishable from component failures.
+For cloud deployments, bare-metal instances or sole-tenant VM instances are required for Cores 1–14. Shared-tenancy vCPUs introduce steal that cannot be bounded and will cause latency spikes indistinguishable from component failures.
 
-See Chapter 5 for step-by-step configuration instructions for each cloud environment.
+#### Google Cloud Platform (C4A — Axion)
+
+The recommended GCP deployment uses **C4A instances** (Google Axion, ARM64 Neoverse V2) on **sole-tenant nodes** to eliminate vCPU steal. The three cluster nodes must be in the same zone with a **compact placement policy** to minimise inter-VM Raft replication RTT.
+
+**VM sizing:**
+
+| Size | vCPUs | RAM | Fits | Use |
+|------|------:|----:|------|-----|
+| `c4a-standard-32` | 32 | 128 GB | 15 pinned cores + OS headroom; 2× RAM minimum | Minimum viable |
+| `c4a-standard-48` | 48 | 192 GB | Comfortable core and memory headroom | **Recommended** |
+| `c4a-highmem-32` | 32 | 256 GB | 4× RAM minimum; tighter core headroom | Memory-heavy workloads |
+| `c4a-standard-64` | 64 | 256 GB | Maximum headroom on both axes | High session count |
+
+The `c4a-standard-48` instance provides 48 vCPUs (33 free after pinning Cores 1–14 and reserving Core 0 for the OS) and 192 GB RAM (4.5× the 42 GB required allocation), leaving ample headroom for operating system services, observability agents, and future session-count growth.
+
+**Sole-tenant node.** Run each cluster node as a VM on a GCP sole-tenant node to guarantee zero vCPU steal. The `c4a-node-192-1536` node type (192 vCPUs, 1536 GB RAM) accommodates up to four `c4a-standard-48` VMs on a single physical host. In a three-node Raft deployment, use three separate sole-tenant nodes (one VM per node) so that a host failure takes down at most one Raft node.
+
+**Storage.** Use **Local SSD** (NVMe, 375 GB per disk, ~680 MB/s write, sub-millisecond latency) for the Aeron Archive on each node. Local SSD is ephemeral — data is lost on VM stop/start — but this is acceptable in a 3-node Raft cluster because the log is replicated to the other two nodes and can be replayed on restart. Attach one Local SSD disk (375 GB) per node; this exceeds the 256 GB minimum capacity requirement. For persistent storage, **Hyperdisk Extreme** (`pd-extreme` successor) provides comparable write latency with durability, at higher cost.
+
+**Networking.** Enable **gVNIC** (Google Virtual NIC) on all instances and request the **Tier 1 network bandwidth** option (100 Gbps+) for the Raft replication path. Use a **VPC compact placement policy** so all three cluster nodes are placed in close physical proximity within the zone, minimising intra-zone network RTT to the 20–50 µs range typical for GCP same-zone VM-to-VM traffic.
+
+**cgroup CPU isolation.** Kernel `isolcpus` is not available on GCP vCPUs. Use Linux cgroups v2 `cpuset` to pin the gateway threads to specific vCPUs and exclude them from the kernel scheduler:
+
+```bash
+# Pin gateway threads to vCPUs 1–14; leave vCPU 0 for OS
+cgcreate -g cpuset:/gateway
+cgset -r cpuset.cpus=1-14 /gateway
+cgset -r cpuset.mems=0    /gateway
+cgexec -g cpuset:/gateway ./gateway
+```
+
+See Chapter 5 for full step-by-step configuration instructions for GCP and other cloud environments.
 
 ---
 
@@ -325,9 +357,9 @@ On the receive side, the session thread runs simdfix's `PayloadDecoder` on each 
 
 Session-layer admission decisions (rate limiting, maximum frame size) are made here. All other session state — sequence numbers, heartbeat timers, resend logic — is owned by the Java `FixClusteredService` and is authoritative only after Raft commits the message.
 
-The gateway is the FIX **acceptor** for buy-side clients: it never initiates a connection outbound to a client. When a client TCP connection drops, the cluster sets `SessionPhase` to `DISCONNECTED` and the TCP acceptor remains open. The gateway waits passively for the client to reconnect and re-initiate the Logon sequence. No reconnect timer, no outbound dial attempt.
+The gateway is the FIX **acceptor** for buy-side clients: it never initiates a connection outbound to a client. When a client TCP connection is established the FIX Session publishes a `SESSION_CONNECT` event on stream 1; when it drops, a `SESSION_DISCONNECT` event is published on stream 1. Both events are SBE-encoded and flow through the Raft log in strict order relative to every FIX frame from that session. The cluster transitions `SessionPhase` on receipt of these committed events — never speculatively. The TCP acceptor remains open after a disconnect and the gateway waits passively for the client to reconnect and re-initiate the Logon sequence. No reconnect timer, no outbound dial attempt.
 
-Frames that pass admission are SBE-encoded and offered to the Aeron IPC publication (stream 1). The offer call is non-blocking; if the ring is full, back-pressure propagates to the SPSC consumer loop, which naturally throttles the reactor's receive submissions.
+FIX frames that pass admission, and TCP lifecycle events, are SBE-encoded and offered to the Aeron IPC publication (stream 1). The offer call is non-blocking; if the ring is full, back-pressure propagates to the SPSC consumer loop, which naturally throttles the reactor's receive submissions.
 
 ### 2.4.4 FIX Session Thread (Core 2): Outbound Path
 
@@ -342,6 +374,8 @@ Commands arriving on stream 6 are SBE-encoded and include:
 
 On receiving a command the handler decodes the SBE discriminator and payload, updates its shadow state (e.g. advances local `sessionPhase` to ACTIVE), FIX-encodes the outbound frame, and writes it to the TX SPSC toward the reactor. The reactor submits the send via `IORING_OP_SEND`. No outbound FIX frame is ever produced by the handler without a prior cluster command; the handler is purely reactive to committed cluster output.
 
+`RESEND` and `GAP_FILL` commands follow a distinct path because they must not advance the outgoing sequence number. On a `RESEND` command the handler FIX-encodes the application message body carried in the SBE payload, sets `MsgSeqNum` (tag 34) to the original sequence number from the stored message, adds `PossDupFlag=Y` (tag 43), copies the original sending time into `OrigSendingTime` (tag 122), and stamps the current logical clock as the new `SendingTime` (tag 52). `m_nextOutgoingSeqNum` is not incremented. On a `GAP_FILL` command the handler emits a `SequenceReset` with `GapFillFlag=Y` (tag 123), `MsgSeqNum` set to the first sequence number of the gap, and `NewSeqNo` (tag 36) set to the first application-message sequence number beyond the gap. The outgoing sequence counter resumes its pre-resend value once the cluster stops emitting resend commands for that request.
+
 ---
 
 ## 2.5 Aeron Cluster: Global Sequencing
@@ -351,7 +385,7 @@ On receiving a command the handler decodes the SBE discriminator and payload, up
 The Java Aeron Cluster is the **single source of truth** for the order of every FIX message received by the gateway. No application-level processing occurs before the cluster commits a message. This has two consequences:
 
 1. Every node in the cluster applies messages in identical order. The C++ AppWorkers on all nodes receive the same command stream, ensuring consistent risk state and consistent position tracking across the cluster.
-2. After a failover, the new leader resumes processing from the exact position where the old leader left off — no messages are lost or processed twice at the cluster boundary.
+2. After a failover, the new leader resumes processing from the exact position where the old leader left off. Messages **committed** to the Raft log are never lost or processed twice. Messages published on stream 1 via `AeronCluster.offer()` but not yet committed at the moment of a leader failure are lost at the cluster boundary; the originating client (FIX buy-side) is responsible for retransmission via the normal FIX timeout-and-resend mechanism. `SESSION_CONNECT` and `SESSION_DISCONNECT` events are equally subject to this pre-commit loss window; the client's subsequent Logon sequence makes the cluster's session state self-consistent regardless of which lifecycle events were lost.
 
 ### 2.5.2 Sequence Number Assignment
 
@@ -361,12 +395,15 @@ The Java service maintains its own `inboundSeqNum` counter (the FIX application-
 
 ### 2.5.3 FIX Session State in Java
 
-The `FixClusteredService` holds:
+The `FixClusteredService` holds the following state. All items marked *(snapshot)* are serialised in `onTakeSnapshot` and restored in `onLoadSnapshot`; items marked *(runtime)* are re-derived on startup and are not persisted.
 
-- `inboundSeqNum` / `outboundSeqNum` — FIX sequence counters, replicated across all nodes via Raft.
-- `SessionPhase` — current state in the FIX session state machine (Disconnected / LogonPending / Active / LogoutPending).
-- `MemoryStorage` — a circular buffer of the last 2500 outbound messages, used to service `ResendRequest` without touching the archive.
-- Heartbeat and test-request timers, scheduled via `cluster.scheduleTimer()` so they fire at the same cluster-global time on every node.
+- `inboundSeqNum` / `outboundSeqNum` — FIX sequence counters. *(snapshot)*
+- `SessionPhase` — current state per session: Disconnected / LogonPending / Active / LogoutPending. *(snapshot)*
+- `pendingTestReqId` — the `TestReqID` (tag 112) of any outstanding cluster-initiated TestRequest awaiting a matching Heartbeat response, and the `timerId` of its response-timeout timer. Null when no probe is in flight. *(snapshot)*
+- `MemoryStorage` — a circular buffer of the last 2500 outbound messages. *(snapshot)* A companion `outboundSeqNum → {recordingId, startPosition, length}` index stored as a `LinkedHashMap` (insertion order preserved to guarantee identical snapshot bytes across all nodes) maps each outbound sequence number to its position in the Aeron Archive recording; required when a `ResendRequest` spans messages older than the `MemoryStorage` window. *(snapshot)*
+- `pendingResend` — transient state for an in-progress Archive-backed resend: the replay `Image`, the next emit position within the replay, and the inclusive upper bound of the requested range. Present only while a slow-path resend is active (see §2.5.5). *(runtime — not snapshotted; re-derived from the committed ResendRequest log entry on recovery)*
+- `isLeader` — true when this node is the current Raft leader; set in `onNewLeadershipTerm`, cleared in `onRoleChange`. All stream-2 `Publication.offer()` calls are gated on this flag; during log replay on a follower the service rebuilds state silently without emitting any commands. *(runtime)*
+- Heartbeat and test-request timers, scheduled via `cluster.scheduleTimer()` so they fire at the same cluster-global time on every node. *(snapshot — timer IDs are persisted as part of SessionPhase and pendingTestReqId)*
 
 All wall-clock access is prohibited inside `ClusteredService` callbacks. Time is sourced exclusively from `cluster.timeMs()`, which returns the Raft-committed logical timestamp — identical on every node.
 
@@ -386,6 +423,145 @@ After processing each committed message, the Java service emits a command to the
 | `DISCONNECT` | Node lost leadership | — |
 
 `FORWARD_APP` carries the inbound application-layer message as an SBE-encoded payload — the FIX session component decoded the FIX text and the cluster re-encodes the relevant fields into SBE before publishing. `RISK_APPROVED` and `RISK_REJECTED` are emitted after the cluster commits the risk response from stream 7 to the Raft log; no state change in the application layer is triggered before this commit. `SEND` and `RESEND` carry SBE-encoded outbound messages; the Java cluster never produces FIX text. All FIX encoding and decoding on the client-facing path is done exclusively by the FIX Session component (Core 2).
+
+**Output gating and back-pressure.** All `Publication.offer()` calls on stream 2 are gated on `isLeader`; no commands are emitted during log replay on a follower. When `isLeader` is true and an offer returns a negative value (back-pressure), the service retries using `cluster.idleStrategy().idle()` until the offer succeeds. The idle strategy provided by `Cluster.idleStrategy()` must be used — not a custom one — so that the consensus module's own housekeeping continues during the retry spin.
+
+### 2.5.5 ResendRequest Servicing
+
+A counterparty `ResendRequest` (35=2) carrying `BeginSeqNo` (tag 7) and `EndSeqNo` (tag 16) is handled end-to-end through the following sequence. An `EndSeqNo` of 0 is treated as open-ended: the cluster substitutes the current `outboundSeqNum − 1` at commit time, so the resend covers all messages sent up to that moment regardless of what was transmitted after the request was issued.
+
+**Step 1 — Ingress FIX Session (Core 2): receive and forward.**
+The FIX Session decodes the `ResendRequest` and performs admission checks (CompID validation, sequence-number validation) identically to any other session message. No local resend logic executes: the frame is SBE-encoded, preserving `BeginSeqNo` and `EndSeqNo` as typed fields, and published on stream 1 to the cluster. The cluster is the authoritative handler for all resend state.
+
+**Step 2 — Cluster: commit and classify the range.**
+`ConsensusModule` appends the `ResendRequest` to the Raft log; `FixClusteredService.onSessionMessage()` fires on all nodes in commit order. The service resolves the effective replay range `[begin, end]` and classifies each sequence number in the range as either an *application message* (D, F, G, 8, 9, …) or a *session-layer message* (Logon, Heartbeat, Reject, etc.). Application messages are replayed with `PossDupFlag=Y`; contiguous runs of session-layer messages are collapsed into a single `GAP_FILL` command — they are never retransmitted individually.
+
+**Step 3a — Fast path: MemoryStorage.**
+If the entire range `[begin, end]` falls within the `MemoryStorage` window (the most recent 2500 outbound messages), the cluster calls `getMessages(begin, end)`, which returns the range as a contiguous span of `StoredMessage` flyweights backed by stable in-memory buffers. No I/O occurs and the replay completes in the same `onSessionMessage` callback.
+
+**Step 3b — Slow path: Aeron Archive replay state machine.**
+If any sequence numbers fall below the `MemoryStorage` base — older than 2500 messages — the cluster uses an asynchronous replay state machine spanning multiple service duty cycles. `AeronArchive.startReplay()` is non-blocking; it starts a replay publication and returns before any data has been delivered. Blocking inside `onSessionMessage` until the replay completes is prohibited. Instead:
+
+1. `onSessionMessage` receives the ResendRequest. The service consults the `LinkedHashMap` index to find `{recordingId, startPosition, length}` for the Archive portion of the range (`[begin, memoryStorageBase − 1]`). It calls `AeronArchive.startReplay(recordingId, startPosition, length, replayChannel, replayStreamId)`, stores the resulting replay `Image` and the emit position in `pendingResend`, and returns immediately. The `onSessionMessage` callback exits; no RESEND commands are emitted yet.
+
+2. On each subsequent service duty cycle, `FixClusteredService` polls `pendingResend.image` for one batch of fragments. Each fragment-handler callback receives a `DirectBuffer` flyweight into the Aeron term buffer (no copy). The service classifies each replayed entry as application or session-layer, emits the corresponding `RESEND` or `GAP_FILL` commands on stream 2, and advances `pendingResend.emitPosition`. The batch size is bounded so the service remains responsive to new `onSessionMessage` and `onTimerEvent` callbacks.
+
+3. When the replay `Image` signals end-of-stream (`Image.isClosed()` or fragment count reaches zero at `pendingResend.endPosition`), the Archive portion is complete. The service immediately transitions to the MemoryStorage portion: it calls `getMessages(memoryStorageBase, end)` and emits the remaining `RESEND`/`GAP_FILL` commands synchronously (in-memory, no I/O). `pendingResend` is then cleared.
+
+For ranges entirely within `MemoryStorage` (Step 3a), no `pendingResend` state is created; the entire emission happens synchronously in `onSessionMessage`.
+
+```
+ResendRequest [begin=1, end=2700]          MemoryStorage window [201..2700]
+                                                    │
+  onSessionMessage:                                 │
+    startReplay(seqNums 1..200) → Image             │
+    store pendingResend; return                      │
+                                                    │
+  subsequent duty cycles:                           │
+    poll Image (batched) → RESEND/GAP_FILL          │
+    ...                                             │
+    Image.isClosed() → emit MemoryStorage remainder─►getMessages(201, 2700) → RESEND/GAP_FILL
+    clear pendingResend
+```
+
+**Failover during Archive replay.** If a leader election occurs while `pendingResend` is active, the `pendingResend` state is runtime-only and is not snapshotted. On recovery the new leader replays the committed `ResendRequest` log entry, re-derives the range, and re-starts the Archive replay from scratch. The client receives the resend from the beginning of the requested range again, which is correct FIX behaviour (`PossDupFlag=Y` frames are idempotent at the application layer).
+
+**Step 4 — Cluster: emit RESEND and GAP_FILL commands on stream 2.**
+For each stored application message in the resolved range the cluster emits one `RESEND` command carrying the original `MsgType`, original `MsgSeqNum`, SBE-encoded message body, and original `SendingTime` (as `OrigSendingTime`). For each contiguous run of session-layer messages the cluster emits one `GAP_FILL` command carrying the first and last sequence numbers of the run. Commands flow stream 2 → AppWorker → stream 6 → Ingress FIX Session; the AppWorker forwards them without inspection. All offers on stream 2 follow the back-pressure retry pattern described in §2.5.4.
+
+**Step 5 — Ingress FIX Session (Core 2): encode and transmit.**
+The FIX Session encodes each `RESEND` and `GAP_FILL` command into outbound FIX frames as described in §2.4.4. Encoded frames are written to the TX SPSC; the io_uring Reactor submits them to the client socket via `IORING_OP_SEND` in the same way as any other outbound frame.
+
+### 2.5.6 FIX Session Layer: All Message Scenarios
+
+**Design principle.** The FIX Session component (Core 2) is a pure reactor — it has no session state machine of its own. Every FIX session state change is owned exclusively by the Java `FixClusteredService` and takes effect only after the triggering event is committed to the Raft log. The C++ component encodes outbound FIX frames and decodes inbound ones; all decisions about what to send, when to send it, and how session state advances are made by the cluster and delivered as SBE-encoded commands on stream 6. No outbound FIX frame is produced without a prior committed cluster command. During Raft log replay (before `isLeader` is set) `FixClusteredService` rebuilds its state silently; no commands are emitted on stream 2 and the C++ handlers receive nothing until the `CONNECT` command signals that this node is the active leader.
+
+**TCP lifecycle events.** When a client TCP connection is established or dropped, the FIX Session publishes a `SESSION_CONNECT` or `SESSION_DISCONNECT` event on stream 1. These events are committed to the Raft log in strict order relative to every FIX frame from that session, so the cluster's view of connection state and message arrival is always causally consistent. A `SESSION_DISCONNECT` committed after a Logon reaches the cluster only after all in-flight FIX frames from that connection have been committed ahead of it; the cluster cannot see a message from a session it believes is already disconnected.
+
+The scenarios below describe the full round-trip for each session message type. "→ stream 1" means the FIX Session publishes an SBE-encoded event; "← stream 6" means the cluster emits an SBE-encoded command the FIX Session receives and encodes as a FIX frame.
+
+---
+
+**Logon (35=A)**
+
+1. TCP accept → FIX Session publishes `SESSION_CONNECT` → stream 1.
+2. Client sends Logon → FIX Session validates framing, SBE-encodes → stream 1.
+3. Cluster commits both events. `FixClusteredService` validates `BeginString`, CompIDs, and `HeartBtInt` (tag 108). On success: transitions `SessionPhase` Disconnected → Active; schedules heartbeat timer via `cluster.scheduleTimer()`. On authentication failure or CompID mismatch: transitions to Disconnected, emits `SEND` Logout.
+4. On success: cluster emits `SEND` Logon-Ack ← stream 6. FIX Session encodes and transmits Logon response.
+5. If the inbound `MsgSeqNum` is higher than expected (gap on reconnect): cluster emits `SEND` ResendRequest before the Logon-Ack and transitions `SessionPhase` → Recovering (see **ResendRequest** below).
+6. If the inbound `MsgSeqNum` is lower than expected (duplicate or reset): cluster emits `SEND` Logout with a text reason and transitions `SessionPhase` → LogoutPending.
+
+---
+
+**Logout (35=5)**
+
+*Client-initiated:*
+1. Client sends Logout → stream 1. Cluster commits, transitions `SessionPhase` Active → LogoutPending.
+2. Cluster emits `SEND` Logout-Ack ← stream 6. FIX Session encodes and transmits.
+3. Cluster transitions `SessionPhase` → Disconnected.
+
+*Cluster-initiated (admin shutdown or fatal session error):*
+1. Cluster emits `SEND` Logout ← stream 6. FIX Session encodes and transmits. `SessionPhase` → LogoutPending.
+2. Client's Logout reply arrives → stream 1. Cluster commits, transitions `SessionPhase` → Disconnected.
+3. If no Logout reply arrives within the logout grace period (scheduled via `cluster.scheduleTimer()`): cluster transitions `SessionPhase` → Disconnected unilaterally.
+4. TCP drop → FIX Session publishes `SESSION_DISCONNECT` → stream 1 (may arrive before or after the Logout exchange; the cluster handles either ordering).
+
+---
+
+**Heartbeat (35=0)**
+
+*Inbound (client heartbeat):*
+1. Client sends Heartbeat → stream 1. Cluster commits, resets the inbound-idle timer (re-schedules via `cluster.scheduleTimer()`). No outbound message is emitted unless the Heartbeat carries a `TestReqID` (tag 112) matching an outstanding test request (see **TestRequest** below).
+
+*Outbound (heartbeat timer fires):*
+1. Heartbeat timer fires in `FixClusteredService.onTimerEvent()`. Cluster emits `SEND` Heartbeat ← stream 6. FIX Session encodes and transmits. Timer is re-scheduled.
+
+---
+
+**TestRequest (35=1)**
+
+*Inbound (client probing the gateway):*
+1. Client sends TestRequest → stream 1. Cluster commits, emits `SEND` Heartbeat (carrying the same `TestReqID`) ← stream 6. FIX Session encodes and transmits.
+
+*Cluster-initiated (missed heartbeat detected):*
+1. Inbound-idle timer fires. Cluster emits `SEND` TestRequest ← stream 6, records the `TestReqID` in cluster state, schedules a response-timeout timer.
+2. Client responds with Heartbeat carrying the matching `TestReqID` → stream 1. Cluster commits, validates `TestReqID`, cancels the timeout timer, re-schedules the normal heartbeat timer.
+3. If the response-timeout timer fires before the matching Heartbeat arrives: cluster transitions `SessionPhase` → Disconnected and emits `SEND` Logout (client is considered unresponsive).
+
+---
+
+**ResendRequest (35=2)**
+
+Full flow: §2.5.5.
+
+*Cluster-initiated (inbound sequence gap detected):*
+When an inbound FIX frame arrives with `MsgSeqNum` greater than `nextExpectedSeqNum`, the cluster commits the out-of-sequence message to the Raft log (messages are never discarded on gap detection), transitions `SessionPhase` → Recovering, and emits `SEND` ResendRequest ← stream 6 covering `[nextExpectedSeqNum, receivedSeqNum − 1]`. FIX Session encodes and transmits. As the client's replay responses arrive on stream 1 in commit order, the cluster fills the gap. When `nextExpectedSeqNum` reaches the previously out-of-sequence message, `SessionPhase` → Active and normal processing resumes.
+
+---
+
+**SequenceReset (35=4)**
+
+*Inbound with `GapFillFlag=Y` (tag 123 — gap-fill mode):*
+The counterparty is skipping session-layer messages in a resend response. The cluster advances `nextExpectedSeqNum` to `NewSeqNo` (tag 36) without recording those sequence numbers as a gap. No outbound message is emitted.
+
+*Inbound with `GapFillFlag=N` (hard reset):*
+The counterparty is resetting its sequence numbering. The cluster sets `inboundSeqNum` to `NewSeqNo` unconditionally and persists the new value in cluster state. No outbound message is emitted. If `NewSeqNo` is lower than `nextExpectedSeqNum`, the cluster emits `SEND` Reject (session reject reason: value is incorrect) and does not apply the reset.
+
+*Outbound (as gap-fill, part of resend servicing):*
+Cluster emits `GAP_FILL` command ← stream 6; FIX Session encodes as `SequenceReset` with `GapFillFlag=Y`. See §2.4.4 and §2.5.5.
+
+*Outbound (hard reset):*
+Cluster emits `SEND` SequenceReset (without `GapFillFlag`) ← stream 6; FIX Session encodes and transmits. Used when the cluster needs to synchronise the counterparty to the current outbound sequence number (e.g., after a session reset on reconnect).
+
+---
+
+**Reject (35=3)**
+
+*Inbound (counterparty rejecting a sent message):*
+The cluster commits the inbound Reject to the Raft log. The referenced `RefSeqNum` (tag 45) is recorded in cluster state. No outbound response is produced. If the rejected message was a Logon, the cluster transitions `SessionPhase` → Disconnected.
+
+*Outbound (cluster rejecting a malformed inbound message):*
+When `FixClusteredService` detects a session-layer protocol violation in a committed inbound message — `BeginString` mismatch, CompID mismatch, invalid `MsgType`, missing required field, `SendingTime` accuracy violation — the cluster emits `SEND` Reject ← stream 6 carrying `RefSeqNum` (tag 45 = rejected `MsgSeqNum`), `RefMsgType` (tag 372), and `SessionRejectReason` (tag 373). FIX Session encodes and transmits. The inbound sequence counter is still advanced; the rejected message is counted as received. If the violation is fatal to the session (e.g., CompID mismatch), the cluster additionally emits `SEND` Logout and transitions `SessionPhase` → LogoutPending.
 
 ---
 
@@ -408,7 +584,7 @@ The AppWorker is intentionally **stateless between leader elections**. It holds 
 
 ### 2.6.2 Risk Thread (Core 8) and the Slow External Call
 
-tThe Risk Thread is the architectural accommodation for an external risk system that cannot be made asynchronous. It dedicates a full isolated core to managing up to **25 concurrent in-flight requests** to the risk platform using a multiplexed, correlation-ID-based protocol over a single persistent TCP connection.
+The Risk Thread is the architectural accommodation for an external risk system that cannot be made asynchronous. It dedicates a full isolated core to managing up to **25 concurrent in-flight requests** to the risk platform using a multiplexed, correlation-ID-based protocol over a single persistent TCP connection.
 
 ```
 AppWorker          Risk Thread            Cluster (Raft)       Big Iron
@@ -558,18 +734,22 @@ No thread is blocked. Core 8 spins on its event loop even when all 25 slots are 
 ## 2.10 Aeron IPC Stream Map
 
 ```
-Stream 1  C++ Ingress → Java Cluster       SBE-encoded inbound messages (one per FIX frame)
+Stream 1  C++ Ingress → Java Cluster       SBE-encoded session events and inbound FIX messages
+                                             · SESSION_CONNECT / SESSION_DISCONNECT: TCP lifecycle
+                                             · FIX frames: one SBE-encoded message per inbound FIX frame
 Stream 2  Java Cluster → C++ AppWorker     ordered commands (all payloads SBE-encoded)
                                              · FORWARD_APP: SBE-encoded application message
                                              · SEND/RESEND:  SBE-encoded outbound message
-                                             · GAP_FILL, CONNECT, DISCONNECT: control
+                                             · GAP_FILL: begin/end seq range for SequenceReset
+                                             · CONNECT: node elected Raft leader (SenderCompID / TargetCompID)
+                                             · DISCONNECT: node lost Raft leadership
 Stream 3  C++ AppWorker → Java Cluster     application messages: sent-reports, reject commands
 Stream 4  C++ AppWorker → C++ Egress       approved OrderCommands (on RISK_APPROVED from stream 2)
 Stream 5  C++ Egress → Java Cluster        application messages: execution reports (for client routing)
 Stream 6  C++ AppWorker → C++ Ingress      SBE-encoded outbound commands for FIX Session component
 Stream 7  C++ Risk Thread → Java Cluster   application messages: SBE-encoded risk responses (approved/rejected + correlationId + clusterSessionPosition)
 
-Streams entering the cluster fall into two categories: **stream 1** carries inbound client messages (SBE-encoded, one per FIX frame received from a buy-side client); **streams 3, 5, and 7** carry application-layer feedback from the C++ processing tier — acknowledgements, reject commands, execution reports, and risk decisions. All payloads on all four inbound streams are SBE-encoded; the application state machine consumes only SBE from the cluster (stream 2) and produces only SBE to the cluster (streams 3 and 7). No raw FIX bytes are ever published to the cluster on any stream.
+Streams entering the cluster fall into two categories: **stream 1** carries TCP lifecycle events (`SESSION_CONNECT` / `SESSION_DISCONNECT`) and inbound FIX frames — all SBE-encoded, in causal order for each session; **streams 3, 5, and 7** carry application-layer feedback from the C++ processing tier — acknowledgements, reject commands, execution reports, and risk decisions. All payloads on all four inbound streams are SBE-encoded; the application state machine consumes only SBE from the cluster (stream 2) and produces only SBE to the cluster (streams 3 and 7). No raw FIX bytes are ever published to the cluster on any stream.
 
 The Aeron IPC streams cover only intra-host communication between the four gateway processes. The two external TCP connections — buy-side clients (handled by the Ingress FIX Session, Core 2) and the sell-side gateway (handled by the Egress FIX Session, Core 9) — are not Aeron streams. Both FIX sessions are bi-directional: the Ingress session receives orders and sends execution reports and session messages to clients; the Egress session sends orders and receives execution reports from the exchange. All FIX encoding and decoding on both connections is performed by the respective FIX Session component using simdfix.
 ```

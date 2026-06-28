@@ -16,7 +16,7 @@ No application-level processing — risk checks, order routing, position account
 
 2. **Exact-once failover.** When a new leader is elected, it resumes processing from the exact log position where the old leader left off. No committed message is lost or applied twice at the cluster boundary.
 
-The sequencer is implemented in Java 21 using Aeron Cluster and consists of two cooperating components: the `ConsensusModule` (part of the Aeron Cluster library) and `FixClusteredService` (gateway application code that implements the `ClusteredService` interface).
+The sequencer is implemented in Java 21 using Aeron Cluster and consists of two cooperating components: the `ConsensusModule` (part of the Aeron Cluster library) and `FixClusteredService` (gateway application code). `FixClusteredService` is itself split into `FixAeronHandler` (which implements `ClusteredService` and owns all Aeron-specific state) and `FixSessionStateMachine` (which contains the FIX session logic and is called synchronously by the handler). See §6.1.6 for the internal structure.
 
 ---
 
@@ -26,12 +26,12 @@ The sequencer receives messages from four distinct Aeron IPC streams, each carry
 
 | Stream | Source | Content | Format |
 |--------|--------|---------|--------|
-| 1 | C++ Ingress (FIX Session, Core 2) | Validated inbound FIX frames from buy-side clients | SBE-encoded per frame |
+| 1 | C++ Ingress (FIX Session, Core 2) | TCP lifecycle events (`SESSION_CONNECT` / `SESSION_DISCONNECT`) and validated inbound FIX frames from buy-side clients, in causal order per session | SBE-encoded per event/frame |
 | 3 | C++ AppWorker (Core 7) | Application feedback: sent-reports, reject commands | SBE-encoded |
 | 5 | C++ Egress (Core 9) | Execution reports received from the sell-side gateway | SBE-encoded |
 | 7 | C++ Risk Thread (Core 8) | Risk check results: approved or rejected, with correlationId | SBE-encoded |
 
-All four streams deliver SBE-encoded payloads. No raw FIX bytes enter the sequencer on any stream; the FIX Session component (Core 2) decodes the FIX wire format into a typed SBE message before publication on stream 1. All other streams carry application-layer SBE messages that never had a FIX representation.
+All four streams deliver SBE-encoded payloads. No raw FIX bytes enter the sequencer on any stream; the FIX Session component (Core 2) decodes the FIX wire format into a typed SBE message before publication on stream 1. TCP lifecycle events (`SESSION_CONNECT`, `SESSION_DISCONNECT`) are published on stream 1 alongside FIX frames so the cluster sees them in the same committed order as every message from that session. All other streams carry application-layer SBE messages that never had a FIX representation.
 
 In a multi-node deployment each Ingress node has its own stream 1 publication. The Aeron Cluster ingress channel merges all of them into a single ordered log: the `ConsensusModule` acts as the merge point, sequencing offers from all connected Ingress publications into one commit stream.
 
@@ -76,7 +76,7 @@ Every message committed to the Raft log receives a **`clusterSessionPosition`**:
 
 - **Idempotency key for risk responses.** The Risk Thread publishes each risk result on stream 7 tagged with the `clusterSessionPosition` of the order it is responding to. The cluster commits the result and emits `RISK_APPROVED` or `RISK_REJECTED` on stream 2 carrying the same position. The AppWorker uses this position to match the result to the original order with no ambiguity, even after failover.
 - **Failover recovery.** On process restart, the cluster replays the Raft log from the last snapshot position. Outstanding risk requests are identified as `FORWARD_APP` log entries with no corresponding committed `RISK_APPROVED` or `RISK_REJECTED` at a higher position. The new Risk Thread re-submits them using the original `clusterSessionPosition` as the correlation anchor.
-- **Resend deduplication.** `MemoryStorage` indexes outbound messages by `clusterSessionPosition`, allowing the cluster to detect and suppress duplicate `SEND` commands that arrive because an AppWorker replayed from an earlier log position.
+- **ResendRequest servicing.** `MemoryStorage` indexes outbound messages by `outboundSeqNum` (the FIX MsgSeqNum assigned to each outbound message). When a buy-side ResendRequest arrives, the cluster uses this index to locate stored SBE payloads by the sequence number range requested. For ranges that extend beyond `MemoryStorage`, the cluster also maintains a `LinkedHashMap<outboundSeqNum, ArchivePosition>` that maps each stored sequence number to its recording position in Aeron Archive. The risk-response correlation anchor (`clusterSessionPosition`) is a separate concept used only for matching Risk Thread responses back to the originating order.
 
 **Dual sequence numbering.** Every received message carries two independent sequence numbers that serve different purposes:
 
@@ -105,52 +105,92 @@ Every committed log entry carries a **`cluster.timeMs()`** timestamp — the clu
 
 ---
 
-### 6.1.6 FixClusteredService: Session State Machine
+### 6.1.6 FixClusteredService: Internal Structure
 
-`FixClusteredService` implements the `ClusteredService` interface and contains all gateway application logic that must be replicated across the cluster. It is the only place in the system where FIX session state is durably maintained.
+`FixClusteredService` implements the `ClusteredService` interface. Internally it is split into two cooperating classes:
 
-**State held by FixClusteredService:**
+- **`FixAeronHandler`** — owns the `ClusteredService` interface. Receives every Aeron Cluster callback (`onSessionMessage`, `onTimerEvent`, `onTakeSnapshot`, `onLoadSnapshot`, `onNewLeadershipTerm`, `onRoleChange`) and holds all Aeron-specific runtime state. On each callback it decodes the SBE payload and delegates synchronously to `FixSessionStateMachine`.
+
+- **`FixSessionStateMachine`** — contains the FIX session logic: phase transitions, sequence number validation, MemoryStorage maintenance, and command emission. It has no direct dependency on Aeron Cluster APIs; it receives decoded events and emits typed commands that `FixAeronHandler` encodes and publishes.
+
+Because `FixSessionStateMachine` is called synchronously from within `FixAeronHandler`'s callbacks, and all callbacks are invoked by the single Aeron Cluster conductor thread in commit order, there is no concurrency between the two classes. The Raft log's total ordering is fully preserved.
 
 ```
-inboundSeqNum:    int64       — last FIX inbound sequence number committed to the log
-outboundSeqNum:   int64       — last FIX outbound sequence number committed to the log
-sessionPhase:     SessionPhase — { DISCONNECTED, LOGON_PENDING, ACTIVE, LOGOUT_PENDING }
-memoryStorage:    MemoryStorage — circular buffer of last 2500 outbound SBE messages
-heartbeatTimer:   long        — correlationId of the active heartbeat timer
-testReqTimer:     long        — correlationId of the active test-request timer (if any)
+onSessionMessage(header, buffer, offset, length)   ← Aeron Cluster conductor thread
+    │
+    ▼
+FixAeronHandler
+    · decode SBE discriminator and payload
+    · call FixSessionStateMachine.onEvent(event)   ← synchronous, same thread
+    │       │
+    │       ▼
+    │   FixSessionStateMachine
+    │       · advance session phase
+    │       · validate / update sequence numbers
+    │       · update MemoryStorage
+    │       · return list of Commands to emit
+    │
+    · encode each Command → Publication.offer() on stream 2
+    · apply isLeader gate and back-pressure retry (§6.1.9)
 ```
 
-All of this state is replicated to every follower as it changes and is serialised into the cluster snapshot for fast recovery after restart.
+**State split between the two classes:**
+
+`FixAeronHandler` holds Aeron-specific runtime state (not snapshotted):
+
+```
+isLeader:      boolean       — set in onNewLeadershipTerm, cleared in onRoleChange
+pendingResend: PendingResend — active Archive replay; null when idle
+               { image: Image, emitPosition: long, endPosition: long }
+```
+
+`FixSessionStateMachine` holds all FIX session state per session. Snapshotted fields survive failover; runtime fields are re-derived:
+
+```
+— Snapshotted (serialised by FixAeronHandler.onTakeSnapshot) —
+inboundSeqNum:        int64
+outboundSeqNum:       int64
+sessionPhase:         SessionPhase  — { DISCONNECTED, LOGON_PENDING, ACTIVE, LOGOUT_PENDING }
+pendingTestReqId:     String        — TestReqID of outstanding probe (null if none)
+memoryStorage:        MemoryStorage — circular buffer of last 2500 outbound SBE messages
+outboundArchiveIndex: LinkedHashMap<outboundSeqNum, ArchivePosition>
+                       — insertion-order; LinkedHashMap guarantees identical snapshot bytes
+heartbeatTimer:       long          — correlationId of active heartbeat timer (0 if none)
+testReqTimer:         long          — correlationId of active test-request timer (0 if none)
+```
+
+`onTakeSnapshot` and `onLoadSnapshot` live in `FixAeronHandler` (they interact with the Aeron Archive API directly) but serialise and restore `FixSessionStateMachine` state.
 
 **Session phase transitions.** The session state machine advances on committed messages:
 
 ```
 DISCONNECTED
-    ├─ on CONNECT command              → LOGON_PENDING
+    ├─ on committed SESSION_CONNECT event (stream 1) → LOGON_PENDING
     └─ (stays DISCONNECTED on all other events)
 
 LOGON_PENDING
     ├─ on committed Logon (tag 35=A)   → ACTIVE
     │    emit: SEND Logon-Ack (stream 2), start heartbeat timer
-    ├─ on heartbeat timer expiry       → send TestRequest; start test-req timer
+    ├─ on heartbeat timer expiry       → emit SEND TestRequest; start test-req timer
     ├─ on test-req timer expiry        → emit DISCONNECT; → DISCONNECTED
-    └─ on DISCONNECT command           → DISCONNECTED
+    └─ on committed SESSION_DISCONNECT → DISCONNECTED
 
 ACTIVE
     ├─ on committed app message (D,F,G,…) → emit FORWARD_APP (stream 2)
     ├─ on committed Heartbeat (tag 35=0)  → reset heartbeat timer
     ├─ on committed TestRequest           → emit SEND Heartbeat (stream 2)
-    ├─ on committed ResendRequest         → service from MemoryStorage
-    │    emit: RESEND for app messages, GAP_FILL for session messages
+    ├─ on committed ResendRequest         → service per §2.5.5
+    │    fast path (≤2500): synchronous; emit RESEND/GAP_FILL within onSessionMessage
+    │    slow path (>2500): start Archive replay; store in pendingResend; poll across duty cycles
     ├─ on committed Logout (tag 35=5)     → emit SEND Logout-Ack; → LOGOUT_PENDING
     ├─ on heartbeat timer expiry          → emit SEND TestRequest; start test-req timer
     ├─ on test-req timer expiry           → emit SEND Logout; → LOGOUT_PENDING
-    └─ on DISCONNECT command              → → DISCONNECTED
+    └─ on committed SESSION_DISCONNECT    → → DISCONNECTED
 
 LOGOUT_PENDING
     ├─ on committed Logout-Ack            → → DISCONNECTED
     ├─ on logout timer expiry             → → DISCONNECTED (force)
-    └─ on DISCONNECT command              → → DISCONNECTED
+    └─ on committed SESSION_DISCONNECT    → → DISCONNECTED
 ```
 
 **Sequence number validation.** On each inbound committed message the service compares the FIX `MsgSeqNum` (tag 34, extracted from the SBE payload) against `inboundSeqNum + 1`:
@@ -159,6 +199,499 @@ LOGOUT_PENDING
 - **Too high (gap)**: emit `SEND ResendRequest` on stream 2. Do not advance `inboundSeqNum` until the gap is filled.
 - **Too low with `PossDupFlag=Y`** (tag 43): duplicate retransmission. Ignore silently. Do not advance `inboundSeqNum`.
 - **Too low without `PossDupFlag`**: sequence reset. Emit `SEND Logout` and transition to LOGOUT_PENDING.
+
+**FixAeronHandler: class outline.**
+
+```java
+public final class FixAeronHandler implements ClusteredService
+{
+    private static final int REPLAY_BATCH        = 10;
+    private static final int ENVELOPE_HEADER_LEN = 9; // 1-byte discriminator + 8-byte sessionId
+
+    // session map: LinkedHashMap for deterministic snapshot byte order (§6.1.11)
+    private final LinkedHashMap<Long, FixSessionStateMachine> sessions        = new LinkedHashMap<>();
+    private final ExpandableDirectByteBuffer                  encodingBuffer  = new ExpandableDirectByteBuffer(4096);
+
+    private Cluster       cluster;
+    private Publication   stream2;
+    private AeronArchive  aeronArchive;
+    private boolean       isLeader      = false;
+    private PendingResend pendingResend  = null;  // non-null only during Archive replay
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    @Override
+    public void onStart(final Cluster cluster, final Image snapshotImage)
+    {
+        this.cluster      = cluster;
+        this.stream2      = cluster.context().aeron().addPublication(STREAM_2_CHANNEL, STREAM_2_ID);
+        this.aeronArchive = AeronArchive.connect(new AeronArchive.Context()
+            .aeron(cluster.context().aeron()));
+
+        if (snapshotImage != null)
+        {
+            loadSnapshot(snapshotImage);
+        }
+    }
+
+    // ── Committed log entries ─────────────────────────────────────────────────
+
+    @Override
+    public void onSessionMessage(
+        final ClientSession aeronSession,
+        final long          timestamp,
+        final DirectBuffer  buffer,
+        final int           offset,
+        final int           length,
+        final Header        header)
+    {
+        pollPendingResend();   // make progress on any in-flight Archive replay
+
+        final int  discriminator = buffer.getByte(offset) & 0xFF;
+        final long fixSessionId  = buffer.getLong(offset + 1);
+
+        final FixSessionStateMachine fsm = sessions.computeIfAbsent(
+            fixSessionId, FixSessionStateMachine::new);
+
+        final Command[] commands = fsm.onEvent(
+            discriminator, buffer, offset + ENVELOPE_HEADER_LEN,
+            length - ENVELOPE_HEADER_LEN, cluster.timeMs());
+
+        emitCommands(commands, header.position());
+    }
+
+    @Override
+    public void onTimerEvent(final long correlationId, final long timestamp)
+    {
+        pollPendingResend();
+
+        // each FSM checks the correlationId against its own timers and returns
+        // commands only if the timer belongs to it; others return empty
+        for (final FixSessionStateMachine fsm : sessions.values())
+        {
+            final Command[] commands = fsm.onTimer(correlationId, cluster.timeMs());
+            if (commands.length > 0)
+            {
+                emitCommands(commands, 0L);
+                break;
+            }
+        }
+    }
+
+    // ── Snapshot ──────────────────────────────────────────────────────────────
+
+    @Override
+    public void onTakeSnapshot(final ExclusivePublication snapshotPublication)
+    {
+        for (final FixSessionStateMachine fsm : sessions.values())
+        {
+            final int len = fsm.encodeTo(encodingBuffer, 0);
+            while (snapshotPublication.offer(encodingBuffer, 0, len) < 0)
+            {
+                cluster.idleStrategy().idle();
+            }
+        }
+    }
+
+    private void loadSnapshot(final Image snapshotImage)
+    {
+        final FragmentHandler decoder = (buf, off, len, hdr) ->
+        {
+            final FixSessionStateMachine fsm = FixSessionStateMachine.decodeFrom(buf, off);
+            sessions.put(fsm.sessionId(), fsm);
+        };
+
+        while (!snapshotImage.isClosed())
+        {
+            cluster.idleStrategy().idle(snapshotImage.poll(decoder, REPLAY_BATCH));
+        }
+    }
+
+    // ── Leadership ────────────────────────────────────────────────────────────
+
+    @Override
+    public void onRoleChange(final Cluster.Role newRole)
+    {
+        isLeader = (newRole == Cluster.Role.LEADER);
+        if (!isLeader)
+        {
+            pendingResend = null;  // follower: discard any in-progress replay (will be restarted
+        }                         // by new leader re-processing the committed ResendRequest entry)
+    }
+
+    // ── Archive replay (slow-path ResendRequest, §6.1.7) ─────────────────────
+
+    void startArchiveReplay(
+        final FixSessionStateMachine fsm,
+        final long                   recordingId,
+        final long                   startPosition,
+        final long                   endPosition)
+    {
+        final long replaySessionId = aeronArchive.startReplay(
+            recordingId, startPosition, endPosition - startPosition,
+            REPLAY_CHANNEL, REPLAY_STREAM_ID);
+
+        final Image image = cluster.context().aeron()
+            .addSubscription(REPLAY_CHANNEL, REPLAY_STREAM_ID)
+            .imageBySessionId((int) replaySessionId);
+
+        pendingResend = new PendingResend(fsm, image, startPosition, endPosition);
+    }
+
+    private void pollPendingResend()
+    {
+        if (pendingResend == null || !isLeader)
+        {
+            return;
+        }
+
+        final int fragments = pendingResend.image.poll(
+            (buf, off, len, hdr) ->
+            {
+                final Command[] commands = pendingResend.fsm
+                    .onResendFragment(buf, off, len, cluster.timeMs());
+                emitCommands(commands, 0L);
+                pendingResend.emitPosition = hdr.position();
+            },
+            REPLAY_BATCH);
+
+        cluster.idleStrategy().idle(fragments);
+
+        if (pendingResend.image.isClosed())
+        {
+            // emit the tail: messages in MemoryStorage beyond the Archive window
+            final Command[] tail = pendingResend.fsm
+                .flushMemoryStorageTail(pendingResend.emitPosition, pendingResend.endPosition);
+            emitCommands(tail, 0L);
+            pendingResend = null;
+        }
+    }
+
+    // ── Command emission ──────────────────────────────────────────────────────
+
+    private void emitCommands(final Command[] commands, final long clusterPosition)
+    {
+        if (!isLeader)
+        {
+            return;   // suppress all output during log replay on a follower
+        }
+        for (final Command cmd : commands)
+        {
+            cmd.encodeInto(encodingBuffer, 0, clusterPosition);
+            while (stream2.offer(encodingBuffer, 0, cmd.encodedLength()) < 0)
+            {
+                cluster.idleStrategy().idle();  // must use cluster idle so consensus housekeeping continues
+            }
+        }
+    }
+}
+```
+
+**FixSessionStateMachine: class outline.**
+
+`Command` is a sealed interface; `FixAeronHandler` inspects returned commands and handles `ScheduleTimerCommand` and `StartArchiveReplayCommand` locally before emitting the rest on stream 2.
+
+```java
+// ── Command types returned to FixAeronHandler ─────────────────────────────────
+sealed interface Command permits
+    SendCommand, ForwardAppCommand, ResendCommand, GapFillCommand,
+    DisconnectCommand, ScheduleTimerCommand, StartArchiveReplayCommand
+{
+    Command[] NONE = new Command[0];
+}
+
+record SendCommand              (long sessionId, DirectBuffer payload, int length)           implements Command {}
+record ForwardAppCommand        (long sessionId, DirectBuffer payload, int length)           implements Command {}
+record ResendCommand            (long sessionId, long origSeqNum, DirectBuffer payload, int length) implements Command {}
+record GapFillCommand           (long sessionId, long fromSeqNum, long newSeqNo)             implements Command {}
+record DisconnectCommand        (long sessionId)                                              implements Command {}
+record ScheduleTimerCommand     (long correlationId, long deadlineMs)                        implements Command {}
+record StartArchiveReplayCommand(long recordingId,  long startPosition, long endPosition)    implements Command {}
+
+// ── FixSessionStateMachine ────────────────────────────────────────────────────
+public final class FixSessionStateMachine
+{
+    private final long sessionId;
+
+    // ── Snapshotted state (serialised by FixAeronHandler.onTakeSnapshot) ──────
+    private SessionPhase sessionPhase     = SessionPhase.DISCONNECTED;
+    private long         inboundSeqNum    = 0;
+    private long         outboundSeqNum   = 0;
+    private String       pendingTestReqId = null;
+    private long         heartbeatTimer   = 0;   // correlationId; 0 = none
+    private long         testReqTimer     = 0;
+    private final MemoryStorage                        memoryStorage        = new MemoryStorage(2500);
+    private final LinkedHashMap<Long, ArchivePosition> outboundArchiveIndex = new LinkedHashMap<>();
+
+    private long nextTimerId = 1;   // monotonically increasing; snapshotted
+
+    FixSessionStateMachine(final long sessionId) { this.sessionId = sessionId; }
+    long sessionId() { return sessionId; }
+
+    // ── Event dispatch ────────────────────────────────────────────────────────
+
+    Command[] onEvent(
+        final int          discriminator,
+        final DirectBuffer buffer,
+        final int          offset,
+        final int          length,
+        final long         nowMs)
+    {
+        return switch (discriminator)
+        {
+            case DISC_SESSION_CONNECT    -> onSessionConnect(nowMs);
+            case DISC_SESSION_DISCONNECT -> onSessionDisconnect();
+            case DISC_LOGON              -> onInboundLogon(buffer, offset, nowMs);
+            case DISC_LOGOUT             -> onInboundLogout(buffer, offset, nowMs);
+            case DISC_HEARTBEAT          -> onInboundHeartbeat(buffer, offset, nowMs);
+            case DISC_TEST_REQUEST       -> onInboundTestRequest(buffer, offset);
+            case DISC_RESEND_REQUEST     -> onInboundResendRequest(buffer, offset);
+            case DISC_SEQUENCE_RESET     -> onInboundSequenceReset(buffer, offset);
+            default                      -> onInboundApplicationMessage(discriminator, buffer, offset, length);
+        };
+    }
+
+    Command[] onTimer(final long correlationId, final long nowMs)
+    {
+        if (correlationId == heartbeatTimer) return onHeartbeatTimerExpiry(nowMs);
+        if (correlationId == testReqTimer)   return onTestReqTimerExpiry(nowMs);
+        return Command.NONE;
+    }
+
+    // ── Session phase transitions ─────────────────────────────────────────────
+
+    private Command[] onSessionConnect(final long nowMs)
+    {
+        if (sessionPhase != SessionPhase.DISCONNECTED) return Command.NONE;
+        sessionPhase   = SessionPhase.LOGON_PENDING;
+        heartbeatTimer = nextTimerId++;
+        return new Command[]{ new ScheduleTimerCommand(heartbeatTimer, nowMs + LOGON_TIMEOUT_MS) };
+    }
+
+    private Command[] onSessionDisconnect()
+    {
+        sessionPhase     = SessionPhase.DISCONNECTED;
+        heartbeatTimer   = 0;
+        testReqTimer     = 0;
+        pendingTestReqId = null;
+        return Command.NONE;
+    }
+
+    private Command[] onInboundLogon(
+        final DirectBuffer buffer, final int offset, final long nowMs)
+    {
+        if (sessionPhase != SessionPhase.LOGON_PENDING) return Command.NONE;
+        final Command[] seqCheck = validateAndAdvanceSeqNum(buffer, offset, nowMs);
+        if (seqCheck != null) return seqCheck;
+
+        sessionPhase   = SessionPhase.ACTIVE;
+        heartbeatTimer = nextTimerId++;
+        return new Command[]{
+            new SendCommand(sessionId, buildLogonAck(buffer, offset), LOGON_ACK_LEN),
+            new ScheduleTimerCommand(heartbeatTimer, nowMs + heartbeatIntervalMs)
+        };
+    }
+
+    private Command[] onInboundHeartbeat(
+        final DirectBuffer buffer, final int offset, final long nowMs)
+    {
+        if (sessionPhase != SessionPhase.ACTIVE) return Command.NONE;
+        final Command[] seqCheck = validateAndAdvanceSeqNum(buffer, offset, nowMs);
+        if (seqCheck != null) return seqCheck;
+
+        pendingTestReqId = null;   // heartbeat satisfies any outstanding TestRequest
+        heartbeatTimer   = nextTimerId++;
+        return new Command[]{ new ScheduleTimerCommand(heartbeatTimer, nowMs + heartbeatIntervalMs) };
+    }
+
+    private Command[] onInboundTestRequest(final DirectBuffer buffer, final int offset)
+    {
+        if (sessionPhase != SessionPhase.ACTIVE) return Command.NONE;
+        final Command[] seqCheck = validateAndAdvanceSeqNum(buffer, offset, 0L);
+        if (seqCheck != null) return seqCheck;
+
+        final String testReqId = extractTestReqId(buffer, offset);
+        return new Command[]{ new SendCommand(sessionId, buildHeartbeat(testReqId), HEARTBEAT_LEN) };
+    }
+
+    private Command[] onInboundResendRequest(final DirectBuffer buffer, final int offset)
+    {
+        if (sessionPhase != SessionPhase.ACTIVE) return Command.NONE;
+        final Command[] seqCheck = validateAndAdvanceSeqNum(buffer, offset, 0L);
+        if (seqCheck != null) return seqCheck;
+
+        final long beginSeqNo = extractBeginSeqNo(buffer, offset);
+        final long endSeqNo   = extractEndSeqNo(buffer, offset);   // 0 means open-ended
+
+        if (memoryStorage.covers(beginSeqNo, endSeqNo))
+        {
+            return buildResendCommandsFromMemory(beginSeqNo, endSeqNo);   // fast path
+        }
+
+        // slow path: ask FixAeronHandler to start an async Archive replay
+        final ArchivePosition pos = outboundArchiveIndex.get(beginSeqNo);
+        return new Command[]{ new StartArchiveReplayCommand(
+            pos.recordingId(), pos.startPosition(), pos.endPosition()) };
+    }
+
+    private Command[] onInboundLogout(
+        final DirectBuffer buffer, final int offset, final long nowMs)
+    {
+        if (sessionPhase == SessionPhase.DISCONNECTED) return Command.NONE;
+        final Command[] seqCheck = validateAndAdvanceSeqNum(buffer, offset, nowMs);
+        if (seqCheck != null) return seqCheck;
+
+        if (sessionPhase == SessionPhase.LOGOUT_PENDING)
+        {
+            // peer confirms our Logout → clean close
+            sessionPhase = SessionPhase.DISCONNECTED;
+            return new Command[]{ new DisconnectCommand(sessionId) };
+        }
+
+        // peer-initiated Logout → ack and wait for TCP close
+        sessionPhase = SessionPhase.LOGOUT_PENDING;
+        return new Command[]{ new SendCommand(sessionId, buildLogoutAck(), LOGOUT_ACK_LEN) };
+    }
+
+    private Command[] onInboundSequenceReset(final DirectBuffer buffer, final int offset)
+    {
+        final boolean gapFill = extractGapFillFlag(buffer, offset);
+        final long    newSeqNo = extractNewSeqNo(buffer, offset);
+        if (gapFill)
+        {
+            // advance inboundSeqNum past session messages we do not expect
+            inboundSeqNum = newSeqNo - 1;
+        }
+        else
+        {
+            // hard reset: accept unconditionally
+            inboundSeqNum = newSeqNo - 1;
+        }
+        return Command.NONE;
+    }
+
+    private Command[] onInboundApplicationMessage(
+        final int discriminator, final DirectBuffer buffer, final int offset, final int length)
+    {
+        if (sessionPhase != SessionPhase.ACTIVE) return Command.NONE;
+        final Command[] seqCheck = validateAndAdvanceSeqNum(buffer, offset, 0L);
+        if (seqCheck != null) return seqCheck;
+
+        return new Command[]{ new ForwardAppCommand(sessionId, buffer, length) };
+    }
+
+    // ── Timer expiry ──────────────────────────────────────────────────────────
+
+    private Command[] onHeartbeatTimerExpiry(final long nowMs)
+    {
+        return switch (sessionPhase)
+        {
+            case LOGON_PENDING ->
+            {
+                sessionPhase = SessionPhase.DISCONNECTED;
+                yield new Command[]{ new DisconnectCommand(sessionId) };
+            }
+            case ACTIVE ->
+            {
+                pendingTestReqId = String.valueOf(nowMs);   // unique per cluster.timeMs()
+                testReqTimer     = nextTimerId++;
+                yield new Command[]{
+                    new SendCommand(sessionId, buildTestRequest(pendingTestReqId), TEST_REQUEST_LEN),
+                    new ScheduleTimerCommand(testReqTimer, nowMs + TEST_REQ_TIMEOUT_MS)
+                };
+            }
+            default -> Command.NONE;
+        };
+    }
+
+    private Command[] onTestReqTimerExpiry(final long nowMs)
+    {
+        if (sessionPhase != SessionPhase.ACTIVE) return Command.NONE;
+        sessionPhase     = SessionPhase.LOGOUT_PENDING;
+        pendingTestReqId = null;
+        testReqTimer     = 0;
+        heartbeatTimer   = nextTimerId++;
+        return new Command[]{
+            new SendCommand(sessionId, buildLogout(), LOGOUT_LEN),
+            new ScheduleTimerCommand(heartbeatTimer, nowMs + LOGOUT_TIMEOUT_MS)
+        };
+    }
+
+    // ── Sequence number validation ────────────────────────────────────────────
+
+    /**
+     * Returns null on success (caller continues); returns a non-null Command[]
+     * if a gap, duplicate, or fatal sequence error was detected.
+     */
+    private Command[] validateAndAdvanceSeqNum(
+        final DirectBuffer buffer, final int offset, final long nowMs)
+    {
+        final long    msgSeqNum = extractMsgSeqNum(buffer, offset);
+        final boolean possDup   = extractPossDupFlag(buffer, offset);
+        final long    expected  = inboundSeqNum + 1;
+
+        if (msgSeqNum == expected)
+        {
+            inboundSeqNum = msgSeqNum;
+            return null;   // normal
+        }
+        else if (msgSeqNum > expected)
+        {
+            // gap: request retransmission; do not advance inboundSeqNum
+            return new Command[]{ new SendCommand(
+                sessionId, buildResendRequest(expected, msgSeqNum - 1), RESEND_REQUEST_LEN) };
+        }
+        else if (possDup)
+        {
+            return Command.NONE;   // duplicate — discard silently
+        }
+        else
+        {
+            // too low without PossDupFlag: fatal
+            sessionPhase = SessionPhase.LOGOUT_PENDING;
+            return new Command[]{ new SendCommand(sessionId, buildLogout(), LOGOUT_LEN) };
+        }
+    }
+
+    // ── Archive replay helpers (called by FixAeronHandler) ───────────────────
+
+    /** Classify one replayed fragment and return RESEND or GAP_FILL commands. */
+    Command[] onResendFragment(
+        final DirectBuffer buffer, final int offset, final int length, final long nowMs)
+    {
+        final int msgType = extractMsgType(buffer, offset);
+        if (isApplicationMessage(msgType))
+        {
+            return new Command[]{ new ResendCommand(
+                sessionId, extractMsgSeqNum(buffer, offset), buffer, length) };
+        }
+        // session message: collapse to GAP_FILL (details deferred to buildGapFill)
+        return buildGapFillForSessionMessage(buffer, offset);
+    }
+
+    /** Emit RESEND/GAP_FILL for any tail entries in MemoryStorage. */
+    Command[] flushMemoryStorageTail(final long fromSeqNum, final long toSeqNum)
+    {
+        return buildResendCommandsFromMemory(fromSeqNum, toSeqNum);
+    }
+
+    // ── Snapshot serialisation ────────────────────────────────────────────────
+
+    int encodeTo(final MutableDirectBuffer buf, final int offset)
+    {
+        // write: sessionId, sessionPhase, inboundSeqNum, outboundSeqNum,
+        //        pendingTestReqId, heartbeatTimer, testReqTimer, nextTimerId,
+        //        memoryStorage contents, outboundArchiveIndex (insertion order)
+        return ENCODED_LENGTH;   // bytes written
+    }
+
+    static FixSessionStateMachine decodeFrom(final DirectBuffer buf, final int offset)
+    {
+        // mirror of encodeTo
+        return new FixSessionStateMachine(buf.getLong(offset));
+    }
+}
+```
 
 ---
 
@@ -171,7 +704,17 @@ When a `ResendRequest` (tag 35=2) arrives, `FixClusteredService` scans `MemorySt
 - **Application messages** (ExecutionReport, OrderCancelReject): emitted as `RESEND` commands on stream 2, each carrying `PossDupFlag=Y` (tag 43) added to the SBE payload by the cluster before publication.
 - **Session messages** (Heartbeat, TestRequest, Logon, etc.): never retransmitted individually. The entire run of session messages within the requested range is replaced by a single `GAP_FILL` command that instructs the AppWorker's FIX Session component to emit a FIX SequenceReset-GapFill (tag 123=Y).
 
-If the requested range extends beyond what `MemoryStorage` holds, the cluster falls back to Aeron Archive for the older entries. Archive reads are synchronous and are only triggered for ranges older than 2500 messages — a condition that should not occur in normal operation.
+If the requested range extends beyond what `MemoryStorage` holds, the cluster falls back to Aeron Archive for the older entries using an **asynchronous state machine** stored in `pendingResend`:
+
+1. **`onSessionMessage` (start):** call `AeronArchive.startReplay()` to start the replay subscription. `startReplay()` returns immediately — it does not block until data arrives. Store the returned `Image`, the current emit position, and the end position in `pendingResend`. Return from `onSessionMessage`.
+
+2. **Subsequent duty cycles (poll):** on each service duty cycle, poll `pendingResend.image` for available fragments. Emit each replayed message as a `RESEND` or `GAP_FILL` command on stream 2 (respecting the §6.1.9 back-pressure pattern), then advance `emitPosition`. Bound the per-cycle fragment batch to avoid starving other streams.
+
+3. **Completion:** when `pendingResend.image.isClosed()` is true, the Archive replay has delivered all requested entries. Emit any tail entries that fall within `MemoryStorage` (the most recent messages, beyond the Archive window), then clear `pendingResend` (set to null).
+
+`pendingResend` is runtime state — it is not snapshotted (see §6.1.10). On failover the incoming leader finds `pendingResend` null and re-starts any in-progress Archive replay from the beginning by re-processing the committed ResendRequest log entry. Because every emitted RESEND frame carries `PossDupFlag=Y`, re-delivery of frames already sent by the previous leader is idempotent at the FIX protocol level.
+
+The Archive slow path is triggered only for ranges older than 2500 messages. In normal operation this does not occur; it is a resilience path for unusual scenarios such as a lengthy disconnect followed by a large gap fill.
 
 ---
 
@@ -179,16 +722,12 @@ If the requested range extends beyond what `MemoryStorage` holds, the cluster fa
 
 `FixClusteredService` maintains a session context for **every external FIX connection** — not only buy-side client sessions, but also the sell-side exchange session. In the minimum deployment there are at least two contexts: one for the buy-side client and one for the sell-side exchange. In practice there will be one sell-side context plus one context per connected buy-side client.
 
-The service maintains a `Map<Long, SessionState>` keyed by a `sessionId` that is unique per external connection. Each entry holds:
+The service maintains a `LinkedHashMap<Long, SessionState>` keyed by a `sessionId` that is unique per external connection. The `LinkedHashMap` preserves insertion order, guaranteeing identical snapshot byte sequences across all cluster nodes. Each entry holds the full per-session state described in §6.1.6 plus a role indicator:
 
 ```
-inboundSeqNum:   int64         — last committed inbound FIX sequence number
-outboundSeqNum:  int64         — last committed outbound FIX sequence number
-sessionPhase:    SessionPhase  — current state in the session state machine
-sessionRole:     SessionRole   — ACCEPTOR (buy-side) or INITIATOR (sell-side)
-memoryStorage:   MemoryStorage — outbound message buffer for ResendRequest
-heartbeatTimer:  int64         — correlationId of active heartbeat timer (0 if none)
-testReqTimer:    int64         — correlationId of active test-request timer (0 if none)
+sessionRole:  SessionRole — ACCEPTOR (buy-side) or INITIATOR (sell-side)
+(plus all fields from §6.1.6: inboundSeqNum, outboundSeqNum, sessionPhase,
+ pendingTestReqId, memoryStorage, outboundArchiveIndex, heartbeatTimer, testReqTimer)
 ```
 
 The `sessionRole` field distinguishes the two session types. Buy-side (acceptor) sessions wait for the client to send a Logon; sell-side (initiator) sessions emit the Logon themselves after `CONNECT`. The phase transition diagrams differ accordingly, but the underlying state fields — sequence numbers, timers, `MemoryStorage` — are identical in structure. Both session types are replicated across all Raft nodes and included in the cluster snapshot.
@@ -223,8 +762,9 @@ The `clusterSessionPosition` is included in every command envelope so the AppWor
 The full command set and their triggers are described in §2.5.4. Key points regarding command generation order:
 
 - Commands are emitted **strictly in commit order**. The AppWorker's duty cycle processes them in the order they arrive; it never reorders or batches across multiple log positions.
-- A single committed log entry may produce **multiple commands** on stream 2. A `ResendRequest` that spans 10 messages produces 10 `RESEND` (or `GAP_FILL`) commands in sequence.
+- A single committed log entry may produce **multiple commands** on stream 2. A `ResendRequest` that spans 10 messages produces 10 `RESEND` (or `GAP_FILL`) commands in sequence. When the requested range exceeds `MemoryStorage` capacity (slow path, §6.1.7), those commands are emitted across multiple duty cycles via `pendingResend` rather than within a single `onSessionMessage` invocation.
 - `FORWARD_APP` is emitted only for application-layer FIX messages (MsgType D, F, G, 8, 9, …). Session-layer messages (A, 0, 1, 2, 5, …) are handled entirely within `FixClusteredService` and do not produce a `FORWARD_APP` command.
+- All `Publication.offer()` calls on stream 2 are gated on `isLeader`. During Raft log replay on a follower node, `isLeader` is false and no commands are emitted; the follower rebuilds its state silently. When `isLeader` is true and an offer returns a negative value (back-pressure), the service retries using `cluster.idleStrategy().idle()` until the offer succeeds — the cluster-provided idle strategy must be used so that the consensus module's own housekeeping continues during the retry spin.
 
 ---
 
@@ -232,18 +772,28 @@ The full command set and their triggers are described in §2.5.4. Key points reg
 
 **Snapshot trigger.** The cluster takes a snapshot of `FixClusteredService` state periodically — by default, every N committed entries (configurable) or on a manual trigger — and writes it to Aeron Archive on the local NVMe. The snapshot position is the `clusterSessionPosition` of the last committed entry at the time of the snapshot.
 
-**Snapshot contents.** The snapshot serialises the entire `FixClusteredService` state:
+**Snapshot contents.** The snapshot serialises all snapshotted `FixClusteredService` state. Runtime-only fields (`pendingResend`, `isLeader`) are excluded.
 
 ```
-for each sessionId in sessionMap:
-    sessionId:         uint64
-    inboundSeqNum:     int64
-    outboundSeqNum:    int64
-    sessionPhase:      uint8
-    heartbeatTimer:    int64   (correlationId, 0 if none)
-    testReqTimer:      int64   (correlationId, 0 if none)
-    memoryStorage:     MemoryStorage (2500 × SBE message slots)
+for each sessionId in sessionMap (in insertion order — LinkedHashMap):
+    sessionId:            uint64
+    inboundSeqNum:        int64
+    outboundSeqNum:       int64
+    sessionPhase:         uint8
+    pendingTestReqId:     String  (empty string if no outstanding TestRequest probe)
+    heartbeatTimer:       int64   (correlationId, 0 if none)
+    testReqTimer:         int64   (correlationId, 0 if none)
+    memoryStorage:        MemoryStorage (2500 × SBE message slots)
+    outboundArchiveIndex: LinkedHashMap entries in insertion order
+                          { outboundSeqNum: int64, recordingId: int64,
+                            startPosition: int64, length: int64 }
+
+NOT included in snapshot (runtime state, re-derived on recovery):
+    pendingResend:        (null on fresh leader; re-started from committed ResendRequest log entry)
+    isLeader:             (re-derived from first onNewLeadershipTerm callback)
 ```
+
+The session map itself is a `LinkedHashMap` (insertion order) to guarantee identical snapshot byte sequences across all cluster nodes. Any non-deterministic iteration order (e.g. `HashMap`) would produce different snapshot bytes on different nodes, violating the determinism invariant described in §6.1.11.
 
 **Recovery sequence.** On restart (fresh start or failover), each cluster node:
 
@@ -284,7 +834,7 @@ The C++ FIX Session component on Core 2 is not an autonomous state machine. It i
 
 Every piece of local state the handler maintains is a **shadow** of the cluster's committed state. It is updated exclusively by commands arriving on stream 6 — commands that are themselves derived from Raft-committed log entries. The handler never makes a session decision independently. It never decides to send a Logon-Ack, a Heartbeat, or a SequenceReset on its own initiative. It only acts when the cluster tells it to, and only in the way the cluster specifies.
 
-This constraint is what makes failover seamless. When the cluster elects a new leader, `FixClusteredService.onRoleChange(LEADER)` fires with the full committed session state already in place. The new leader's C++ handler starts consuming stream 6 from that point and immediately knows the correct session phase, the correct sequence positions, and the correct outbound queue — without any recovery step of its own.
+This constraint is what makes failover seamless. When the cluster elects a new leader, `FixClusteredService.onNewLeadershipTerm()` fires with the full committed session state already in place and sets `isLeader = true`. The new leader's C++ handler starts consuming stream 6 from that point and immediately knows the correct session phase, the correct sequence positions, and the correct outbound queue — without any recovery step of its own. `onRoleChange` clears `isLeader` when this node ceases to be leader.
 
 ### 6.2.2 What the Handler Does Not Do
 
@@ -352,7 +902,7 @@ The handler never buffers outbound messages. Each command on stream 6 produces e
 
 During follower operation the handler on a non-leader node receives no commands on stream 6 (the leader publishes stream 6; followers do not). Its TCP acceptor is not open. `shadowPhase` remains `DISCONNECTED` throughout.
 
-On `onRoleChange(LEADER)` the cluster publishes `CONNECT` on stream 6. The handler responds:
+On `onNewLeadershipTerm()` (`isLeader` becomes true) the cluster publishes `CONNECT` on stream 6. The handler responds:
 
 1. Opens the TCP acceptor.
 2. Sets `shadowPhase` to `LOGON_PENDING`.
@@ -509,13 +1059,20 @@ The output is a `FIXMessage` in FIX internal format: a fixed-size struct of deco
 
 ### 6.3.5 Inbound Pipeline: Frame to Stream 1
 
-For each complete `FIXMessage` produced by `PayloadDecoder`:
+**TCP lifecycle events.** In addition to FIX frames, the handler publishes two TCP lifecycle events on stream 1:
+
+- **`SESSION_CONNECT`**: published immediately when a client TCP connection is accepted by the reactor and the fd is added to the known-connection table. The SBE payload carries the `sessionId` (an opaque identifier for this connection) and the peer address.
+- **`SESSION_DISCONNECT`**: published immediately when the reactor detects a client disconnect (zero-length `recv`, `EPOLLRDHUP`, or error), before the fd is removed from the known-connection table.
+
+Both events are SBE-encoded and published on stream 1 via the same `AeronCluster.offer()` path as FIX frames. Because stream 1 is a single ordered publication per Ingress process, the `SESSION_CONNECT` and `SESSION_DISCONNECT` events arrive at the cluster in strict causal order relative to every FIX frame from that session. The same pre-commit loss window that applies to FIX frames applies to these events — a leader crash between `offer()` and Raft commit loses the event; the client's subsequent Logon sequence makes the cluster's session state self-consistent regardless.
+
+**FIX frame inbound processing.** For each complete `FIXMessage` produced by `PayloadDecoder`:
 
 ```
 1. Admission check:
    a. Frame size ≤ maximum configured size.
    b. Checksum arithmetic: sum of all bytes before tag 10 mod 256 == tag 10 value.
-   c. fd is in the known-connection table (i.e. a CONNECT has been received for it).
+   c. fd is in the known-connection table (i.e. the TCP accept has been processed and SESSION_CONNECT will be/has been published).
    → If any check fails: discard silently. No response sent. No cluster notification.
 
 2. SBE encode:

@@ -63,7 +63,7 @@ All three cluster nodes must reach quorum before the leader publishes `CONNECT`.
 
 ## 4.1 Overview
 
-The cluster runs three nodes. At any moment one node is the **leader** — it holds the open client TCP connections, publishes commands to its local C++ workers, and sends to the sell-side gateway. The other two nodes are **followers** — they apply the same Raft log entries and maintain warm-standby state, but their TCP stacks are idle and their C++ workers discard all non-structural commands.
+The cluster runs three nodes. At any moment one node is the **leader** — it holds the open client TCP connections, publishes commands to its local C++ workers, and sends to the sell-side gateway. The other two nodes are **followers** — they apply the same Raft log entries and maintain warm-standby state, but their TCP stacks are idle. `FixClusteredService` on followers rebuilds state silently: the `isLeader` flag is false and all stream-2 `Publication.offer()` calls are suppressed, so follower AppWorkers receive no FORWARD_APP, SEND, RESEND, GAP_FILL, RISK_APPROVED, or RISK_REJECTED commands. Only CONNECT and DISCONNECT reach the C++ workers on a role change.
 
 A failover is triggered when followers stop receiving Raft heartbeats from the leader and elect a replacement. The new leader then re-establishes all external connections using the FIX session state that was already replicated before the crash. No data is recovered from disk beyond what was committed to the Raft log; no manual intervention is required.
 
@@ -73,23 +73,26 @@ A failover is triggered when followers stop receiving Raft heartbeats from the l
 
 The Raft log is the durability boundary. Anything committed (acknowledged by a quorum of two or more nodes) is guaranteed to be present on the new leader. Anything not yet committed is lost.
 
-### Survives (committed Raft state)
+### Survives (committed Raft state — serialised in `onTakeSnapshot`, restored in `onLoadSnapshot`)
 
 | State | Owner | Notes |
 |-------|-------|-------|
-| `inboundSeqNum` | Java `FixClusteredService` | Last FIX sequence number received from the client and committed to the log. |
-| `outboundSeqNum` | Java `FixClusteredService` | Last FIX sequence number sent to the client and committed to the log. |
-| `SessionPhase` | Java `FixClusteredService` | Connection state at the last committed message (Active, LogonPending, etc.). |
-| `MemoryStorage` | Java `FixClusteredService` | Circular buffer of the last 2500 outbound FIX messages, used for ResendRequest servicing. |
-| Heartbeat timer deadlines | Java `FixClusteredService` | Registered via `cluster.scheduleTimer()`; replicated as log entries. |
+| `inboundSeqNum` / `outboundSeqNum` | Java `FixClusteredService` | FIX sequence counters at the last committed message. |
+| `SessionPhase` | Java `FixClusteredService` | Connection state per session (Active, LogonPending, etc.). |
+| `pendingTestReqId` | Java `FixClusteredService` | TestReqID and timer ID of any outstanding cluster-initiated TestRequest probe. Null if no probe is in flight. |
+| `MemoryStorage` | Java `FixClusteredService` | Circular buffer of the last 2500 outbound FIX messages, used for fast-path ResendRequest servicing. |
+| `outboundSeqNum → Archive position` index | Java `FixClusteredService` | `LinkedHashMap` mapping each outbound sequence number to its Aeron Archive recording position; required for slow-path ResendRequest servicing beyond the MemoryStorage window. |
+| Heartbeat / test-request timer deadlines | Java `FixClusteredService` | Registered via `cluster.scheduleTimer()`; replicated as log entries and restored via `pendingTestReqId`. |
 
-### Lost (not committed)
+### Lost (not committed or runtime-only)
 
 | State | Notes |
 |-------|-------|
-| Inbound FIX frames in the leader's Aeron IPC ring buffer (stream 1) | Published by C++ ingress but not yet offered to the ConsensusModule ingress channel, or offered but not yet replicated to a quorum. |
+| Inbound FIX frames in the leader's Aeron IPC ring buffer (stream 1) | Published by C++ ingress but not yet committed to a Raft quorum. Client retransmits after reconnect. |
+| `SESSION_CONNECT` / `SESSION_DISCONNECT` events offered but not yet committed | Subject to the same pre-commit loss window as FIX frames; the client's Logon sequence makes cluster session state self-consistent regardless. |
 | FIX frames received by the leader's TCP stack but not yet written to Aeron IPC | Still in the kernel socket buffer on the crashed node. |
-| In-flight Risk Thread requests (up to 25) | The correlation table exists only in the leader's Risk Thread. All in-flight orders are treated as rejected on the new leader. |
+| `pendingResend` (in-progress Archive replay) | Runtime state only; not snapshotted. The new leader re-derives it deterministically from the committed ResendRequest log entry and restarts the Archive replay from the beginning of the requested range. |
+| In-flight Risk Thread requests (up to 25) | Correlation table exists only in the leader's Risk Thread. All in-flight orders are re-dispatched from the Raft log on the new leader as new risk requests. |
 | C++ AppWorker transient decode state | Stateless by design; resets on CONNECT. |
 
 ---
@@ -190,7 +193,12 @@ Messages sent by the old leader that were in its TCP send buffer at the time of 
 
 **Case B — client received messages A sent after the last committed outbound sequence**: this occurs if A sent FIX bytes from its TCP buffer for messages it had already published downstream but that were not yet committed to Raft (i.e. the cluster had sequenced them but the commit was in-flight at crash time). The client's expected sequence is higher than the new leader's `outboundSeqNum + 1`. From the client's perspective, the new leader has reset the sequence. The new leader responds by sending a SequenceReset-GapFill (tag 123 = Y, `NewSeqNo` = client's expected inbound seq) to bridge the gap, then continues normally. The skipped range corresponds to messages the cluster never committed and therefore cannot retransmit.
 
-**Case C — client missed messages the old leader committed and sent**: the client sends a `ResendRequest` for the missing range. The new leader services it from `MemoryStorage` (last 2500 outbound messages). For session-level messages in the resend range (heartbeats, test requests), the leader emits a SequenceReset-GapFill instead of retransmitting them. Application messages (ExecutionReport, etc.) are retransmitted with `PossDupFlag=Y` (tag 43 = Y).
+**Case C — client missed messages the old leader committed and sent**: the client sends a `ResendRequest` for the missing range. The new leader services it via the flow described in §2.5.5:
+
+- **Fast path** (gap ≤ 2500 messages): the range falls entirely within `MemoryStorage`; the leader emits `RESEND`/`GAP_FILL` commands synchronously within the `onSessionMessage` callback.
+- **Slow path** (gap > 2500 messages): the leader consults the `outboundSeqNum → Archive position` index, calls `AeronArchive.startReplay()`, and drains the resulting replay `Image` across multiple service duty cycles via the `pendingResend` state machine. `pendingResend` is runtime state; if a second failover occurs during replay the new leader re-starts the replay from the beginning of the requested range.
+
+In both paths, session-layer messages in the resend range (Heartbeat, TestRequest, etc.) are gap-filled as a `SequenceReset` with `GapFillFlag=Y` rather than retransmitted. Application messages (ExecutionReport, etc.) are retransmitted with `PossDupFlag=Y` (tag 43 = Y).
 
 ### 4.5.3 Inbound Gap at Client
 
@@ -200,7 +208,7 @@ If the client had sent messages that reached the old leader's TCP stack but neve
 
 ## 4.6 C++ Process Restart on the New Leader
 
-The C++ processes on the new leader (Ingress, Application, Egress) have been running throughout — they were just in follower mode with no TCP connections and with the AppWorker discarding SEND commands.
+The C++ processes on the new leader (Ingress, Application, Egress) have been running throughout in follower mode: no TCP connections were held and `FixClusteredService` was suppressing all stream-2 output (see §4.1), so the AppWorker received no work commands.
 
 ### 4.6.1 AppWorker (Core 7)
 
@@ -286,7 +294,7 @@ Client disconnects (TCP RST / timeout)
     │   Closes fd. Removes fd from registered buffer set.
     │
     ├─ FIX Session (Core 2): detects fd closure.
-    │   Publishes disconnect notification to cluster (stream 1).
+    │   Publishes SESSION_DISCONNECT event to cluster (stream 1).
     │
     └─ FixClusteredService: commits disconnect.
         SessionPhase → DISCONNECTED.
