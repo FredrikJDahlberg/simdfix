@@ -51,8 +51,6 @@ set(FIX_HEADERS
         ${MAIN_PATH}/detail/simd/LinearSearch.hpp ${MAIN_PATH}/detail/encoder/FieldEncoder.hpp
         ${MAIN_PATH}/encoder/DataEncoder.hpp ${MAIN_PATH}/encoder/PayloadEncoder.hpp
         ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp
-        ${MAIN_PATH}/session/Session.hpp
-        ${MAIN_PATH}/session/ClientSession.hpp ${MAIN_PATH}/session/ServerSession.hpp
         ${MAIN_PATH}/storage/Storage.hpp ${MAIN_PATH}/storage/MemoryStorage.hpp)
 add_library(SimdFix INTERFACE)
 add_library(SimdFix::SimdFix ALIAS SimdFix)
@@ -277,9 +275,7 @@ endif()
 
 # Dynamically create an executable or library treating headers as source items
 # Using set_source_files_properties forces CMake/Compilers to attempt compilation
-add_library(header_test ${FIX_HEADERS} ${GENERATED_HEADERS}
-        ${MAIN_PATH}/session/Session.hpp
-        ${MAIN_PATH}/session/ClientSession.hpp ${MAIN_PATH}/session/ServerSession.hpp)
+add_library(header_test ${FIX_HEADERS} ${GENERATED_HEADERS})
 set_source_files_properties(${FIX_HEADERS} ${GENERATED_HEADERS} PROPERTIES LANGUAGE CXX)
 target_include_directories(header_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp
