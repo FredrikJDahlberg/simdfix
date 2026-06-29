@@ -1,4 +1,4 @@
-# simdfix
+<p align="center"><img src="doc/simdfix.png" width="600" alt="simdfix"/></p>
 
 A SIMD-accelerated [FIX](https://www.fixtrading.org/standards/fix-sessions-online/) (Financial Information Exchange) protocol codec in C++23, targeting ARM NEON. Decodes and encodes FIX messages using 16-byte parallel NEON operations and SWAR (SIMD Within A Register) digit parsing with zero copies.
 
