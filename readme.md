@@ -64,15 +64,18 @@ Available benchmarks: `logon-cold`, `logon-hot`, `logon-getters`, `logon-groups`
 
 | Benchmark | Message Size | Throughput | Latency |
 |-----------|-------------|-----------|---------|
-| Logon decode | 142 B | 1.54 GB/s | 92 ns/msg |
-| Logon getters | 142 B | 1.21 GB/s | 118 ns/msg |
-| Logon encode | 142 B | 2.19 GB/s | 103 ns/msg |
-| NewOrderSingle decode | 154 B | 1.62 GB/s | 95 ns/msg |
-| NewOrderSingle getters | 154 B | 1.02 GB/s | 151 ns/msg |
-| NewOrderSingle encode | 154 B | 4.34 GB/s | 38 ns/msg |
-| ExecutionReport decode | 245 B | 1.68 GB/s | 146 ns/msg |
-| ExecutionReport getters | 245 B | 1.04 GB/s | 236 ns/msg |
-| ExecutionReport encode | 245 B | 2.42 GB/s | 101 ns/msg |
+| Logon cold | 142 B | 1.47 GB/s | 96.5 ns/msg |
+| Logon decode | 142 B | 1.50 GB/s | 94.8 ns/msg |
+| Logon getters | 142 B | 1.18 GB/s | 120.5 ns/msg |
+| Logon groups | 142 B | 1.22 GB/s | 208.0 ns/msg |
+| Logon data | 166 B | 1.08 GB/s | 153.1 ns/msg |
+| Logon encode | 142 B | 1.94 GB/s | 115.3 ns/msg |
+| NewOrderSingle decode | 154 B | 0.64 GB/s | 240.4 ns/msg |
+| NewOrderSingle getters | 154 B | 0.51 GB/s | 301.2 ns/msg |
+| NewOrderSingle encode | 154 B | 4.14 GB/s | 39.3 ns/msg |
+| ExecutionReport decode | 245 B | 1.42 GB/s | 173.1 ns/msg |
+| ExecutionReport getters | 245 B | 1.00 GB/s | 245.9 ns/msg |
+| ExecutionReport encode | 245 B | 2.39 GB/s | 102.5 ns/msg |
 
 ## Code Coverage
 
