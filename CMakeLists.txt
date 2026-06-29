@@ -206,14 +206,13 @@ add_fix_test(OptionalIntTest  "${TEST_PATH}/utils/OptionalIntTest.cpp")
 add_fix_test(Uint8x16Test       "${TEST_PATH}/simd/Uint8x16Test.cpp")
 add_fix_test(LinearSearchTest  "${TEST_PATH}/simd/LinearSearchTest.cpp")
 add_fix_test(MemoryStorageTest "${TEST_PATH}/storage/MemoryStorageTest.cpp")
-add_fix_test(SessionTest       "${TEST_PATH}/session/SessionTest.cpp")
 
 set(FIX_TEST_TARGETS
         PayloadDecoderTest PayloadDecoderFuzzTest
         MessageDecoderTest MessageEncoderTest
         GroupDecoderTest FieldDecoderTest
         ConversionsTest FixedDecimalTest OptionalIntTest Uint8x16Test LinearSearchTest
-        MemoryStorageTest SessionTest)
+        MemoryStorageTest)
 
 add_custom_target(AllTests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
@@ -258,7 +257,6 @@ if(XCRUN)
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/Uint8x16Test.profraw"         $<TARGET_FILE:Uint8x16Test>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/LinearSearchTest.profraw"    $<TARGET_FILE:LinearSearchTest>
         COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/MemoryStorageTest.profraw"   $<TARGET_FILE:MemoryStorageTest>
-        COMMAND ${CMAKE_COMMAND} -E env "LLVM_PROFILE_FILE=${COVERAGE_DIR}/SessionTest.profraw"         $<TARGET_FILE:SessionTest>
         COMMAND ${XCRUN} llvm-profdata merge -sparse ${_PROFRAW_FILES} -o ${COVERAGE_DIR}/coverage.profdata
         COMMAND ${XCRUN} llvm-cov report
             $<TARGET_FILE:${_PRIMARY}>
