@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. See [README.md](README.md) for full project documentation, architecture, and benchmarks.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. See [README.md](README.md) for full project documentation and benchmarks.
 
 ## What This Is
 
-**simdfix** is a SIMD-accelerated FIX protocol codec in C++23 (ARM NEON). See [README.md](README.md) for architecture details.
+**simdfix** is a SIMD-accelerated FIX protocol codec in C++23 (ARM NEON).
 
 ## Build Commands
 
