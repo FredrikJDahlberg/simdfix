@@ -8,7 +8,7 @@ A SIMD-accelerated [FIX](https://www.fixtrading.org/standards/fix-sessions-onlin
 - **SIMD tokenization** — processes 16 bytes per cycle to detect tag delimiters (`=`) and field separators (`0x01`).
 - **Zero-copy parsing** — the decoder produces a flat `Field[]` array of positions, tags, and lengths without copying message data.
 - **Encode and decode** — typed field, group, and data (raw binary) accessors for both reading and writing FIX messages.
-- **Code generation** — message decoders, encoders, and handler dispatch are generated from `protocol.xml` via the included `Generator` tool.
+- **Code generation** — message decoders, encoders, and handler dispatch are generated from a session spec (`session.xml`) and an optional application spec (`protocol.xml`) via the included `Generator` tool. Session-layer messages are always generated; application messages are merged in when the application spec is present.
 - **No exceptions in the hot path** — fallible operations return `std::expected<T, Result>`.
 
 ## Requirements
@@ -84,7 +84,23 @@ This runs all test binaries, merges their `profraw` files, and prints an `llvm-c
 
 ## Code Generation
 
-Message types (decoders, encoders, handler dispatch) are generated from `src/generator/resources/protocol.xml` and `src/generator/resources/config.xml`. The generator writes to the CMake build directory (`<build>/org/limitless/fix/generated/`), keeping generated files out of the source tree. To regenerate after changing the protocol spec:
+Generation is driven by three XML files and produces six headers under `<build>/org/limitless/fix/generated/`.
+
+| File | Role | Required |
+|------|------|----------|
+| `src/generator/resources/session.xml` | Session-layer messages (Logon, Logout, Heartbeat, TestRequest, ResendRequest, Reject, SequenceReset) and their enums | Always |
+| `src/generator/resources/protocol.xml` | Application-layer messages (e.g. NewOrderSingle, ExecutionReport) and their enums | Optional |
+| `src/generator/resources/config.xml` | Engine identity, buffer sizes, timing, session topology | Always |
+
+When both `session.xml` and `protocol.xml` are present the generator merges their data models before emitting code. Shared enums — in particular `MessageType` — are merged by value: entries from `session.xml` come first, then any new values from the application spec are appended. Duplicate values are silently dropped.
+
+The generator CLI reflects this split:
+
+```
+Generator <session.xml> <output-dir> <config.xml> <config-output-dir> [<application.xml>]
+```
+
+To regenerate after changing any XML file:
 
 ```bash
 cmake --build cmake-build-debug --target GenerateMessages
@@ -134,13 +150,13 @@ Generated headers are never checked into the repository and must not be hand-edi
 
 All generated headers live under `<build>/org/limitless/fix/generated/` and are excluded from the source tree. The build directory is on the include path for all consumers, so headers are included as `org/limitless/fix/generated/…`.
 
-**`generated/messages/FixMessageDecoders.hpp`** / **`FixMessageEncoders.hpp`** / **`FixMessageHandler.hpp`** — Generated from `protocol.xml`. Contain per-message-type decoder/encoder structs and the `FixMessageHandler<T>` CRTP dispatch base (which provides default no-op `handle` overloads for every message type and a `receive<Message>()` method with a deferred constraint that catches wrong handler signatures at instantiation time). Do not edit manually.
+**`generated/messages/FixMessageDecoders.hpp`** / **`FixMessageEncoders.hpp`** / **`FixMessageHandler.hpp`** — Generated from `session.xml` (and optionally merged with the application spec). Contain per-message-type decoder/encoder structs and the `FixMessageHandler<T>` CRTP dispatch base (which provides default no-op `handle` overloads for every message type and a `receive<Message>()` method with a deferred constraint that catches wrong handler signatures at instantiation time). Do not edit manually.
 
-**`generated/messages/FixTypes.hpp`** — Generated enum wrappers and type metadata (e.g., `OrdType`, `Side`, `ExecType`).
+**`generated/messages/FixTypes.hpp`** — Generated enum wrappers and type metadata (e.g., `OrdType`, `Side`, `ExecType`). The `MessageType` enum is the merged union of values from both specs.
 
 **`generated/config/FixEngine.hpp`** / **`FixConfig.hpp`** — Generated from `config.xml`. Contain protocol version constants (`FIXT_1_1`) and engine-level configuration (session parameters). Do not edit manually.
 
-**`Generator` (`FixGenerator.cpp`)** — Reads `protocol.xml` and `config.xml` and emits all six generated headers. Run via the `GenerateMessages` CMake target after changing either XML file.
+**`Generator` (`FixGenerator.cpp`)** — Reads `session.xml`, `config.xml`, and an optional application spec and emits all six generated headers. Run via the `GenerateMessages` CMake target after changing any input XML file.
 
 #### Session
 
@@ -154,9 +170,12 @@ All generated headers live under `<build>/org/limitless/fix/generated/` and are 
 
 ### Adding a New Message Type
 
-1. Add the message definition to `protocol.xml`.
-2. Run `Generator` to regenerate `FixMessageDecoders.hpp`, `FixMessageEncoders.hpp`, `FixMessageHandler.hpp`, and `FixTypes.hpp`.
-3. Add a `handle(FooDecoder&)` override in application handler code (e.g., `Session`).
+Session-layer messages (Logon, Heartbeat, etc.) belong in `session.xml`. Application messages (NewOrderSingle, ExecutionReport, etc.) belong in the application spec (`protocol.xml` in this repository). For each:
+
+1. Add the enum values for the new message to the `MessageType` enum in the appropriate XML file — the generator merges `MessageType` from both specs automatically.
+2. Add the message definition with its fields.
+3. Run `cmake --build cmake-build-debug --target GenerateMessages` to regenerate all six headers.
+4. Add a `handle(FooDecoder&)` override in the application handler.
 
 ## License
 

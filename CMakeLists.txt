@@ -30,8 +30,9 @@ set(GEN_PATH "org/limitless/fix/generated/messages")
 set(CONFIG_GEN_PATH "org/limitless/fix/generated/config")
 set(TEST_PATH "src/test/cpp/org/limitless/fix")
 set(GENERATOR_PATH "src/generator/org/limitless/generator/fix/")
-set(PROTOCOL_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/protocol.xml")
-set(CONFIG_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/config.xml")
+set(SESSION_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/session.xml")
+set(APP_XML     "${CMAKE_SOURCE_DIR}/src/generator/resources/test.xml")
+set(CONFIG_XML  "${CMAKE_SOURCE_DIR}/src/generator/resources/config.xml")
 set(GENERATED_DIR "${CMAKE_BINARY_DIR}/${GEN_PATH}")
 set(CONFIG_GENERATED_DIR "${CMAKE_BINARY_DIR}/${CONFIG_GEN_PATH}")
 set(GENERATED_HEADERS
@@ -166,12 +167,13 @@ target_link_libraries(Generator PRIVATE pugixml::pugixml)
 add_custom_command(
         OUTPUT ${GENERATED_HEADERS}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_DIR} ${CONFIG_GENERATED_DIR}
-        COMMAND $<TARGET_FILE:Generator> ${PROTOCOL_XML} ${GENERATED_DIR} ${CONFIG_XML} ${CONFIG_GENERATED_DIR}
+        COMMAND $<TARGET_FILE:Generator> ${SESSION_XML} ${GENERATED_DIR} ${CONFIG_XML} ${CONFIG_GENERATED_DIR} ${APP_XML}
         DEPENDS Generator
-                ${PROTOCOL_XML}
+                ${SESSION_XML}
+                ${APP_XML}
                 ${CONFIG_XML}
                 ${GENERATOR_PATH}/FixGenerator.cpp ${GENERATOR_PATH}/DataModel.hpp ${GENERATOR_PATH}/ConfigMapping.hpp
-        COMMENT "Generating FIX message headers from protocol.xml and config.xml"
+        COMMENT "Generating FIX message headers from session.xml, protocol.xml and config.xml"
         VERBATIM
 )
 add_custom_target(GenerateMessages DEPENDS ${GENERATED_HEADERS})

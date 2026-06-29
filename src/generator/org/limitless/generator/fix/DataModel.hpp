@@ -5,6 +5,7 @@
 #ifndef SIMD_FIX_DATA_MODEL_HPP
 #define SIMD_FIX_DATA_MODEL_HPP
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -279,6 +280,87 @@ struct DataModel
         processRecords(protocol.select_nodes(".//component"), RecordType::Component);
         processRecords(protocol.select_nodes(".//group"), RecordType::Group);
         processRecords(protocol.select_nodes(".//message"), RecordType::Message);
+    }
+
+    // Merges an application-layer protocol document into the model built from the
+    // session XML. Enums that already exist (e.g. MessageType) have new values
+    // appended; all other types, components, groups and messages are additive.
+    void merge(const pugi::xml_document& doc)
+    {
+        const pugi::xml_node protocol = doc.child("protocol");
+        mergeTypes(protocol.child("types").children());
+        processRecords(protocol.select_nodes(".//component"), RecordType::Component);
+        processRecords(protocol.select_nodes(".//group"), RecordType::Group);
+        processRecords(protocol.select_nodes(".//message"), RecordType::Message);
+    }
+
+private:
+    void mergeTypes(const pugi::xml_object_range<pugi::xml_node_iterator>& types)
+    {
+        for (auto typeNode : types)
+        {
+            const auto name = std::string{typeNode.attribute("name").as_string()};
+            if (std::strncmp(typeNode.name(), "enum", 4) == 0)
+            {
+                auto it = std::find_if(m_enums.begin(), m_enums.end(),
+                    [&name](const Record& r) { return r.m_name == name; });
+                if (it != m_enums.end())
+                {
+                    for (auto element : typeNode.children())
+                    {
+                        const auto fieldName = std::string{element.attribute("name").as_string()};
+                        const auto fieldValue = std::string{element.attribute("value").as_string()};
+                        const auto dup = std::find_if(it->m_fields.begin(), it->m_fields.end(),
+                            [&fieldName](const Field& f) { return f.m_name == fieldName; });
+                        if (dup == it->m_fields.end())
+                        {
+                            it->m_fields.emplace_back(0, fieldName, fieldValue, 1, Presence::Null,
+                                                      Category::Enum, RecordType::Enum);
+                        }
+                    }
+                }
+                else
+                {
+                    Record record{name, std::string{}, RecordType::Enum};
+                    record.m_fields.emplace_back(0, "Null", "?", 1, Presence::Null,
+                                                 Category::Enum, RecordType::Enum);
+                    for (auto element : typeNode.children())
+                    {
+                        const auto fieldName = std::string{element.attribute("name").as_string()};
+                        const auto fieldValue = std::string{element.attribute("value").as_string()};
+                        record.m_fields.emplace_back(0, fieldName, fieldValue, 1, Presence::Null,
+                                                     Category::Enum, RecordType::Enum);
+                    }
+                    m_types.try_emplace(name, name, 1, 1, Category::Enum);
+                    m_enums.emplace_back(record);
+                }
+            }
+            else
+            {
+                const auto primitive = std::string{typeNode.attribute("primitiveType").as_string()};
+                const auto type = std::string{typeNode.attribute("type").as_string()};
+                if (primitive.empty() && type.empty())
+                {
+                    continue;
+                }
+                auto primitiveType = m_types.find(primitive);
+                auto refType = m_types.find(type);
+                if (!primitive.empty() && primitiveType == m_types.end())
+                {
+                    std::println("Error: type '{}' has an invalid primitive type '{}'", name, primitive);
+                }
+                else if (!type.empty() && refType == m_types.end())
+                {
+                    std::println("Error: type '{}' has an invalid derived '{}'", name, type);
+                }
+                else
+                {
+                    auto* ref = refType != m_types.end() ? &refType->second : &primitiveType->second;
+                    auto length = std::max(typeNode.attribute("length").as_int(), ref->m_length);
+                    m_types.try_emplace(name, name, ref->m_size, length, ref->m_type);
+                }
+            }
+        }
     }
 };
 }
