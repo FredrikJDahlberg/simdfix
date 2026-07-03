@@ -533,17 +533,28 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "#include \"org/limitless/fix/generated/messages/FixMessageDecoders.hpp\"\n\n";
     out << "namespace org::limitless::fix::generated::messages {\n\n";
     out << "using fix::Result;\n\n";
+    out << "template <typename Role, typename Message>\n";
+    out << "concept HandlesMessage = requires(Role& role, Message& message)\n";
+    out << "{\n";
+    out << "    { role.handle(message) } -> std::same_as<Result>;\n";
+    out << "};\n\n";
     out << "template <typename MessageHandler>\n";
     out << "class FixMessageHandler\n{\n";
     out << "protected:\n";
     out << "    const SessionContext* m_context{};\n\n";
     out << "public:\n";
     out << "    template <typename Message>\n";
-    out << "        requires requires(MessageHandler& h, std::remove_reference_t<Message>& m)\n";
-    out << "        { { h.handle(m) } -> std::same_as<Result>; }\n";
     out << "    Result receive(Message&& message)\n";
     out << "    {\n";
-    out << "        return static_cast<MessageHandler*>(this)->handle(std::forward<Message>(message));\n";
+    out << "        using Decoded = std::remove_reference_t<Message>;\n";
+    out << "        if constexpr (HandlesMessage<MessageHandler, Decoded>)\n";
+    out << "        {\n";
+    out << "            return static_cast<MessageHandler*>(this)->handle(std::forward<Message>(message));\n";
+    out << "        }\n";
+    out << "        else\n";
+    out << "        {\n";
+    out << "            return Result::Success;\n";
+    out << "        }\n";
     out << "    }\n\n";
     out << "    void setSessionContext(const SessionContext& context)\n";
     out << "    {\n";
@@ -572,12 +583,7 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "                break;\n";
     out << "        }\n";
     out << "        return status;\n";
-    out << "    }\n\n";
-    out << "protected:\n";
-    for (auto& message: messages)
-    {
-        out << std::format("    Result handle({}Decoder&) {{ return Result::Success; }}\n", message.m_name);
-    }
+    out << "    }\n";
     out << "};\n\n";
     out << "} // namespace org::limitless::fix::generated::messages\n\n";
     out << "#endif //SIMD_FIX_MESSAGE_HANDLER_HPP\n";
