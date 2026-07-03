@@ -104,6 +104,37 @@ TEST(PayloadDecoder, TrailerFieldEnd)
     ASSERT_EQ(Result::Success, status);
 }
 
+TEST(PayloadDecoder, BlockBoundaryFieldEnd)
+{
+    // Regression: when a tag's value byte and its SOH terminator land on
+    // byte 14 and 15 of a 16-byte SIMD block (the last byte of the block),
+    // processBlock failed to record the field length and processTrailer then
+    // overwrote the field with the next tag.
+    //
+    // The message below places "7=1" at block-4 positions 12-14 and the
+    // SOH at position 15 (byte 79), so "16=0" lands in the processTrailer
+    // region.  Before the fix, tag 7 was absent from the token array and
+    // ResendRequestDecoder::validate() returned RequiredFieldMissing.
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=69" SOH "35=2" SOH "49=CLIENT" SOH
+        "56=SEQUENCER2" SOH "34=10" SOH "52=20260101-00:00:00.000" SOH
+        "7=1" SOH "16=0" SOH "10=078" SOH);
+    PayloadDecoder<FIXT_1_1> decoder;
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_EQ(message.size(), processed);
+
+    const auto fields = decoder.fields();
+    // Tag 7 (BeginSeqNo) must be tokenized with value at byte 78, length 1.
+    ASSERT_EQ(7,  fields[7].m_tag);
+    ASSERT_EQ(78, fields[7].m_position);
+    ASSERT_EQ(1,  fields[7].m_length);
+    // Tag 16 (EndSeqNo) must follow immediately in the trailer region.
+    ASSERT_EQ(16, fields[8].m_tag);
+    ASSERT_EQ(83, fields[8].m_position);
+    ASSERT_EQ(1,  fields[8].m_length);
+}
+
 TEST(PayloadDecoder, Fragment)
 {
     const auto message = utils::makeSpan("8=FIXT.");

@@ -363,12 +363,25 @@ private:
             nonTagBitPos += digitBits;
         }
         m_position = 0;
+        // When this is the last SIMD block before processTrailer, and the SOH
+        // that terminates the last-opened field's value falls on byte 15 (the
+        // block boundary), processTrailer would pick up that field as "pending"
+        // and overwrite it.  Close it here and bump m_count so processTrailer
+        // starts with a fresh slot.
+        if (offset + Uint8x16::Size + 15 >= length && field->m_tag != CheckSumTag &&
+            field->m_position >= static_cast<uint16_t>(offset) && data[offset + Uint8x16::Size - 1] == FieldEnd)
+        {
+            field->m_length = static_cast<uint16_t>(offset + Uint8x16::Size - 1 - field->m_position);
+            m_fields[m_count] = {};
+            m_tags[m_count] = 0;
+            ++m_count;
+        }
         if (trailingCount >= 4)
         {
             const auto count = trailingCount >> 2;
             const auto digit = &digits[Uint8x16::Size - count];
             m_tag = utils::asciiToUin32(0, digit, count);
-            m_position = -count;
+            m_position = -count; // adjust position of next field
         }
         return m_fields[m_count - 1].m_tag == 10;
     }
@@ -456,7 +469,8 @@ private:
      *         the value does not match
      */
     //Result::Values processCheckSum(const std::span<const data_t>::pointer data,
-    Result processCheckSum(const std::span<const data_t>::pointer data,                                   const uint64_t blockSum,
+    Result processCheckSum(const std::span<const data_t>::pointer data,
+                           const uint64_t blockSum,
                            const position_t blockEnd,
                            const length_t length) const
     {

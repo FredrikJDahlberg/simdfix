@@ -81,8 +81,7 @@ TEST(PayloadDecoderFuzz, AllTruncations)
     }
 }
 
-// Bit-flip mutation of a valid message body (BeginString prefix preserved so we
-// exercise past the protocol check), random truncation length.
+// Bit-flip mutation of a valid message body (BeginString prefix preserved), random truncation length.
 TEST(PayloadDecoderFuzz, MutatedBody)
 {
     const std::vector<uint8_t> base(ValidData.begin(), ValidData.end());
@@ -143,9 +142,10 @@ TEST(PayloadDecoderFuzz, DecoderReuse)
             }
         }
     }
-    // Decoder still parses a valid message correctly after the churn.
-    std::vector<uint8_t> buffer(logon);
-    EXPECT_EQ(Result::Success, decoder.parse(Buffer{buffer.data(), buffer.size()}).m_value);
+
+    std::vector buffer(logon);
+    auto result = decoder.parse(Buffer{buffer.data(), buffer.size()});
+    EXPECT_EQ(Result::Success, result.m_value) << name(result.m_value);
 }
 
 }
