@@ -470,6 +470,44 @@ TEST(MessageDecoder, LogonWithXmlDataInlineSkip)
     }
 }
 
+TEST(MessageDecoder, HeartbeatWithLongCompIds)
+{
+    // Regression: found via phixeron's FixTestServer sending a hand-built
+    // Heartbeat (SenderCompID=WRONGSENDER, TargetCompID=SEQUENCER, a 2-digit
+    // BodyLength) to a live gateway — the gateway's CompID-mismatch Reject
+    // echoed RefSeqNum=0 instead of the real MsgSeqNum=2, i.e.
+    // HeartbeatDecoder::sequenceNumber() decoded a wrong tag 34 even though
+    // validate() reported Success. PayloadDecoderTest's raw tokenizer-level
+    // check on this exact byte layout (BlockBoundaryFieldEnd-style: BodyLength's
+    // own SOH lands on byte 15 of the first 16-byte SIMD block) reports the
+    // correct position/length for tag 34, so this test instead exercises the
+    // actual decoded value through the generated decoder, matching exactly
+    // what ClusterIngressHandler does in production.
+    struct AppHandler : FixMessageHandler<AppHandler>
+    {
+        using FixMessageHandler::handle;
+
+        bool found = false;
+
+        Result handle(HeartbeatDecoder& heartbeat)
+        {
+            EXPECT_EQ("WRONGSENDER", toString(heartbeat.sender().value()));
+            EXPECT_EQ("SEQUENCER", toString(heartbeat.target().value()));
+            EXPECT_EQ(2U, heartbeat.sequenceNumber().value());
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder<FIXT_1_1> decoder;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=59" SOH "35=0" SOH "49=WRONGSENDER" SOH
+        "56=SEQUENCER" SOH "34=2" SOH "52=20260101-00:00:00" SOH "10=064" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(Result::Success, status);
+    ASSERT_TRUE(app.found);
+}
+
 TEST(MessageDecoder, ResendRequest)
 {
     struct AppHandler : FixMessageHandler<AppHandler>

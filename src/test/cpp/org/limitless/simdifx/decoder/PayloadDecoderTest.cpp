@@ -95,6 +95,51 @@ TEST(PayloadDecoder, TrailerSplitCheckSum)
     check(decoder.fields(), std::span(expectedFields, std::size(expectedFields)));
 }
 
+TEST(PayloadDecoder, ReusedDecoderSecondMessageFieldLengths)
+{
+    // Regression: found via phixeron's FixTestServer sending Logon then a
+    // Heartbeat over the same TCP connection — FixConnection reuses one
+    // PayloadDecoder instance for every message on a connection's lifetime
+    // (see FixConnection::m_decoder / onReceive). A live gateway's CompID-
+    // mismatch Reject to that second message (the Heartbeat) echoed
+    // RefSeqNum=0 instead of the real MsgSeqNum=2.
+    //
+    // Isolated single-parse tests of the exact same Heartbeat bytes (see
+    // MessageDecoderTest.HeartbeatWithLongCompIds) decode tag 34 correctly,
+    // proving this only reproduces when the *same* decoder instance parses a
+    // second message after a first one: the second parse's fields (35 and 34
+    // in this repro) come out with length inflated by one byte, feeding one
+    // extra byte from the following tag's "=" into the value.
+    PayloadDecoder<FIXT_1_1> decoder;
+
+    const auto logon = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=66" SOH "35=A" SOH "49=CLIENT" SOH "56=SEQUENCER" SOH
+        "34=1" SOH "52=20260703-12:00:00" SOH "98=0" SOH "108=30" SOH "10=227" SOH);
+    auto [processed1, status1] = decoder.parse(logon);
+    ASSERT_EQ(Result::Success, status1);
+    ASSERT_EQ(logon.size(), processed1);
+
+    const auto heartbeat = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=59" SOH "35=0" SOH "49=WRONGSENDER" SOH "56=SEQUENCER" SOH
+        "34=2" SOH "52=20260703-12:00:00" SOH "10=075" SOH);
+    auto [processed2, status2] = decoder.parse(heartbeat);
+    ASSERT_EQ(Result::Success, status2);
+    ASSERT_EQ(heartbeat.size(), processed2);
+
+    constexpr Field expectedFields[] =
+    {
+        { 2, 8, 8 },
+        { 13, 9, 2 },
+        { 19, 35, 1 },
+        { 24, 49, 11 },
+        { 39, 56, 9 },
+        { 52, 34, 1 },
+        { 57, 52, 17 },
+        { 78, 10, 3 },
+    };
+    check(decoder.fields(), std::span(expectedFields, std::size(expectedFields)));
+}
+
 TEST(PayloadDecoder, TrailerFieldEnd)
 {
     const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=21" SOH "35=66" SOH

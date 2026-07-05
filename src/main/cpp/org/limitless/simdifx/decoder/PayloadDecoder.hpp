@@ -346,8 +346,8 @@ private:
             {
                 return false;
             }
-
             field = &m_fields[m_count++];
+            field->m_length = 0;
 
             const position_t count = digitBits >> 2;
             const data_t* digit = &digits[tagPos];
