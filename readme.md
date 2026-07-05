@@ -87,7 +87,7 @@ This runs all test binaries, merges their `profraw` files, and prints an `llvm-c
 
 ## Code Generation
 
-Generation is driven by three XML files and produces six headers under `<build>/org/limitless/fix/generated/`.
+Generation is driven by three XML files and produces six headers under `<build>/org/limitless/simdifx/generated/`.
 
 | File | Role | Required |
 |------|------|----------|

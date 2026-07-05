@@ -25,11 +25,11 @@ if(SIMDFIX_HAS_MSSE41)
     set(SIMDFIX_SSE41_FLAG -msse4.1)
 endif()
 
-set(MAIN_PATH "src/main/cpp/org/limitless/fix")
-set(GEN_PATH "org/limitless/fix/generated/messages")
-set(CONFIG_GEN_PATH "org/limitless/fix/generated/config")
-set(TEST_PATH "src/test/cpp/org/limitless/fix")
-set(GENERATOR_PATH "src/generator/org/limitless/generator/fix/")
+set(MAIN_PATH "src/main/cpp/org/limitless/simdifx")
+set(GEN_PATH "org/limitless/simdifx/generated/messages")
+set(CONFIG_GEN_PATH "org/limitless/simdifx/generated/config")
+set(TEST_PATH "src/test/cpp/org/limitless/simdifx")
+set(GENERATOR_PATH "src/generator/org/limitless/generator/simdifx/")
 set(SESSION_XML "${CMAKE_SOURCE_DIR}/src/generator/resources/session.xml")
 set(APP_XML     "${CMAKE_SOURCE_DIR}/src/generator/resources/test.xml")
 set(CONFIG_XML  "${CMAKE_SOURCE_DIR}/src/generator/resources/config.xml")
@@ -55,7 +55,7 @@ add_library(SimdFix INTERFACE)
 add_library(SimdFix::SimdFix ALIAS SimdFix)
 # In-tree builds (tests, benchmarks) see the headers where they live; installed
 # consumers see them under <prefix>/include. The public entry point is
-# org/limitless/fix/Fix.hpp; anything under org/limitless/fix/detail/ is internal.
+# org/limitless/simdifx/Fix.hpp; anything under org/limitless/simdifx/detail/ is internal.
 target_include_directories(SimdFix INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp>
         $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
@@ -72,7 +72,7 @@ target_link_options(SimdFix INTERFACE
 )
 
 # Makes the header-only library consumable via find_package(SimdFix). Public
-# headers install under <prefix>/include preserving the org/limitless/fix tree.
+# headers install under <prefix>/include preserving the org/limitless/simdifx tree.
 # detail/ is excluded: all public API signatures use opaque types; the detail
 # headers are only needed for in-tree builds (tests, benchmarks).
 include(GNUInstallDirs)

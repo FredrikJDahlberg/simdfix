@@ -26,53 +26,9 @@ mapping/`Category` and cannot yet be used in `protocol.xml`:
 Session handling
 -----
 
-- Logon/Logout handshake — initiate and accept FIX sessions, negotiate
-  HeartBtInt, and exchange Logon/Logout messages.
-- Heartbeat & TestRequest — send Heartbeat on the negotiated interval,
-  respond to TestRequest with the matching TestReqID, and detect missing
-  heartbeats.
-- Sequence number tracking — maintain inbound/outbound MsgSeqNum,
-  detect gaps, and trigger resend requests.
-- ResendRequest / SequenceReset — handle gap-fill and full-reset
-  scenarios for message recovery.
-- Message persistence & replay — store outbound messages for possible
-  resend and replay inbound messages after a reconnect.
-- Duplicate & PossDupFlag handling — detect and suppress duplicate
-  messages, set PossDupFlag / PossResend on retransmissions.
-- Keep-alive periods — drive the `keepAlive` timer tick from the configured
-  heartbeat period (`DefaultHeartbeatPeriod`, overridable via the `Builder`):
-  emit a Heartbeat when the link is idle, escalate to a TestRequest when a
-  beat is overdue, and mark the session stale after repeated misses.
-- Message handling — route decoded messages by MsgType: classify session vs
-  application messages with `isSessionMessage`, handle admin messages in the
-  session layer and forward application messages to the handler below.
-- Export StorageType / TransportType from `Session` — expose the `Storage` and
-  `Transport` template parameters as public nested aliases (inherited by
-  `ClientSession` / `ServerSession`), so downstream/generic callers can name
-  `SessionType::StorageType` etc. Note this does not simplify the role classes'
-  own CRTP handler base (the role is incomplete in its base-clause); it is purely
-  for consumers of a fully-formed session type.
-
-Storage
------
-
-- Aeron Archive backend — a `FixStorageStrategy` over Aeron Archive's
-  record/replay (C++ client). Append = `Publication::offer` to a recorded
-  publication; capture the pre-offer `position()` as the message start. Aeron
-  addresses by stream byte-position, not MsgSeqNum, so keep the same
-  seqnum -> position index (`MsgSeqNum -> {recordingId, startPos, length}`) — the
-  mmap'd index above, re-cast. Range read = `startReplay(recordingId, fromPos,
-  len, ...)` then poll the replay Image with a fragment handler: the handler's
-  `(buffer, offset, length)` is a flyweight valid only during the callback and
-  `poll()` delivers a term (packet) at a time, so the flyweight + batched-cursor
-  contracts map natively (no copies). `clear()` = `truncateRecording` / new
-  recording per session. Use `ReplayMerge` for live catch-up on reconnect.
-  Defers to the fault-tolerance bullet: `offer()` back-pressure -> fallible
-  append, durable-before-wire via `getRecordingPosition`, and Aeron Cluster
-  (Raft) for failover.
-- Fault tolerance (later) — fallible returns (`Result`/`expected`),
-  durable-append-before-wire, recovery metadata (last seqNum / range as source
-  of truth after failover), and replication are deferred.
+- Add runtime configuration of session context: memcpy(dst, src, 64)
+calculate offset for remaining payload, use fixed length buffer, 
+add compId max length to config
 
 Continuous integration — hosted NEON runner
 -----
