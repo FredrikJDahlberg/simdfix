@@ -7,7 +7,6 @@
 #include <print>
 #include <set>
 
-#include "org/limitless/generator/simdifx/ConfigMapping.hpp"
 #include "org/limitless/generator/simdifx/DataModel.hpp"
 
 using namespace org::limitless::simdifx;
@@ -267,7 +266,7 @@ static void generateEncoders(const std::string& fileName,
     out << "    PayloadEncoder m_encoder;\n";
     out << "public:\n";
     out << "    FixPayloadEncoder(const Protocol protocol, const std::string& sender, const std::string& target)\n";
-    out << "        : m_encoder{protocol, sender, target}\n";
+    out << "        : m_encoder{std::string{code(protocol)}, sender, target}\n";
     out << "    {\n";
     out << "    }\n\n";
 

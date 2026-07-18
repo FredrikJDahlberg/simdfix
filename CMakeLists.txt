@@ -38,7 +38,7 @@ set(CONFIG_GENERATED_DIR "${CMAKE_BINARY_DIR}/${CONFIG_GEN_PATH}")
 set(GENERATED_HEADERS
         ${GENERATED_DIR}/FixTypes.hpp ${GENERATED_DIR}/FixMessageDecoders.hpp
         ${GENERATED_DIR}/FixMessageEncoders.hpp ${GENERATED_DIR}/FixMessageHandler.hpp
-        ${CONFIG_GENERATED_DIR}/FixEngine.hpp ${CONFIG_GENERATED_DIR}/FixConfig.hpp)
+        ${CONFIG_GENERATED_DIR}/FixEngine.hpp)
 set(FIX_HEADERS
         ${MAIN_PATH}/Fix.hpp ${MAIN_PATH}/Types.hpp ${MAIN_PATH}/TokenizedMessage.hpp ${MAIN_PATH}/detail/Tokens.hpp
         ${MAIN_PATH}/utils/Conversions.hpp ${MAIN_PATH}/utils/FixedDecimal.hpp ${MAIN_PATH}/utils/OptionalInt.hpp
@@ -169,7 +169,7 @@ add_custom_command(
                 ${SESSION_XML}
                 ${APP_XML}
                 ${CONFIG_XML}
-                ${GENERATOR_PATH}/FixGenerator.cpp ${GENERATOR_PATH}/DataModel.hpp ${GENERATOR_PATH}/ConfigMapping.hpp
+                ${GENERATOR_PATH}/FixGenerator.cpp ${GENERATOR_PATH}/DataModel.hpp
         COMMENT "Generating FIX message headers from session.xml, protocol.xml and config.xml"
         VERBATIM
 )

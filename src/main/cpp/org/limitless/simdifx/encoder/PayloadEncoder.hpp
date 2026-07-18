@@ -47,12 +47,11 @@ class PayloadEncoder {
 public:
     PayloadEncoder() = delete;
 
-    PayloadEncoder(const generated::messages::Protocol protocol, const std::string& sender, const std::string& target)
+    PayloadEncoder(const std::string& beginString, const std::string& sender, const std::string& target)
     {
         // Encode the header fields once into the inline prefix buffer (no heap):
         // "8="+protocol+SOH, "9=0000"+SOH, "35=?"+SOH, "49="+sender+SOH,
         // "56="+target+SOH. wrap() then copies MaxPrefixLength bytes per message.
-        const auto beginString = code(protocol);
         assert(beginString.size() + sender.size() + target.size() + 23 <= MaxPrefixLength // FIXME
                && "FIX header prefix exceeds MaxPrefixLength");
         auto buffer = std::span{m_messagePrefix.data(), m_messagePrefix.size()};
@@ -186,9 +185,9 @@ public:
         return m_encodedLength;
     }
 
-    static PayloadEncoder build(const generated::messages::Protocol protocol, const std::string& sender, const std::string& target)
+    static PayloadEncoder build(const std::string& beginString, const std::string& sender, const std::string& target)
     {
-        return PayloadEncoder{protocol, sender, target};
+        return PayloadEncoder{beginString, sender, target};
     }
 };
 
