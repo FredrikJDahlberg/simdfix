@@ -27,9 +27,6 @@ static void generateEngineConfig(const std::string& fileName,
                                  const pugi::xml_document& config,
                                  const Record& protocol);
 
-static void generateConfig(const std::string& fileName,
-                           const pugi::xml_document& config);
-
 static void generateRecordDecoders(std::ostream& out, const Record& record);
 static void generateRecordEncoders(std::ostream& out, const Record& record);
 
@@ -86,16 +83,11 @@ int main(int argc, char** argv)
         std::println("Config XML error: {}, file = {}", configResult.description(), argv[3]);
         return 1;
     }
-    model.processVersions(config.child("config").child("versions"));
-    std::filesystem::create_directories(argv[4]);
 
+    std::filesystem::create_directories(argv[4]);
     std::string engineFile{argv[4]};
     engineFile.append("/FixEngine.hpp");
     generateEngineConfig(engineFile, config, model.m_protocol);
-
-    std::string configFile{argv[4]};
-    configFile.append("/FixConfig.hpp");
-    generateConfig(configFile, config);
 
     return 0;
 }
@@ -186,29 +178,6 @@ static void generateEnums(std::ostream& out, const Record& record)
     generateEnumFunctions(out, record.m_name, record.m_fields);
 }
 
-static void generateProtocol(std::ostream& out, const Record& protocol)
-{
-    out << "enum class Protocol : uint8_t\n{\n";
-    const auto end = protocol.m_fields.end();
-    for (auto value = protocol.m_fields.begin(); value != end; ++value)
-    {
-        out << std::format("    {}{}\n", value->m_name, value != end - 1 ? "," : "");
-    }
-    out << "};\n\n";
-
-    generateEnumFunctions(out, "Protocol", protocol.m_fields);
-
-    for (const auto& field : protocol.m_fields)
-    {
-        if (field.m_name != "Null")
-        {
-            out << std::format("inline constexpr FixedString {} {{\"{}\"}};\n",
-                               field.m_name, field.m_type);
-        }
-    }
-    out << "\n";
-}
-
 static void generateTypes(const std::string& fileName,
                           const std::vector<Record>& enums)
 {
@@ -256,7 +225,6 @@ static void generateDecoders(const std::string& fileName,
     out << "#include \"org/limitless/simdifx/decoder/GroupDecoder.hpp\"\n";
     out << "#include \"org/limitless/simdifx/decoder/MessageDecoder.hpp\"\n\n";
     out << "namespace org::limitless::simdifx::generated::messages {\n\n";
-    out << "using config::Protocol;\n";
     out << "using namespace org::limitless::simdifx::decoder;\n\n";
     for (auto& record: records)
     {
@@ -294,12 +262,14 @@ static void generateEncoders(const std::string& fileName,
         generateRecordEncoders(out, record);
     }
 
-    out << "template <FixedString Protocol, FixedString Target, FixedString Sender>\n";
     out << "class FixPayloadEncoder\n";
     out << "{\n";
-    out << "    PayloadEncoder<Protocol, Target, Sender> m_encoder;\n";
+    out << "    PayloadEncoder m_encoder;\n";
     out << "public:\n";
-    out << "    FixPayloadEncoder() = default;\n\n";
+    out << "    FixPayloadEncoder(const Protocol protocol, const std::string& sender, const std::string& target)\n";
+    out << "        : m_encoder{protocol, sender, target}\n";
+    out << "    {\n";
+    out << "    }\n\n";
 
     out << "    FixPayloadEncoder& wrap(const uint32_t offset, const std::span<uint8_t> data)\n";
     out << "    {\n";
@@ -383,7 +353,6 @@ static void generateEngineConfig(const std::string& fileName,
     out << "#include \"org/limitless/simdifx/Types.hpp\"\n\n";
 
     out << "namespace org::limitless::simdifx::generated::config {\n\n";
-    generateProtocol(out, protocol);
     const auto engine = config.child("config").child("engine");
     out << std::format("inline constexpr FixedString EngineCompId{{\"{}\"}};\n\n",
                        engine.attribute("compId").as_string());
@@ -398,116 +367,6 @@ static void generateEngineConfig(const std::string& fileName,
 
     out << "} // namespace org::limitless::simdifx::generated::config\n\n";
     out << "#endif //SIMD_FIX_ENGINE_HPP\n";
-}
-
-/**
- * Emits FixConfig.hpp from config.xml: one session type alias per <session> row
- * (role -> ClientSession/ServerSession, Sender = engine CompID, Target = remote,
- * plus the storage/transport/application policies), a variant over them, and a
- * name -> session registry. Includes FixEngine.hpp so the engine constants are
- * visible here too.
- */
-static void generateConfig(const std::string& fileName, const pugi::xml_document& config)
-{
-    const auto root = config.child("config");
-    const std::string compId = root.child("engine").attribute("compId").as_string();
-
-    struct Built { std::string name; std::string alias; std::string storage; std::string heartbeat; };
-    std::vector<Built> sessions;
-    std::vector<std::string> aliases;
-    std::set<std::string> headers;
-    bool hasSessionHeaders = false;
-
-    // local is always the engine: Sender = EngineCompId, Target = remote.
-    for (const auto session : root.child("sessions").children("session"))
-    {
-        const std::string name = session.attribute("name").as_string();
-        const std::string role = session.attribute("role").as_string();
-        const std::string beginString = session.attribute("beginString").as_string();
-        const std::string remote = session.attribute("remote").as_string();
-        const auto storage = resolveClass(StorageClasses, session.attribute("storage").as_string());
-        const auto transport = resolveClass(TransportClasses, session.attribute("transport").as_string());
-        const auto application = resolveClass(ApplicationClasses, session.attribute("application").as_string());
-        const std::string klass = sessionClass(role);
-        const std::string alias = cap(name) + "Session";
-
-        const std::string sessionHeader = session.attribute("header").as_string();
-        if (!sessionHeader.empty())
-        {
-            hasSessionHeaders = true;
-        }
-        for (const auto& header : {storage.header, transport.header, application.header, sessionHeader})
-        {
-            if (!header.empty())
-            {
-                headers.insert(header);
-            }
-        }
-
-        aliases.push_back(std::format("using {} = {}<{}, \"{}\", \"{}\", {}, {}, {}>;\n",
-                                      alias, klass, beginString, compId, remote,
-                                      storage.type, transport.type, application.type));
-        sessions.push_back({name, alias, storage.type, session.attribute("heartbeat").as_string()});
-    }
-
-    std::ofstream out(fileName);
-    out << "// Generated by Generator from config.xml. Do not edit by hand.\n";
-    out << "#ifndef SIMD_FIX_CONFIG_HPP\n";
-    out << "#define SIMD_FIX_CONFIG_HPP\n\n";
-    out << "#include \"org/limitless/simdifx/generated/config/FixEngine.hpp\"\n";
-
-    if (!hasSessionHeaders)
-    {
-        out << "\nnamespace org::limitless::simdifx::generated::config {\n\n";
-        out << "} // namespace org::limitless::simdifx::generated::config\n\n";
-        out << "#endif //SIMD_FIX_CONFIG_HPP\n";
-        return;
-    }
-
-    out << "#include <string_view>\n";
-    out << "#include <unordered_map>\n";
-    out << "#include <variant>\n\n";
-    for (const auto& header : headers)
-    {
-        out << std::format("#include \"{}\"\n", header);
-    }
-    out << "\n";
-    out << "namespace org::limitless::simdifx::generated::config {\n\n";
-    out << "using namespace org::limitless::simdifx::session;\n\n";
-
-    for (const auto& alias : aliases)
-    {
-        out << alias;
-    }
-
-    out << "\nusing AnySession = std::variant<";
-    for (size_t i = 0; i < sessions.size(); ++i)
-    {
-        out << sessions[i].alias << (i + 1 < sessions.size() ? ", " : "");
-    }
-    out << ">;\n\n";
-
-    out << "[[nodiscard]] inline std::unordered_map<std::string_view, AnySession> sessions()\n";
-    out << "{\n";
-    out << "    std::unordered_map<std::string_view, AnySession> registry;\n";
-    for (const auto& s : sessions)
-    {
-        if (s.heartbeat.empty())
-        {
-            out << std::format("    registry.emplace(\"{}\", {}{{}});\n", s.name, s.alias);
-        }
-        else
-        {
-            out << std::format("    registry.emplace(\"{}\", {}::Builder{{{}{{}}}}"
-                               ".heartbeatPeriod(std::chrono::milliseconds{{{}}}).build());\n",
-                               s.name, s.alias, s.storage, s.heartbeat);
-        }
-    }
-    out << "    return registry;\n";
-    out << "}\n\n";
-
-    out << "} // namespace org::limitless::simdifx::generated::config\n\n";
-    out << "#endif //SIMD_FIX_CONFIG_HPP\n";
 }
 
 static void generateMessageHandler(const std::string& fileName, const std::vector<Record>& records)

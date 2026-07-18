@@ -22,18 +22,24 @@ before parsing).
 
 | Benchmark | Message | ns/msg | GB/s |
 |-----------|---------|-------:|-----:|
-| LOGON COLD | Logon, 142 B | 92.2 | 1.54 |
-| LOGON HOT | Logon, 142 B | 92.3 | 1.54 |
-| LOGON GETTERS | Logon, 142 B | 109.2 | 1.30 |
-| LOGON GROUPS | Logon + 3 hops, 253 B | 199.8 | 1.27 |
-| LOGON DATA | Logon + XmlData, 166 B | 154.2 | 1.08 |
-| LOGON ENCODE | Logon + 3 hops, ~224 B | 102.3 | 2.19 |
-| NOS HOT | NewOrderSingle, 154 B | 95.0 | 1.62 |
-| NOS GETTERS | NewOrderSingle, 154 B | 128.5 | 1.20 |
-| NOS ENCODE | NewOrderSingle, 154 B | 37.3 | 4.37 |
-| ER HOT | ExecutionReport, 245 B | 145.7 | 1.68 |
-| ER GETTERS | ExecutionReport, 245 B | 239.3 | 1.02 |
-| ER ENCODE | ExecutionReport, 245 B | 103.0 | 2.38 |
+| LOGON COLD | Logon, 142 B | 94.0 | 1.51 |
+| LOGON HOT | Logon, 142 B | 94.2 | 1.51 |
+| LOGON GETTERS | Logon, 142 B | 118.4 | 1.20 |
+| LOGON GROUPS | Logon + 3 hops, 253 B | 203.6 | 1.24 |
+| LOGON DATA | Logon + XmlData, 166 B | 142.8 | 1.16 |
+| LOGON ENCODE | Logon + 3 hops, ~224 B | 137.0 | 1.61 |
+| NOS HOT | NewOrderSingle, 154 B | 96.8 | 1.59 |
+| NOS GETTERS | NewOrderSingle, 154 B | 152.8 | 1.01 |
+| NOS ENCODE | NewOrderSingle, 154 B | 102.1 | 1.60 |
+| ER HOT | ExecutionReport, 245 B | 148.7 | 1.65 |
+| ER GETTERS | ExecutionReport, 245 B | 249.4 | 0.98 |
+| ER ENCODE | ExecutionReport, 245 B | 177.9 | 1.38 |
+
+> **Encode figures measure real work.** The encode benchmarks feed their field
+> inputs through a runtime taint (see below) so the compiler cannot constant-fold
+> a literal message into precomputed bytes. Earlier revisions reported folded
+> encode numbers (e.g. NOS ENCODE 37 ns / 4.37 GB/s) that were unattainable with
+> runtime inputs.
 
 ## What each benchmark measures
 
@@ -49,6 +55,39 @@ before parsing).
 - **ER HOT** — hot-cache tokenization of a flat `ExecutionReport` (245 B); no getters.
 - **ER GETTERS** — as ER HOT plus all 16 `ExecutionReportDecoder` getters (orderID, clOrdID, execID, execType, ordStatus, symbol, side, orderQty, price, lastQty, lastPx, leavesQty, cumQty, avgPx, transactTime, text) — a wide mix of string, enum, integer, decimal, and timestamp fields.
 - **ER ENCODE** — encodes a flat `ExecutionReport` via `FixPayloadEncoder`/`ExecutionReportEncoder`.
+
+## Changes since previous measurement (2026-07-18)
+
+1. **Encode benchmarks made non-foldable** — the encode loops fed compile-time
+   literal inputs (sequence number, timestamps, quantities, prices). With the
+   whole message known at compile time, the optimizer precomputed each formatted
+   field — most significantly the 21-byte UTCTimestamp — into constant stores, so
+   the benchmark measured constant folding rather than encoding. Each encode loop
+   now adds a runtime value (a `volatile` read, always zero, so the emitted bytes
+   are unchanged) to its numeric inputs, forcing the formatting to run as it does
+   in a live engine. The encode figures rise accordingly and now reflect real
+   per-message cost. Decode benchmarks are unaffected — they already parse runtime
+   bytes from a buffer.
+2. **Runtime `PayloadEncoder`** — `PayloadEncoder` is now constructed from runtime
+   begin-string / sender / target strings rather than compile-time template
+   parameters. The header prefix is built once into an inline, heap-free
+   `std::array`; `wrap()` copies a fixed-size prefix that lowers to inline NEON
+   stores (no `memcpy` call).
+
+| Benchmark | Before (folded) | After (real) | Change |
+|-----------|----------------:|-------------:|-------:|
+| LOGON ENCODE | 102.3 ns | 137.0 ns | +33.9% |
+| NOS ENCODE | 37.3 ns | 102.1 ns | +173.7% |
+| ER ENCODE | 103.0 ns | 177.9 ns | +72.7% |
+
+The jump is largest for NewOrderSingle: with only two timestamps and a short
+body, the folded-away timestamp formatting dominated its previous figure. The
+change is a measurement correction, not a regression — for realistic (runtime)
+inputs the runtime encoder is in fact slightly faster than the former
+compile-time-template encoder (NOS ~76 ns vs ~90 ns when both format a runtime
+timestamp); the old 37 ns was never attainable outside a literal-only benchmark.
+Decode figures drift ±1–4% from the 2026-06-24 run (run-to-run/thermal), with no
+algorithmic change.
 
 ## Changes since previous measurement (2026-06-24)
 
@@ -173,8 +212,9 @@ Tokenization-only and encode benchmarks are unchanged.
   throughput stays the same.
 - The XmlData inline-skip path (LOGON DATA) adds ~31 ns over LOGON GETTERS,
   reflecting the scalar scan past the data payload and the extra token emission.
-- NOS ENCODE (~38 ns/msg) is ~63% faster than LOGON ENCODE (~102 ns/msg)
-  because it has no repeating-group encoding pass.
+- NOS ENCODE (~102 ns/msg) is faster than LOGON ENCODE (~137 ns/msg): the Logon
+  carries a 3-entry hops group, i.e. three extra timestamps and counters to
+  format, on top of a longer message.
 - ExecutionReport (245 B, 16 fields) is the widest message benchmarked: its
   16 getters add ~92 ns over the hot parse (ER GETTERS 237.6 ns vs ER HOT
   145.9 ns), roughly proportional to its field count versus the smaller

@@ -12,6 +12,7 @@
 #include <span>
 
 #include "org/limitless/simdifx/generated/config/FixEngine.hpp"
+#include "org/limitless/simdifx/generated/messages/FixTypes.hpp"
 #include "org/limitless/simdifx/decoder/PayloadHandler.hpp"
 #include "org/limitless/simdifx/detail/Tokens.hpp"
 #include "org/limitless/simdifx/detail/simd/Uint8x16.hpp"
@@ -38,11 +39,12 @@ struct NoDataFields
  * trailing CheckSum. Handles messages that are fragmented across chunk
  * boundaries, including tags split across a 16-byte block boundary.
  *
- * @tparam BeginString FIX protocol version string (e.g. "FIXT.1.1", "FIX.4.4")
+ * @tparam Protocol FIX protocol version enumerator (e.g. Protocol::FIXT_1_1);
+ *         its wire code (via code()) is the BeginString validated on parse()
  * @tparam DataFields compile-time schema providing dataTag(uint16_t) for
  *         binary-safe data field skipping; defaults to NoDataFields (no skip)
  */
-template <FixedString BeginString, typename DataFields = NoDataFields>
+template <generated::messages::Protocol Protocol, typename DataFields = NoDataFields>
 class PayloadDecoder
 {
     static constexpr size_t MaxSize = generated::config::MaxFields;
@@ -52,7 +54,8 @@ class PayloadDecoder
 
     static constexpr uint64_t CheckSumMask = 1 |  '1' << 8 | '0' << 16 | '=' << 24 | 1ULL << 56;
 
-    static constexpr uint32_t ProtocolLength = BeginString.Size - 1;
+    static constexpr std::string_view ProtocolCode = generated::messages::code(Protocol);
+    static constexpr uint32_t ProtocolLength = static_cast<uint32_t>(ProtocolCode.size());
     static constexpr auto ProtocolPrefix = []
     {
         std::array<uint8_t, ProtocolLength + 3> result{};
@@ -60,7 +63,7 @@ class PayloadDecoder
         result[1] = '=';
         for (std::size_t i = 0; i < ProtocolLength; ++i)
         {
-            result[i + 2] = static_cast<uint8_t>(BeginString.Value[i]);
+            result[i + 2] = static_cast<uint8_t>(ProtocolCode[i]);
         }
         result[ProtocolLength + 2] = FieldEnd;
         return result;

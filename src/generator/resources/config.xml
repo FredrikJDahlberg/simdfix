@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config>
+
     <engine compId="ENGINE">          <!-- the local node; every session's Sender (tag 49 outbound) -->
         <message maxSize="4096"/>     <!-- bytes:  MaxMessageSize         -->
         <payload maxFields="256"/>    <!-- count:  PayloadDecoder MaxSize  -->
@@ -7,15 +8,4 @@
         <heartbeat millis="10000"/>   <!-- ms:     default HeartBtInt       -->
     </engine>
 
-    <versions>
-        <version name="FIXT_1_1" code="FIXT.1.1"/>
-        <version name="FIX_4_3" code="FIX.4.3"/>
-        <version name="FIX_4_4" code="FIX.4.4"/>
-    </versions>
-
-    <sessions>
-        <session name="alpha" role="server" beginString="FIXT_1_1" remote="AAA" storage="memory" heartbeat="30000"/>
-        <session name="beta"  role="server" beginString="FIXT_1_1" remote="BBB"/>
-        <session name="gamma" role="client" beginString="FIXT_1_1" remote="VENUE"/>
-    </sessions>
 </config>

@@ -150,6 +150,8 @@ public:
         ++m_encodedLength;
     }
 
+
+
     /**
      * Writes "TAG=VALUE" followed by SOH for 32-bit (or smaller) signed/unsigned integers.
      * @tparam Tag tag number to write
@@ -371,13 +373,18 @@ public:
     template <FixedString Tag, FixedString Value>
     static uint32_t encode(const uint32_t offset, std::span<uint8_t> buffer)
     {
-        constexpr uint32_t TagLength = sizeof(Tag) - 1;
-        std::memcpy(buffer.data() + offset, Tag, TagLength);
-        uint32_t encodedLength = TagLength;
+        return encode<char>(std::span(Tag), std::span(Value), offset, buffer);
+    }
+
+    static uint32_t encode(const std::string& tag, const std::string& value,
+                           const uint32_t offset, std::span<uint8_t> buffer)
+    {
+        std::memcpy(buffer.data() + offset, tag.data(), tag.size());
+        uint32_t encodedLength = tag.size();
         buffer[offset + encodedLength] = '=';
         ++encodedLength;
-        std::memcpy(buffer.data() + offset + encodedLength, Value, sizeof(Value) - 1);
-        encodedLength += sizeof(Value) - 1;
+        std::memcpy(buffer.data() + offset + encodedLength, value.data(), value.size());
+        encodedLength += value.size();
         buffer[offset + encodedLength] = FieldEnd;
         ++encodedLength;
         return encodedLength;

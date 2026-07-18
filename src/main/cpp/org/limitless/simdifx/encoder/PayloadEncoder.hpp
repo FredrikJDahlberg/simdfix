@@ -5,6 +5,8 @@
 #ifndef SIMD_FIX_PAYLOAD_ENCODER_HPP
 #define SIMD_FIX_PAYLOAD_ENCODER_HPP
 
+#include <array>
+#include <cassert>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -23,30 +25,52 @@ using namespace org::limitless::simdifx::detail::simd;
 // Writes the FIX header (BeginString, BodyLength, MsgType, SenderCompID, TargetCompID)
 // ahead of a message body and, once the body has been encoded, fills in BodyLength
 // and appends the trailing CheckSum field.
-template <FixedString Protocol, FixedString Target, FixedString Sender>
-class PayloadEncoder
-{
+class PayloadEncoder {
+    static constexpr uint32_t BodyLengthDigits = 4;
+    // Fixed upper bound on the header prefix ("8="+protocol+SOH, "9=0000"+SOH,
+    // "35=?"+SOH, "49="+sender+SOH, "56="+target+SOH). Holding it in an inline
+    // array (no heap) lets wrap() copy a compile-time-constant number of bytes,
+    // which the compiler inlines instead of calling out to memcpy.
+    static constexpr uint32_t MaxPrefixLength = 64;
+
     std::span<uint8_t> m_buffer{};
+    std::array<uint8_t, MaxPrefixLength> m_messagePrefix{};
+
     uint32_t m_offset{};
     uint32_t m_encodedLength{};
 
-    static constexpr uint32_t ProtocolLength = Protocol.Size - 1;
-    static constexpr uint32_t SenderLength = Sender.Size - 1;
-    static constexpr uint32_t TargetLength = Target.Size - 1;
-
-    static constexpr uint32_t BodyLengthOffset = ProtocolLength + 5; // "8=" + protocol + SOH + "9="
-    static constexpr uint32_t BodyLengthDigits = 4;
-    static constexpr uint32_t MessageTypeOffset = BodyLengthOffset + BodyLengthDigits + 4; // SOH + "35="
-
-    // Length of the header fields preceding the body, i.e. everything up to and
-    // including SenderCompID/TargetCompID.
-    static constexpr uint32_t HeaderLength = ProtocolLength + SenderLength + TargetLength + 23;
-
-    // Portion of HeaderLength counted towards the FIX BodyLength (MsgType, SenderCompID, TargetCompID).
-    static constexpr uint32_t HeaderBodyLength = SenderLength + TargetLength + 13;
+    uint32_t m_bodyLengthOffset;
+    uint32_t m_messageTypeOffset;
+    uint32_t m_headerLength;
+    uint32_t m_headerBodyLength;
 
 public:
-    PayloadEncoder() = default;
+    PayloadEncoder() = delete;
+
+    PayloadEncoder(const generated::messages::Protocol protocol, const std::string& sender, const std::string& target)
+    {
+        // Encode the header fields once into the inline prefix buffer (no heap):
+        // "8="+protocol+SOH, "9=0000"+SOH, "35=?"+SOH, "49="+sender+SOH,
+        // "56="+target+SOH. wrap() then copies MaxPrefixLength bytes per message.
+        const auto beginString = code(protocol);
+        assert(beginString.size() + sender.size() + target.size() + 23 <= MaxPrefixLength // FIXME
+               && "FIX header prefix exceeds MaxPrefixLength");
+        auto buffer = std::span{m_messagePrefix.data(), m_messagePrefix.size()};
+
+        uint32_t offset = 0;
+        offset += FieldEncoder::encode("8", beginString.data(), offset, buffer);
+        offset += FieldEncoder::encode("9", "0000", offset, buffer);
+        const uint32_t bodyLengthStart = offset; // BodyLength counts MsgType onward
+        offset += FieldEncoder::encode("35", "?", offset, buffer);
+        offset += FieldEncoder::encode("49", sender, offset, buffer);
+        offset += FieldEncoder::encode("56", target, offset, buffer);
+
+        m_headerLength = offset;
+        m_headerBodyLength = offset - bodyLengthStart;
+
+        m_bodyLengthOffset = beginString.size() + 5; // "8=" + protocol + SOH + "9="
+        m_messageTypeOffset = m_bodyLengthOffset + BodyLengthDigits + 4; // SOH + "35="
+    }
 
     /**
      * Rebinds the encoder to a destination buffer and writes the FIX header
@@ -56,15 +80,14 @@ public:
      * @param buffer destination buffer
      * @return *this, for chaining
      */
-    PayloadEncoder& wrap(const uint32_t offset, const std::span<uint8_t> buffer)
+    PayloadEncoder& wrap(const uint32_t offset, std::span<uint8_t> buffer)
     {
         m_offset = offset;
         m_buffer = buffer;
-        m_encodedLength =  FieldEncoder::encode<"8", Protocol>(m_offset, m_buffer);
-        m_encodedLength += FieldEncoder::encode<"9", "0000">(m_offset + m_encodedLength, m_buffer);
-        m_encodedLength += FieldEncoder::encode<"35", "?">(m_offset + m_encodedLength, m_buffer);
-        m_encodedLength += FieldEncoder::encode<"49", Sender>(m_offset + m_encodedLength, m_buffer);
-        m_encodedLength += FieldEncoder::encode<"56", Target>(m_offset + m_encodedLength, m_buffer);
+        // Constant-size copy so the compiler lowers it to inline fixed-width
+        // stores rather than an out-of-line memcpy call. Bytes beyond the actual
+        // header (m_headerLength) are overwritten by the message body.
+        std::memcpy(m_buffer.data() + m_offset, m_messagePrefix.data(), MaxPrefixLength);
         return *this;
     }
 
@@ -73,7 +96,7 @@ public:
      */
     [[nodiscard]] uint32_t offset() const
     {
-        return m_offset + HeaderLength;
+        return m_offset + m_headerLength;
     }
 
     /**
@@ -124,10 +147,10 @@ public:
     template <EncodableMessage Message>
     uint32_t encode(const Message& message)
     {
-        const auto bodyLength = HeaderBodyLength + static_cast<uint32_t>(message.encodedLength());
-        m_buffer[m_offset + MessageTypeOffset] = static_cast<uint8_t>(message.type().front());
-        utils::writeFixedDigits<BodyLengthDigits>(bodyLength, m_buffer.data() + m_offset + BodyLengthOffset);
-        m_encodedLength = HeaderLength + static_cast<uint32_t>(message.encodedLength());
+        const auto bodyLength = m_headerBodyLength + static_cast<uint32_t>(message.encodedLength());
+        m_buffer[m_offset + m_messageTypeOffset] = static_cast<uint8_t>(message.type().front());
+        utils::writeFixedDigits<BodyLengthDigits>(bodyLength, m_buffer.data() + m_offset + m_bodyLengthOffset);
+        m_encodedLength = m_headerLength + static_cast<uint32_t>(message.encodedLength());
 
         uint32_t position = 0;
         ChecksumAccumulator accum;
@@ -161,6 +184,11 @@ public:
     [[nodiscard]] uint32_t encodedLength() const
     {
         return m_encodedLength;
+    }
+
+    static PayloadEncoder build(const generated::messages::Protocol protocol, const std::string& sender, const std::string& target)
+    {
+        return PayloadEncoder{protocol, sender, target};
     }
 };
 

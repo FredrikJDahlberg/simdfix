@@ -259,20 +259,6 @@ struct DataModel
         }
     }
 
-    void processVersions(const pugi::xml_node& versions)
-    {
-        m_protocol = Record{"Protocol", "", RecordType::Enum};
-        m_protocol.m_fields.emplace_back(0, "Null", "?", 1, Presence::Null,
-                                         Category::Enum, RecordType::Enum);
-        for (auto version : versions.children("version"))
-        {
-            auto name = std::string{version.attribute("name").as_string()};
-            auto code = std::string{version.attribute("code").as_string()};
-            m_protocol.m_fields.emplace_back(0, std::move(name), std::move(code), 1,
-                                             Presence::Null, Category::Enum, RecordType::Enum);
-        }
-    }
-
     void process(const pugi::xml_document& doc)
     {
         const pugi::xml_node protocol = doc.child("protocol");

@@ -122,6 +122,15 @@ nanoseconds timer(Handler handler)
     return nanoseconds(high_resolution_clock::now() - start);
 }
 
+// Runtime taint for encode-benchmark inputs. A live engine's sequence numbers,
+// timestamps, quantities and prices are runtime values; when they are compile-
+// time literals the optimizer precomputes each formatted field into constant
+// stores, so the benchmark measures constant-folding rather than encoding.
+// Each encode loop reads this volatile once per iteration (blocking both the
+// folding and loop-invariant hoisting) and adds it to the field inputs. It is
+// always zero, so the encoded bytes are identical to the untainted message.
+static volatile uint64_t g_taintSource = 0;
+
 static void fillBuffer(uint8_t* buf, const size_t bufSize)
 {
     size_t i = 0;
@@ -227,7 +236,7 @@ struct LogonDataGetterHandler : FixMessageHandler<LogonDataGetterHandler>
 // COLD: 1 GB buffer — data comes from DRAM for most of the run.
 static void benchColdCache()
 {
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
 
     constexpr size_t COLD_SIZE = 1024ULL * 1024 * 1024;
     auto coldBuf = std::make_unique<uint8_t[]>(COLD_SIZE);
@@ -248,7 +257,7 @@ static void benchColdCache()
 // HOT: 256 KB buffer — fits in L2, measures pure compute throughput.
 static void benchHotCache()
 {
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -286,7 +295,7 @@ static void benchHotCache()
 // GETTERS: parse + apply every LogonDecoder getter to the message.
 static void benchGetters()
 {
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -317,7 +326,7 @@ static void benchGetters()
 // repeating group, to the message.
 static void benchGroups()
 {
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -361,7 +370,7 @@ static void benchLogonData()
             return -1;
         }
     };
-    PayloadDecoder<FIXT_1_1, DataFields> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1, DataFields> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -397,7 +406,7 @@ static void benchLogonData()
 // NOS_HOT: hot-cache decode of NewOrderSingle (tokenization only, no getters).
 static void benchNewOrderSingleHot()
 {
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -490,13 +499,16 @@ struct ExecutionReportGetterHandler : FixMessageHandler<ExecutionReportGetterHan
 // encoder guarantees a valid message with a correct BodyLength and CheckSum.
 static size_t encodeExecutionReport(const std::span<uint8_t> buf)
 {
-    FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
+    // Built once and reused: a session-scoped encoder is set up per connection,
+    // not per message, so the hot loop measures only wrap()+encode().
+    static FixPayloadEncoder encoder{Protocol::FIXT_1_1, "TARGET", "SENDER"};
+    const uint64_t n = g_taintSource;
     encoder.wrap(0, buf);
 
     ExecutionReportEncoder report{};
     encoder.wrapMessage(report)
-            .sequenceNumber(1)
-            .sendingTime(milliseconds{1'781'378'773'959})
+            .sequenceNumber(static_cast<uint32_t>(1 + n))
+            .sendingTime(milliseconds{static_cast<int64_t>(1'781'378'773'959 + n)})
             .orderID("ORDER1")
             .clOrdID("CLORD1")
             .execID("EXEC1")
@@ -504,14 +516,14 @@ static size_t encodeExecutionReport(const std::span<uint8_t> buf)
             .ordStatus(OrdStatus::PartiallyFilled)
             .symbol("AAPL")
             .side(Side::Buy)
-            .orderQty(100)
-            .price(utils::FixedDecimal{15000, 0})
-            .lastQty(50)
-            .lastPx(utils::FixedDecimal{14950, 0})
-            .leavesQty(50)
-            .cumQty(50)
-            .avgPx(utils::FixedDecimal{14950, 0})
-            .transactTime(milliseconds{1'781'378'773'959})
+            .orderQty(static_cast<uint32_t>(100 + n))
+            .price(utils::FixedDecimal{static_cast<int64_t>(15000 + n), 0})
+            .lastQty(static_cast<uint32_t>(50 + n))
+            .lastPx(utils::FixedDecimal{static_cast<int64_t>(14950 + n), 0})
+            .leavesQty(static_cast<uint32_t>(50 + n))
+            .cumQty(static_cast<uint32_t>(50 + n))
+            .avgPx(utils::FixedDecimal{static_cast<int64_t>(14950 + n), 0})
+            .transactTime(milliseconds{static_cast<int64_t>(1'781'378'773'959 + n)})
             .text("FILL");
 
     return encoder.encode(report);
@@ -520,7 +532,7 @@ static size_t encodeExecutionReport(const std::span<uint8_t> buf)
 // ER_HOT: hot-cache decode of ExecutionReport (tokenization only, no getters).
 static void benchExecutionReportHot()
 {
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
 
     std::array<uint8_t, 256> msg{};
     const size_t msgLength = encodeExecutionReport(msg);
@@ -565,7 +577,7 @@ static void benchExecutionReportHot()
 // ER_GETTERS: parse + apply every ExecutionReportDecoder getter.
 static void benchExecutionReportGetters()
 {
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
 
     std::array<uint8_t, 256> msg{};
     const size_t msgLength = encodeExecutionReport(msg);
@@ -619,7 +631,7 @@ static void benchExecutionReportEncode()
 
 static void benchNewOrderSingleGetters()
 {
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
 
     constexpr size_t HOT_SIZE  = 256 * 1024;
     constexpr size_t HOT_COUNT = 4096;
@@ -658,25 +670,26 @@ static void benchNewOrderSingleEncode()
     std::array<uint8_t, 256> buffer{};
 
     size_t encodedLength = 0;
+    FixPayloadEncoder encoder{Protocol::FIXT_1_1, "TARGET", "SENDER"};
     const auto duration = timer([&]
     {
         for (size_t i = 0; i < HOT_COUNT; ++i)
         {
-            FixPayloadEncoder<FIXT_1_1, "TARGET", "SENDER"> encoder{};
+            const uint64_t n = g_taintSource;
             encoder.wrap(0, buffer);
 
             NewOrderSingleEncoder order{};
             encoder.wrapMessage(order)
-                    .sequenceNumber(1)
-                    .sendingTime(milliseconds{1'781'378'773'959})
+                    .sequenceNumber(static_cast<uint32_t>(1 + n))
+                    .sendingTime(milliseconds{static_cast<int64_t>(1'781'378'773'959 + n)})
                     .clOrdID("ORDER1")
                     .handlInst(HandlInst::AutoPrivate)
                     .symbol("AAPL")
                     .side(Side::Buy)
-                    .transactTime(milliseconds{1'781'378'773'959})
-                    .orderQty(100)
+                    .transactTime(milliseconds{static_cast<int64_t>(1'781'378'773'959 + n)})
+                    .orderQty(static_cast<uint32_t>(100 + n))
                     .ordType(OrdType::Limit)
-                    .price(utils::FixedDecimal{15000, 0});
+                    .price(utils::FixedDecimal{static_cast<int64_t>(15000 + n), 0});
 
             encodedLength = encoder.encode(order);
         }
@@ -691,25 +704,27 @@ static void benchEncode()
     std::array<uint8_t, 256> buffer{};
 
     size_t encodedLength = 0;
+    FixPayloadEncoder encoder{Protocol::FIXT_1_1, "TARGET", "SENDER"};
     const auto duration = timer([&]
     {
         for (size_t i = 0; i < HOT_COUNT; ++i)
         {
-            FixPayloadEncoder<FIXT_1_1, "SellSide_1", "Buyer"> encoder{};
+            const uint64_t n = g_taintSource;
+            const auto ts = milliseconds{static_cast<int64_t>(1'781'378'773'959 + n)};
             encoder.wrap(0, buffer);
 
             LogonEncoder logon{};
             encoder.wrapMessage(logon)
-                    .sequenceNumber(1)
-                    .sendingTime(milliseconds{1'781'378'773'959})
+                    .sequenceNumber(static_cast<uint32_t>(1 + n))
+                    .sendingTime(ts)
                     .encryptMethod(Encryption::None)
-                    .heartbeatInterval(30);
+                    .heartbeatInterval(static_cast<uint32_t>(30 + n));
 
             logon
                     .hops(3)
-                    .next().hopCompID("HOP1").hopSendingTime(milliseconds{1'781'378'773'959}).hopRefID(1)
-                    .next().hopCompID("HOP2").hopSendingTime(milliseconds{1'781'378'773'959}).hopRefID(2)
-                    .next().hopCompID("HOP3").hopSendingTime(milliseconds{1'781'378'773'959}).hopRefID(3);
+                    .next().hopCompID("HOP1").hopSendingTime(ts).hopRefID(static_cast<uint32_t>(1 + n))
+                    .next().hopCompID("HOP2").hopSendingTime(ts).hopRefID(static_cast<uint32_t>(2 + n))
+                    .next().hopCompID("HOP3").hopSendingTime(ts).hopRefID(static_cast<uint32_t>(3 + n));
 
             encodedLength = encoder.encode(logon);
         }

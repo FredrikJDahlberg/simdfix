@@ -6,6 +6,10 @@
             <element name="None" value="0"/>
         </enum>
 
+        <enum name="Protocol">
+            <element name="FIXT_1_1" value="FIXT.1.1"/>
+        </enum>
+
         <enum name="MessageType">
             <element name="Logon" value="A"/>
             <element name="Logout" value="5"/>

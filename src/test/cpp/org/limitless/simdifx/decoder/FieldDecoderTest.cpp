@@ -12,6 +12,7 @@
 namespace org::limitless::simdifx::decoder {
 
 using namespace org::limitless::simdifx::generated::config;
+using namespace org::limitless::simdifx::generated::messages;
 using namespace org::limitless::simdifx::detail::parser;
 
 #define SOH "\x01"
@@ -22,7 +23,7 @@ TEST(FieldDecoder, GetInt32)
         "8=FIXT.1.1" SOH "9=62" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "9999=-12345" SOH "10=004" SOH);
 
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 
@@ -47,7 +48,7 @@ TEST(FieldDecoder, GetFixedDecimal)
         "8=FIXT.1.1" SOH "9=73" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "9999=123.45" SOH "9998=-0.01" SOH "10=020" SOH);
 
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 
@@ -72,7 +73,7 @@ TEST(FieldDecoder, GetFixedDecimalLong)
         "8=FIXT.1.1" SOH "9=86" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "9999=123456.789012" SOH "9998=-1234.56789" SOH "10=213" SOH);
 
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(Result::Success, status);
 
@@ -97,7 +98,7 @@ TEST(FieldDecoder, GetFixedDecimalInvalidValue)
         "8=FIXT.1.1" SOH "9=100" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "9999=.123" SOH "9998=123." SOH "9997=12.3.4" SOH "9996=12A.5" SOH "9995=-" SOH "10=097" SOH);
 
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(Result::Success, status);
 
@@ -137,7 +138,7 @@ TEST(FieldDecoder, GetUint32InvalidValue)
         "8=FIXT.1.1" SOH "9=83" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "9999=ABC" SOH "9998=99999999999" SOH "9997=-" SOH "10=130" SOH);
 
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(message);
     ASSERT_EQ(Result::Success, status);
 
@@ -169,7 +170,7 @@ TEST(FieldDecoder, GetInt32MissingField)
         "8=FIXT.1.1" SOH "9=50" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "10=179" SOH);
 
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 

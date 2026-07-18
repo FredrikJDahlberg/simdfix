@@ -14,6 +14,7 @@
 namespace org::limitless::simdifx::decoder {
 
 using namespace org::limitless::simdifx::generated::config;
+using namespace org::limitless::simdifx::generated::messages;
 
 #define SOH "\x01"
 
@@ -26,7 +27,7 @@ TEST(GroupDecoder, ScopesFieldLookupToCurrentRepeat)
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
 
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 
@@ -77,7 +78,7 @@ TEST(GroupDecoder, RewrapWithoutClearDoesNotLeakScopeDepth)
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
 
-    PayloadDecoder<FIXT_1_1> decoder;
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(logout);
     ASSERT_EQ(Result::Success, status);
 

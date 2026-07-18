@@ -50,7 +50,7 @@ namespace
     ParseResult parseExact(std::span<const uint8_t> bytes)
     {
         std::vector<uint8_t> buffer(bytes.begin(), bytes.end());
-        PayloadDecoder<generated::config::FIXT_1_1, DataFields> decoder;
+        PayloadDecoder<generated::messages::Protocol::FIXT_1_1, DataFields> decoder;
         return decoder.parse(Buffer{buffer.data(), buffer.size()});
     }
 
@@ -127,7 +127,7 @@ TEST(PayloadDecoderFuzz, RandomBody)
 // Reuse one decoder across differently sized messages to surface stale state.
 TEST(PayloadDecoderFuzz, DecoderReuse)
 {
-    PayloadDecoder<generated::config::FIXT_1_1, DataFields> decoder;
+    PayloadDecoder<generated::messages::Protocol::FIXT_1_1, DataFields> decoder;
     const std::vector<uint8_t> logon(ValidLogon.begin(), ValidLogon.end());
     const std::vector<uint8_t> data(ValidData.begin(), ValidData.end());
 
