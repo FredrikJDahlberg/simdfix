@@ -28,7 +28,7 @@ namespace
 {
     // Iterations per randomized case. Bumped low enough to keep ctest fast under
     // -O0 + ASan; raise locally for a deeper soak.
-    constexpr int Iterations = 20'000;
+    constexpr int Iterations = 750'000;
 
     // tag 212 is the length tag for data tag 213, exercising emitDataSkip.
     struct DataFields
@@ -68,15 +68,21 @@ TEST(PayloadDecoderFuzz, ValidMessagesExactSize)
     EXPECT_EQ(Result::Success, parseExact(bytesOf(ValidData)).m_value);
 }
 
-// Every truncation of each message: no over-read, never Success.
+// Every truncation of each message: no over-read, never Success, and never a
+// processed count reaching past the bytes supplied. The last of those matters to
+// any caller framing a stream: m_processed is what advances the read cursor, so a
+// count larger than the buffer walks the cursor off the end of it.
 TEST(PayloadDecoderFuzz, AllTruncations)
 {
     for (const auto full : {bytesOf(ValidLogon), bytesOf(ValidData)})
     {
         for (size_t n = 0; n < full.size(); ++n)
         {
-            const auto status = parseExact(full.first(n)).m_value;
-            ASSERT_NE(Result::Success, status) << "truncated to " << n << " bytes";
+            const auto result = parseExact(full.first(n));
+            ASSERT_NE(Result::Success, result.m_value) << "truncated to " << n << " bytes";
+            ASSERT_LE(result.m_processed, n)
+                << "truncated to " << n << " bytes: processed " << result.m_processed << " (" << name(result.m_value)
+                << ")";
         }
     }
 }
@@ -98,7 +104,10 @@ TEST(PayloadDecoderFuzz, MutatedBody)
             message[11 + (rng() % (message.size() - 11))] = static_cast<uint8_t>(byteDist(rng));
         }
         // parseExact copies to an exact-size buffer; truncate via the span.
-        parseExact(std::span{message}.first(lenDist(rng)));
+        const size_t n = lenDist(rng);
+        const auto result = parseExact(std::span{message}.first(n));
+        ASSERT_LE(result.m_processed, n) << "mutated length " << n << ": processed " << result.m_processed << " ("
+                                         << name(result.m_value) << ")";
     }
 }
 
@@ -118,9 +127,11 @@ TEST(PayloadDecoderFuzz, RandomBody)
         {
             message[i] = static_cast<uint8_t>(byteDist(rng));
         }
-        const auto status = parseExact(message).m_value;
+        const auto result = parseExact(message);
         // Random bytes effectively never form a valid checksummed message.
-        ASSERT_NE(Result::Success, status) << "random length " << n;
+        ASSERT_NE(Result::Success, result.m_value) << "random length " << n;
+        ASSERT_LE(result.m_processed, n) << "random length " << n << ": processed " << result.m_processed << " ("
+                                         << name(result.m_value) << ")";
     }
 }
 

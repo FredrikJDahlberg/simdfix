@@ -153,7 +153,15 @@ public:
         const auto length = static_cast<length_t>(buffer.size());
         if (std::memcmp(data, ProtocolPrefix.data(), ProtocolPrefix.size()) != 0)
         {
-            return { 8, Result::InvalidBeginString };
+            // Nothing is consumed: this buffer does not begin a message of ours, and
+            // where the next one starts is not something a single-message parse can
+            // say. Resynchronizing — scanning on for the next BeginString — belongs to
+            // whoever owns the stream. Reporting a fixed step here instead would be a
+            // byte count that is not one: a caller advancing by it lands at an
+            // arbitrary offset, and stays misaligned if it keeps its buffer across
+            // reads. Zero is what MessageFragment already reports for the same reason,
+            // so callers that break on it are already correct.
+            return { 0, Result::InvalidBeginString };
         }
         m_fields[BeginStringPosition] = { 2, 8, ProtocolLength };
         m_tags[BeginStringPosition] = 8;
@@ -236,7 +244,16 @@ private:
     ParseResult checkRequiredFields(const data_t* data, const uint64_t blockSum, const position_t blockEnd, const length_t messageLength) const
     {
         const auto* last = &m_fields[m_count - 1];
-        const bool hasCheckSum = last->m_tag == CheckSumTag;
+        // A CheckSum field is only present if it ends within the bytes supplied. Both
+        // producers of the last token — the SIMD scan's completion marker and
+        // processTrailer's synthesized field — can place one past the end on a message
+        // cut short or a mutated body, and this is the one place their claim is turned
+        // into the processed byte count. Letting an out-of-bounds field through would
+        // report more bytes consumed than were given, which walks a stream caller's read
+        // cursor off the end of its own buffer. Ending past the end means the message is
+        // unfinished, which is exactly what the absent CheckSum tells the checks below.
+        const bool hasCheckSum = last->m_tag == CheckSumTag &&
+            static_cast<uint32_t>(last->m_position) + last->m_length + 1 <= messageLength;
         const uint32_t processed = hasCheckSum ? last->m_position + last->m_length + 1 : 0;
         const auto& bodyLength = m_fields[BodyLengthPosition];
         if (bodyLength.m_tag != BodyLengthTag)
@@ -590,9 +607,17 @@ private:
             fieldEndPos = fieldEndBit / 8;
             fieldEnds &= ~(1ULL << fieldEndBit);
         }
-        if (position < remaining)
-        { // checked by decoder
-            constexpr uint32_t checkSumPrefixLen = 3; // "10="
+        constexpr uint32_t checkSumPrefixLen = 3; // "10="
+        constexpr uint32_t checkSumFieldLen = checkSumPrefixLen + CheckSumValueLength + 1; // "10=" + digits + SOH
+        // The value itself is checked by the decoder; what has to hold here is that the
+        // field fits. Claiming one the trailer is too short for puts its end past the
+        // buffer, and checkRequiredFields reads exactly that end as the processed byte
+        // count — so a message cut short would report having consumed bytes that were
+        // never supplied, and a caller framing a stream would advance off the end of it.
+        // Too short to hold one means the message is unfinished, which is what the
+        // absent CheckSum then tells checkRequiredFields.
+        if (position + checkSumFieldLen <= remaining)
+        {
             last = &m_fields[m_count++];
             last->m_tag = CheckSumTag;
             m_tags[last - m_fields.data()] = CheckSumTag;

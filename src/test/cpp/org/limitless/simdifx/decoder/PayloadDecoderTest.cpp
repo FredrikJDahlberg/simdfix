@@ -326,4 +326,25 @@ TEST(PayloadDecoder, TruncationSafety)
         ASSERT_NE(Result::Success, status) << "garbage length " << n;
     }
 }
+
+// A buffer that does not begin with this decoder's BeginString consumes nothing.
+// The distinction matters to anyone framing a TCP stream: m_processed advances the
+// read cursor, so a non-zero answer here would move it to an offset the decoder
+// never established was a message boundary, and a caller retaining its buffer
+// across reads would stay misaligned from then on. Finding the next BeginString is
+// the stream owner's job; parse() reports only that it consumed nothing.
+TEST(PayloadDecoder, ForeignBeginStringConsumesNothing)
+{
+    for (const std::string_view text : {"8=FIX.4.4" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH,
+                                        "xxxxxxxxxxxxxxxx8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH,
+                                        "................................"})
+    {
+        const std::vector<uint8_t> buffer(text.begin(), text.end());
+        PayloadDecoder<Protocol::FIXT_1_1> decoder;
+        const auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
+        ASSERT_EQ(Result::InvalidBeginString, status) << text << " -> " << name(status);
+        ASSERT_EQ(0u, processed) << "a buffer that starts no message of ours consumes none of it";
+    }
+}
+
 }
