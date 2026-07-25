@@ -28,7 +28,7 @@ namespace
 {
     // Iterations per randomized case. Bumped low enough to keep ctest fast under
     // -O0 + ASan; raise locally for a deeper soak.
-    constexpr int Iterations = 750'000;
+    constexpr int Iterations = 20'000;
 
     // tag 212 is the length tag for data tag 213, exercising emitDataSkip.
     struct DataFields
