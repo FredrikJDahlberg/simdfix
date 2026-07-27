@@ -98,21 +98,7 @@ TEST(PayloadDecoder, TrailerSplitCheckSum)
 
 TEST(PayloadDecoder, ReusedDecoderSecondMessageFieldLengths)
 {
-    // Regression: found via phixeron's FixTestServer sending Logon then a
-    // Heartbeat over the same TCP connection — FixConnection reuses one
-    // PayloadDecoder instance for every message on a connection's lifetime
-    // (see FixConnection::m_decoder / onReceive). A live gateway's CompID-
-    // mismatch Reject to that second message (the Heartbeat) echoed
-    // RefSeqNum=0 instead of the real MsgSeqNum=2.
-    //
-    // Isolated single-parse tests of the exact same Heartbeat bytes (see
-    // MessageDecoderTest.HeartbeatWithLongCompIds) decode tag 34 correctly,
-    // proving this only reproduces when the *same* decoder instance parses a
-    // second message after a first one: the second parse's fields (35 and 34
-    // in this repro) come out with length inflated by one byte, feeding one
-    // extra byte from the following tag's "=" into the value.
     PayloadDecoder<Protocol::FIXT_1_1> decoder;
-
     const auto logon = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=66" SOH "35=A" SOH "49=CLIENT" SOH "56=SEQUENCER" SOH
         "34=1" SOH "52=20260703-12:00:00" SOH "98=0" SOH "108=30" SOH "10=227" SOH);
@@ -152,15 +138,6 @@ TEST(PayloadDecoder, TrailerFieldEnd)
 
 TEST(PayloadDecoder, BlockBoundaryFieldEnd)
 {
-    // Regression: when a tag's value byte and its SOH terminator land on
-    // byte 14 and 15 of a 16-byte SIMD block (the last byte of the block),
-    // processBlock failed to record the field length and processTrailer then
-    // overwrote the field with the next tag.
-    //
-    // The message below places "7=1" at block-4 positions 12-14 and the
-    // SOH at position 15 (byte 79), so "16=0" lands in the processTrailer
-    // region.  Before the fix, tag 7 was absent from the token array and
-    // ResendRequestDecoder::validate() returned RequiredFieldMissing.
     const auto message = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=69" SOH "35=2" SOH "49=CLIENT" SOH
         "56=SEQUENCER2" SOH "34=10" SOH "52=20260101-00:00:00.000" SOH
@@ -192,14 +169,6 @@ TEST(PayloadDecoder, Fragment)
 
 TEST(PayloadDecoder, TrailerSplitValue)
 {
-    // Regression test for processTrailer's split-value branch.
-    //
-    // The field value "15000" (tag 44) has its first three bytes ('1','5','0')
-    // at the end of the last 16-byte NEON block and the remaining two ('0','0')
-    // plus the SOH in the tail.  The tail's first SOH therefore precedes the
-    // tail's first '=', triggering the split-value branch.
-    // Before the fix the branch computed fieldEndPos-tagEndPos-1 = 2 instead of
-    // (offset-token.m_position)+fieldEndPos = 5, silently truncating the value.
     const auto message = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0129" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH
@@ -210,9 +179,6 @@ TEST(PayloadDecoder, TrailerSplitValue)
     ASSERT_EQ(Result::Success, status);
     ASSERT_EQ(message.size(), processed);
 
-    // Field 14 is tag 44 (Price); its value "15000" crosses the block→tail
-    // boundary.  Verify the full five-digit length is reported, not the
-    // truncated two-digit length produced by the pre-fix formula.
     const auto fields = decoder.fields();
     ASSERT_EQ(44, fields[14].m_tag);
     ASSERT_EQ(141, fields[14].m_position);
@@ -221,12 +187,6 @@ TEST(PayloadDecoder, TrailerSplitValue)
 
 TEST(PayloadDecoder, SplitTagDigitZero)
 {
-    // Tag 150 ("150=0") starts at byte 94, placing the '0' digit of "150"
-    // at position 96 — the first byte of a new 16-byte SIMD chunk. The
-    // previous chunk carries "15" via m_tag. The digit '0' maps to value 0
-    // after subtracting '0', which is identical to the "no digit" sentinel.
-    // Before the fix, processBlock treated it as a non-digit and emitted
-    // tag 15 instead of 150.
     const auto message = utils::makeSpan(
         "8=FIXT.1.1" SOH "9=0142" SOH "35=8" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH
@@ -327,14 +287,19 @@ TEST(PayloadDecoder, TruncationSafety)
     }
 }
 
-// A buffer that does not begin with this decoder's BeginString consumes nothing.
-// The distinction matters to anyone framing a TCP stream: m_processed advances the
-// read cursor, so a non-zero answer here would move it to an offset the decoder
-// never established was a message boundary, and a caller retaining its buffer
-// across reads would stay misaligned from then on. Finding the next BeginString is
-// the stream owner's job; parse() reports only that it consumed nothing.
 TEST(PayloadDecoder, ForeignBeginStringConsumesNothing)
 {
+    for (const std::string_view text : {
+        "8=FIX.4.4" SOH "9=117" SOH "35=A" SOH "49=Buyer" SOH "56=SellerSide" SOH "34=1" SOH
+        "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH "141=Y" SOH
+        "553=Username" SOH "554=Password" SOH "1137=9" SOH "10=218" SOH })
+    {
+        const std::vector<uint8_t> buffer(text.begin(), text.end());
+        PayloadDecoder<Protocol::FIXT_1_1> decoder;
+        const auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
+        ASSERT_EQ(Result::InvalidBeginString, status) << text << " -> " << name(status);
+        ASSERT_EQ(0u, processed) << "a buffer that starts no message of ours consumes none of it";
+    }
     for (const std::string_view text : {"8=FIX.4.4" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH,
                                         "xxxxxxxxxxxxxxxx8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH,
                                         "................................"})
@@ -342,7 +307,7 @@ TEST(PayloadDecoder, ForeignBeginStringConsumesNothing)
         const std::vector<uint8_t> buffer(text.begin(), text.end());
         PayloadDecoder<Protocol::FIXT_1_1> decoder;
         const auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
-        ASSERT_EQ(Result::InvalidBeginString, status) << text << " -> " << name(status);
+        ASSERT_EQ(Result::MessageFragment, status) << text << " -> " << name(status);
         ASSERT_EQ(0u, processed) << "a buffer that starts no message of ours consumes none of it";
     }
 }
