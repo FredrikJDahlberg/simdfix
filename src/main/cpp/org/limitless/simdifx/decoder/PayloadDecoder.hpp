@@ -551,7 +551,6 @@ private:
             // may lack the '=' so tagEndPos is the not-found sentinel (8).
             const uint32_t tagBytes = std::min(tagEndPos, static_cast<uint32_t>(remaining));
             last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(m_tag, data, tagBytes, false));
-            std::printf("6 tag = %d\n", m_tag);
             m_tags[last - m_fields.data()] = last->m_tag;
             last->m_position = static_cast<uint16_t>(offset + tagEndPos + 1);
             last->m_length = static_cast<uint16_t>(fieldEndPos - tagEndPos - 1);
@@ -559,8 +558,7 @@ private:
             m_tag = 0;
         }
         else if (fieldEndPos < tagEndPos)
-        { // handle split value: bytes from last->m_position to offset came from
-          // the preceding block; fieldEndPos tail bytes complete the value.
+        { // handle split value
             last->m_length = static_cast<int16_t>(offset - last->m_position + fieldEndPos);
             position = fieldEndPos + 1;
             fieldEnds &= ~(1ULL << fieldEndBit);
@@ -570,16 +568,12 @@ private:
         }
         while (position + 7 < remaining)
         {
-            // Bail on an inconsistent trailer (missing '='/SOH desyncs the
-            // positions): guards against an unsigned underflow of the digit
-            // count and a read past the trailer. checkRequiredFields then
-            // reports the malformed message.
             if (tagEndPos < position || tagEndPos > remaining)
             {
                 break;
             }
-            last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(0, data + position, tagEndPos - position, false));
-            std::printf("7 tag = %d\n", m_tag);
+            last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(0, data + position,
+                tagEndPos - position, false));
             m_tags[last - m_fields.data()] = last->m_tag;
             position += tagEndPos - position + 1;
             last->m_position = static_cast<uint16_t>(position + offset);
