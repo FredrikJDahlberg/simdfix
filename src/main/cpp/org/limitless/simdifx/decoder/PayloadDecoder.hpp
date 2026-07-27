@@ -51,7 +51,6 @@ class PayloadDecoder
 
     static constexpr uint32_t RequiredFieldCount = 7;
     static constexpr uint32_t MessageFragmentLimit = 32;
-
     static constexpr uint64_t CheckSumMask = 1 |  '1' << 8 | '0' << 16 | '=' << 24 | 1ULL << 56;
 
     static constexpr std::string_view ProtocolCode = generated::messages::code(Protocol);
@@ -81,7 +80,6 @@ class PayloadDecoder
     uint32_t m_tag{};
     int32_t m_position{};
     size_t m_count{};
-
 
 public:
     using position_t = uint32_t;
@@ -120,14 +118,14 @@ public:
     ParseResult parse(const Buffer buffer, Handler& handler)
     {
         auto result = parse(buffer);
-        if (result.m_value != Result::Success)
+        if (result.m_status != Result::Success)
         {
-            return { result.m_processed, result.m_value };
+            return { result.m_processed, result.m_status };
         }
 
         const TokenizedMessage message{buffer, {m_fields.data(), m_count}, {m_tags.data(), m_count},
             static_cast<int32_t>(m_count)};
-        result.m_value = handler.handle(message);
+        result.m_status = handler.handle(message);
         return result;
     }
 
@@ -151,10 +149,6 @@ public:
 
         const auto data = buffer.data();
         const auto length = static_cast<length_t>(buffer.size());
-        if (std::memcmp(data, ProtocolPrefix.data(), ProtocolPrefix.size()) != 0)
-        {
-            return { 0, Result::InvalidBeginString };
-        }
         m_fields[BeginStringPosition] = { 2, 8, ProtocolLength };
         m_tags[BeginStringPosition] = 8;
         m_count = 1;
@@ -217,7 +211,7 @@ public:
             processTrailer(offset, buffer);
         }
         auto result = checkRequiredFields(data, blockSum, offset, length);
-        if (result.m_value != Result::Success)
+        if (result.m_status != Result::Success)
         {
             m_fields[m_count - 1].m_tag = 0;
         }
@@ -255,6 +249,10 @@ private:
         const int32_t byteCount = last->m_position - bodyLength.m_position - bodyLength.m_length - 4;
         if (hasCheckSum)
         {
+            if (std::memcmp(data, ProtocolPrefix.data(), ProtocolPrefix.size()) != 0)
+            {
+                return { 0, Result::InvalidBeginString };
+            }
             if (bodyLength.m_tag != BodyLengthTag)
             {
                 return {processed, Result::InvalidBodyLengthTag};
@@ -272,12 +270,9 @@ private:
                 return {0, Result::RequiredFieldMissing};
             }
         }
-        else
+        else if (byteCount < length)
         {
-            if (byteCount < length)
-            {
-                return {0, Result::MessageFragment};
-            }
+            return {0, Result::MessageFragment};
         }
 #if !defined(NDEBUG)
         for (size_t i = 0; i < m_count; ++i)
@@ -510,7 +505,8 @@ private:
         }
 
         const auto messageCheckSum = checkSumValue & 0xff;
-        if (utils::asciiToUint64(0, data + m_fields[m_count - 1].m_position, 3, false) != messageCheckSum)
+        if (utils::asciiToUint64(0, data + m_fields[m_count - 1].m_position,
+            3, false) != messageCheckSum)
         {
             return Result::InvalidCheckSum;
         }

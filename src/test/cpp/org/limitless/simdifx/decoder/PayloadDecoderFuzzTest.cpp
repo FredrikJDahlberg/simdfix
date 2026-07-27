@@ -64,8 +64,8 @@ namespace
 // over-read (the trailing checksum SOH is the final byte, no padding behind it).
 TEST(PayloadDecoderFuzz, ValidMessagesExactSize)
 {
-    EXPECT_EQ(Result::Success, parseExact(bytesOf(ValidLogon)).m_value);
-    EXPECT_EQ(Result::Success, parseExact(bytesOf(ValidData)).m_value);
+    EXPECT_EQ(Result::Success, parseExact(bytesOf(ValidLogon)).m_status);
+    EXPECT_EQ(Result::Success, parseExact(bytesOf(ValidData)).m_status);
 }
 
 // Every truncation of each message: no over-read, never Success, and never a
@@ -79,9 +79,9 @@ TEST(PayloadDecoderFuzz, AllTruncations)
         for (size_t n = 0; n < full.size(); ++n)
         {
             const auto result = parseExact(full.first(n));
-            ASSERT_NE(Result::Success, result.m_value) << "truncated to " << n << " bytes";
+            ASSERT_NE(Result::Success, result.m_status) << "truncated to " << n << " bytes";
             ASSERT_LE(result.m_processed, n)
-                << "truncated to " << n << " bytes: processed " << result.m_processed << " (" << name(result.m_value)
+                << "truncated to " << n << " bytes: processed " << result.m_processed << " (" << name(result.m_status)
                 << ")";
         }
     }
@@ -107,7 +107,7 @@ TEST(PayloadDecoderFuzz, MutatedBody)
         const size_t n = lenDist(rng);
         const auto result = parseExact(std::span{message}.first(n));
         ASSERT_LE(result.m_processed, n) << "mutated length " << n << ": processed " << result.m_processed << " ("
-                                         << name(result.m_value) << ")";
+                                         << name(result.m_status) << ")";
     }
 }
 
@@ -129,9 +129,9 @@ TEST(PayloadDecoderFuzz, RandomBody)
         }
         const auto result = parseExact(message);
         // Random bytes effectively never form a valid checksummed message.
-        ASSERT_NE(Result::Success, result.m_value) << "random length " << n;
+        ASSERT_NE(Result::Success, result.m_status) << "random length " << n;
         ASSERT_LE(result.m_processed, n) << "random length " << n << ": processed " << result.m_processed << " ("
-                                         << name(result.m_value) << ")";
+                                         << name(result.m_status) << ")";
     }
 }
 
@@ -156,7 +156,7 @@ TEST(PayloadDecoderFuzz, DecoderReuse)
 
     std::vector buffer(logon);
     auto result = decoder.parse(Buffer{buffer.data(), buffer.size()});
-    EXPECT_EQ(Result::Success, result.m_value) << name(result.m_value);
+    EXPECT_EQ(Result::Success, result.m_status) << name(result.m_status);
 }
 
 }

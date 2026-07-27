@@ -8,12 +8,13 @@
 #include <span>
 #include <string>
 #include <vector>
+#include <iostream>
+#include <streambuf>
 
 #include <gtest/gtest.h>
 
 #include "org/limitless/simdifx/Types.hpp"
 #include "org/limitless/simdifx/decoder/PayloadDecoder.hpp"
-
 #include "org/limitless/simdifx/generated/messages/FixMessageDecoders.hpp"
 #include "org/limitless/simdifx/generated/messages/FixMessageHandler.hpp"
 
@@ -928,8 +929,7 @@ TEST(MessageDecoder, InvalidUTCTimestamp)
     }
 }
 
-TEST(MessageDecoder, InvalidMandatoryFields)
-{
+TEST(MessageDecoder, InvalidMandatoryFields) {
     PayloadDecoder<Protocol::FIXT_1_1> decoder;
     struct AppHandler : FixMessageHandler<AppHandler>{} app;
     {
@@ -972,6 +972,88 @@ TEST(MessageDecoder, InvalidMandatoryFields)
         auto[processed, status] = decoder.parse(message, app);
         ASSERT_EQ(Result::InvalidCheckSumTag, status) << name(status);
     }
+    {
+        const auto message = utils::makeSpan(
+            "8=FIX.4.3" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+            "34=1" SOH "52=20260613-25:26:13.959" SOH "98=0" SOH "108=30" SOH "10=071" );
+        auto[processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(Result::MessageFragment, status) << name(status);
+    }
 }
 
+struct MemoryStream : std::streambuf
+{
+    MemoryStream(const uint8_t* data, std::size_t size)
+    {
+        auto* char_data = reinterpret_cast<char*>(const_cast<uint8_t*>(data));
+        setg(char_data, char_data, char_data + size);
+    }
+};
+
+class MemoryIstream : private MemoryStream, public std::istream {
+    size_t remaining;
+
+public:
+    MemoryIstream(const uint8_t* data, std::size_t size) :
+        MemoryStream(data, size), std::istream(static_cast<MemoryStream*>(this)), remaining{size}
+    {
+    }
+
+    int32_t read(size_t position, size_t capacity, uint8_t* buffer)
+    {
+        if (remaining <= 0)
+        {
+            return -1;
+        }
+        std::istream::read(reinterpret_cast<char*>(buffer + position), capacity);
+        int32_t bytes = gcount();
+        remaining -= bytes;
+        return  bytes + position;
+    }
+};
+
+TEST(MessageDecoder, FragmentHandler)
+{
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    uint8_t data[] = "8=FIXT.1.1" SOH "9=0067" SOH "35=4" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=5" SOH "52=20260613-19:26:13.959" SOH "123=Y" SOH "36=10" SOH "10=093" SOH
+        "8=FIXT.1.1" SOH "9=0067" SOH "35=4" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=6" SOH "52=20260613-19:26:13.959" SOH "123=Y" SOH "36=10" SOH "10=094" SOH
+        "8=FIXT.1.1" SOH "9=0067" SOH "35=4" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=7" SOH "52=20260613-19:26:13.959" SOH "123=Y" SOH "36=10" SOH "10=095" SOH;
+    MemoryIstream stream(static_cast<uint8_t*>(data), sizeof(data));
+
+    int32_t compacts = 0;
+    struct AppHandler : FixMessageHandler<AppHandler>
+    {
+        int32_t count = 0;
+        using FixMessageHandler::handle;
+        Result handle(SequenceResetDecoder& reset)
+        {
+            ++count;
+            return Result::Success;
+        }
+    } app;
+
+    uint8_t buffer[200];
+    ParseResult result{};
+    int32_t position = 0;
+    int32_t limit = stream.read(0, sizeof(buffer), buffer);
+    while (position < limit)
+    {
+        std::span span(buffer + position, limit - position);
+        result = decoder.parse(span, app);
+        position += result.m_processed;
+        if (result.m_status == Result::MessageFragment)
+        {
+            int32_t remaining = limit - position;
+            std::memcpy(buffer, buffer + position, remaining);
+            position = 0;
+            limit = stream.read(remaining, sizeof(buffer) - remaining, buffer);
+            ++compacts;
+        }
+    }
+    ASSERT_EQ(3, app.count);
+    ASSERT_EQ(2, compacts);
+}
 }

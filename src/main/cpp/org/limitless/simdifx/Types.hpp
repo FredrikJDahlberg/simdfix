@@ -177,7 +177,7 @@ using Buffer = std::span<const uint8_t>;
 struct ParseResult
 {
     uint32_t m_processed;
-    Result m_value;
+    Result m_status;
 };
 
 using Uint8Result = expected<uint8_t, Result>;
