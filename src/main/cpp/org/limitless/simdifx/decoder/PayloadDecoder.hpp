@@ -251,7 +251,7 @@ private:
         {
             if (std::memcmp(data, ProtocolPrefix.data(), ProtocolPrefix.size()) != 0)
             {
-                return { 0, Result::InvalidBeginString };
+                return { processed, Result::InvalidBeginString };
             }
             if (bodyLength.m_tag != BodyLengthTag)
             {
@@ -267,7 +267,7 @@ private:
             }
             if (m_count < RequiredFieldCount)
             {
-                return {0, Result::RequiredFieldMissing};
+                return {processed, Result::RequiredFieldMissing};
             }
         }
         else if (byteCount < length)

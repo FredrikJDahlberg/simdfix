@@ -62,6 +62,7 @@ TEST(MessageDecoder, Logon)
     PayloadDecoder<Protocol::FIXT_1_1> decoder;
     auto [processed, status] = decoder.parse(login, app);
     ASSERT_EQ(Result::Success, status);
+    ASSERT_EQ(login.size() - 17, processed);
     ASSERT_TRUE(app.found);
 }
 
@@ -89,6 +90,7 @@ TEST(MessageDecoder, Logout)
               "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
         auto [processed, status] = decoder.parse(logout, app);
         ASSERT_EQ(Result::Success, status);
+        ASSERT_EQ(logout.size(), processed);
         ASSERT_TRUE(app.found);
     }
     {
@@ -96,6 +98,7 @@ TEST(MessageDecoder, Logout)
             "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "45=666" SOH "10=030" SOH);
         auto [processed, status] = decoder.parse(reject, app);
         ASSERT_EQ(Result::InvalidMessageType, status);
+        ASSERT_EQ(reject.size(), processed);
     }
 }
 
@@ -178,6 +181,7 @@ TEST(MessageDecoder, HopGroup1)
         "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
         "627=2" SOH "629=10" SOH "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
     auto[processed, status] = decoder.parse(logout, app);
+    ASSERT_EQ(logout.size(), processed);
     ASSERT_EQ(Result::Success, status);
 }
 
@@ -216,6 +220,7 @@ TEST(MessageDecoder, HopGroup2)
     const auto logout = utils::makeSpan("8=FIXT.1.1" SOH "9=86" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
         "52=20260609-12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=10" SOH "629=37" SOH "628=20" SOH  "10=090" SOH);
     auto[processed, status] = decoder.parse(logout, app);
+    ASSERT_EQ(logout.size(), processed);
     ASSERT_EQ(Result::Success, status);
 }
 
@@ -251,6 +256,7 @@ TEST(MessageDecoder, HopGroup3)
         "52=12:13:14.000" SOH "34=100101" SOH "627=2" SOH "629=20260609-12:13:14.000" SOH
         "629=20260609-12:13:15.000" SOH "10=253" SOH);
     auto[processed, status] = decoder.parse(logout, app);
+    ASSERT_EQ(logout.size(), processed);
     ASSERT_EQ(Result::Success, status);
 }
 
@@ -281,6 +287,7 @@ TEST(MessageDecoder, InvalidGroupCount)
         "8=FIXT.1.1" SOH "9=70" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=12:12:12.123" SOH
         "627=2" SOH "629=10" SOH "628=20" SOH "10=071" SOH);
     auto[processed, status] = decoder.parse(logout, app);
+    ASSERT_EQ(logout.size(), processed);
     ASSERT_EQ(Result::Success, status);
 }
 
@@ -313,6 +320,7 @@ TEST(MessageDecoder, NewOrderSingle)
         "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
         "38=100" SOH "40=2" SOH "44=15000" SOH "10=126" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -354,6 +362,7 @@ TEST(MessageDecoder, NewOrderSingleWithDateAndTime)
         "38=100" SOH "40=2" SOH "44=120.00000000" SOH
         "75=20260613" SOH "1079=12:34:56.789" SOH "10=151" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -386,6 +395,7 @@ TEST(MessageDecoder, LogonWithXmlData)
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
         "212=11" SOH "213=<root/>test" SOH "10=124" SOH));
     auto [processed, status] = decoder.parse(Buffer{message.data(), message.size()}, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -421,6 +431,7 @@ TEST(MessageDecoder, LogonWithXmlDataEmbeddedSoh)
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
         "212=12" SOH "213=<root" SOH "/>test" SOH "10=127" SOH));
     auto [processed, status] = decoder.parse(Buffer{message.data(), message.size()}, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -464,9 +475,9 @@ TEST(MessageDecoder, LogonWithXmlDataInlineSkip)
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH
         "212=12" SOH "213=<root" SOH "/>test" SOH "10=127" SOH));
     auto [processed, status] = decoder.parse(Buffer{message.data(), message.size()}, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
-
     const auto fields = decoder.fields();
     for (size_t i = 0; i < fields.size(); ++i)
     {
@@ -480,17 +491,6 @@ TEST(MessageDecoder, LogonWithXmlDataInlineSkip)
 
 TEST(MessageDecoder, HeartbeatWithLongCompIds)
 {
-    // Regression: found via phixeron's FixTestServer sending a hand-built
-    // Heartbeat (SenderCompID=WRONGSENDER, TargetCompID=SEQUENCER, a 2-digit
-    // BodyLength) to a live gateway — the gateway's CompID-mismatch Reject
-    // echoed RefSeqNum=0 instead of the real MsgSeqNum=2, i.e.
-    // HeartbeatDecoder::sequenceNumber() decoded a wrong tag 34 even though
-    // validate() reported Success. PayloadDecoderTest's raw tokenizer-level
-    // check on this exact byte layout (BlockBoundaryFieldEnd-style: BodyLength's
-    // own SOH lands on byte 15 of the first 16-byte SIMD block) reports the
-    // correct position/length for tag 34, so this test instead exercises the
-    // actual decoded value through the generated decoder, matching exactly
-    // what ClusterIngressHandler does in production.
     struct AppHandler : FixMessageHandler<AppHandler>
     {
         using FixMessageHandler::handle;
@@ -512,6 +512,7 @@ TEST(MessageDecoder, HeartbeatWithLongCompIds)
         "8=FIXT.1.1" SOH "9=59" SOH "35=0" SOH "49=WRONGSENDER" SOH
         "56=SEQUENCER" SOH "34=2" SOH "52=20260101-00:00:00" SOH "10=064" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -539,6 +540,7 @@ TEST(MessageDecoder, ResendRequest)
         "8=FIXT.1.1" SOH "9=0064" SOH "35=2" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=5" SOH "52=20260613-19:26:13.959" SOH "7=1" SOH "16=4" SOH "10=162" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -569,6 +571,7 @@ TEST(MessageDecoder, Reject)
         "34=10" SOH "52=20260613-19:26:13.959" SOH "45=9" SOH "371=55" SOH "372=D" SOH
         "373=1" SOH "58=Missing Symbol" SOH "10=191" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -598,6 +601,7 @@ TEST(MessageDecoder, RejectMinimal)
         "8=FIXT.1.1" SOH "9=0060" SOH "35=3" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=3" SOH "52=20260613-19:26:13.959" SOH "45=2" SOH "10=247" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -624,6 +628,7 @@ TEST(MessageDecoder, SequenceReset)
         "8=FIXT.1.1" SOH "9=0067" SOH "35=4" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=5" SOH "52=20260613-19:26:13.959" SOH "123=Y" SOH "36=10" SOH "10=093" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -650,6 +655,7 @@ TEST(MessageDecoder, SequenceResetNoGapFill)
         "8=FIXT.1.1" SOH "9=0061" SOH "35=4" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=5" SOH "52=20260613-19:26:13.959" SOH "36=10" SOH "10=042" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -692,6 +698,7 @@ TEST(MessageDecoder, ExecutionReportFill)
         "32=100" SOH "31=150.50000000" SOH "151=0" SOH "14=100" SOH
         "6=150.50000000" SOH "60=20260613-19:26:13.959" SOH "10=023" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::Success, status);
     ASSERT_TRUE(app.found);
 }
@@ -734,6 +741,7 @@ TEST(MessageDecoder, ExecutionReportMinimal)
         "6=0" SOH "60=20260613-19:26:13.959" SOH "10=249" SOH);
     auto [processed, status] = decoder.parse(message, app);
     ASSERT_EQ(Result::Success, status);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_TRUE(app.found);
 }
 
@@ -772,6 +780,7 @@ TEST(MessageDecoder, ExecutionReportReject)
         "58=Insufficient buying power" SOH "10=180" SOH);
     auto [processed, status] = decoder.parse(message, app);
     ASSERT_EQ(Result::Success, status);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_TRUE(app.found);
 }
 
@@ -785,6 +794,7 @@ TEST(MessageDecoder, InvalidBeginString)
         "34=1" SOH "52=20260613-19:26:13.959" SOH "10=000" SOH);
     auto [processed, status] = decoder.parse(message, app);
     ASSERT_EQ(Result::InvalidBeginString, status) << name(status);
+    ASSERT_EQ(message.size(), processed);
 }
 
 TEST(MessageDecoder, InvalidCheckSum)
@@ -796,6 +806,7 @@ TEST(MessageDecoder, InvalidCheckSum)
         "8=FIXT.1.1" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=999" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::InvalidCheckSum, status) << name(status);
 }
 
@@ -808,6 +819,7 @@ TEST(MessageDecoder, InvalidMessageType)
         "8=FIXT.1.1" SOH "9=0067" SOH "35=Z" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=099" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::InvalidMessageType, status) << name(status);
 }
 
@@ -823,6 +835,7 @@ TEST(MessageDecoder, InvalidSenderCompId)
         "8=FIXT.1.1" SOH "9=0067" SOH "35=A" SOH "49=WRONG!" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=055" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::InvalidSenderCompId, status) << name(status);
 }
 
@@ -838,6 +851,7 @@ TEST(MessageDecoder, InvalidTargetCompId)
         "8=FIXT.1.1" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=WRONG!" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=049" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::InvalidTargetCompId, status) << name(status);
 }
 
@@ -850,6 +864,7 @@ TEST(MessageDecoder, MissingSendingTime)
         "8=FIXT.1.1" SOH "9=0042" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "98=0" SOH "108=30" SOH "10=094" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::InvalidSendingTime, status) << name(status);
 }
 
@@ -862,6 +877,7 @@ TEST(MessageDecoder, MissingSequenceNumber)
         "8=FIXT.1.1" SOH "9=0062" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "10=111" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::InvalidSequenceNumber, status) << name(status);
 }
 
@@ -874,6 +890,7 @@ TEST(MessageDecoder, MissingRequiredField)
         "8=FIXT.1.1" SOH "9=0060" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
         "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "10=009" SOH);
     auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::RequiredFieldMissing, status) << name(status);
 }
 
@@ -897,6 +914,7 @@ TEST(MessageDecoder, InvalidUTCTimestamp)
             "8=FIXT.1.1" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
             "34=1" SOH "52=20260613-25:26:13.959" SOH "98=0" SOH "108=30" SOH "10=071" SOH);
         auto [processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(message.size(), processed);
         ASSERT_EQ(Result::Success, status);
     }
     // NOS with invalid TransactTime (hour 25), invalid DateOnly (month 13),
@@ -925,58 +943,75 @@ TEST(MessageDecoder, InvalidUTCTimestamp)
             "38=100" SOH "40=2" SOH "44=15000" SOH
             "75=20261301" SOH "1079=12:60:00.000" SOH "10=254" SOH);
         auto [processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(message.size(), processed);
         ASSERT_EQ(Result::Success, status);
     }
 }
 
-TEST(MessageDecoder, InvalidMandatoryFields) {
+TEST(MessageDecoder, InvalidMandatoryFields)
+{
     PayloadDecoder<Protocol::FIXT_1_1> decoder;
     struct AppHandler : FixMessageHandler<AppHandler>{} app;
     {
-        const auto message = utils::makeSpan("666=FIXT.1.1" SOH);
+        const auto message =
+            utils::makeSpan("666=FIXT.1.1" SOH);
         auto[processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(0, processed);
         ASSERT_EQ(Result::MessageFragment, status) << name(status);
     }
     {
-        const auto message = utils::makeSpan("8=FIXT.1.1" SOH "666=66" SOH "666=66" SOH "666=66" SOH);
+        const auto message =
+            utils::makeSpan("8=FIXT.1.1" SOH "666=66" SOH "666=66" SOH "666=66" SOH);
         auto[processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(0, processed);
         ASSERT_EQ(Result::MessageFragment, status) << name(status);
     }
     {
-        const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=35" SOH "52=101112.123" SOH
+        const auto message =
+            utils::makeSpan("8=FIXT.1.1" SOH "9=35" SOH "52=101112.123" SOH
             "666=66" SOH "666=66" SOH "666=66" SOH "10=043" SOH);
         auto[processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(message.size(), processed);
         ASSERT_EQ(Result::InvalidMessageTypeTag, status) << name(status);
     }
     {
-        const auto message = utils::makeSpan("8=FIXT.1.1" SOH "666=66" SOH "35=66" SOH "666=66" SOH
+        const auto message =
+            utils::makeSpan("8=FIXT.1.1" SOH "666=66" SOH "35=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "10=043" SOH);
         auto[processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(message.size(), processed);
         ASSERT_EQ(Result::InvalidBodyLengthTag, status) << name(status);
     }
     {
-        const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=666" SOH "35=66" SOH "666=66" SOH
+        const auto message =
+            utils::makeSpan("8=FIXT.1.1" SOH "9=666" SOH "35=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "10=043" SOH);
         auto[processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(message.size(), processed);
         ASSERT_EQ(Result::InvalidBodyLength, status) << name(status);
     }
     {
-        const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=28" SOH "666=66" SOH "666=66" SOH
+        const auto message =
+            utils::makeSpan("8=FIXT.1.1" SOH "9=28" SOH "666=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "10=063" SOH);
         auto[processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(message.size(), processed);
         ASSERT_EQ(Result::InvalidMessageTypeTag, status) << name(status);
     }
     {
-        const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=48" SOH "35=66" SOH "666=66" SOH
+        const auto message =
+            utils::makeSpan("8=FIXT.1.1" SOH "9=48" SOH "35=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "11=043" SOH "                     ");
         auto[processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(0, processed);
         ASSERT_EQ(Result::InvalidCheckSumTag, status) << name(status);
     }
     {
-        const auto message = utils::makeSpan(
-            "8=FIX.4.3" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+        const auto message =
+            utils::makeSpan("8=FIX.4.3" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
             "34=1" SOH "52=20260613-25:26:13.959" SOH "98=0" SOH "108=30" SOH "10=071" );
         auto[processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(0, processed);
         ASSERT_EQ(Result::MessageFragment, status) << name(status);
     }
 }
