@@ -125,11 +125,18 @@ TEST(MessageDecoder, MessageFragment)
         ASSERT_FALSE(app.found);
     }
     {
-        const auto logout2 = utils::makeSpan(
+        const auto logout = utils::makeSpan(
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
               "34=100101" SOH "52=10:11:12.123" SOH "627=2" SOH "629=10" SOH
               "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
-        auto [processed, status] = decoder.parse(logout2, app);
+        for (auto length = 0; length < logout.size(); ++length)
+        {
+            const auto fragment = std::span(logout.data(), length);
+            const auto [processed, status] = decoder.parse(fragment, app);
+            ASSERT_EQ(0, processed) << "length = " << length << ", processed = " << processed;
+            ASSERT_EQ(Result::MessageFragment, status) << "status = " << name(status) << " p=" << processed << ", l=" << length;
+        }
+        auto [processed, status] = decoder.parse(logout, app);
         ASSERT_EQ(Result::Success, status);
         ASSERT_EQ(107UL, processed);
     }
@@ -933,7 +940,7 @@ TEST(MessageDecoder, InvalidMandatoryFields)
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "666=66" SOH "666=66" SOH "666=66" SOH);
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(Result::InvalidBodyLengthTag, status) << name(status);
+        ASSERT_EQ(Result::MessageFragment, status) << name(status);
     }
     {
         const auto message = utils::makeSpan("8=FIXT.1.1" SOH "9=35" SOH "52=101112.123" SOH

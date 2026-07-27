@@ -153,14 +153,6 @@ public:
         const auto length = static_cast<length_t>(buffer.size());
         if (std::memcmp(data, ProtocolPrefix.data(), ProtocolPrefix.size()) != 0)
         {
-            // Nothing is consumed: this buffer does not begin a message of ours, and
-            // where the next one starts is not something a single-message parse can
-            // say. Resynchronizing — scanning on for the next BeginString — belongs to
-            // whoever owns the stream. Reporting a fixed step here instead would be a
-            // byte count that is not one: a caller advancing by it lands at an
-            // arbitrary offset, and stays misaligned if it keeps its buffer across
-            // reads. Zero is what MessageFragment already reports for the same reason,
-            // so callers that break on it are already correct.
             return { 0, Result::InvalidBeginString };
         }
         m_fields[BeginStringPosition] = { 2, 8, ProtocolLength };
@@ -224,7 +216,12 @@ public:
         {
             processTrailer(offset, buffer);
         }
-        return checkRequiredFields(data, blockSum, offset, length);
+        auto result = checkRequiredFields(data, blockSum, offset, length);
+        if (result.m_value != Result::Success)
+        {
+            m_fields[m_count - 1].m_tag = 0;
+        }
+        return result;
     }
 
 private:
@@ -241,68 +238,55 @@ private:
      * @return Result::Success with the number of bytes processed, or the
      *         first validation failure
      */
-    ParseResult checkRequiredFields(const data_t* data, const uint64_t blockSum, const position_t blockEnd, const length_t messageLength) const
+    ParseResult checkRequiredFields(const data_t* data, const uint64_t blockSum,
+        const position_t blockEnd, const length_t messageLength) const
     {
         const auto* last = &m_fields[m_count - 1];
-        // A CheckSum field is only present if it ends within the bytes supplied. Both
-        // producers of the last token — the SIMD scan's completion marker and
-        // processTrailer's synthesized field — can place one past the end on a message
-        // cut short or a mutated body, and this is the one place their claim is turned
-        // into the processed byte count. Letting an out-of-bounds field through would
-        // report more bytes consumed than were given, which walks a stream caller's read
-        // cursor off the end of its own buffer. Ending past the end means the message is
-        // unfinished, which is exactly what the absent CheckSum tells the checks below.
         const bool hasCheckSum = last->m_tag == CheckSumTag &&
             static_cast<uint32_t>(last->m_position) + last->m_length + 1 <= messageLength;
         const uint32_t processed = hasCheckSum ? last->m_position + last->m_length + 1 : 0;
         const auto& bodyLength = m_fields[BodyLengthPosition];
-        if (bodyLength.m_tag != BodyLengthTag)
-        {
-            return {processed, Result::InvalidBodyLengthTag};
-        }
-
-        // Bound the BodyLength digit read; on malformed input field #1 may sit
-        // near or past the buffer end (padded reads a full 8 bytes).
         if (static_cast<uint32_t>(bodyLength.m_position) + bodyLength.m_length > messageLength)
         {
             return {processed, Result::InvalidBodyLength};
         }
         const bool bodyPadded = static_cast<uint32_t>(bodyLength.m_position) + sizeof(uint64_t) <= messageLength;
-        const auto length = utils::asciiToUint64(0, data + bodyLength.m_position, bodyLength.m_length, bodyPadded);
-        const uint32_t byteCount = last->m_position - bodyLength.m_position - bodyLength.m_length - 4;
-        if (!hasCheckSum && byteCount < length)
+        const int64_t length = utils::asciiToUint64(0, data + bodyLength.m_position, bodyLength.m_length, bodyPadded);
+        const int32_t byteCount = last->m_position - bodyLength.m_position - bodyLength.m_length - 4;
+        if (hasCheckSum)
         {
-            return {0, Result::MessageFragment};
+            if (bodyLength.m_tag != BodyLengthTag)
+            {
+                return {processed, Result::InvalidBodyLengthTag};
+            }
+            if (byteCount != length)
+            {
+                return {processed, Result::InvalidBodyLength};
+            }
+            if (m_fields[MessageTypePosition].m_tag != MessageTypeTag)
+            {
+                return {processed, Result::InvalidMessageTypeTag};
+            }
+            if (m_count < RequiredFieldCount)
+            {
+                return {0, Result::RequiredFieldMissing};
+            }
         }
-        if (byteCount != length)
+        else
         {
-            return {processed, Result::InvalidBodyLength};
+            if (byteCount < length)
+            {
+                return {0, Result::MessageFragment};
+            }
         }
-
-        if (!hasCheckSum && m_count < RequiredFieldCount)
-        {
-            return {0, Result::RequiredFieldMissing};
-        }
-        if (m_fields[MessageTypePosition].m_tag != MessageTypeTag)
-        {
-            return {processed, Result::InvalidMessageTypeTag};
-        }
-
 #if !defined(NDEBUG)
         for (size_t i = 0; i < m_count; ++i)
         {
-            std::printf("%3zu tag = %3d, pos = %3d, len = %3d\n", i, m_fields[i].m_tag, m_fields[i].m_position, m_fields[i].m_length);
+            std::printf("%3zu tag = %3d, pos = %3d, len = %3d\n", i,
+                m_fields[i].m_tag, m_fields[i].m_position, m_fields[i].m_length);
         }
 #endif
-
-
-        // checksum and field count
-        const auto status = processCheckSum(data, blockSum, blockEnd, messageLength);
-        if (status != Result::Success)
-        {
-            return {processed, status};
-        }
-        return {processed, m_count < RequiredFieldCount ? Result::RequiredFieldMissing : status};
+        return {processed, processCheckSum(data, blockSum, blockEnd, messageLength)};
     }
 
     /**
@@ -424,8 +408,8 @@ private:
     bool skipDataField(const data_t* data, const length_t length, const Field* field,
                        position_t& offset, uint64_t& blockSum)
     {
-        const auto dataTagNum = DataFields::dataTag(field->m_tag);
-        if (dataTagNum < 0)
+        const auto tag = DataFields::dataTag(field->m_tag);
+        if (tag < 0)
         {
             return false;
         }
@@ -449,11 +433,11 @@ private:
         }
         ++pos;
 
-        auto* dataToken = &m_fields[m_count++];
-        dataToken->m_tag = static_cast<uint16_t>(dataTagNum);
-        m_tags[dataToken - m_fields.data()] = dataToken->m_tag;
-        dataToken->m_position = static_cast<uint16_t>(pos);
-        dataToken->m_length = static_cast<int16_t>(lengthValue);
+        auto* next = &m_fields[m_count++];
+        next->m_tag = static_cast<uint16_t>(tag);
+        m_tags[next - m_fields.data()] = next->m_tag;
+        next->m_position = static_cast<uint16_t>(pos);
+        next->m_length = static_cast<int16_t>(lengthValue);
 
         // Resume just past the data payload's trailing SOH. Clamp to the buffer
         // so a huge (malformed) length cannot push the scan offset out of range;
@@ -567,6 +551,7 @@ private:
             // may lack the '=' so tagEndPos is the not-found sentinel (8).
             const uint32_t tagBytes = std::min(tagEndPos, static_cast<uint32_t>(remaining));
             last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(m_tag, data, tagBytes, false));
+            std::printf("6 tag = %d\n", m_tag);
             m_tags[last - m_fields.data()] = last->m_tag;
             last->m_position = static_cast<uint16_t>(offset + tagEndPos + 1);
             last->m_length = static_cast<uint16_t>(fieldEndPos - tagEndPos - 1);
@@ -594,6 +579,7 @@ private:
                 break;
             }
             last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(0, data + position, tagEndPos - position, false));
+            std::printf("7 tag = %d\n", m_tag);
             m_tags[last - m_fields.data()] = last->m_tag;
             position += tagEndPos - position + 1;
             last->m_position = static_cast<uint16_t>(position + offset);
@@ -609,20 +595,14 @@ private:
         }
         constexpr uint32_t checkSumPrefixLen = 3; // "10="
         constexpr uint32_t checkSumFieldLen = checkSumPrefixLen + CheckSumValueLength + 1; // "10=" + digits + SOH
-        // The value itself is checked by the decoder; what has to hold here is that the
-        // field fits. Claiming one the trailer is too short for puts its end past the
-        // buffer, and checkRequiredFields reads exactly that end as the processed byte
-        // count — so a message cut short would report having consumed bytes that were
-        // never supplied, and a caller framing a stream would advance off the end of it.
-        // Too short to hold one means the message is unfinished, which is what the
-        // absent CheckSum then tells checkRequiredFields.
         if (position + checkSumFieldLen <= remaining)
         {
             last = &m_fields[m_count++];
-            last->m_tag = CheckSumTag;
-            m_tags[last - m_fields.data()] = CheckSumTag;
+            // last->m_position = static_cast<uint16_t>(offset + position + checkSumPrefixLen);
             last->m_position = static_cast<uint16_t>(offset + position + checkSumPrefixLen);
             last->m_length = CheckSumValueLength;
+            auto data = buffer.data() + offset + position;
+            last->m_tag = (data[0] - '0') * 10 + (data[1] - '0');
         }
     }
 };
