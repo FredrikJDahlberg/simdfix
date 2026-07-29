@@ -794,8 +794,7 @@ TEST(MessageDecoder, InvalidBeginString)
         "34=1" SOH "52=20260613-19:26:13.959" SOH "10=000" SOH);
     auto [processed, status] = decoder.parse(message, app);
     ASSERT_EQ(Result::InvalidBeginString, status) << name(status);
-    // Skipped as junk, all but the bytes that could still start a BeginString.
-    ASSERT_EQ(message.size() - (sizeof("8=FIXT.1.1" SOH) - 2), processed);
+    ASSERT_EQ(0, processed);
 }
 
 TEST(MessageDecoder, InvalidCheckSum)
@@ -1012,7 +1011,7 @@ TEST(MessageDecoder, InvalidMandatoryFields)
             utils::makeSpan("8=FIX.4.3" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
             "34=1" SOH "52=20260613-25:26:13.959" SOH "98=0" SOH "108=30" SOH "10=071" );
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(message.size() - (sizeof("8=FIXT.1.1" SOH) - 2), processed);
+        ASSERT_EQ(0, processed);
         ASSERT_EQ(Result::InvalidBeginString, status) << name(status);
     }
 }

@@ -9,6 +9,7 @@
 #include "org/limitless/simdifx/utils/Conversions.hpp"
 #include "org/limitless/simdifx/decoder/PayloadDecoder.hpp"
 
+#include "org/limitless/simdifx/generated/messages/FixMessageDecoders.hpp"
 #include "org/limitless/simdifx/generated/messages/FixTypes.hpp"
 
 namespace org::limitless::simdifx::decoder {
@@ -287,15 +288,9 @@ TEST(PayloadDecoder, TruncationSafety)
     }
 }
 
-// A buffer that does not open on our BeginString holds junk up to the next one, and
-// framing on the trailing CheckSum instead would swallow the message behind that junk.
-TEST(PayloadDecoder, ForeignBeginStringResynchronizes)
+TEST(PayloadDecoder, ForeignBeginStringSkip)
 {
-    constexpr size_t beginStringLength = sizeof("8=FIXT.1.1" SOH) - 1;
-
-    // Nothing of ours anywhere: skip all of it but the bytes that could still be the
-    // start of a BeginString straddling the end of the buffer.
-    for (const std::string_view text : {
+        for (const std::string_view text : {
         "8=FIX.4.4" SOH "9=117" SOH "35=A" SOH "49=Buyer" SOH "56=SellerSide" SOH "34=1" SOH
         "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH "141=Y" SOH
         "553=Username" SOH "554=Password" SOH "1137=9" SOH "10=218" SOH,
@@ -308,9 +303,6 @@ TEST(PayloadDecoder, ForeignBeginStringResynchronizes)
         ASSERT_EQ(Result::InvalidBeginString, status) << text << " -> " << name(status);
         ASSERT_EQ(0, processed) << text;
     }
-
-    // Junk ahead of a message of ours: skipped to the byte, so the message behind it is
-    // parsed whole on the next call rather than consumed as part of the junk.
     for (const std::string_view text : {"xxxxxxxxxxxxxxxx8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH,
                                         "x8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH})
     {
