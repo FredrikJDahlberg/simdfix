@@ -164,6 +164,33 @@ TEST(FieldDecoder, GetUint32InvalidValue)
     EXPECT_EQ(Result::InvalidValue, signOnly.error());
 }
 
+TEST(FieldDecoder, LengthAt)
+{
+    const auto logout = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=76" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
+        "9999=ABC" SOH "9998=ABCDEFGHIJK" SOH "10=198" SOH);
+
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    auto [processed, status] = decoder.parse(logout);
+    ASSERT_EQ(Result::Success, status);
+
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
+    {
+        tags[i] = fields[i].m_tag;
+    }
+
+    FieldDecoder field{logout, fields, tags, static_cast<int32_t>(fields.size())};
+
+    const auto shortIndex = field.findIndex<9999, RecordType::Message>();
+    const auto longIndex = field.findIndex<9998, RecordType::Message>();
+    ASSERT_GE(shortIndex, 0);
+    ASSERT_GE(longIndex, 0);
+    EXPECT_EQ(3u, field.lengthAt(static_cast<int8_t>(shortIndex)));
+    EXPECT_EQ(11u, field.lengthAt(static_cast<int8_t>(longIndex)));
+}
+
 TEST(FieldDecoder, GetInt32MissingField)
 {
     const auto logout = utils::makeSpan(

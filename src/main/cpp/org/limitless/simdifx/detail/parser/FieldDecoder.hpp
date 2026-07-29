@@ -365,6 +365,16 @@ public:
     }
 
     /**
+     * The wire length of the token at a pre-found index, as tokenized (no conversion).
+     * @param index token index (must be valid)
+     * @return byte length of the field's value on the wire
+     */
+    [[nodiscard]] uint16_t lengthAt(const int8_t index) const
+    {
+        return m_fields[index].m_length;
+    }
+
+    /**
      * Converts the token at a pre-found index to the requested type.
      * @tparam T value type to convert to
      * @param index token index (must be valid)

@@ -799,6 +799,28 @@ static std::string_view headerErrorCode(const int32_t tag)
     return {};
 }
 
+// Categories whose wire representation has a meaningful max length: String's comes from the
+// dictionary, the rest from their default type width set in DataModel::processTypes(). Decimal
+// is deliberately excluded - FIX places no max digit count on it.
+static bool hasLengthLimit(const Category category)
+{
+    switch (category)
+    {
+        case Category::String:
+        case Category::Uint8:
+        case Category::Int32:
+        case Category::Uint32:
+        case Category::Int64:
+        case Category::Uint64:
+        case Category::Timestamp:
+        case Category::UTCTimeOnly:
+        case Category::UTCDateOnly:
+            return true;
+        default:
+            return false;
+    }
+}
+
 static void generateCheckRequired(std::ostream& out, const Record& record)
 {
     if (record.m_parent != RecordType::Message)
@@ -825,6 +847,18 @@ static void generateCheckRequired(std::ostream& out, const Record& record)
         out << std::format("            m_lastFailedTag = {};\n", field.m_tag);
         out << std::format("            return Result::{};\n", resultName);
         out << "        }\n";
+        // Sender/Target overlength is already rejected downstream by verifyCompIds
+        // (a string_view compare against the resolved identity, safe at any length),
+        // which preserves the offending claimed identity on the Reject; a blanket
+        // length check here would pre-empt that with a less specific one.
+        if (hasLengthLimit(field.m_category) && field.m_length > 0 && errorCode.empty())
+        {
+            out << std::format("        if (m_decoder.lengthAt(m_{}Index) > {})\n", memberName, field.m_length);
+            out << "        {\n";
+            out << std::format("            m_lastFailedTag = {};\n", field.m_tag);
+            out << "            return Result::InvalidLength;\n";
+            out << "        }\n";
+        }
     }
 
     for (const auto& field : record.m_fields)
@@ -836,6 +870,15 @@ static void generateCheckRequired(std::ostream& out, const Record& record)
         const auto memberName = uncap(field.m_name);
         out << std::format("        m_{}Index = static_cast<int8_t>(m_decoder.findIndex<{}, RecordType::Message>());\n",
                            memberName, field.m_tag);
+        if (hasLengthLimit(field.m_category) && field.m_length > 0)
+        {
+            out << std::format("        if (m_{}Index >= 0 && m_decoder.lengthAt(m_{}Index) > {})\n",
+                               memberName, memberName, field.m_length);
+            out << "        {\n";
+            out << std::format("            m_lastFailedTag = {};\n", field.m_tag);
+            out << "            return Result::InvalidLength;\n";
+            out << "        }\n";
+        }
     }
 
     out << "        return validateSession();\n";

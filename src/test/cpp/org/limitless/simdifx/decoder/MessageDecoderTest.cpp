@@ -952,6 +952,162 @@ TEST(MessageDecoder, LastFailedTagResetsOnTheNextMessage)
     }
 }
 
+TEST(MessageDecoder, RequiredFieldOverLength)
+{
+    // NewOrderSingle with a 21-byte ClOrdID(11) — one past test.xml's declared
+    // length="20" — present, so it clears the required-field check, but
+    // validate() must still reject the overlength value rather than truncate it.
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    struct AppHandler : FixMessageHandler<AppHandler>{} app;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=135" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "11=AAAAAAAAAAAAAAAAAAAAA" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH
+        "60=20260613-19:26:13.959" SOH "38=100" SOH "40=2" SOH "10=087" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
+    ASSERT_EQ(Result::InvalidLength, status) << name(status);
+    EXPECT_EQ(11u, app.lastFailedTag());
+}
+
+TEST(MessageDecoder, OptionalFieldOverLength)
+{
+    // Same check, but on an optional field: NewOrderSingle's Text(58) is absent
+    // in the passing case, so this exercises the other branch of validate()'s
+    // length guard — only checked when the field is present at all.
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    struct AppHandler : FixMessageHandler<AppHandler>{} app;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=189" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
+        "38=100" SOH "40=2" SOH
+        "58=BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" SOH "10=037" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
+    ASSERT_EQ(Result::InvalidLength, status) << name(status);
+    EXPECT_EQ(58u, app.lastFailedTag());
+}
+
+TEST(MessageDecoder, FieldAtExactMaxLengthIsNotRejected)
+{
+    // A ClOrdID of exactly 20 bytes — the dictionary max, not one past it —
+    // must decode successfully: the bound is inclusive.
+    struct AppHandler : FixMessageHandler<AppHandler>
+    {
+        using FixMessageHandler::handle;
+
+        bool found = false;
+
+        Result handle(NewOrderSingleDecoder& order)
+        {
+            EXPECT_EQ(std::string(20, 'C'), toString(order.clOrdID().value()));
+            found = true;
+            return Result::Success;
+        }
+    } app;
+
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=134" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "11=CCCCCCCCCCCCCCCCCCCC" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH
+        "60=20260613-19:26:13.959" SOH "38=100" SOH "40=2" SOH "10=061" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
+    ASSERT_EQ(Result::Success, status) << name(status);
+    ASSERT_TRUE(app.found);
+}
+
+TEST(MessageDecoder, SenderCompIdOverLengthIsNotFlaggedAsInvalidLength)
+{
+    // SenderCompID(49) is excluded from the generic length guard on purpose:
+    // an 11-byte Sender against session.xml's length="8" can never match a
+    // configured SessionContext, so validateSession()'s own comparison already
+    // rejects it correctly (and, unlike a blanket length check, preserves this
+    // as an identity failure rather than a generic content one). Confirms the
+    // generator's exclusion — see generateCheckRequired in FixGenerator.cpp.
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    SessionContext context{"FIXT.1.1", "SENDER", "TARGET"};
+    struct AppHandler : FixMessageHandler<AppHandler>{} app;
+    app.setSessionContext(context);
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=125" SOH "35=D" SOH "49=SENDERSENDE" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
+        "38=100" SOH "40=2" SOH "10=029" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
+    ASSERT_EQ(Result::InvalidSenderCompId, status) << name(status);
+    EXPECT_EQ(49u, app.lastFailedTag());
+}
+
+TEST(MessageDecoder, NumericFieldOverLength)
+{
+    // OrderQty(38) is uint32 with no dictionary length="" — the generator falls back to
+    // uint32's default max width (10 digits, "4294967295"). 11 digits is one past it.
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    struct AppHandler : FixMessageHandler<AppHandler>{} app;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=128" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
+        "38=12345678901" SOH "40=2" SOH "10=094" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
+    ASSERT_EQ(Result::InvalidLength, status) << name(status);
+    EXPECT_EQ(38u, app.lastFailedTag());
+}
+
+TEST(MessageDecoder, NumericFieldAtExactMaxLengthIsNotRejected)
+{
+    // OrderQty at exactly 10 digits (UINT32_MAX) — the bound is inclusive.
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    struct AppHandler : FixMessageHandler<AppHandler>{} app;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=127" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
+        "38=4294967295" SOH "40=2" SOH "10=056" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
+    ASSERT_EQ(Result::Success, status) << name(status);
+}
+
+TEST(MessageDecoder, OptionalDateOnlyFieldOverLength)
+{
+    // TradeDate(75) is dateonly with no dictionary length="" — default max width is 8
+    // ("YYYYMMDD"). 9 digits is one past it, exercising the optional-field loop.
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    struct AppHandler : FixMessageHandler<AppHandler>{} app;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=133" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
+        "38=100" SOH "40=2" SOH "75=202606133" SOH "10=030" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
+    ASSERT_EQ(Result::InvalidLength, status) << name(status);
+    EXPECT_EQ(75u, app.lastFailedTag());
+}
+
+TEST(MessageDecoder, DecimalFieldIsNotLengthChecked)
+{
+    // Decimal (Price(44)) is deliberately excluded from the length guard — FIX places no
+    // max digit count on it, unlike the integer/temporal categories. Confirms the
+    // generator's exclusion — see hasLengthLimit in FixGenerator.cpp.
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    struct AppHandler : FixMessageHandler<AppHandler>{} app;
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=154" SOH "35=D" SOH "49=SENDER" SOH "56=TARGET" SOH
+        "34=1" SOH "52=20260613-19:26:13.959" SOH
+        "11=ORDER1" SOH "21=1" SOH "55=AAPL" SOH "54=1" SOH "60=20260613-19:26:13.959" SOH
+        "38=100" SOH "40=2" SOH "44=123456789012345678901234567890" SOH "10=125" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
+    ASSERT_EQ(Result::Success, status) << name(status);
+}
+
 TEST(MessageDecoder, InvalidUTCTimestamp)
 {
     // Logon with invalid SendingTime (hour 25)

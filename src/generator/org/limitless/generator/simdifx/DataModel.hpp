@@ -96,17 +96,24 @@ struct DataModel
 
     void processTypes(const pugi::xml_object_range<pugi::xml_node_iterator>& types)
     {
+        // Default lengths below are max wire-widths for the type itself (e.g. "-2147483648"
+        // for int32), used as the length-check bound in generateCheckRequired() when a field
+        // doesn't declare its own dictionary length="" (numeric/temporal fields never do).
+        // string/char keep a floor of 1: every string/char field in practice declares an
+        // explicit length, which std::max(...) against this floor leaves untouched.
         m_types.try_emplace("char",   "char",   1, 1, Category::String);
-        m_types.try_emplace("uint8",  "uint8_t",  1, 1, Category::Uint8);
-        m_types.try_emplace("int32",  "int32_t",  4, 1, Category::Int32);
-        m_types.try_emplace("uint32", "uint32_t", 4, 1, Category::Uint32);
-        m_types.try_emplace("int64",  "int64_t",  8, 1, Category::Int64);
-        m_types.try_emplace("uint64", "uint64_t", 8, 1, Category::Uint64);
+        m_types.try_emplace("uint8",  "uint8_t",  1, 3, Category::Uint8);
+        m_types.try_emplace("int32",  "int32_t",  4, 11, Category::Int32);
+        m_types.try_emplace("uint32", "uint32_t", 4, 10, Category::Uint32);
+        m_types.try_emplace("int64",  "int64_t",  8, 20, Category::Int64);
+        m_types.try_emplace("uint64", "uint64_t", 8, 20, Category::Uint64);
 
+        // decimal has no spec-defined max digit count, so it keeps the floor of 1 and is
+        // excluded from the length check entirely (see hasLengthLimit in FixGenerator.cpp).
         m_types.try_emplace("decimal", "FixedDecimal", 8, 1, Category::Decimal);
-        m_types.try_emplace("timestamp", "std::chrono::millis", 8, 1, Category::Timestamp);
-        m_types.try_emplace("timeonly",  "std::chrono::millis", 8, 1, Category::UTCTimeOnly);
-        m_types.try_emplace("dateonly",  "std::chrono::millis", 8, 1, Category::UTCDateOnly);
+        m_types.try_emplace("timestamp", "std::chrono::millis", 8, 21, Category::Timestamp);
+        m_types.try_emplace("timeonly",  "std::chrono::millis", 8, 12, Category::UTCTimeOnly);
+        m_types.try_emplace("dateonly",  "std::chrono::millis", 8, 8, Category::UTCDateOnly);
         m_types.try_emplace("string", "std::string_view", 1, 1, Category::String);
 
         m_types.try_emplace("Protocol", "Protocol", 1, 1, Category::Enum);
