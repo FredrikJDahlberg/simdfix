@@ -287,28 +287,38 @@ TEST(PayloadDecoder, TruncationSafety)
     }
 }
 
-TEST(PayloadDecoder, ForeignBeginStringConsumesNothing)
+// A buffer that does not open on our BeginString holds junk up to the next one, and
+// framing on the trailing CheckSum instead would swallow the message behind that junk.
+TEST(PayloadDecoder, ForeignBeginStringResynchronizes)
 {
+    constexpr size_t beginStringLength = sizeof("8=FIXT.1.1" SOH) - 1;
+
+    // Nothing of ours anywhere: skip all of it but the bytes that could still be the
+    // start of a BeginString straddling the end of the buffer.
     for (const std::string_view text : {
         "8=FIX.4.4" SOH "9=117" SOH "35=A" SOH "49=Buyer" SOH "56=SellerSide" SOH "34=1" SOH
         "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH "141=Y" SOH
-        "553=Username" SOH "554=Password" SOH "1137=9" SOH "10=218" SOH })
+        "553=Username" SOH "554=Password" SOH "1137=9" SOH "10=218" SOH,
+        "8=FIX.4.4" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH,
+        "................................"})
     {
         const std::vector<uint8_t> buffer(text.begin(), text.end());
         PayloadDecoder<Protocol::FIXT_1_1> decoder;
         const auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
         ASSERT_EQ(Result::InvalidBeginString, status) << text << " -> " << name(status);
-        ASSERT_EQ(141u, processed);
+        ASSERT_EQ(buffer.size() - beginStringLength + 1, processed) << text;
     }
-    for (const std::string_view text : {"8=FIX.4.4" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH,
-                                        "xxxxxxxxxxxxxxxx8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH,
-                                        "................................"})
+
+    // Junk ahead of a message of ours: skipped to the byte, so the message behind it is
+    // parsed whole on the next call rather than consumed as part of the junk.
+    for (const std::string_view text : {"xxxxxxxxxxxxxxxx8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH,
+                                        "x8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH})
     {
         const std::vector<uint8_t> buffer(text.begin(), text.end());
         PayloadDecoder<Protocol::FIXT_1_1> decoder;
         const auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
-        ASSERT_EQ(Result::MessageFragment, status) << text << " -> " << name(status);
-        ASSERT_EQ(0u, processed) << "a buffer that starts no message of ours consumes none of it";
+        ASSERT_EQ(Result::InvalidBeginString, status) << text << " -> " << name(status);
+        ASSERT_EQ(text.find("8=FIXT.1.1"), processed) << "the junk, and not one byte of what follows it";
     }
 }
 
