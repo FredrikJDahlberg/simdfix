@@ -31,6 +31,10 @@ private:
 
 protected:
     FieldDecoder m_decoder{};
+    // Tag of the field validate()/validateSession() was checking when it returned a
+    // failure, so a session-level Reject can populate RefTagID(371). Left at 0 ("no
+    // specific tag") unless a failing check below sets it.
+    uint32_t m_lastFailedTag{0};
 
 public:
     MessageDecoder() = default;
@@ -77,6 +81,7 @@ public:
         if (!beginString ||
             !std::ranges::equal(beginString.value(), m_context->m_protocol))
         {
+            m_lastFailedTag = 8;
             return Result::InvalidBeginString;
         }
 
@@ -84,6 +89,7 @@ public:
         if (!sender ||
             !std::ranges::equal(sender.value(), m_context->m_senderCompId))
         {
+            m_lastFailedTag = 49;
             return Result::InvalidSenderCompId;
         }
 
@@ -91,10 +97,20 @@ public:
         if (!target ||
             !std::ranges::equal(target.value(), m_context->m_targetCompId))
         {
+            m_lastFailedTag = 56;
             return Result::InvalidTargetCompId;
         }
 
         return Result::Success;
+    }
+
+    /**
+     * @return the tag validate()/validateSession() was checking when it last
+     *         returned a failure, or 0 if none is applicable.
+     */
+    [[nodiscard]] uint32_t lastFailedTag() const noexcept
+    {
+        return m_lastFailedTag;
     }
 };
 }

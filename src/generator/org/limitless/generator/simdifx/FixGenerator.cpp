@@ -399,7 +399,10 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "template <typename MessageHandler>\n";
     out << "class FixMessageHandler\n{\n";
     out << "protected:\n";
-    out << "    const SessionContext* m_context{};\n\n";
+    out << "    const SessionContext* m_context{};\n";
+    out << "    // Tag the most recent validate() failure was specific to, for a session-level\n";
+    out << "    // Reject's RefTagID(371); 0 (\"no specific tag\") on success or a non-tag failure.\n";
+    out << "    uint32_t m_lastFailedTag{0};\n\n";
     out << "public:\n";
     out << "    template <typename Message>\n";
     out << "    Result receive(Message&& message)\n";
@@ -418,9 +421,14 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
     out << "    {\n";
     out << "        m_context = &context;\n";
     out << "    }\n\n";
+    out << "    [[nodiscard]] uint32_t lastFailedTag() const noexcept\n";
+    out << "    {\n";
+    out << "        return m_lastFailedTag;\n";
+    out << "    }\n\n";
     out << "    Result handle(const TokenizedMessage& message)\n";
     out << "    {\n";
     out << "        auto status = Result::InvalidMessageType;\n";
+    out << "        m_lastFailedTag = 0;\n";
     out << "        switch (message.messageId())\n";
     out << "        {\n";
     for (auto& message: messages)
@@ -433,6 +441,10 @@ static void generateMessageHandler(const std::string& fileName, const std::vecto
         out << "                if (status == Result::Success)\n";
         out << "                {\n";
         out << std::format("                    status = receive({});\n", localName);
+        out << "                }\n";
+        out << "                else\n";
+        out << "                {\n";
+        out << std::format("                    m_lastFailedTag = {}.lastFailedTag();\n", localName);
         out << "                }\n";
         out << "                break;\n";
         out << "            }\n";
@@ -810,6 +822,7 @@ static void generateCheckRequired(std::ostream& out, const Record& record)
                            memberName, field.m_tag);
         out << std::format("        if (m_{}Index < 0)\n", memberName);
         out << "        {\n";
+        out << std::format("            m_lastFailedTag = {};\n", field.m_tag);
         out << std::format("            return Result::{};\n", resultName);
         out << "        }\n";
     }
