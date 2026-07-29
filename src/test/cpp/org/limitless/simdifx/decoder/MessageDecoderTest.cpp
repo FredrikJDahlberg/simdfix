@@ -837,6 +837,7 @@ TEST(MessageDecoder, InvalidSenderCompId)
     auto [processed, status] = decoder.parse(message, app);
     ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::InvalidSenderCompId, status) << name(status);
+    EXPECT_EQ(49u, app.lastFailedTag());
 }
 
 TEST(MessageDecoder, InvalidTargetCompId)
@@ -853,6 +854,30 @@ TEST(MessageDecoder, InvalidTargetCompId)
     auto [processed, status] = decoder.parse(message, app);
     ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::InvalidTargetCompId, status) << name(status);
+    EXPECT_EQ(56u, app.lastFailedTag());
+}
+
+TEST(MessageDecoder, InvalidBeginStringSessionMismatch)
+{
+    // Wire BeginString is well-formed FIXT.1.1 and passes PayloadDecoder's own
+    // tokenizer-level check (see MessageDecoder.InvalidBeginString, a different
+    // code path) — but the session context expects a different protocol, so
+    // validateSession()'s own BeginString check is what fails here. Reuses the
+    // exact bytes of the valid Logon in MessageDecoder.Logon, so the checksum is
+    // already proven correct; only the injected SessionContext differs.
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    SessionContext context{"WRONG.PROTO", "Buyer", "SellerSide"};
+
+    struct AppHandler : FixMessageHandler<AppHandler>{} app;
+    app.setSessionContext(context);
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH "56=SellerSide" SOH "34=1" SOH
+        "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH "141=Y" SOH "553=Username" SOH
+        "554=Password" SOH "1137=9" SOH "10=218" SOH);
+    auto [processed, status] = decoder.parse(message, app);
+    ASSERT_EQ(message.size(), processed);
+    ASSERT_EQ(Result::InvalidBeginString, status) << name(status);
+    EXPECT_EQ(8u, app.lastFailedTag());
 }
 
 TEST(MessageDecoder, MissingSendingTime)
@@ -866,6 +891,7 @@ TEST(MessageDecoder, MissingSendingTime)
     auto [processed, status] = decoder.parse(message, app);
     ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::InvalidSendingTime, status) << name(status);
+    EXPECT_EQ(52u, app.lastFailedTag());
 }
 
 TEST(MessageDecoder, MissingSequenceNumber)
@@ -879,6 +905,7 @@ TEST(MessageDecoder, MissingSequenceNumber)
     auto [processed, status] = decoder.parse(message, app);
     ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::InvalidSequenceNumber, status) << name(status);
+    EXPECT_EQ(34u, app.lastFailedTag());
 }
 
 TEST(MessageDecoder, MissingRequiredField)
@@ -892,6 +919,37 @@ TEST(MessageDecoder, MissingRequiredField)
     auto [processed, status] = decoder.parse(message, app);
     ASSERT_EQ(message.size(), processed);
     ASSERT_EQ(Result::RequiredFieldMissing, status) << name(status);
+    EXPECT_EQ(108u, app.lastFailedTag());
+}
+
+TEST(MessageDecoder, LastFailedTagResetsOnTheNextMessage)
+{
+    // A validate() failure's tag must not leak into a later, unrelated message on
+    // the same long-lived handler — FixMessageHandler::handle(TokenizedMessage&)
+    // resets it before every dispatch, not just on the next failure.
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    struct AppHandler : FixMessageHandler<AppHandler>{} app;
+    {
+        // Same missing-HeartbeatInterval Logon as MissingRequiredField.
+        const auto message = utils::makeSpan(
+            "8=FIXT.1.1" SOH "9=0060" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+            "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "10=009" SOH);
+        auto [processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(message.size(), processed);
+        ASSERT_EQ(Result::RequiredFieldMissing, status) << name(status);
+        ASSERT_EQ(108u, app.lastFailedTag());
+    }
+    {
+        // Same valid Logon as MessageDecoder.Logon, on the same handler instance.
+        const auto message = utils::makeSpan(
+            "8=FIXT.1.1" SOH "9=118" SOH "35=A" SOH "49=Buyer" SOH "56=SellerSide" SOH "34=1" SOH
+            "52=20190605-11:51:27.84800" SOH "1128=9" SOH "98=0" SOH "108=30" SOH "141=Y" SOH "553=Username" SOH
+            "554=Password" SOH "1137=9" SOH "10=218" SOH);
+        auto [processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(message.size(), processed);
+        ASSERT_EQ(Result::Success, status) << name(status);
+        EXPECT_EQ(0u, app.lastFailedTag()) << "a later success must clear the earlier failure's tag";
+    }
 }
 
 TEST(MessageDecoder, InvalidUTCTimestamp)
