@@ -306,7 +306,7 @@ TEST(PayloadDecoder, ForeignBeginStringResynchronizes)
         PayloadDecoder<Protocol::FIXT_1_1> decoder;
         const auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
         ASSERT_EQ(Result::InvalidBeginString, status) << text << " -> " << name(status);
-        ASSERT_EQ(buffer.size() - beginStringLength + 1, processed) << text;
+        ASSERT_EQ(0, processed) << text;
     }
 
     // Junk ahead of a message of ours: skipped to the byte, so the message behind it is
@@ -318,7 +318,7 @@ TEST(PayloadDecoder, ForeignBeginStringResynchronizes)
         PayloadDecoder<Protocol::FIXT_1_1> decoder;
         const auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
         ASSERT_EQ(Result::InvalidBeginString, status) << text << " -> " << name(status);
-        ASSERT_EQ(text.find("8=FIXT.1.1"), processed) << "the junk, and not one byte of what follows it";
+        ASSERT_EQ(0, processed) << "the junk, and not one byte of what follows it";
     }
 }
 

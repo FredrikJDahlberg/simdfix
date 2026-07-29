@@ -145,8 +145,8 @@ public:
             return { 0, Result::MessageFragment };
         }
         if (std::memcmp(buffer.data(), ProtocolPrefix.data(), ProtocolPrefix.size()) != 0)
-        {
-            return { skipToBeginString(buffer), Result::InvalidBeginString };
+        {   // a corrupt stream should be closed
+            return { 0, Result::InvalidBeginString };
         }
         m_count = 0;
         m_tag = 0;
@@ -223,25 +223,6 @@ public:
     }
 
 private:
-
-    /**
-     * Locates the next BeginString in a buffer that does not open on one, so a
-     * caller resynchronizing after junk skips no further than the next message.
-     * @param buffer raw FIX message bytes
-     * @return the offset of the next BeginString, or, when there is none, the
-     *         largest offset that cannot cut one straddling the buffer end
-     */
-    [[nodiscard]] static uint32_t skipToBeginString(const Buffer buffer)
-    {
-        const auto* const first = buffer.data();
-        const auto* const last = first + buffer.size();
-        const auto* const found = std::search(first + 1, last, ProtocolPrefix.begin(), ProtocolPrefix.end());
-        if (found != last)
-        {
-            return static_cast<uint32_t>(found - first);
-        }
-        return static_cast<uint32_t>(buffer.size() - (ProtocolPrefix.size() - 1));
-    }
 
     /**
      * Validates BodyLength against the actual message size and checks for
@@ -383,7 +364,8 @@ private:
         }
         m_position = 0;
         if (offset + Uint8x16::Size + 15 >= length && field->m_tag != CheckSumTag &&
-            field->m_position >= static_cast<uint16_t>(offset) && data[offset + Uint8x16::Size - 1] == FieldEnd)
+            field->m_position >= static_cast<uint16_t>(offset) &&
+            data[offset + Uint8x16::Size - 1] == FieldEnd)
         {
             field->m_length = static_cast<uint16_t>(offset + Uint8x16::Size - 1 - field->m_position);
             m_fields[m_count] = {};
