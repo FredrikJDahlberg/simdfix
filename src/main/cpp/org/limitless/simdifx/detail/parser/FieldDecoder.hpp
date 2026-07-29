@@ -9,6 +9,7 @@
 #include "org/limitless/simdifx/detail/Expected.hpp"
 #include <span>
 #include <chrono>
+#include <limits>
 #include <utility>
 
 #include "org/limitless/simdifx/detail/Tokens.hpp"
@@ -113,6 +114,32 @@ public:
     }
 
     /**
+     * Parses up to MaxUint32Digits (10) ASCII digits as an unsigned integer, using SWAR
+     * digit parsing where possible. asciiToUint64's SWAR fast path only ever reads and
+     * parses the first 8 bytes of what it is given — a field longer than that is split
+     * into a leading chunk (the digits beyond the last 8) plus a trailing 8-digit SWAR
+     * chunk, composed via the scale()-accumulator overload. The trailing chunk reads
+     * exactly the field's own last 8 bytes, so it needs no padding margin from the
+     * surrounding buffer, unlike the direct single-chunk path used for length <= 8.
+     * @param digits ASCII digits to parse, 1-10 of them
+     * @param length number of digits at `digits`
+     * @param padded true if digits has at least sizeof(uint64_t) safely readable bytes
+     *               (only consulted for the length <= 8 fast path)
+     * @return parsed value
+     */
+    [[nodiscard]] static uint64_t parseUnsignedDigits(const uint8_t* digits, const uint32_t length,
+                                                       const bool padded)
+    {
+        if (length <= 8)
+        {
+            return utils::asciiToUint64(0, digits, length, padded);
+        }
+        const uint32_t head = length - 8;
+        const uint64_t high = utils::asciiToUint64(digits, head, false);
+        return utils::asciiToUint64(high, digits + head, 8, true);
+    }
+
+    /**
      * Parses the ASCII digits of a token as an unsigned 32-bit integer using
      * SWAR digit parsing. Validates length and digit content.
      * @param token token whose bytes are the digits to convert
@@ -130,7 +157,15 @@ public:
             return unexpected{Result::InvalidValue};
         }
         const auto padded = m_data.size() >= field->m_position + sizeof(uint64_t);
-        return static_cast<uint32_t>(utils::asciiToUint64(0, digits, field->m_length, padded));
+        const uint64_t value = parseUnsignedDigits(digits, field->m_length, padded);
+        // A digit count within MaxUint32Digits doesn't guarantee the value itself fits —
+        // e.g. 10 digits reaches up to 9999999999, well past UINT32_MAX. Caught here rather
+        // than left to the truncating cast below, which would silently wrap instead.
+        if (value > std::numeric_limits<uint32_t>::max())
+        {
+            return unexpected{Result::InvalidValue};
+        }
+        return static_cast<uint32_t>(value);
     }
 
     /**
@@ -151,7 +186,24 @@ public:
         {
             return unexpected{Result::InvalidValue};
         }
-        return utils::asciiToInt32(digits, field->m_length);
+        // Bounds-checked by hand rather than through utils::asciiToInt32: that helper
+        // truncates straight to int32_t, discarding the full magnitude a caller would need
+        // to detect overflow (e.g. 11 digits reaches up to 99999999999, well past
+        // INT32_MIN/MAX either sign).
+        const uint64_t magnitude = parseUnsignedDigits(digits + start, field->m_length - start, false);
+        if (start != 0)
+        {
+            if (magnitude > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()) + 1)
+            {
+                return unexpected{Result::InvalidValue};
+            }
+            return static_cast<int32_t>(-static_cast<int64_t>(magnitude));
+        }
+        if (magnitude > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()))
+        {
+            return unexpected{Result::InvalidValue};
+        }
+        return static_cast<int32_t>(magnitude);
     }
 
     /**

@@ -164,6 +164,109 @@ TEST(FieldDecoder, GetUint32InvalidValue)
     EXPECT_EQ(Result::InvalidValue, signOnly.error());
 }
 
+// 10 digits is within MaxUint32Digits (unlike GetUint32InvalidValue's 11-digit case above,
+// which fails the length check before conversion is even attempted), but 9999999999 is
+// still past UINT32_MAX (4294967295) - convertToUint32 must bounds-check the parsed value
+// itself rather than let the truncating cast to uint32_t silently wrap it.
+TEST(FieldDecoder, GetUint32TrueOverflow)
+{
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=82" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
+        "9999=9999999999" SOH "9998=4294967295" SOH "10=078" SOH);
+
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status);
+
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
+    {
+        tags[i] = fields[i].m_tag;
+    }
+
+    FieldDecoder field{message, fields, tags, static_cast<int32_t>(fields.size())};
+
+    const auto overflow = field.getUint32<9999, false, RecordType::Message>();
+    EXPECT_FALSE(overflow.has_value());
+    EXPECT_EQ(Result::InvalidValue, overflow.error());
+
+    const auto atMax = field.getUint32<9998, false, RecordType::Message>();
+    ASSERT_TRUE(atMax.has_value());
+    EXPECT_EQ(4294967295u, *atMax);
+}
+
+// Isolates the bug found while writing GetUint32TrueOverflow's boundary case: below
+// UINT32_MAX (no overflow involved at all), asciiToUint64's SWAR fast path silently
+// parsed only the first 8 characters of a longer field and dropped the rest — e.g.
+// "1234567890" came back as 12345678. parseUnsignedDigits' chunking exists to fix
+// exactly this.
+TEST(FieldDecoder, GetUint32NineAndTenDigitValuesRoundTrip)
+{
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=81" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
+        "9999=123456789" SOH "9998=1234567890" SOH "10=228" SOH);
+
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status);
+
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
+    {
+        tags[i] = fields[i].m_tag;
+    }
+
+    FieldDecoder field{message, fields, tags, static_cast<int32_t>(fields.size())};
+
+    const auto nineDigits = field.getUint32<9999, false, RecordType::Message>();
+    ASSERT_TRUE(nineDigits.has_value());
+    EXPECT_EQ(123456789u, *nineDigits);
+
+    const auto tenDigits = field.getUint32<9998, false, RecordType::Message>();
+    ASSERT_TRUE(tenDigits.has_value());
+    EXPECT_EQ(1234567890u, *tenDigits);
+}
+
+// Same shape as GetUint32TrueOverflow, for the signed side: 10/11 digits are within
+// MaxInt32Chars but the magnitude can still exceed INT32_MIN/INT32_MAX.
+TEST(FieldDecoder, GetInt32TrueOverflow)
+{
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=116" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH "34=100101" SOH "52=10:11:12.123" SOH
+        "9999=2147483648" SOH "9998=-2147483649" SOH "9997=-2147483648" SOH "9996=2147483647" SOH "10=254" SOH);
+
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status);
+
+    const auto fields = decoder.fields();
+    std::vector<uint16_t> tags(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i)
+    {
+        tags[i] = fields[i].m_tag;
+    }
+
+    FieldDecoder field{message, fields, tags, static_cast<int32_t>(fields.size())};
+
+    const auto positiveOverflow = field.getInt32<9999, false, RecordType::Message>();
+    EXPECT_FALSE(positiveOverflow.has_value());
+    EXPECT_EQ(Result::InvalidValue, positiveOverflow.error());
+
+    const auto negativeOverflow = field.getInt32<9998, false, RecordType::Message>();
+    EXPECT_FALSE(negativeOverflow.has_value());
+    EXPECT_EQ(Result::InvalidValue, negativeOverflow.error());
+
+    const auto atMin = field.getInt32<9997, false, RecordType::Message>();
+    ASSERT_TRUE(atMin.has_value());
+    EXPECT_EQ(-2147483648, *atMin);
+
+    const auto atMax = field.getInt32<9996, false, RecordType::Message>();
+    ASSERT_TRUE(atMax.has_value());
+    EXPECT_EQ(2147483647, *atMax);
+}
+
 TEST(FieldDecoder, LengthAt)
 {
     const auto logout = utils::makeSpan(
