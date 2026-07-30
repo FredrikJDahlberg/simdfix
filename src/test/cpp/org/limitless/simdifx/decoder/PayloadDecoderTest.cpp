@@ -2,6 +2,8 @@
 // Created by Fredrik Dahlberg on 2026-04-11.
 //
 
+#include <algorithm>
+#include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -24,6 +26,26 @@ using namespace org::limitless::simdifx::generated::messages;
 [[nodiscard]] inline std::vector<uint8_t> heap(const std::span<const uint8_t> source)
 {
     return {source.begin(), source.end()};
+}
+
+// Assembles a well-formed message from its body fields, filling in the
+// BodyLength and CheckSum the bytes call for.
+[[nodiscard]] inline std::string build(const std::vector<std::string>& body)
+{
+    std::string fields;
+    for (const auto& field : body)
+    {
+        fields += field;
+        fields += static_cast<char>(FieldEnd);
+    }
+    std::string message = "8=FIXT.1.1" SOH "9=" + std::to_string(fields.size()) + SOH + fields;
+    uint32_t sum = 0;
+    for (const auto byte : message)
+    {
+        sum += static_cast<uint8_t>(byte);
+    }
+    const auto checkSum = std::to_string(sum & 0xff);
+    return message + "10=" + std::string(3 - checkSum.size(), '0') + checkSum + SOH;
 }
 
 void check(std::span<Field> result, const std::span<const Field> expected)
@@ -157,6 +179,88 @@ TEST(PayloadDecoder, BlockBoundaryFieldEnd)
     ASSERT_EQ(16, fields[8].m_tag);
     ASSERT_EQ(83, fields[8].m_position);
     ASSERT_EQ(1,  fields[8].m_length);
+}
+
+// Second instance of the BlockBoundaryFieldEnd bug above: the closing SOH again
+// lands on byte 15 of the last full block, but here the field's value *starts* in
+// the preceding block (tag 122 at 78, SOH at 95). processBlock's boundary check
+// only closed the field when it also began in the same block, so the length stayed
+// at 0 and the typed accessor read the field as absent. Shifting the whole message
+// by one byte moves the SOH off lane 15 and the same field parses correctly, which
+// is what makes this alignment-dependent rather than a plain framing error.
+TEST(PayloadDecoder, BlockBoundaryFieldEndSpanningPreviousBlock)
+{
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=80" SOH "35=0" SOH "49=CLIENT" SOH "56=SEQUENCERNODE" SOH
+        "34=2" SOH "52=20260703-12:00:00" SOH "122=20260703-11:59:00" SOH "10=020" SOH);
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status) << name(status);
+    ASSERT_EQ(message.size(), processed);
+
+    constexpr Field expectedFields[] =
+    {
+        { 2, 8, 8 },
+        { 13, 9, 2 },
+        { 19, 35, 1 },
+        { 24, 49, 6 },
+        { 34, 56, 13 },
+        { 51, 34, 1 },
+        { 56, 52, 17 },
+        { 78, 122, 17 },  // SOH at 95, 95 % 16 == 15
+        { 0, 0, 0 },      // the trailer holds only the CheckSum, so the slot processBlock
+                          // left for the next tag stays empty; the shifted control below
+                          // ends up with the same empty slot from processTrailer
+        { 99, 10, 3 },
+    };
+    check(decoder.fields(), std::span(expectedFields, std::size(expectedFields)));
+
+    // Control: one extra byte ahead of tag 122 moves its SOH to 96 (lane 0).
+    const auto shifted = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=81" SOH "35=0" SOH "49=CLIENTX" SOH "56=SEQUENCERNODE" SOH
+        "34=2" SOH "52=20260703-12:00:00" SOH "122=20260703-11:59:00" SOH "10=109" SOH);
+    PayloadDecoder<Protocol::FIXT_1_1> shiftedDecoder;
+    auto [shiftedProcessed, shiftedStatus] = shiftedDecoder.parse(shifted);
+    ASSERT_EQ(Result::Success, shiftedStatus) << name(shiftedStatus);
+    ASSERT_EQ(shifted.size(), shiftedProcessed);
+
+    const auto fields = shiftedDecoder.fields();
+    ASSERT_EQ(122, fields[7].m_tag);
+    ASSERT_EQ(79, fields[7].m_position);
+    ASSERT_EQ(17, fields[7].m_length);
+}
+
+// Both block-boundary bugs above were alignment-dependent: the same field parsed
+// correctly at one offset and lost its length at another, and neither showed up as
+// a parse failure. The fuzz suite only proves malformed input is never Success, so
+// nothing checked that a *valid* message tokenizes to the right positions and
+// lengths at every 16-byte alignment. This sweeps a message across all of them by
+// growing a padding field, checking each field against the layout of its own bytes.
+TEST(PayloadDecoder, EveryAlignmentTokenizesToTheWireLayout)
+{
+    for (size_t pad = 0; pad <= 32; ++pad)
+    {
+        const std::string message = build({"35=0", "49=" + std::string(6 + pad, 'C'),
+            "56=SEQUENCERNODE", "34=2", "52=20260703-12:00:00", "122=20260703-11:59:00"});
+        const std::vector<uint8_t> buffer(message.begin(), message.end());
+        PayloadDecoder<Protocol::FIXT_1_1> decoder;
+        const auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
+        ASSERT_EQ(Result::Success, status) << "pad " << pad << ": " << name(status);
+        ASSERT_EQ(buffer.size(), processed) << "pad " << pad;
+
+        const auto fields = decoder.fields();
+        for (size_t start = 0; start < message.size(); )
+        {
+            const size_t equals = message.find('=', start);
+            const size_t end = message.find(FieldEnd, start);
+            const auto tag = static_cast<uint16_t>(std::stoul(message.substr(start, equals - start)));
+            const auto found = std::ranges::find(fields, tag, &Field::m_tag);
+            ASSERT_NE(fields.end(), found) << "pad " << pad << ", tag " << tag << " not tokenized";
+            EXPECT_EQ(equals + 1, found->m_position) << "pad " << pad << ", tag " << tag;
+            EXPECT_EQ(end - equals - 1, found->m_length) << "pad " << pad << ", tag " << tag;
+            start = end + 1;
+        }
+    }
 }
 
 TEST(PayloadDecoder, Fragment)

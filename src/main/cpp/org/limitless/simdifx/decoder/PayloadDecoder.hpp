@@ -364,8 +364,12 @@ private:
             nonTagBitPos += digitBits;
         }
         m_position = 0;
+        // Last full block ending on SOH: the field it closes is still open, and the
+        // trailer starts on the next tag's digits, so processTrailer would take its
+        // slot for that tag instead of closing it. Close it here and leave the slot.
+        // The field's value may have started in an earlier block, so its position is
+        // not bounded by offset.
         if (offset + Uint8x16::Size + 15 >= length && field->m_tag != CheckSumTag &&
-            field->m_position >= static_cast<uint16_t>(offset) &&
             data[offset + Uint8x16::Size - 1] == FieldEnd)
         {
             field->m_length = static_cast<uint16_t>(offset + Uint8x16::Size - 1 - field->m_position);
