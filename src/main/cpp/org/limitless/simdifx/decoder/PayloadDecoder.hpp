@@ -248,7 +248,8 @@ private:
         {
             return {processed, Result::InvalidBodyLength};
         }
-        const bool bodyPadded = static_cast<uint32_t>(bodyLength.m_position) + sizeof(uint64_t) <= messageLength;
+        const bool bodyPadded = bodyLength.m_length <= 8 &&
+            static_cast<uint32_t>(bodyLength.m_position) + sizeof(uint64_t) <= messageLength;
         const int64_t length = utils::asciiToUint64(0, data + bodyLength.m_position, bodyLength.m_length, bodyPadded);
         const int32_t byteCount = last->m_position - bodyLength.m_position - bodyLength.m_length - 4;
         if (hasCheckSum)

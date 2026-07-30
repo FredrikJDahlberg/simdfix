@@ -288,6 +288,135 @@ TEST(PayloadDecoder, TruncationSafety)
     }
 }
 
+// A structurally-complete, correctly-checksummed message whose declared
+// BodyLength(9) does not match its real length: the CheckSum tag is still
+// found (hasCheckSum), so this is reported as InvalidBodyLength — a distinct
+// failure from a still-arriving message (Fragment, below) or a truncated one
+// (TruncationSafety, above). Found via FixConnectionTest.cpp's
+// CorruptBodyLengthIsDiscardedNotDisconnected: phixeron maps this status to
+// "discard silently, keep the connection" rather than a Reject or a disconnect.
+TEST(PayloadDecoder, CompleteMessageWithWrongBodyLengthValue)
+{
+    // Real body is 53 bytes; declared BodyLength(9) claims 999.
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=999" SOH "35=0" SOH "49=CLIENT" SOH "56=PHIXERON" SOH
+        "34=2" SOH "52=20260703-12:00:00" SOH "10=187" SOH);
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    const auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::InvalidBodyLength, status);
+    ASSERT_EQ(message.size(), processed) << "the whole malformed message is consumed, not held as a fragment";
+}
+
+// Same as above, but the BodyLength(9) value itself is non-numeric garbage
+// rather than a wrong-but-parseable number. The tokenizer does not validate
+// a field's value content while framing (only '=' and SOH positions matter),
+// so this still tokenizes as a complete message and is likewise reported as
+// InvalidBodyLength once the parsed "value" fails the byte-count cross-check.
+TEST(PayloadDecoder, CompleteMessageWithGarbledBodyLengthDigits)
+{
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=!@#" SOH "35=0" SOH "49=CLIENT" SOH "56=PHIXERON" SOH
+        "34=2" SOH "52=20260703-12:00:00" SOH "10=148" SOH);
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    const auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::InvalidBodyLength, status);
+    ASSERT_EQ(message.size(), processed);
+}
+
+// A BodyLength(9) claiming far more bytes than are actually on the wire, with
+// no CheckSum anywhere in what's present: hasCheckSum is false, so this reads
+// as "still arriving" (MessageFragment, processed=0), not as malformed — the
+// tokenizer cannot yet tell a huge-but-honest message from a corrupt one.
+// Found via FixConnectionTest.cpp's OversizedBodyLengthNeverArrivingEventuallyDisconnects:
+// phixeron disconnects such a connection only once the held fragment exceeds
+// its own MaxMessageSize cap, independent of this status.
+TEST(PayloadDecoder, OversizedBodyLengthWithoutCheckSumIsFragment)
+{
+    std::string message = "8=FIXT.1.1" SOH "9=5000000" SOH "35=0" SOH "49=CLIENT" SOH "56=PHIXERON" SOH
+        "34=2" SOH "52=20260703-12:00:00" SOH;
+    message += std::string(100, 'Z');  // filler: no '=', no SOH, no CheckSum ever appears
+    const std::vector<uint8_t> buffer(message.begin(), message.end());
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    const auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
+    ASSERT_EQ(Result::MessageFragment, status);
+    ASSERT_EQ(0UL, processed);
+}
+
+// Regression for a bug found while adding this coverage: unlike skipDataField's
+// `padded` (gated on field length <= 8), checkRequiredFields' bodyPadded used to
+// ignore bodyLength's own digit count, so any BodyLength value written with more
+// than 8 digits hit asciiToUint64's SWAR fast path, which silently reads only
+// the first 8 digits and drops the rest (the same root cause fixed for
+// FieldDecoder.hpp's convertToUint32/convertToInt32 earlier). A correct value
+// merely padded with leading zeros past 8 digits must still parse correctly.
+TEST(PayloadDecoder, NineDigitBodyLengthWithLeadingZerosParsesCorrectly)
+{
+    // Real body is 53 bytes; declared BodyLength(9) is the same value, zero-padded to 9 digits.
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=000000053" SOH "35=0" SOH "49=CLIENT" SOH "56=PHIXERON" SOH
+        "34=2" SOH "52=20260703-12:00:00" SOH "10=200" SOH);
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    const auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status) << name(status);
+    ASSERT_EQ(message.size(), processed);
+}
+
+// Symmetric case for the length-prefixed DATA field mechanism (skipDataField):
+// unlike BodyLength above, its `padded` flag already gates on field length <= 8
+// (PayloadDecoder.hpp's skipDataField), so a DataLen value written with more
+// than 8 digits was never subject to the SWAR truncation bug. This pins that
+// down so a future change to skipDataField can't silently regress it.
+TEST(PayloadDecoder, NineDigitDataLengthWithLeadingZerosParsesCorrectly)
+{
+    struct DataFields
+    {
+        static constexpr int32_t dataTag(const uint16_t tag) { return tag == 212 ? 213 : -1; }
+    };
+    // Real DataLen(212) is 12 bytes (same payload as the ValidData fixture elsewhere
+    // in this file), declared zero-padded to 9 digits.
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=98" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH "34=1" SOH
+        "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "212=000000012" SOH "213=<root" SOH
+        "/>test" SOH "10=118" SOH);
+    PayloadDecoder<Protocol::FIXT_1_1, DataFields> decoder;
+    const auto [processed, status] = decoder.parse(message);
+    ASSERT_EQ(Result::Success, status) << name(status);
+    ASSERT_EQ(message.size(), processed);
+
+    const auto fields = decoder.fields();
+    bool found = false;
+    for (const auto& field : fields)
+    {
+        if (field.m_tag == 213)
+        {
+            EXPECT_EQ(12U, field.m_length) << "the 9-digit DataLen must parse as 12, not a truncated value";
+            found = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(found);
+}
+
+// A DataLen(212) value that is non-numeric garbage rather than a wrong-but-
+// parseable number: the tokenizer does not validate a field's value content
+// while framing, so this still frames as a complete-looking message and the
+// garbage-derived length must not be mistaken for a valid one.
+TEST(PayloadDecoder, DataFieldWithGarbledLengthDigitsIsNotSuccess)
+{
+    struct DataFields
+    {
+        static constexpr int32_t dataTag(const uint16_t tag) { return tag == 212 ? 213 : -1; }
+    };
+    const auto message = utils::makeSpan(
+        "8=FIXT.1.1" SOH "9=92" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH "34=1" SOH
+        "52=20260613-19:26:13.959" SOH "98=0" SOH "108=30" SOH "212=!@#" SOH "213=<root" SOH
+        "/>test" SOH "10=065" SOH);
+    PayloadDecoder<Protocol::FIXT_1_1, DataFields> decoder;
+    const auto [processed, status] = decoder.parse(message);
+    ASSERT_NE(Result::Success, status) << name(status);
+    ASSERT_LE(processed, message.size());
+}
+
 TEST(PayloadDecoder, ForeignBeginStringSkip)
 {
         for (const std::string_view text : {
