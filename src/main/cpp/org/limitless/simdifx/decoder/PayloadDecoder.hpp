@@ -469,7 +469,6 @@ private:
      *         bytes are not "\x01""10=...", or Result::InvalidCheckSum if
      *         the value does not match
      */
-    //Result::Values processCheckSum(const std::span<const data_t>::pointer data,
     Result processCheckSum(const std::span<const data_t>::pointer data,
                            const uint64_t blockSum,
                            const position_t blockEnd,
@@ -544,8 +543,6 @@ private:
         { // handle split tag
             last->m_length = static_cast<uint16_t>(offset + m_position - 1 - last->m_position);
             last = &m_fields[m_count++];
-            // Clamp the digit count to the trailer: a truncated/malformed message
-            // may lack the '=' so tagEndPos is the not-found sentinel (8).
             const uint32_t tagBytes = std::min(tagEndPos, static_cast<uint32_t>(remaining));
             last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(m_tag, data, tagBytes, false));
             m_tags[last - m_fields.data()] = last->m_tag;
@@ -563,7 +560,9 @@ private:
             fieldEndPos = fieldEndBit / 8;
             last = &m_fields[m_count++];
         }
-        while (position + 7 < remaining)
+        constexpr uint32_t CheckSumPrefixLen = 3; // "10="
+        constexpr uint32_t CheckSumFieldLen = CheckSumPrefixLen + CheckSumValueLength + 1; // "10=" + digits + SOH
+        while (position + CheckSumFieldLen < remaining)
         {
             if (tagEndPos < position || tagEndPos > remaining)
             {
@@ -584,13 +583,13 @@ private:
             fieldEndPos = fieldEndBit / 8;
             fieldEnds &= ~(1ULL << fieldEndBit);
         }
-        constexpr uint32_t checkSumPrefixLen = 3; // "10="
-        constexpr uint32_t checkSumFieldLen = checkSumPrefixLen + CheckSumValueLength + 1; // "10=" + digits + SOH
-        if (position + checkSumFieldLen <= remaining)
+        if (position + CheckSumFieldLen <= remaining)
         {
-            last = &m_fields[m_count++];
-            // last->m_position = static_cast<uint16_t>(offset + position + checkSumPrefixLen);
-            last->m_position = static_cast<uint16_t>(offset + position + checkSumPrefixLen);
+            if (last->m_length >= 1)
+            {   // last field have been used already
+                last = &m_fields[m_count++];
+            }
+            last->m_position = static_cast<uint16_t>(offset + position + CheckSumPrefixLen);
             last->m_length = CheckSumValueLength;
             auto data = buffer.data() + offset + position;
             last->m_tag = (data[0] - '0') * 10 + (data[1] - '0');

@@ -207,10 +207,7 @@ TEST(PayloadDecoder, BlockBoundaryFieldEndSpanningPreviousBlock)
         { 34, 56, 13 },
         { 51, 34, 1 },
         { 56, 52, 17 },
-        { 78, 122, 17 },  // SOH at 95, 95 % 16 == 15
-        { 0, 0, 0 },      // the trailer holds only the CheckSum, so the slot processBlock
-                          // left for the next tag stays empty; the shifted control below
-                          // ends up with the same empty slot from processTrailer
+        { 78, 122, 17 },
         { 99, 10, 3 },
     };
     check(decoder.fields(), std::span(expectedFields, std::size(expectedFields)));
