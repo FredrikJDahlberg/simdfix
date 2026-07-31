@@ -562,12 +562,8 @@ private:
         }
         constexpr uint32_t CheckSumPrefixLen = 3; // "10="
         constexpr uint32_t CheckSumFieldLen = CheckSumPrefixLen + CheckSumValueLength + 1; // "10=" + digits + SOH
-        while (position + CheckSumFieldLen < remaining)
+        while (position + CheckSumFieldLen < remaining && tagEndPos >= position)
         {
-            if (tagEndPos < position || tagEndPos > remaining)
-            {
-                break;
-            }
             last->m_tag = static_cast<uint16_t>(utils::asciiToUint64(0, data + position,
                 tagEndPos - position, false));
             m_tags[last - m_fields.data()] = last->m_tag;
