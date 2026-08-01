@@ -72,11 +72,11 @@ template <generated::messages::Protocol Protocol, typename DataFields = decoder:
 
     // "35=...49=...56=...34=<num>\x01" — up to, but excluding, the original SendingTime: that
     // field is replaced outright rather than copied through (see below).
-    const std::span<const uint8_t> bodyPrefix(original.data() + bodyStart, msgSeqNumEnd - bodyStart);
-    const std::span<const uint8_t> bodySuffix(original.data() + origSendingTimeEnd,
+    const std::span bodyPrefix(original.data() + bodyStart, msgSeqNumEnd - bodyStart);
+    const std::span bodySuffix(original.data() + origSendingTimeEnd,
                                                checksumStart - origSendingTimeEnd);
-    const std::string_view origSendingTimeValue(
-        reinterpret_cast<const char*>(original.data()) + sendingTime.m_position, sendingTime.m_length);
+    const std::string_view origSendingTimeValue(reinterpret_cast<const char*>(original.data()) +
+                                                sendingTime.m_position, sendingTime.m_length);
 
     constexpr std::size_t FreshSendingTimeFieldLength = 3 /* "52=" */ + utils::UTCTimestampLength + 1 /* SOH */;
     constexpr std::string_view PossDupField = "43=Y";
@@ -85,48 +85,48 @@ template <generated::messages::Protocol Protocol, typename DataFields = decoder:
                                                        PossDupField.size() + 1 + OrigSendingTimeTag.size() + 1 +
                                                        origSendingTimeValue.size() + bodySuffix.size());
 
-    std::size_t w = 0;
+    std::size_t position = 0;
     std::memcpy(out.data(), original.data(), prefixEnd);  // "8=...\x01" verbatim
-    w = prefixEnd;
+    position = prefixEnd;
 
     detail::encoder::FieldEncoder fieldEncoder;
-    fieldEncoder.wrap(out, static_cast<uint32_t>(w));
+    fieldEncoder.wrap(out, static_cast<uint32_t>(position));
     fieldEncoder.encodeField(BodyLengthTag, newBodyLength);
-    w += fieldEncoder.encodedLength();
+    position += fieldEncoder.encodedLength();
 
-    std::memcpy(out.data() + w, bodyPrefix.data(), bodyPrefix.size());  // "35=...34=<num>\x01" verbatim
-    w += bodyPrefix.size();
+    std::memcpy(out.data() + position, bodyPrefix.data(), bodyPrefix.size());  // "35=...34=<num>\x01" verbatim
+    position += bodyPrefix.size();
 
-    fieldEncoder.wrap(out, static_cast<uint32_t>(w));
+    fieldEncoder.wrap(out, static_cast<uint32_t>(position));
     fieldEncoder.encode<"52", std::chrono::milliseconds>(currentSendingTime);  // this retransmission's own time
-    w += fieldEncoder.encodedLength();
+    position += fieldEncoder.encodedLength();
 
-    std::memcpy(out.data() + w, PossDupField.data(), PossDupField.size());
-    w += PossDupField.size();
-    out[w++] = FieldEnd;
+    std::memcpy(out.data() + position, PossDupField.data(), PossDupField.size());
+    position += PossDupField.size();
+    out[position++] = FieldEnd;
 
-    std::memcpy(out.data() + w, OrigSendingTimeTag.data(), OrigSendingTimeTag.size());
-    w += OrigSendingTimeTag.size();
-    std::memcpy(out.data() + w, origSendingTimeValue.data(), origSendingTimeValue.size());
-    w += origSendingTimeValue.size();
-    out[w++] = FieldEnd;
+    std::memcpy(out.data() + position, OrigSendingTimeTag.data(), OrigSendingTimeTag.size());
+    position += OrigSendingTimeTag.size();
+    std::memcpy(out.data() + position, origSendingTimeValue.data(), origSendingTimeValue.size());
+    position += origSendingTimeValue.size();
+    out[position++] = FieldEnd;
 
-    std::memcpy(out.data() + w, bodySuffix.data(), bodySuffix.size());  // unprocessed remaining body, verbatim
-    w += bodySuffix.size();
+    std::memcpy(out.data() + position, bodySuffix.data(), bodySuffix.size());  // unprocessed remaining body, verbatim
+    position += bodySuffix.size();
 
     uint32_t sum = 0;
-    for (std::size_t i = 0; i < w; ++i)
+    for (std::size_t i = 0; i < position; ++i)
     {
         sum += out[i];
     }
-    out[w++] = '1';
-    out[w++] = '0';
-    out[w++] = '=';
-    utils::writeFixedDigits<3>(sum % 256, out.data() + w);
-    w += 3;
-    out[w++] = FieldEnd;
+    out[position++] = '1';
+    out[position++] = '0';
+    out[position++] = '=';
+    utils::writeFixedDigits<3>(sum % 256, out.data() + position);
+    position += 3;
+    out[position++] = FieldEnd;
 
-    return w;
+    return position;
 }
 
 }  // namespace org::limitless::simdifx::encoder
