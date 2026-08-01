@@ -197,6 +197,7 @@ add_fix_test(PayloadDecoderFuzzTest "${TEST_PATH}/decoder/PayloadDecoderFuzzTest
 target_compile_definitions(PayloadDecoderFuzzTest PRIVATE NDEBUG)
 add_fix_test(MessageDecoderTest      "${TEST_PATH}/decoder/MessageDecoderTest.cpp")
 add_fix_test(MessageEncoderTest      "${TEST_PATH}/encoder/MessageEncoderTest.cpp")
+add_fix_test(ResendEncoderTest       "${TEST_PATH}/encoder/ResendEncoderTest.cpp")
 add_fix_test(GroupDecoderTest "${TEST_PATH}/decoder/GroupDecoderTest.cpp")
 add_fix_test(FieldDecoderTest "${TEST_PATH}/decoder/FieldDecoderTest.cpp")
 add_fix_test(ConversionsTest       "${TEST_PATH}/utils/ConversionsTest.cpp")
@@ -207,8 +208,8 @@ add_fix_test(LinearSearchTest  "${TEST_PATH}/simd/LinearSearchTest.cpp")
 
 set(FIX_TEST_TARGETS
         PayloadDecoderTest PayloadDecoderFuzzTest MessageDecoderTest MessageEncoderTest
-        GroupDecoderTest FieldDecoderTest ConversionsTest FixedDecimalTest OptionalIntTest
-        Uint8x16Test LinearSearchTest)
+        ResendEncoderTest GroupDecoderTest FieldDecoderTest ConversionsTest FixedDecimalTest
+        OptionalIntTest Uint8x16Test LinearSearchTest)
 
 add_custom_target(AllTests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
