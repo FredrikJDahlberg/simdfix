@@ -952,6 +952,53 @@ TEST(MessageDecoder, LastFailedTagResetsOnTheNextMessage)
     }
 }
 
+TEST(MessageDecoder, TokenizedMessageReadsTagsBeforeDispatch)
+{
+    // The window TokenizedMessage's tag accessors exist for: a handler intercepting
+    // handle(TokenizedMessage&) knows only the MsgType, and still needs MsgSeqNum for
+    // a message whose validate() fails and whose typed handler therefore never runs.
+    struct AppHandler : FixMessageHandler<AppHandler>
+    {
+        uint32_t seqNum = 0;
+        bool gapFill = false;
+        bool sawText = false;
+
+        Result handle(const TokenizedMessage& message)
+        {
+            seqNum = message.getUint32<34>().value_or(0u);
+            const auto flag = message.getString<123>();
+            gapFill = flag && *flag == "Y";
+            sawText = message.getString<58>().has_value();
+            return FixMessageHandler::handle(message);
+        }
+    } app;
+
+    PayloadDecoder<Protocol::FIXT_1_1> decoder;
+    {
+        // The SequenceResetGapFill message: 34 and 123 both present, 58 absent.
+        const auto message = utils::makeSpan(
+            "8=FIXT.1.1" SOH "9=0067" SOH "35=4" SOH "49=SENDER" SOH "56=TARGET" SOH
+            "34=5" SOH "52=20260613-19:26:13.959" SOH "123=Y" SOH "36=10" SOH "10=093" SOH);
+        auto [processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(message.size(), processed);
+        ASSERT_EQ(Result::Success, status) << name(status);
+        EXPECT_EQ(5u, app.seqNum);
+        EXPECT_TRUE(app.gapFill);
+        EXPECT_FALSE(app.sawText) << "an absent tag must not read as present";
+    }
+    {
+        // The MissingRequiredField Logon: no typed handler runs, but the read landed.
+        const auto message = utils::makeSpan(
+            "8=FIXT.1.1" SOH "9=0060" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
+            "34=1" SOH "52=20260613-19:26:13.959" SOH "98=0" SOH "10=009" SOH);
+        auto [processed, status] = decoder.parse(message, app);
+        ASSERT_EQ(message.size(), processed);
+        ASSERT_EQ(Result::RequiredFieldMissing, status) << name(status);
+        EXPECT_EQ(1u, app.seqNum);
+        EXPECT_FALSE(app.gapFill);
+    }
+}
+
 TEST(MessageDecoder, RequiredFieldOverLength)
 {
     // NewOrderSingle with a 21-byte ClOrdID(11) — one past test.xml's declared

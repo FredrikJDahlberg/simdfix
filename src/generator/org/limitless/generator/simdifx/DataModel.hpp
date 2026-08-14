@@ -295,7 +295,7 @@ private:
             const auto name = std::string{typeNode.attribute("name").as_string()};
             if (std::strncmp(typeNode.name(), "enum", 4) == 0)
             {
-                auto it = std::find_if(m_enums.begin(), m_enums.end(),
+                auto it = std::ranges::find_if(m_enums,
                     [&name](const Record& r) { return r.m_name == name; });
                 if (it != m_enums.end())
                 {

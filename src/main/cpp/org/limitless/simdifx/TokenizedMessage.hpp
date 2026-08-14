@@ -14,6 +14,7 @@
 
 #include "org/limitless/simdifx/Types.hpp"
 #include "org/limitless/simdifx/detail/Tokens.hpp"
+#include "org/limitless/simdifx/detail/parser/FieldDecoder.hpp"
 
 namespace org::limitless::simdifx
 {
@@ -40,6 +41,38 @@ struct TokenizedMessage
             id = static_cast<uint16_t>(id | (data[field.m_position + 1] << 8));
         }
         return id;
+    }
+
+    /**
+     * Looks up Tag outside any repeating group and parses its value as an
+     * unsigned 32-bit integer. For reading a header field before the message
+     * type is known and a generated decoder has been chosen; once one has,
+     * read through the decoder instead.
+     * @tparam Tag tag number to read
+     * @return field value, or Result::Success if the tag is absent
+     */
+    template <int32_t Tag>
+    [[nodiscard]] Uint32Result getUint32() const
+    {
+        return decoder().getUint32<Tag, false, detail::RecordType::Message>();
+    }
+
+    /**
+     * Looks up Tag outside any repeating group and returns its value as a
+     * string view into the message buffer. Same purpose as getUint32.
+     * @tparam Tag tag number to read
+     * @return field value, or Result::Success if the tag is absent
+     */
+    template <int32_t Tag>
+    [[nodiscard]] StringResult getString() const
+    {
+        return decoder().getString<Tag, false, detail::RecordType::Message>();
+    }
+
+private:
+    [[nodiscard]] detail::parser::FieldDecoder decoder() const
+    {
+        return {data, fields, tags, size};
     }
 };
 
