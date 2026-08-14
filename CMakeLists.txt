@@ -10,7 +10,31 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 enable_testing()
 
-find_package(GTest REQUIRED)
+# Built from source rather than found on the system: a prebuilt gtest is not
+# ASan-instrumented, so its std::vector annotations disagree with the
+# instrumented tests (container-overflow false positives), and its headers can
+# be shadowed by an older copy in a default include dir such as /usr/local.
+include(FetchContent)
+FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG        v1.16.0
+        GIT_SHALLOW    TRUE
+)
+set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+# The Debug flags the tests are built with, so ASan sees one consistent picture
+# across the gtest boundary.
+foreach(_gtest_target gtest gtest_main)
+    target_compile_options(${_gtest_target} PRIVATE
+            $<$<CONFIG:Debug>:-g -O0 -fsanitize=address -fno-omit-frame-pointer>)
+    # googletest declares its includes SYSTEM, which emits -isystem. Clang searches
+    # /usr/local/include ahead of every -isystem path, so a gtest installed there
+    # would shadow this one; -I is searched first and cannot be shadowed.
+    set_target_properties(${_gtest_target} PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "")
+endforeach()
 
 # The x86 SSE backend (Uint8x16_sse.inl) uses _mm_blendv_epi8, an SSE4.1
 # intrinsic. The Release build already enables it via -march=native, but the
