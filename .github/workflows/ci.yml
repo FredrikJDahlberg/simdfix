@@ -56,3 +56,13 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+      - name: Build example
+        run: >
+          cmake -S examples/quotes -B examples/quotes/build -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }}
+          && cmake --build examples/quotes/build -j
+
+      - name: Run example
+        run: ./examples/quotes/build/quotes

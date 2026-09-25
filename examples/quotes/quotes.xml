@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    A minimal application spec: one Quote message (MsgType S) and one enum.
+    Session messages (Logon, Heartbeat, ...) come from session.xml and are
+    always generated; MessageType entries here are appended to them.
+-->
+<protocol name="application">
+
+    <types>
+        <enum name="MessageType">
+            <element name="Quote" value="S"/>
+        </enum>
+
+        <enum name="QuoteType">
+            <element name="Indicative" value="0"/>
+            <element name="Tradeable" value="1"/>
+        </enum>
+    </types>
+
+    <message name="Quote" id="S">
+        <field name="Header" type="StandardHeader"/>
+        <field name="QuoteID" tag="117" primitiveType="string" length="20"/>
+        <field name="Symbol" tag="55" primitiveType="string" length="8"/>
+        <field name="QuoteType" tag="537" type="QuoteType" presence="optional"/>
+        <field name="BidPx" tag="132" primitiveType="decimal"/>
+        <field name="OfferPx" tag="133" primitiveType="decimal"/>
+        <field name="BidSize" tag="134" primitiveType="uint32"/>
+        <field name="OfferSize" tag="135" primitiveType="uint32"/>
+        <field name="TransactTime" tag="60" primitiveType="timestamp" presence="optional"/>
+    </message>
+
+</protocol>

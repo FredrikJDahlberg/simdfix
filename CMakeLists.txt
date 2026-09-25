@@ -37,9 +37,21 @@ set(GEN_PATH "org/limitless/simdifx/generated/messages")
 set(CONFIG_GEN_PATH "org/limitless/simdifx/generated/config")
 set(TEST_PATH "src/test/cpp/org/limitless/simdifx")
 set(GENERATOR_PATH "src/generator/org/limitless/generator/simdifx/")
-set(SESSION_XML "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/resources/session.xml")
-set(APP_XML     "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/resources/test.xml")
-set(CONFIG_XML  "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/resources/config.xml")
+# The specs the generator reads. A consumer overrides them with -D on the command
+# line, or by setting them before add_subdirectory(); the in-tree default for the
+# application spec is test.xml, which the tests need.
+if(NOT DEFINED SIMDFIX_SESSION_XML)
+    set(SIMDFIX_SESSION_XML "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/resources/session.xml")
+endif()
+if(NOT DEFINED SIMDFIX_APP_XML)
+    set(SIMDFIX_APP_XML "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/resources/test.xml")
+endif()
+if(NOT DEFINED SIMDFIX_CONFIG_XML)
+    set(SIMDFIX_CONFIG_XML "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/resources/config.xml")
+endif()
+set(SESSION_XML "${SIMDFIX_SESSION_XML}")
+set(APP_XML     "${SIMDFIX_APP_XML}")
+set(CONFIG_XML  "${SIMDFIX_CONFIG_XML}")
 set(GENERATED_DIR "${CMAKE_BINARY_DIR}/${GEN_PATH}")
 set(CONFIG_GENERATED_DIR "${CMAKE_BINARY_DIR}/${CONFIG_GEN_PATH}")
 set(GENERATED_HEADERS
@@ -141,7 +153,7 @@ add_custom_command(
                 ${APP_XML}
                 ${CONFIG_XML}
                 ${GENERATOR_PATH}/FixGenerator.cpp ${GENERATOR_PATH}/DataModel.hpp
-        COMMENT "Generating FIX message headers from session.xml, protocol.xml and config.xml"
+        COMMENT "Generating FIX message headers from ${SESSION_XML}, ${APP_XML} and ${CONFIG_XML}"
         VERBATIM
 )
 # Part of the default build so that `cmake --build` followed by `cmake --install`

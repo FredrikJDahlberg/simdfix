@@ -136,6 +136,49 @@ while (!input.empty())
 
 Repeating groups are read with `count()`, `next()` and `hasNext()` on the group accessor. See `src/test/cpp/org/limitless/simdifx/` for more examples.
 
+### Using your own spec
+
+The examples above use the messages in simdfix's own spec. To generate classes for your own messages, write an application spec and point `SIMDFIX_APP_XML` at it before adding simdfix:
+
+```xml
+<protocol name="application">
+    <types>
+        <enum name="MessageType">
+            <element name="Quote" value="S"/>
+        </enum>
+        <enum name="QuoteType">
+            <element name="Indicative" value="0"/>
+            <element name="Tradeable" value="1"/>
+        </enum>
+    </types>
+
+    <message name="Quote" id="S">
+        <field name="Header" type="StandardHeader"/>
+        <field name="QuoteID" tag="117" primitiveType="string" length="20"/>
+        <field name="Symbol" tag="55" primitiveType="string" length="8"/>
+        <field name="QuoteType" tag="537" type="QuoteType" presence="optional"/>
+        <field name="BidPx" tag="132" primitiveType="decimal"/>
+        <field name="OfferPx" tag="133" primitiveType="decimal"/>
+        <field name="BidSize" tag="134" primitiveType="uint32"/>
+        <field name="OfferSize" tag="135" primitiveType="uint32"/>
+        <field name="TransactTime" tag="60" primitiveType="timestamp" presence="optional"/>
+    </message>
+</protocol>
+```
+
+```cmake
+set(SIMDFIX_APP_XML "${CMAKE_CURRENT_SOURCE_DIR}/quotes.xml")
+add_subdirectory(external/simdfix EXCLUDE_FROM_ALL)
+```
+
+The generator then emits `QuoteEncoder` and `QuoteDecoder`, with one accessor per field (`quoteID()`, `bidPx()`, `quoteType()`, ...) and a `QuoteType` enum. The session messages from `session.xml` are always included. [`examples/quotes`](examples/quotes) is a complete project that encodes and decodes a stream of quotes:
+
+```bash
+cmake -S examples/quotes -B examples/quotes/build -DCMAKE_BUILD_TYPE=Release
+cmake --build examples/quotes/build
+./examples/quotes/build/quotes
+```
+
 ## Building
 
 ```bash
@@ -217,7 +260,7 @@ Generation is driven by three XML files and produces five headers under `<build>
 
 When both `session.xml` and `protocol.xml` are present the generator merges their data models before emitting code. Shared enums — in particular `MessageType` — are merged by value: entries from `session.xml` come first, then any new values from the application spec are appended. Duplicate values are silently dropped.
 
-The in-tree build passes `test.xml` as the application spec, so tests, benchmarks and the default install see its superset of messages. The spec is selected by `APP_XML` in `CMakeLists.txt`.
+The in-tree build passes `test.xml` as the application spec, so tests, benchmarks and the default install see its superset of messages. Each spec can be replaced by setting `SIMDFIX_SESSION_XML`, `SIMDFIX_APP_XML` or `SIMDFIX_CONFIG_XML`, either with `-D` on the command line or before `add_subdirectory` (see [Using your own spec](#using-your-own-spec)).
 
 The generator CLI reflects this split:
 
