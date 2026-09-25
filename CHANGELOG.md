@@ -65,8 +65,9 @@ Breaking changes come with the steps to migrate.
 - A `VERSION` file; `org/limitless/simdfix/Version.hpp` (`SIMDFIX_VERSION`, `SIMDFIX_VERSION_MAJOR`, ...);
   a `SimdFixConfigVersion.cmake`, so `find_package(SimdFix 0.2)` accepts 0.2.x only.
 - The headers compile with `-fno-exceptions`, which the build checks.
-- A release process: `CHANGELOG.md`, `.github/tag-release.sh` and the `release` workflow, which tests,
-  compares benchmarks with the previous release and publishes a source tarball.
+- A release process: `CHANGELOG.md`; `.github/tag-release.sh`, which checks CI and compares the
+  benchmarks with the previous release before tagging; and the `release` workflow, which tests the tag
+  and publishes a source tarball.
 - README sections on FetchContent, the compiler flags a consumer needs, and releases. CI builds the
   example against an installed simdfix too.
 

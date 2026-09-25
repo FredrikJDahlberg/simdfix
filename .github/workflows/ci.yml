@@ -5,6 +5,13 @@ on:
   pull_request:
   # The release workflow runs these same jobs on the tag it releases.
   workflow_call:
+  # Run by hand, optionally with the Apple jobs: gh workflow run ci.yml -f apple=true
+  workflow_dispatch:
+    inputs:
+      apple:
+        description: Also build and test on Apple Silicon
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -18,75 +25,53 @@ jobs:
           # C++20 — polyfill path (expected/byteswap shims)
           - name: x86_64 C++20 (SSE)
             runner: ubuntu-24.04
-            os: linux
             cxx_standard: 20
+          # GitHub-hosted arm64 Linux, free for public repositories.
           - name: arm64 C++20 (NEON)
-            runner: [self-hosted, macOS, ARM64]
-            os: macos
+            runner: ubuntu-24.04-arm
             cxx_standard: 20
           # C++23 — std::expected / std::byteswap
           - name: x86_64 C++23 (SSE)
             runner: ubuntu-24.04
-            os: linux
             cxx_standard: 23
           - name: arm64 C++23 (NEON)
-            runner: [self-hosted, macOS, ARM64]
-            os: macos
+            runner: ubuntu-24.04-arm
             cxx_standard: 23
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies (Linux)
-        if: matrix.os == 'linux'
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
             cmake clang g++-14 libgtest-dev libpugixml-dev
 
-      - name: Install dependencies (macOS)
-        if: matrix.os == 'macos'
+      - uses: ./.github/actions/verify
+        with:
+          cxx-standard: ${{ matrix.cxx_standard }}
+
+  # Apple Silicon with Apple clang. Optional, since these builds are run locally:
+  # they run only when asked for, with the apple input of a manual run or the
+  # repository variable SIMDFIX_APPLE_CI set to true, and a failure never fails
+  # the workflow, so it cannot hold up a release. They use GitHub's macos-15
+  # runner unless the variable SIMDFIX_APPLE_RUNNER names another as JSON, e.g.
+  # ["self-hosted", "macOS", "ARM64"].
+  apple:
+    name: Apple arm64 C++${{ matrix.cxx_standard }} (NEON)
+    if: vars.SIMDFIX_APPLE_CI == 'true' || inputs.apple == true
+    runs-on: ${{ vars.SIMDFIX_APPLE_RUNNER && fromJSON(vars.SIMDFIX_APPLE_RUNNER) || 'macos-15' }}
+    timeout-minutes: 30
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        cxx_standard: [20, 23]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
         run: brew install cmake googletest pugixml
 
-      - name: Configure
-        run: >
-          cmake -B build -DCMAKE_BUILD_TYPE=Debug
-          -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-          -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }}
-
-      - name: Build
-        run: cmake --build build -j
-
-      - name: Test
-        run: ctest --test-dir build --output-on-failure
-
-      # The example against this source tree, via add_subdirectory().
-      - name: Build example
-        run: >
-          cmake -S examples/quotes -B examples/quotes/build -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_CXX_COMPILER=clang++
-          -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }}
-          && cmake --build examples/quotes/build -j
-
-      - name: Run example
-        run: ./examples/quotes/build/quotes
-
-      # The example against an installed simdfix, via find_package() and simdfix_generate().
-      - name: Install simdfix
-        run: >
-          cmake -B build-install -DCMAKE_BUILD_TYPE=Release -DSIMDFIX_BUILD_TESTS=OFF
-          -DCMAKE_CXX_COMPILER=clang++
-          -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }}
-          && cmake --build build-install -j
-          && cmake --install build-install --prefix "${{ runner.temp }}/simdfix"
-
-      - name: Build example against the install
-        run: >
-          cmake -S examples/quotes -B examples/quotes/build-installed -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_CXX_COMPILER=clang++
-          -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }}
-          -DCMAKE_PREFIX_PATH="${{ runner.temp }}/simdfix"
-          && grep -q "^SimdFix_DIR:PATH=${{ runner.temp }}/simdfix/" examples/quotes/build-installed/CMakeCache.txt
-          && cmake --build examples/quotes/build-installed -j
-
-      - name: Run example built against the install
-        run: ./examples/quotes/build-installed/quotes
+      - uses: ./.github/actions/verify
+        with:
+          cxx-standard: ${{ matrix.cxx_standard }}

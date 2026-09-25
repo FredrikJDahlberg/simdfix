@@ -29,23 +29,3 @@ Session handling
 - Add runtime configuration of session context: memcpy(dst, src, 64)
 calculate offset for remaining payload, use fixed length buffer, 
 add compId max length to config
-
-Continuous integration — hosted NEON runner
------
-
-The arm64 (NEON) CI leg currently runs on a self-hosted Apple Silicon
-Mac (runner labels: self-hosted, macOS, ARM64). GitHub's free hosted
-arm64 Linux runners (ubuntu-24.04-arm) are only free on *public* repos,
-and this repo is private, so a hosted NEON leg would otherwise queue
-forever waiting for a runner. To move the NEON leg onto a GitHub-hosted
-runner instead of the local Mac:
-
-- Make the repo public (then ubuntu-24.04-arm is free), OR enable paid
-  GitHub-hosted arm64 runners (larger/arm64 hosted runners are billed on
-  private repos; configure under Settings -> Actions -> Runners).
-- In .github/workflows/ci.yml, change the arm64 matrix entry from
-  `runner: [self-hosted, macOS, ARM64]` / `os: macos` to
-  `runner: ubuntu-24.04-arm` / `os: linux`. 
-- Decommission the self-hosted runner: remove it under Settings ->
-  Actions -> Runners, and stop it on the Mac (`./svc.sh uninstall`, or
-  stop `./run.sh`).

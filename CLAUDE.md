@@ -47,7 +47,7 @@ cd cmake-build-debug && ctest
 - Every user-visible change gets a line in the Unreleased section of `CHANGELOG.md`, under Breaking
   (with migration steps), Added, Fixed or Performance. Until 1.0 a breaking change needs a minor release.
 - Decoder changes are checked for speed with `.github/bench-compare.sh <previous tag>` (Release builds,
-  medians of alternating runs); the release workflow fails on a benchmark more than 3% slower.
+  medians of alternating runs); `tag-release.sh` refuses to tag if a benchmark is more than 3% slower.
 
 ## Coding Style
 

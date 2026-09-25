@@ -1,29 +1,37 @@
 #!/usr/bin/env bash
-# tag-release.sh [--dry-run] <major.minor.patch> — release simdfix at the current main.
+# tag-release.sh [--dry-run] [--skip-benchmark] <major.minor.patch> — release simdfix at the current main.
 #
 #   .github/tag-release.sh 0.2.0
 #
-# Checks that main is clean, pushed, and green in CI, and that CHANGELOG.md has
-# Unreleased notes. Then writes the number to VERSION, turns the Unreleased notes
+# Checks that main is clean, pushed, and green in CI, that CHANGELOG.md has
+# Unreleased notes, and that no benchmark is more than 3% slower than in the
+# previous release (bench-compare.sh, on this machine: GitHub's shared runners are
+# too noisy for it). Then writes the number to VERSION, turns the Unreleased notes
 # into the release's section, commits just those two files as "Release <version>",
 # pushes main, and tags and pushes v<version>. The tag starts the release workflow.
-# --dry-run runs the checks and changes nothing.
+#
+# --dry-run         runs the checks and changes nothing
+# --skip-benchmark  leaves out the benchmark comparison, e.g. on a busy machine
 
 set -euo pipefail
 
 DRY_RUN=false
-if [[ "${1:-}" == "--dry-run" ]]; then
-    DRY_RUN=true
-    shift
-fi
-RELEASE="${1:-}"
+BENCHMARK=true
+RELEASE=""
+for argument in "$@"; do
+    case "$argument" in
+        --dry-run) DRY_RUN=true ;;
+        --skip-benchmark) BENCHMARK=false ;;
+        *) RELEASE="$argument" ;;
+    esac
+done
 
 fail() {
     echo "tag-release: $*" >&2
     exit 1
 }
 
-[[ "$RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "usage: $0 [--dry-run] <major.minor.patch>"
+[[ "$RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "usage: $0 [--dry-run] [--skip-benchmark] <major.minor.patch>"
 
 cd "$(git rev-parse --show-toplevel)"
 TAG="v$RELEASE"
@@ -52,6 +60,17 @@ command -v gh >/dev/null || fail "the GitHub CLI (gh) is needed to check CI"
 CI="$(gh run list --workflow ci.yml --commit "$(git rev-parse HEAD)" --json status,conclusion \
         --jq '.[0] | if . == null then "not run" else "\(.status) \(.conclusion)" end')"
 [[ "$CI" == "completed success" ]] || fail "CI on $(git rev-parse --short HEAD) is '$CI', not 'completed success'"
+
+# Decoding speed against the previous release, on this machine.
+PREVIOUS="$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)"
+if ! $BENCHMARK; then
+    echo "tag-release: skipping the benchmark comparison"
+elif [[ -z "$PREVIOUS" ]]; then
+    echo "tag-release: no previous release to compare benchmarks with"
+else
+    .github/bench-compare.sh "$PREVIOUS" ||
+        fail "a benchmark is slower than in $PREVIOUS; if the machine was busy, run again or pass --skip-benchmark"
+fi
 
 if $DRY_RUN; then
     echo "tag-release: ready to release $RELEASE (dry run, nothing changed)"

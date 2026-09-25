@@ -332,16 +332,23 @@ To cut a release:
 
 1. Add what changed to the Unreleased section of `CHANGELOG.md`, with migration steps for anything
    breaking, and push it to `main`.
-2. Wait for CI on that commit to pass. The arm64 jobs run on the self-hosted runner, which must be online.
+2. Wait for CI on that commit to pass.
 3. Run `.github/tag-release.sh <major.minor.patch>`, or first `.github/tag-release.sh --dry-run <version>`
    to check without changing anything. It refuses unless `main` is clean, pushed and green, and the
-   version comes after `VERSION`. It then writes `VERSION`, turns the Unreleased notes into the
-   release's section, commits the two files as `Release <version>`, and pushes `main` and the tag.
+   version comes after `VERSION`. It then compares the benchmarks with the previous release on this
+   machine (`.github/bench-compare.sh <previous tag>`), refusing if one is more than 3% slower; pass
+   `--skip-benchmark` if the machine is too busy to measure. Last, it writes `VERSION`, turns the
+   Unreleased notes into the release's section, commits the two files as `Release <version>`, and
+   pushes `main` and the tag.
 4. Watch the `release` workflow (`gh run watch`). It fails unless the tag matches `VERSION`, reruns the
-   CI matrix, and compares the benchmarks with the previous release on the self-hosted runner, failing if
-   one is more than 3% slower (`.github/bench-compare.sh <previous tag>` runs the same comparison
-   locally; re-run the job if a noisy run fails it). Last, it creates the GitHub Release with the
-   CHANGELOG section as notes and the source tarball `simdfix-<version>.tar.gz` with its SHA-256.
+   CI matrix, and then creates the GitHub Release with the CHANGELOG section as notes and the source
+   tarball `simdfix-<version>.tar.gz` with its SHA-256.
+
+CI builds and tests on x86_64 and arm64 Linux. Apple Silicon jobs are optional, since those builds run
+locally: start them with `gh workflow run ci.yml -f apple=true`, or on every run by setting the
+repository variable `SIMDFIX_APPLE_CI` to `true`. They never fail the workflow. They run on GitHub's
+`macos-15` runner unless the variable `SIMDFIX_APPLE_RUNNER` names another as JSON, e.g.
+`["self-hosted", "macOS", "ARM64"]`.
 
 ## License
 

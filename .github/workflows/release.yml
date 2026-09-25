@@ -1,10 +1,11 @@
 name: release
 
 # A v* tag, pushed by .github/tag-release.sh, releases that commit: it runs the CI
-# matrix again, compares the benchmarks with the previous release, and publishes a
-# GitHub Release holding the source tarball and its SHA-256, with the tag's
-# CHANGELOG.md section as the notes. The Release is created last, so it exists only
-# once everything before it has passed.
+# matrix again and publishes a GitHub Release holding the source tarball and its
+# SHA-256, with the tag's CHANGELOG.md section as the notes. The Release is created
+# last, so it exists only once everything before it has passed. The benchmark
+# comparison with the previous release runs in tag-release.sh, on the machine that
+# tags: GitHub's shared runners are too noisy for it.
 on:
   push:
     tags: ['v*']
@@ -19,11 +20,8 @@ jobs:
     timeout-minutes: 5
     outputs:
       version: ${{ steps.version.outputs.version }}
-      previous: ${{ steps.version.outputs.previous }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Tag matches VERSION and CHANGELOG.md
         id: version
@@ -37,38 +35,14 @@ jobs:
               echo "::error::CHANGELOG.md has no section for ${VERSION}"
               exit 1
           fi
-          PREVIOUS="$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
-          echo "previous=${PREVIOUS}" >> "${GITHUB_OUTPUT}"
 
   test:
     needs: check
     uses: ./.github/workflows/ci.yml
 
-  # On the self-hosted Apple Silicon runner, which the published numbers come from.
-  # BENCH_THRESHOLD is how much slower, in percent, a benchmark may get. If a noisy
-  # run fails it, re-run this job: gh run rerun --failed <run id>.
-  benchmark:
-    needs: check
-    if: needs.check.outputs.previous != ''
-    runs-on: [self-hosted, macOS, ARM64]
-    timeout-minutes: 45
-    env:
-      BENCH_THRESHOLD: 3
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Compare with ${{ needs.check.outputs.previous }}
-        run: .github/bench-compare.sh "${{ needs.check.outputs.previous }}"
-
   publish:
-    needs: [check, test, benchmark]
-    # The benchmark job is skipped for the first release, which has nothing to compare with.
-    if: >-
-      always() && needs.check.result == 'success' && needs.test.result == 'success' &&
-      (needs.benchmark.result == 'success' || needs.benchmark.result == 'skipped')
+    needs: [check, test]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

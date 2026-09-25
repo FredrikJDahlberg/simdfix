@@ -1,0 +1,65 @@
+name: verify
+description: >
+  Builds and tests simdfix in Debug, then builds and runs examples/quotes against
+  this source tree and against an install. Expects clang, CMake, googletest and
+  pugixml to be installed.
+
+inputs:
+  cxx-standard:
+    description: C++ standard to build with (20 or 23)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Configure
+      shell: bash
+      run: >
+        cmake -B build -DCMAKE_BUILD_TYPE=Debug
+        -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+        -DCMAKE_CXX_STANDARD=${{ inputs.cxx-standard }}
+
+    - name: Build
+      shell: bash
+      run: cmake --build build -j
+
+    - name: Test
+      shell: bash
+      run: ctest --test-dir build --output-on-failure
+
+    # The example against this source tree, via add_subdirectory().
+    - name: Build example
+      shell: bash
+      run: >
+        cmake -S examples/quotes -B examples/quotes/build -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_CXX_COMPILER=clang++
+        -DCMAKE_CXX_STANDARD=${{ inputs.cxx-standard }}
+        && cmake --build examples/quotes/build -j
+
+    - name: Run example
+      shell: bash
+      run: ./examples/quotes/build/quotes
+
+    # The example against an installed simdfix, via find_package() and simdfix_generate().
+    - name: Install simdfix
+      shell: bash
+      run: >
+        cmake -B build-install -DCMAKE_BUILD_TYPE=Release -DSIMDFIX_BUILD_TESTS=OFF
+        -DCMAKE_CXX_COMPILER=clang++
+        -DCMAKE_CXX_STANDARD=${{ inputs.cxx-standard }}
+        && cmake --build build-install -j
+        && cmake --install build-install --prefix "${{ runner.temp }}/simdfix"
+
+    - name: Build example against the install
+      shell: bash
+      run: >
+        cmake -S examples/quotes -B examples/quotes/build-installed -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_CXX_COMPILER=clang++
+        -DCMAKE_CXX_STANDARD=${{ inputs.cxx-standard }}
+        -DCMAKE_PREFIX_PATH="${{ runner.temp }}/simdfix"
+        && grep -q "^SimdFix_DIR:PATH=${{ runner.temp }}/simdfix/" examples/quotes/build-installed/CMakeCache.txt
+        && cmake --build examples/quotes/build-installed -j
+
+    - name: Run example built against the install
+      shell: bash
+      run: ./examples/quotes/build-installed/quotes
