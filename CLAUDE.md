@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-**simdfix** is a SIMD-accelerated FIX protocol codec in C++23 (ARM NEON).
+**simdfix** is a SIMD-accelerated FIX protocol codec in C++20/23 (ARM NEON and x86 SSE).
 
 ## Build Commands
 

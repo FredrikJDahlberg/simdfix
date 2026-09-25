@@ -1,6 +1,14 @@
 <p align="center"><img src="doc/simdfix.png" width="600" alt="simdfix"/></p>
 
-A SIMD-accelerated [FIX](https://www.fixtrading.org/standards/fix-sessions-online/) (Financial Information Exchange) protocol codec in C++23, targeting ARM NEON. Decodes and encodes FIX messages using 16-byte parallel NEON operations and SWAR (SIMD Within A Register) digit parsing with zero copies.
+<p align="center">
+  <a href="https://github.com/FredrikJDahlberg/simdfix/actions/workflows/ci.yml"><img src="https://github.com/FredrikJDahlberg/simdfix/actions/workflows/ci.yml/badge.svg?branch=main" alt="tests"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/FredrikJDahlberg/simdfix" alt="License"/></a>
+  <img src="https://img.shields.io/badge/C%2B%2B-20%20%7C%2023-blue?logo=cplusplus" alt="C++20 | C++23"/>
+  <img src="https://img.shields.io/badge/SIMD-NEON%20%7C%20SSE-orange" alt="SIMD: NEON | SSE"/>
+  <img src="https://img.shields.io/badge/header--only-yes-brightgreen" alt="Header-only"/>
+</p>
+
+A SIMD-accelerated [FIX](https://www.fixtrading.org/standards/fix-sessions-online/) (Financial Information Exchange) protocol codec in C++20/23, targeting ARM NEON and x86 SSE. Decodes and encodes FIX messages using 16-byte parallel SIMD operations and SWAR (SIMD Within A Register) digit parsing with zero copies.
 
 ## Features
 
@@ -16,8 +24,117 @@ A SIMD-accelerated [FIX](https://www.fixtrading.org/standards/fix-sessions-onlin
 - C++20 or C++23 compiler (Clang 16+ or GCC 13+)
 - CMake 3.20+
 - ARM (NEON) and INTEL (SSE) targets
-- [Google Test](https://github.com/google/googletest) (for tests)
-- [pugixml](https://pugixml.org/) (for the code generator)
+- [Google Test](https://github.com/google/googletest) (for tests; downloaded automatically)
+- [pugixml](https://pugixml.org/) (for the code generator; built from source if not installed)
+
+## Usage
+
+### Adding simdfix to your project
+
+The message decoders and encoders are generated at build time from the XML specs (see [Code Generation](#code-generation)), so a consumer depends on the `GenerateMessages` target or installs simdfix after a build.
+
+As a subdirectory (e.g. a git submodule). The tests and benchmarks are skipped when simdfix is not the top-level project, so only the generator and its pugixml dependency are built:
+
+```cmake
+add_subdirectory(external/simdfix EXCLUDE_FROM_ALL)
+
+add_executable(app main.cpp)
+target_link_libraries(app PRIVATE SimdFix::SimdFix)
+add_dependencies(app GenerateMessages)
+```
+
+As an installed package:
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DSIMDFIX_BUILD_TESTS=OFF
+cmake --build build
+cmake --install build --prefix /opt/simdfix
+```
+
+```cmake
+find_package(SimdFix REQUIRED)   # configure with -DCMAKE_PREFIX_PATH=/opt/simdfix
+target_link_libraries(app PRIVATE SimdFix::SimdFix)
+```
+
+Include the umbrella header `org/limitless/simdifx/Fix.hpp`. Headers under `detail/` are internal. `SimdFix::SimdFix` adds only its include paths, C++20, and `-msse4.1` on x86 to your target; your build type and flags are left alone. Define `NDEBUG` in production builds (CMake does this for `Release`): without it the decoder prints a trace of every block it parses.
+
+### Encoding a message
+
+```cpp
+#include "org/limitless/simdifx/Fix.hpp"
+
+using namespace org::limitless::simdifx;
+using namespace org::limitless::simdifx::generated::messages;
+
+std::array<uint8_t, 512> buffer{};
+FixPayloadEncoder encoder{Protocol::FIXT_1_1, "BUYER", "SELLER"};
+encoder.wrap(0, buffer);
+
+const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::system_clock::now().time_since_epoch());
+
+NewOrderSingleEncoder order{};
+encoder.wrapMessage(order)
+    .sequenceNumber(1)
+    .sendingTime(now)
+    .clOrdID("ORDER1")
+    .handlInst(HandlInst::AutoPrivate)
+    .symbol("AAPL")
+    .side(Side::Buy)
+    .transactTime(now)
+    .orderQty(100)
+    .ordType(OrdType::Limit)
+    .price(utils::FixedDecimal{15025, -2});   // 150.25
+
+const auto length = encoder.encode(order);    // writes BodyLength (9) and CheckSum (10)
+// buffer[0, length) holds the complete message
+```
+
+### Decoding messages
+
+Derive a handler from the generated `FixMessageHandler` and add a `handle` overload for each message type you need. Every message is validated before dispatch, and types without an overload are skipped. Field accessors return `expected<T, Result>` and read straight from the input buffer, so strings come back as `std::string_view` with no copy.
+
+```cpp
+using namespace org::limitless::simdifx::decoder;
+
+struct OrderHandler : FixMessageHandler<OrderHandler>
+{
+    using FixMessageHandler::handle;
+
+    Result handle(NewOrderSingleDecoder& order)
+    {
+        const std::string_view symbol = order.symbol().value();
+        const uint32_t quantity = order.orderQty().value();
+        const double price = order.price().value_or(utils::FixedDecimal{}).toDouble();
+        // ...
+        return Result::Success;
+    }
+};
+
+PayloadDecoder<Protocol::FIXT_1_1> decoder;
+OrderHandler handler;
+
+std::span<const uint8_t> input = received;    // bytes read from the socket
+while (!input.empty())
+{
+    const auto [processed, status] = decoder.parse(input, handler);
+    if (status == Result::MessageFragment)
+    {
+        break;                                // incomplete message: keep the bytes and read more
+    }
+    if (processed == 0)
+    {
+        break;                                // unrecoverable framing error (e.g. InvalidBeginString): close the session
+    }
+    if (status != Result::Success)
+    {
+        // the message was consumed but rejected; name(status) describes why
+    }
+    input = input.subspan(processed);
+}
+```
+
+Repeating groups are read with `count()`, `next()` and `hasNext()` on the group accessor. See `src/test/cpp/org/limitless/simdifx/` for more examples.
 
 ## Building
 
@@ -33,6 +150,8 @@ cmake --build cmake-build-release
 # Build a single target
 cmake --build cmake-build-debug --target PayloadDecoderTest
 ```
+
+Tests, benchmarks and the coverage/profiling targets are controlled by `SIMDFIX_BUILD_TESTS`, which defaults to `ON` when simdfix is the top-level project and `OFF` when it is added with `add_subdirectory` or FetchContent.
 
 ## Running Tests
 
@@ -87,15 +206,18 @@ This runs all test binaries, merges their `profraw` files, and prints an `llvm-c
 
 ## Code Generation
 
-Generation is driven by three XML files and produces six headers under `<build>/org/limitless/simdifx/generated/`.
+Generation is driven by three XML files and produces five headers under `<build>/org/limitless/simdifx/generated/`.
 
 | File | Role | Required |
 |------|------|----------|
 | `src/generator/resources/session.xml` | Session-layer messages (Logon, Logout, Heartbeat, TestRequest, ResendRequest, Reject, SequenceReset) and their enums | Always |
 | `src/generator/resources/protocol.xml` | Application-layer messages (e.g. NewOrderSingle, ExecutionReport) and their enums | Optional |
+| `src/generator/resources/test.xml` | `protocol.xml` plus the extra groups, components and enums the tests exercise | Used by the in-tree build |
 | `src/generator/resources/config.xml` | Engine identity, buffer sizes, timing, session topology | Optional |
 
 When both `session.xml` and `protocol.xml` are present the generator merges their data models before emitting code. Shared enums — in particular `MessageType` — are merged by value: entries from `session.xml` come first, then any new values from the application spec are appended. Duplicate values are silently dropped.
+
+The in-tree build passes `test.xml` as the application spec, so tests, benchmarks and the default install see its superset of messages. The spec is selected by `APP_XML` in `CMakeLists.txt`.
 
 The generator CLI reflects this split:
 
