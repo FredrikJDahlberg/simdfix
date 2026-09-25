@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
-project(simdfix)
+# VERSION is the one place the release number is written. It becomes the project
+# version, the generated Version.hpp, the Generator's --version and the version
+# find_package(SimdFix) checks.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" SIMDFIX_VERSION LIMIT_COUNT 1)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
+project(simdfix VERSION ${SIMDFIX_VERSION})
 
 if(NOT DEFINED CMAKE_CXX_STANDARD)
     set(CMAKE_CXX_STANDARD 20)
@@ -48,6 +53,11 @@ set(FIX_HEADERS
         ${MAIN_PATH}/encoder/DataEncoder.hpp ${MAIN_PATH}/encoder/PayloadEncoder.hpp
         ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp
         ${MAIN_PATH}/encoder/ResendEncoder.hpp)
+
+set(SIMDFIX_VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/include/org/limitless/simdfix/Version.hpp")
+configure_file(cmake/Version.hpp.in "${SIMDFIX_VERSION_HEADER}" @ONLY)
+list(APPEND FIX_HEADERS "${SIMDFIX_VERSION_HEADER}")
+
 add_library(SimdFix INTERFACE)
 add_library(SimdFix::SimdFix ALIAS SimdFix)
 
@@ -57,6 +67,7 @@ add_library(SimdFix::SimdFix ALIAS SimdFix)
 # org/limitless/simdfix/detail/ is internal.
 target_include_directories(SimdFix INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 # Only what the headers need to compile reaches consumers. Warnings, sanitizers,
 # coverage and -march=native are this project's own build choices and live on
@@ -86,6 +97,7 @@ set_target_properties(Generator PROPERTIES CXX_STANDARD 23)
 target_compile_options(Generator PRIVATE -O0 -Wall)
 target_include_directories(Generator PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp"
+        "${CMAKE_CURRENT_BINARY_DIR}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/generator")
 target_link_libraries(Generator PRIVATE pugixml::pugixml)
 
@@ -112,6 +124,8 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp/org
             PATTERN "*.hpp"
             PATTERN "*.inl"
 )
+install(FILES "${SIMDFIX_VERSION_HEADER}"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/org/limitless/simdfix)
 install(FILES
             src/generator/resources/session.xml
             src/generator/resources/config.xml
@@ -129,8 +143,16 @@ configure_package_config_file(
         INSTALL_DESTINATION ${SIMDFIX_INSTALL_CMAKEDIR}
         PATH_VARS SIMDFIX_INSTALL_DATADIR)
 
+# Until 1.0 a minor release may break the API, so find_package(SimdFix 0.2)
+# accepts 0.2.x only; from 1.0 on this becomes SameMajorVersion.
+write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/SimdFixConfigVersion.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMinorVersion)
+
 install(FILES
             ${CMAKE_CURRENT_BINARY_DIR}/SimdFixConfig.cmake
+            ${CMAKE_CURRENT_BINARY_DIR}/SimdFixConfigVersion.cmake
             ${CMAKE_CURRENT_SOURCE_DIR}/cmake/SimdFixGenerate.cmake
         DESTINATION ${SIMDFIX_INSTALL_CMAKEDIR})
 

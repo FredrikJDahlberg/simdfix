@@ -40,6 +40,15 @@ cd cmake-build-debug && ctest
 ./cmake-build-release/SimdFixBenchmark logon-cold|logon-hot|logon-getters|logon-groups|nos-hot|er-hot|all   # default is all
 ```
 
+## Releases
+
+- `VERSION` is the only place the version number is written; never edit it by hand outside
+  `.github/tag-release.sh`, which also dates the CHANGELOG section. See the README's Releases section.
+- Every user-visible change gets a line in the Unreleased section of `CHANGELOG.md`, under Breaking
+  (with migration steps), Added, Fixed or Performance. Until 1.0 a breaking change needs a minor release.
+- Decoder changes are checked for speed with `.github/bench-compare.sh <previous tag>` (Release builds,
+  medians of alternating runs); the release workflow fails on a benchmark more than 3% slower.
+
 ## Coding Style
 
 - **Brace style**: Allman (opening brace on its own line) for namespaces, structs, functions, and control flow.

@@ -3,6 +3,7 @@
 //
 // Umbrella header for the hand-written half of simdfix's public API:
 //
+//   * Version.hpp         — SIMDFIX_VERSION and its parts
 //   * Types.hpp           — value/result vocabulary (Result, *Result, Buffer,
 //                           SessionContext, FixedString, the Encodable* concepts)
 //   * BasicPayloadDecoder — the SIMD tokenizing engine (decode entry point)
@@ -21,6 +22,7 @@
 #ifndef SIMD_FIX_FIX_HPP
 #define SIMD_FIX_FIX_HPP
 
+#include "org/limitless/simdfix/Version.hpp"
 #include "org/limitless/simdfix/Types.hpp"
 #include "org/limitless/simdfix/TokenizedMessage.hpp"
 #include "org/limitless/simdfix/decoder/PayloadDecoder.hpp"

@@ -51,7 +51,7 @@ include(FetchContent)
 FetchContent_Declare(
         simdfix
         GIT_REPOSITORY https://github.com/FredrikJDahlberg/simdfix.git
-        GIT_TAG        main
+        GIT_TAG        v0.2.0     # a release tag; see Releases
         GIT_SHALLOW    TRUE)
 FetchContent_MakeAvailable(simdfix)
 
@@ -78,7 +78,7 @@ cmake --install build --prefix /opt/simdfix
 ```
 
 ```cmake
-find_package(SimdFix REQUIRED)   # configure with -DCMAKE_PREFIX_PATH=/opt/simdfix
+find_package(SimdFix 0.2 REQUIRED)   # accepts 0.2.x; configure with -DCMAKE_PREFIX_PATH=/opt/simdfix
 simdfix_generate(OrderMessages APP_XML ${SIMDFIX_RESOURCE_DIR}/protocol.xml)
 target_link_libraries(app PRIVATE OrderMessages)
 ```
@@ -315,6 +315,33 @@ Generator [--namespace <ns>] <session.xml> <output-dir> <config.xml> <config-out
 `--namespace` defaults to `org::limitless::simdfix::generated`. The generated headers include each other by that namespace as a path, so the output directories must be `<root>/<namespace as a path>/messages` and `.../config`, with `<root>` on the include path.
 
 Headers are regenerated whenever the generator or one of its input XML files changes. They are never checked into the repository and must not be hand-edited.
+
+## Releases
+
+Releases are tagged `v<major.minor.patch>` and listed, with what changed and how to migrate, in
+[`CHANGELOG.md`](CHANGELOG.md). Until 1.0 a minor release may break the API and a patch release does not,
+so pin a tag (FetchContent `GIT_TAG`) or a minor version (`find_package(SimdFix 0.2)`), never `main`.
+The API is the headers outside `detail/`, the code the Generator emits, `simdfix_generate()`, what an
+install contains, the XML spec format and the Generator's command line.
+
+`VERSION` holds the current release number. CMake reads it into the project version,
+`org/limitless/simdfix/Version.hpp` and the Generator's `--version`. Generated headers compile only
+against the simdfix release whose Generator made them.
+
+To cut a release:
+
+1. Add what changed to the Unreleased section of `CHANGELOG.md`, with migration steps for anything
+   breaking, and push it to `main`.
+2. Wait for CI on that commit to pass. The arm64 jobs run on the self-hosted runner, which must be online.
+3. Run `.github/tag-release.sh <major.minor.patch>`, or first `.github/tag-release.sh --dry-run <version>`
+   to check without changing anything. It refuses unless `main` is clean, pushed and green, and the
+   version comes after `VERSION`. It then writes `VERSION`, turns the Unreleased notes into the
+   release's section, commits the two files as `Release <version>`, and pushes `main` and the tag.
+4. Watch the `release` workflow (`gh run watch`). It fails unless the tag matches `VERSION`, reruns the
+   CI matrix, and compares the benchmarks with the previous release on the self-hosted runner, failing if
+   one is more than 3% slower (`.github/bench-compare.sh <previous tag>` runs the same comparison
+   locally; re-run the job if a noisy run fails it). Last, it creates the GitHub Release with the
+   CHANGELOG section as notes and the source tarball `simdfix-<version>.tar.gz` with its SHA-256.
 
 ## License
 
