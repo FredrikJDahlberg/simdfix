@@ -32,32 +32,9 @@ if(SIMDFIX_HAS_MSSE41)
     set(SIMDFIX_SSE41_FLAG -msse4.1)
 endif()
 
-set(MAIN_PATH "src/main/cpp/org/limitless/simdifx")
-set(GEN_PATH "org/limitless/simdifx/generated/messages")
-set(CONFIG_GEN_PATH "org/limitless/simdifx/generated/config")
-set(TEST_PATH "src/test/cpp/org/limitless/simdifx")
-set(GENERATOR_PATH "src/generator/org/limitless/generator/simdifx/")
-# The specs the generator reads. A consumer overrides them with -D on the command
-# line, or by setting them before add_subdirectory(); the in-tree default for the
-# application spec is test.xml, which the tests need.
-if(NOT DEFINED SIMDFIX_SESSION_XML)
-    set(SIMDFIX_SESSION_XML "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/resources/session.xml")
-endif()
-if(NOT DEFINED SIMDFIX_APP_XML)
-    set(SIMDFIX_APP_XML "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/resources/test.xml")
-endif()
-if(NOT DEFINED SIMDFIX_CONFIG_XML)
-    set(SIMDFIX_CONFIG_XML "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/resources/config.xml")
-endif()
-set(SESSION_XML "${SIMDFIX_SESSION_XML}")
-set(APP_XML     "${SIMDFIX_APP_XML}")
-set(CONFIG_XML  "${SIMDFIX_CONFIG_XML}")
-set(GENERATED_DIR "${CMAKE_BINARY_DIR}/${GEN_PATH}")
-set(CONFIG_GENERATED_DIR "${CMAKE_BINARY_DIR}/${CONFIG_GEN_PATH}")
-set(GENERATED_HEADERS
-        ${GENERATED_DIR}/FixTypes.hpp ${GENERATED_DIR}/FixMessageDecoders.hpp
-        ${GENERATED_DIR}/FixMessageEncoders.hpp ${GENERATED_DIR}/FixMessageHandler.hpp
-        ${CONFIG_GENERATED_DIR}/FixEngine.hpp)
+set(MAIN_PATH "src/main/cpp/org/limitless/simdfix")
+set(TEST_PATH "src/test/cpp/org/limitless/simdfix")
+set(GENERATOR_PATH "src/generator/org/limitless/generator/simdfix/")
 set(FIX_HEADERS
         ${MAIN_PATH}/Fix.hpp ${MAIN_PATH}/Types.hpp ${MAIN_PATH}/TokenizedMessage.hpp ${MAIN_PATH}/detail/Tokens.hpp
         ${MAIN_PATH}/utils/Conversions.hpp ${MAIN_PATH}/utils/FixedDecimal.hpp ${MAIN_PATH}/utils/OptionalInt.hpp
@@ -69,16 +46,17 @@ set(FIX_HEADERS
         ${MAIN_PATH}/detail/simd/Uint8x16.hpp
         ${MAIN_PATH}/detail/simd/LinearSearch.hpp ${MAIN_PATH}/detail/encoder/FieldEncoder.hpp
         ${MAIN_PATH}/encoder/DataEncoder.hpp ${MAIN_PATH}/encoder/PayloadEncoder.hpp
-        ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp)
+        ${MAIN_PATH}/encoder/MessageEncoder.hpp ${MAIN_PATH}/encoder/GroupEncoder.hpp
+        ${MAIN_PATH}/encoder/ResendEncoder.hpp)
 add_library(SimdFix INTERFACE)
 add_library(SimdFix::SimdFix ALIAS SimdFix)
 
-# In-tree builds (tests, benchmarks) see the headers where they live; installed
-# consumers see them under <prefix>/include. The public entry point is
-# org/limitless/simdifx/Fix.hpp; anything under org/limitless/simdifx/detail/ is internal.
+# The hand-written headers only. They include the generated message headers, so a
+# consumer links a target made by simdfix_generate() (below), which adds those.
+# The public entry point is org/limitless/simdfix/Fix.hpp; anything under
+# org/limitless/simdfix/detail/ is internal.
 target_include_directories(SimdFix INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp>
-        $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
         $<INSTALL_INTERFACE:include>)
 # Only what the headers need to compile reaches consumers. Warnings, sanitizers,
 # coverage and -march=native are this project's own build choices and live on
@@ -87,40 +65,6 @@ target_compile_features(SimdFix INTERFACE cxx_std_20)
 if(SIMDFIX_HAS_MSSE41)
     target_compile_options(SimdFix INTERFACE ${SIMDFIX_SSE41_FLAG})
 endif()
-
-# Makes the header-only library consumable via find_package(SimdFix). Public
-# headers install under <prefix>/include preserving the org/limitless/simdifx tree.
-# detail/ is installed too: the public headers include it, though it is not part
-# of the supported API.
-include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
-
-install(TARGETS SimdFix EXPORT SimdFixTargets)
-
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp/org
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        FILES_MATCHING
-            PATTERN "*.hpp"
-            PATTERN "*.inl"
-            PATTERN "generated" EXCLUDE
-)
-install(DIRECTORY ${CMAKE_BINARY_DIR}/org
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        FILES_MATCHING PATTERN "*.hpp"
-)
-
-install(EXPORT SimdFixTargets
-        NAMESPACE SimdFix::
-        FILE SimdFixTargets.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SimdFix)
-
-configure_package_config_file(
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/SimdFixConfig.cmake.in
-        ${CMAKE_CURRENT_BINARY_DIR}/SimdFixConfig.cmake
-        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SimdFix)
-
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SimdFixConfig.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SimdFix)
 
 # The generator needs pugixml. A system copy is used when there is one;
 # otherwise it is built from source, so consumers need not install it.
@@ -137,6 +81,7 @@ if(NOT pugixml_FOUND)
     FetchContent_MakeAvailable(pugixml)
 endif()
 add_executable(Generator ${GENERATOR_PATH}/FixGenerator.cpp)
+add_executable(SimdFix::Generator ALIAS Generator)
 set_target_properties(Generator PROPERTIES CXX_STANDARD 23)
 target_compile_options(Generator PRIVATE -O0 -Wall)
 target_include_directories(Generator PRIVATE
@@ -144,23 +89,50 @@ target_include_directories(Generator PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/generator")
 target_link_libraries(Generator PRIVATE pugixml::pugixml)
 
-add_custom_command(
-        OUTPUT ${GENERATED_HEADERS}
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_DIR} ${CONFIG_GENERATED_DIR}
-        COMMAND $<TARGET_FILE:Generator> ${SESSION_XML} ${GENERATED_DIR} ${CONFIG_XML} ${CONFIG_GENERATED_DIR} ${APP_XML}
-        DEPENDS Generator
-                ${SESSION_XML}
-                ${APP_XML}
-                ${CONFIG_XML}
-                ${GENERATOR_PATH}/FixGenerator.cpp ${GENERATOR_PATH}/DataModel.hpp
-        COMMENT "Generating FIX message headers from ${SESSION_XML}, ${APP_XML} and ${CONFIG_XML}"
-        VERBATIM
+# simdfix_generate(): turns FIX specs into a linkable target of generated headers.
+# The same module is installed, so find_package(SimdFix) consumers get it too.
+set(SIMDFIX_RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/generator/resources")
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SimdFixGenerate.cmake)
+
+# Makes the library consumable via find_package(SimdFix): the headers under
+# <prefix>/include (detail/ too, since the public headers include it, though it is
+# not part of the supported API), the Generator under <prefix>/libexec/simdfix, the
+# default specs under <prefix>/share/simdfix, and simdfix_generate().
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+set(SIMDFIX_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/SimdFix)
+set(SIMDFIX_INSTALL_DATADIR ${CMAKE_INSTALL_DATADIR}/simdfix)
+
+install(TARGETS SimdFix Generator EXPORT SimdFixTargets
+        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/simdfix)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp/org
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        FILES_MATCHING
+            PATTERN "*.hpp"
+            PATTERN "*.inl"
 )
-# Part of the default build so that `cmake --build` followed by `cmake --install`
-# always installs the generated headers.
-add_custom_target(GenerateMessages ALL DEPENDS ${GENERATED_HEADERS})
-# SimdFix is an INTERFACE (header-only) target and does not build, so it needs
-# no dependency on GenerateMessages; every consumer depends on it explicitly.
+install(FILES
+            src/generator/resources/session.xml
+            src/generator/resources/config.xml
+            src/generator/resources/protocol.xml
+        DESTINATION ${SIMDFIX_INSTALL_DATADIR})
+
+install(EXPORT SimdFixTargets
+        NAMESPACE SimdFix::
+        FILE SimdFixTargets.cmake
+        DESTINATION ${SIMDFIX_INSTALL_CMAKEDIR})
+
+configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/SimdFixConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/SimdFixConfig.cmake
+        INSTALL_DESTINATION ${SIMDFIX_INSTALL_CMAKEDIR}
+        PATH_VARS SIMDFIX_INSTALL_DATADIR)
+
+install(FILES
+            ${CMAKE_CURRENT_BINARY_DIR}/SimdFixConfig.cmake
+            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/SimdFixGenerate.cmake
+        DESTINATION ${SIMDFIX_INSTALL_CMAKEDIR})
 
 if(SIMDFIX_BUILD_TESTS)
     enable_testing()
@@ -203,11 +175,13 @@ if(SIMDFIX_BUILD_TESTS)
             $<$<CONFIG:Debug>:-fsanitize=address -fprofile-instr-generate>
     )
 
+    # The messages the tests and benchmarks use: protocol.xml plus test-only extras.
+    simdfix_generate(SimdFixTestMessages APP_XML ${CMAKE_CURRENT_SOURCE_DIR}/src/generator/resources/test.xml)
+
     add_executable(SimdFixBenchmark ${TEST_PATH}/benchmark/SimdFixBenchmark.cpp)
     target_include_directories(SimdFixBenchmark PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp")
-    target_link_libraries(SimdFixBenchmark PRIVATE SimdFix SimdFixBuildOptions)
-    add_dependencies(SimdFixBenchmark GenerateMessages)
+    target_link_libraries(SimdFixBenchmark PRIVATE SimdFixTestMessages SimdFixBuildOptions)
     target_compile_definitions(SimdFixBenchmark PRIVATE $<$<CONFIG:Release>:NDEBUG>)
     target_compile_options(SimdFixBenchmark PRIVATE -Wall
             $<$<CONFIG:Debug>:-g -O0 -fsanitize=address -fno-omit-frame-pointer>
@@ -253,19 +227,16 @@ if(SIMDFIX_BUILD_TESTS)
     function(add_fix_test name source)
         add_executable(${name} ${source})
         target_compile_options(${name} PRIVATE -O0 -Wall -fprofile-instr-generate -fcoverage-mapping)
-        target_link_libraries(${name} PRIVATE SimdFix SimdFixBuildOptions GTest::gtest_main)
+        target_link_libraries(${name} PRIVATE SimdFixTestMessages SimdFixBuildOptions GTest::gtest_main)
         target_link_options(${name} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address> -fprofile-instr-generate)
-        add_dependencies(${name} GenerateMessages)
         gtest_discover_tests(${name})
     endfunction()
 
     add_fix_test(PayloadDecoderTest     "${TEST_PATH}/decoder/PayloadDecoderTest.cpp")
+    # The decoder's trace output is opt-in (SIMDFIX_TRACE). Enable it here in Debug
+    # so ASan checks its bounded reads, e.g. in PayloadDecoder.TruncationSafety.
+    target_compile_definitions(PayloadDecoderTest PRIVATE $<$<CONFIG:Debug>:SIMDFIX_TRACE>)
     add_fix_test(PayloadDecoderFuzzTest "${TEST_PATH}/decoder/PayloadDecoderFuzzTest.cpp")
-    # Fuzz the production code path: strip the decoder's debug diagnostics (which
-    # would otherwise dump on every one of the tens of thousands of iterations).
-    # ASan is independent of NDEBUG and stays active; the bounded debug-print paths
-    # are covered by PayloadDecoder.TruncationSafety in the Debug build.
-    target_compile_definitions(PayloadDecoderFuzzTest PRIVATE NDEBUG)
     add_fix_test(MessageDecoderTest      "${TEST_PATH}/decoder/MessageDecoderTest.cpp")
     add_fix_test(MessageEncoderTest      "${TEST_PATH}/encoder/MessageEncoderTest.cpp")
     add_fix_test(ResendEncoderTest       "${TEST_PATH}/encoder/ResendEncoderTest.cpp")
@@ -340,10 +311,10 @@ if(SIMDFIX_BUILD_TESTS)
 
     # Dynamically create an executable or library treating headers as source items
     # Using set_source_files_properties forces CMake/Compilers to attempt compilation
+    get_target_property(GENERATED_HEADERS SimdFixTestMessages SOURCES)
     add_library(header_test ${FIX_HEADERS} ${GENERATED_HEADERS})
     set_source_files_properties(${FIX_HEADERS} ${GENERATED_HEADERS} PROPERTIES LANGUAGE CXX)
-    target_include_directories(header_test PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp
-            ${CMAKE_BINARY_DIR})
-    add_dependencies(header_test GenerateMessages)
+    target_link_libraries(header_test PRIVATE SimdFixTestMessages)
+    # Consumers may build without exceptions; keep every header compiling that way.
+    target_compile_options(header_test PRIVATE -fno-exceptions)
 endif()

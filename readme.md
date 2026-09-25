@@ -16,7 +16,7 @@ A SIMD-accelerated [FIX](https://www.fixtrading.org/standards/fix-sessions-onlin
 - **SIMD tokenization** — processes 16 bytes per cycle to detect tag delimiters (`=`) and field separators (`0x01`).
 - **Zero-copy parsing** — the decoder produces a flat `Field[]` array of positions, tags, and lengths without copying message data.
 - **Encode and decode** — typed field, group, and data (raw binary) accessors for both reading and writing FIX messages.
-- **Code generation** — message decoders, encoders, and handler dispatch are generated from a session spec (`session.xml`) and an optional application spec (`protocol.xml`) via the included `Generator` tool. Session-layer messages are always generated; application messages are merged in when the application spec is present.
+- **Code generation** — message decoders, encoders, and handler dispatch are generated from a session spec (`session.xml`) and an optional application spec via the included `Generator` tool, driven from CMake by `simdfix_generate()`. Session-layer messages are always generated; application messages are merged in when the application spec is present. Each spec can be generated into its own namespace, so one program can use several.
 - **No exceptions in the hot path** — fallible operations return `std::expected<T, Result>`.
 
 ## Requirements
@@ -29,21 +29,47 @@ A SIMD-accelerated [FIX](https://www.fixtrading.org/standards/fix-sessions-onlin
 
 ## Usage
 
+The message decoders and encoders are generated at build time from XML specs (see [Code Generation](#code-generation)). The `simdfix_generate()` CMake function runs the generator over your specs and makes a target to link; linking it brings in the library too, and your code is compiled only after the headers are generated.
+
+```cmake
+simdfix_generate(<name>
+    [APP_XML <file>]        # your application messages and enums
+    [SESSION_XML <file>]    # default: the session.xml shipped with simdfix
+    [CONFIG_XML <file>]     # default: the config.xml shipped with simdfix
+    [NAMESPACE <ns>]        # default: org::limitless::simdfix::generated
+    [OUTPUT_DIR <dir>])     # default: ${CMAKE_CURRENT_BINARY_DIR}/<name>
+```
+
+Include `<namespace as a path>/messages/FixMessages.hpp`, e.g. `org/limitless/simdfix/generated/messages/FixMessages.hpp` for the default namespace. It pulls in the library (`org/limitless/simdfix/Fix.hpp`) and everything generated for that spec. Headers under `detail/` are internal.
+
 ### Adding simdfix to your project
 
-The message decoders and encoders are generated at build time from the XML specs (see [Code Generation](#code-generation)), so a consumer depends on the `GenerateMessages` target or installs simdfix after a build.
+With FetchContent:
 
-As a subdirectory (e.g. a git submodule). The tests and benchmarks are skipped when simdfix is not the top-level project, so only the generator and its pugixml dependency are built:
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+        simdfix
+        GIT_REPOSITORY https://github.com/FredrikJDahlberg/simdfix.git
+        GIT_TAG        main
+        GIT_SHALLOW    TRUE)
+FetchContent_MakeAvailable(simdfix)
+
+simdfix_generate(OrderMessages APP_XML orders.xml NAMESPACE myapp::fix)
+
+add_executable(app main.cpp)
+target_link_libraries(app PRIVATE OrderMessages)
+```
+
+As a subdirectory (e.g. a git submodule), with the same `simdfix_generate()` and `target_link_libraries()` calls:
 
 ```cmake
 add_subdirectory(external/simdfix EXCLUDE_FROM_ALL)
-
-add_executable(app main.cpp)
-target_link_libraries(app PRIVATE SimdFix::SimdFix)
-add_dependencies(app GenerateMessages)
 ```
 
-As an installed package:
+Either way the tests and benchmarks are skipped when simdfix is not the top-level project, so only the generator and its pugixml dependency are built.
+
+As an installed package. The install holds the headers, the generator, the default specs (`session.xml`, `config.xml`, and `protocol.xml` with common application messages) and `simdfix_generate()`:
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release -DSIMDFIX_BUILD_TESTS=OFF
@@ -53,18 +79,28 @@ cmake --install build --prefix /opt/simdfix
 
 ```cmake
 find_package(SimdFix REQUIRED)   # configure with -DCMAKE_PREFIX_PATH=/opt/simdfix
-target_link_libraries(app PRIVATE SimdFix::SimdFix)
+simdfix_generate(OrderMessages APP_XML ${SIMDFIX_RESOURCE_DIR}/protocol.xml)
+target_link_libraries(app PRIVATE OrderMessages)
 ```
 
-Include the umbrella header `org/limitless/simdifx/Fix.hpp`. Headers under `detail/` are internal. `SimdFix::SimdFix` adds only its include paths, C++20, and `-msse4.1` on x86 to your target; your build type and flags are left alone. Define `NDEBUG` in production builds (CMake does this for `Release`): without it the decoder prints a trace of every block it parses.
+### Compiler flags
+
+The library adds only its include paths, C++20, and `-msse4.1` on x86 to your target; your build type and flags are left alone.
+
+- **x86:** SSE4.1 is the baseline, and the only instruction set simdfix needs. You don't need `-march=native`. The benchmarks use it, but that's this project's own choice for its own build. Add it only if you would anyway, knowing the binary then won't run on older CPUs.
+- **ARM:** NEON is part of every AArch64 target, so no flag is needed.
+- **Exceptions:** the headers compile with `-fno-exceptions`.
+- **Tracing:** define `SIMDFIX_TRACE` to have the decoder print a trace of every block and token it parses. It is off by default in every build type.
 
 ### Encoding a message
 
-```cpp
-#include "org/limitless/simdifx/Fix.hpp"
+The examples below use messages from `protocol.xml`, generated into the default namespace.
 
-using namespace org::limitless::simdifx;
-using namespace org::limitless::simdifx::generated::messages;
+```cpp
+#include "org/limitless/simdfix/generated/messages/FixMessages.hpp"
+
+using namespace org::limitless::simdfix;
+using namespace org::limitless::simdfix::generated::messages;
 
 std::array<uint8_t, 512> buffer{};
 FixPayloadEncoder encoder{Protocol::FIXT_1_1, "BUYER", "SELLER"};
@@ -92,11 +128,9 @@ const auto length = encoder.encode(order);    // writes BodyLength (9) and Check
 
 ### Decoding messages
 
-Derive a handler from the generated `FixMessageHandler` and add a `handle` overload for each message type you need. Every message is validated before dispatch, and types without an overload are skipped. Field accessors return `expected<T, Result>` and read straight from the input buffer, so strings come back as `std::string_view` with no copy.
+Derive a handler from the generated `FixMessageHandler` and add a `handle` overload for each message type you need. Every message is validated before dispatch, and types without an overload are skipped. Field accessors return `expected<T, Result>` and read straight from the input buffer, so strings come back as `std::string_view` with no copy. `PayloadDecoder` takes its field capacity and raw data fields from the spec.
 
 ```cpp
-using namespace org::limitless::simdifx::decoder;
-
 struct OrderHandler : FixMessageHandler<OrderHandler>
 {
     using FixMessageHandler::handle;
@@ -134,11 +168,11 @@ while (!input.empty())
 }
 ```
 
-Repeating groups are read with `count()`, `next()` and `hasNext()` on the group accessor. See `src/test/cpp/org/limitless/simdifx/` for more examples.
+Repeating groups are read with `count()`, `next()` and `hasNext()` on the group accessor. An absent group reads as empty, and a nested group is read from the current entry of its enclosing group. Raw data fields (e.g. `XmlDataLen`/`XmlData`) declared in the spec are skipped safely, even when their bytes contain SOH or `=`. See `src/test/cpp/org/limitless/simdfix/` for more examples.
 
 ### Using your own spec
 
-The examples above use the messages in simdfix's own spec. To generate classes for your own messages, write an application spec and point `SIMDFIX_APP_XML` at it before adding simdfix:
+An application spec declares your messages and enums:
 
 ```xml
 <protocol name="application">
@@ -167,11 +201,21 @@ The examples above use the messages in simdfix's own spec. To generate classes f
 ```
 
 ```cmake
-set(SIMDFIX_APP_XML "${CMAKE_CURRENT_SOURCE_DIR}/quotes.xml")
-add_subdirectory(external/simdfix EXCLUDE_FROM_ALL)
+simdfix_generate(QuoteMessages APP_XML quotes.xml NAMESPACE quotes::fix)
+target_link_libraries(app PRIVATE QuoteMessages)
 ```
 
-The generator then emits `QuoteEncoder` and `QuoteDecoder`, with one accessor per field (`quoteID()`, `bidPx()`, `quoteType()`, ...) and a `QuoteType` enum. The session messages from `session.xml` are always included. [`examples/quotes`](examples/quotes) is a complete project that encodes and decodes a stream of quotes:
+```cpp
+#include "quotes/fix/messages/FixMessages.hpp"
+
+using namespace quotes::fix::messages;
+```
+
+The generator then emits `QuoteEncoder` and `QuoteDecoder`, with one accessor per field (`quoteID()`, `bidPx()`, `quoteType()`, ...) and a `QuoteType` enum. The session messages from `session.xml` are always included.
+
+A program can use several specs, e.g. one per venue. Give each its own `simdfix_generate()` target and `NAMESPACE`, then link them all.
+
+[`examples/quotes`](examples/quotes) is a complete project that encodes and decodes a stream of quotes. It builds against an installed simdfix when `CMAKE_PREFIX_PATH` points at one, and against this source tree otherwise:
 
 ```bash
 cmake -S examples/quotes -B examples/quotes/build -DCMAKE_BUILD_TYPE=Release
@@ -249,32 +293,28 @@ This runs all test binaries, merges their `profraw` files, and prints an `llvm-c
 
 ## Code Generation
 
-Generation is driven by three XML files and produces five headers under `<build>/org/limitless/simdifx/generated/`.
+Generation is driven by up to three XML files. For each `simdfix_generate()` target it produces six headers under `<OUTPUT_DIR>/<namespace as a path>/`: `messages/FixMessages.hpp` (the one to include), `messages/FixTypes.hpp`, `messages/FixMessageDecoders.hpp`, `messages/FixMessageEncoders.hpp`, `messages/FixMessageHandler.hpp` and `config/FixEngine.hpp`.
 
 | File | Role | Required |
 |------|------|----------|
-| `src/generator/resources/session.xml` | Session-layer messages (Logon, Logout, Heartbeat, TestRequest, ResendRequest, Reject, SequenceReset) and their enums | Always |
+| `src/generator/resources/session.xml` | Session-layer messages (Logon, Logout, Heartbeat, TestRequest, ResendRequest, Reject, SequenceReset) and their enums | Always; defaults to the shipped copy |
 | `src/generator/resources/protocol.xml` | Application-layer messages (e.g. NewOrderSingle, ExecutionReport) and their enums | Optional |
-| `src/generator/resources/test.xml` | `protocol.xml` plus the extra groups, components and enums the tests exercise | Used by the in-tree build |
-| `src/generator/resources/config.xml` | Engine identity, buffer sizes, timing, session topology | Optional |
+| `src/generator/resources/test.xml` | `protocol.xml` plus the extra groups, components and enums the tests exercise | Used by the in-tree tests |
+| `src/generator/resources/config.xml` | Engine identity, buffer sizes, timing, session topology | Always; defaults to the shipped copy |
 
-When both `session.xml` and `protocol.xml` are present the generator merges their data models before emitting code. Shared enums — in particular `MessageType` — are merged by value: entries from `session.xml` come first, then any new values from the application spec are appended. Duplicate values are silently dropped.
+When both `session.xml` and an application spec are present the generator merges their data models before emitting code. Shared enums — in particular `MessageType` — are merged by value: entries from `session.xml` come first, then any new values from the application spec are appended. Duplicate values are silently dropped.
 
-The in-tree build passes `test.xml` as the application spec, so tests, benchmarks and the default install see its superset of messages. Each spec can be replaced by setting `SIMDFIX_SESSION_XML`, `SIMDFIX_APP_XML` or `SIMDFIX_CONFIG_XML`, either with `-D` on the command line or before `add_subdirectory` (see [Using your own spec](#using-your-own-spec)).
+The in-tree tests and benchmarks generate `test.xml` into the default namespace (the `SimdFixTestMessages` target). An install ships `session.xml`, `config.xml` and `protocol.xml` under `<prefix>/share/simdfix`, which `find_package(SimdFix)` exposes as `SIMDFIX_RESOURCE_DIR`.
 
-The generator CLI reflects this split:
+`simdfix_generate()` runs the generator for you. Its CLI is:
 
 ```
-Generator <session.xml> <output-dir> <config.xml> <config-output-dir> [<application.xml>]
+Generator [--namespace <ns>] <session.xml> <output-dir> <config.xml> <config-output-dir> [<application.xml>]
 ```
 
-To regenerate after changing any XML file:
+`--namespace` defaults to `org::limitless::simdfix::generated`. The generated headers include each other by that namespace as a path, so the output directories must be `<root>/<namespace as a path>/messages` and `.../config`, with `<root>` on the include path.
 
-```bash
-cmake --build cmake-build-debug --target GenerateMessages
-```
-
-Generated headers are never checked into the repository and must not be hand-edited — they are overwritten on every build that touches the generator or its input XML files.
+Headers are regenerated whenever the generator or one of its input XML files changes. They are never checked into the repository and must not be hand-edited.
 
 ## License
 

@@ -9,11 +9,10 @@
 #include <span>
 #include <string_view>
 
-#include "org/limitless/simdifx/Fix.hpp"
+#include "quotes/fix/messages/FixMessages.hpp"
 
-using namespace org::limitless::simdifx;
-using namespace org::limitless::simdifx::decoder;
-using namespace org::limitless::simdifx::generated::messages;
+using namespace org::limitless::simdfix;
+using namespace quotes::fix::messages;
 
 namespace
 {

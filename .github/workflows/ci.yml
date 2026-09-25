@@ -57,6 +57,7 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+      # The example against this source tree, via add_subdirectory().
       - name: Build example
         run: >
           cmake -S examples/quotes -B examples/quotes/build -DCMAKE_BUILD_TYPE=Release
@@ -66,3 +67,24 @@ jobs:
 
       - name: Run example
         run: ./examples/quotes/build/quotes
+
+      # The example against an installed simdfix, via find_package() and simdfix_generate().
+      - name: Install simdfix
+        run: >
+          cmake -B build-install -DCMAKE_BUILD_TYPE=Release -DSIMDFIX_BUILD_TESTS=OFF
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }}
+          && cmake --build build-install -j
+          && cmake --install build-install --prefix "${{ runner.temp }}/simdfix"
+
+      - name: Build example against the install
+        run: >
+          cmake -S examples/quotes -B examples/quotes/build-installed -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }}
+          -DCMAKE_PREFIX_PATH="${{ runner.temp }}/simdfix"
+          && grep -q "^SimdFix_DIR:PATH=${{ runner.temp }}/simdfix/" examples/quotes/build-installed/CMakeCache.txt
+          && cmake --build examples/quotes/build-installed -j
+
+      - name: Run example built against the install
+        run: ./examples/quotes/build-installed/quotes

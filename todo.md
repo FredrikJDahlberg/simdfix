@@ -2,7 +2,7 @@
 
 ## Runtime-built FIX header, replacing compile-time `FixedString` prefix encoding
 
-`PayloadEncoder<Protocol, Target, Sender>` (`src/main/cpp/org/limitless/simdifx/encoder/PayloadEncoder.hpp`)
+`PayloadEncoder<Protocol, Target, Sender>` (`src/main/cpp/org/limitless/simdfix/encoder/PayloadEncoder.hpp`)
 currently takes `BeginString`/`SenderCompID`/`TargetCompID` as `FixedString` non-type template
 parameters (`Types.hpp`) and builds the `8=/9=/35=/49=/56=` header with five separate
 `FieldEncoder::encode<Tag, Value>()` calls (`FieldEncoder.hpp`), each doing its own `memcpy` of
@@ -62,44 +62,3 @@ Planned replacement: build the header once per session into a fixed-size buffer 
   (`m_protocol`/`m_senderCompId`/`m_targetCompId` checked by generated `validate()` methods) —
   confirm bundling the outbound header buffer into the same struct is desired versus a separate
   encode-side context.
-
-## Configurable output namespace / include prefix for the FIX generator
-
-`FixGenerator.cpp` (`src/generator/org/limitless/generator/simdifx/`) hardcodes the vendor
-namespace into everything it emits: `namespace org::limitless::simdifx::generated::messages`
-(≈ line 228) / `::generated::config`, and `#include "org/limitless/simdifx/generated/..."`
-prefixes (≈ lines 253–254). It's invoked positionally with no namespace argument —
-`Generator <session.xml> <msgOutDir> <config.xml> <cfgOutDir> <appXml>` (`CMakeLists.txt:167`).
-
-Consequence: a downstream project that runs this Generator to produce its **own** FIX codecs
-from its own XML (e.g. sibling `phixeron`, which generates into `phixeron_generated/` and includes
-via `org/limitless/simdifx/generated/...`) ends up with its own generated code sitting under
-simdfix's `org::limitless::simdifx::generated` namespace instead of its own
-(e.g. `org::limitless::phixeron::fix::generated`). This is a **naming** problem only — the code is
-correct and there is no header collision (simdfix ships no generated headers on the include path) —
-but downstream code reads as if the FIX messages belong to the vendor.
-
-### Design
-
-- Add a base-namespace argument to the Generator (e.g. a trailing positional `<baseNamespace>`
-  or a `--namespace org::limitless::phixeron::fix` flag), defaulting to
-  `org::limitless::simdifx` so existing callers/behaviour are unchanged.
-- Derive both from that single value:
-  - the emitted `namespace <base>::generated::{messages,config}` declarations, and
-  - the emitted `#include "<base-as-path>/generated/..."` prefixes,
-  so the include directory layout the caller places on its include path matches the namespace.
-- Thread it through the two emission sites (message headers ≈ line 228, config/engine includes
-  ≈ lines 252–254) rather than repeating the literal.
-
-### Why
-
-- Lets each consumer's generated FIX codecs live under its own namespace, so downstream source
-  reads `org::limitless::phixeron::fix::generated::messages::Side` instead of borrowing the
-  vendor's name. simdfix's own build keeps the default and is unaffected.
-
-### Open questions
-
-- One base namespace argument mapped to a path, or two independent knobs (C++ namespace vs.
-  include-path prefix) in case a consumer wants them to differ?
-- Keep the default at `org::limitless::simdifx` (backward-compatible) vs. make the argument
-  required to force every caller to be explicit.

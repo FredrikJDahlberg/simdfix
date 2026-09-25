@@ -48,7 +48,7 @@ cd cmake-build-debug && ctest
 - **Template parameters**: `PascalCase`, including non-type parameters (`Tag`, `Required`, `Parent`, `Enum`).
 - **`[[nodiscard]]`**: applied to all accessor/getter methods that return a value.
 - **`constexpr`**: applied to methods that can be evaluated at compile time, especially field accessors.
-- **Error handling**: no exceptions in the parsing/decoding path — fallible operations return `std::expected<T, Result>`. (`std::invalid_argument` thrown from `GroupDecoder::wrap` on a missing tag is a known exception to this rule.)
+- **Error handling**: no exceptions in the parsing/decoding path — fallible operations return `std::expected<T, Result>`. The library headers must compile with `-fno-exceptions`.
 - **Encapsulation**: keep raw buffers/spans (`m_data`, `m_tokens`, `m_tags`) private; expose narrow accessors (`tokenAt`, `indexOf`, `byteAt`) instead of the underlying containers.
 - **Doc comments**: use Doxygen-style `/** ... */` blocks with `@tparam`, `@param`, `@return`, and `@throws` as applicable, as in `FieldDecoder.hpp`. Apply to public/template methods on encoder and decoder classes.
-- **Generated code**: never hand-edit files produced by `Generator` (e.g. `FixMessageDecoders.hpp`, `FixMessageHandler.hpp`); change `protocol.xml`/`config.xml` or the generator source instead. Generated headers live in the CMake build directory (`<build>/org/limitless/simdifx/generated/`), not in the source tree.
+- **Generated code**: never hand-edit files produced by `Generator` (e.g. `FixMessageDecoders.hpp`, `FixMessageHandler.hpp`); change `protocol.xml`/`config.xml` or the generator source instead. Generated headers live in the CMake build directory (for the tests, `<build>/SimdFixTestMessages/org/limitless/simdfix/generated/`, made by `simdfix_generate()` in `cmake/SimdFixGenerate.cmake`), not in the source tree.
