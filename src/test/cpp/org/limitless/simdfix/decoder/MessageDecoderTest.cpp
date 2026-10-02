@@ -132,11 +132,11 @@ TEST(MessageDecoder, MessageFragment)
               "8=FIXT.1.1" SOH "9=84" SOH "35=5" SOH "49=Buyer" SOH "56=Seller" SOH
               "34=100101" SOH "52=10:11:12.123" SOH "627=2" SOH "629=10" SOH
               "628=12" SOH "629=37" SOH "628=20" SOH "10=211" SOH);
-        for (auto length = 0; length < logout.size(); ++length)
+        for (size_t length = 0; length < logout.size(); ++length)
         {
             const auto fragment = std::span(logout.data(), length);
             const auto [processed, status] = decoder.parse(fragment, app);
-            ASSERT_EQ(0, processed) << "length = " << length << ", processed = " << processed;
+            ASSERT_EQ(0UL, processed) << "length = " << length << ", processed = " << processed;
             ASSERT_EQ(Result::MessageFragment, status) << "status = " << name(status) << " p=" << processed << ", l=" << length;
         }
         auto [processed, status] = decoder.parse(logout, app);
@@ -874,7 +874,7 @@ TEST(MessageDecoder, InvalidBeginString)
         "34=1" SOH "52=20260613-19:26:13.959" SOH "10=000" SOH);
     auto [processed, status] = decoder.parse(message, app);
     ASSERT_EQ(Result::InvalidBeginString, status) << name(status);
-    ASSERT_EQ(0, processed);
+    ASSERT_EQ(0UL, processed);
 }
 
 TEST(MessageDecoder, InvalidCheckSum)
@@ -1297,14 +1297,14 @@ TEST(MessageDecoder, InvalidMandatoryFields)
         const auto message =
             utils::makeSpan("666=FIXT.1.1" SOH);
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(0, processed);
+        ASSERT_EQ(0UL, processed);
         ASSERT_EQ(Result::MessageFragment, status) << name(status);
     }
     {
         const auto message =
             utils::makeSpan("8=FIXT.1.1" SOH "666=66" SOH "666=66" SOH "666=66" SOH);
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(0, processed);
+        ASSERT_EQ(0UL, processed);
         ASSERT_EQ(Result::MessageFragment, status) << name(status);
     }
     {
@@ -1344,7 +1344,7 @@ TEST(MessageDecoder, InvalidMandatoryFields)
             utils::makeSpan("8=FIXT.1.1" SOH "9=48" SOH "35=66" SOH "666=66" SOH
             "666=66" SOH "666=66" SOH "11=043" SOH "                     ");
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(0, processed);
+        ASSERT_EQ(0UL, processed);
         ASSERT_EQ(Result::InvalidCheckSumTag, status) << name(status);
     }
     {
@@ -1352,7 +1352,7 @@ TEST(MessageDecoder, InvalidMandatoryFields)
             utils::makeSpan("8=FIX.4.3" SOH "9=0067" SOH "35=A" SOH "49=SENDER" SOH "56=TARGET" SOH
             "34=1" SOH "52=20260613-25:26:13.959" SOH "98=0" SOH "108=30" SOH "10=071" );
         auto[processed, status] = decoder.parse(message, app);
-        ASSERT_EQ(0, processed);
+        ASSERT_EQ(0UL, processed);
         ASSERT_EQ(Result::InvalidBeginString, status) << name(status);
     }
 }
@@ -1404,7 +1404,7 @@ TEST(MessageDecoder, FragmentHandler)
     {
         int32_t count = 0;
         using FixMessageHandler::handle;
-        Result handle(SequenceResetDecoder& reset)
+        Result handle(SequenceResetDecoder&)
         {
             ++count;
             return Result::Success;

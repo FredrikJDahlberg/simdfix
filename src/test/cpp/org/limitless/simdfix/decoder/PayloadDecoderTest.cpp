@@ -602,7 +602,7 @@ TEST(PayloadDecoder, ForeignBeginStringSkip)
         PayloadDecoder<Protocol::FIXT_1_1> decoder;
         const auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
         ASSERT_EQ(Result::InvalidBeginString, status) << text << " -> " << name(status);
-        ASSERT_EQ(0, processed) << text;
+        ASSERT_EQ(0UL, processed) << text;
     }
     for (const std::string_view text : {"xxxxxxxxxxxxxxxx8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH,
                                         "x8=FIXT.1.1" SOH "9=0091" SOH "35=A" SOH "49=SENDER" SOH})
@@ -611,7 +611,7 @@ TEST(PayloadDecoder, ForeignBeginStringSkip)
         PayloadDecoder<Protocol::FIXT_1_1> decoder;
         const auto [processed, status] = decoder.parse(Buffer{buffer.data(), buffer.size()});
         ASSERT_EQ(Result::InvalidBeginString, status) << text << " -> " << name(status);
-        ASSERT_EQ(0, processed) << "the junk, and not one byte of what follows it";
+        ASSERT_EQ(0UL, processed) << "the junk, and not one byte of what follows it";
     }
 }
 

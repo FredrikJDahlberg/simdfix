@@ -495,16 +495,6 @@ static std::string uncap(const std::string& value)
     return result;
 }
 
-static std::string cap(const std::string& value)
-{
-    std::string result{value};
-    if (!value.empty())
-    {
-        result[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(result[0])));
-    }
-    return result;
-}
-
 /**
  * Emits FixEngine.hpp from config.xml: the engine constants (identity, buffer
  * sizes, timing). Kept free of session includes so the engine headers

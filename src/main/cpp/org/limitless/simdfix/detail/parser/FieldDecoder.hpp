@@ -142,7 +142,7 @@ public:
     /**
      * Parses the ASCII digits of a token as an unsigned 32-bit integer using
      * SWAR digit parsing. Validates length and digit content.
-     * @param token token whose bytes are the digits to convert
+     * @param field field whose bytes are the digits to convert
      * @return parsed value, or InvalidLength/InvalidValue on bad input
      */
     [[nodiscard]] Uint32Result convertToUint32(const Field* field) const
@@ -171,7 +171,7 @@ public:
     /**
      * Parses the ASCII digits of a token, with an optional leading '-', as a
      * signed 32-bit integer. Validates length and digit content.
-     * @param token token whose bytes are the digits to convert
+     * @param field field whose bytes are the digits to convert
      * @return parsed value, or InvalidLength/InvalidValue on bad input
      */
     [[nodiscard]] Int32Result convertToInt32(const Field* field) const
@@ -209,7 +209,7 @@ public:
     /**
      * Parses the ASCII digits of a token, with an optional leading '-' and an
      * optional decimal point, as a FixedDecimal. Validates length and content.
-     * @param token token whose bytes are the digits to convert
+     * @param field field whose bytes are the digits to convert
      * @return parsed value, or InvalidLength/InvalidValue on bad input
      */
     [[nodiscard]] FixedDecimalResult convertToFixedDecimal(const Field* field) const
@@ -320,8 +320,8 @@ public:
     }
 
     /**
-     * @param token pointer into m_fields
-     * @return the index of token within m_fields
+     * @param field pointer into m_fields
+     * @return the index of field within m_fields
      */
     [[nodiscard]] int32_t indexOf(const Field* field) const
     {

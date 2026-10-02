@@ -30,7 +30,7 @@ struct TokenizedMessage
      * Reads the MsgType (tag 35) as the encoded value each generated decoder
      * exposes as its MessageId: a single byte, or two bytes packed
      * low-byte-first for two-character MsgTypes (e.g. "AB" -> 'A' | 'B' << 8).
-     * @return the message id, matching <Message>Decoder::MessageId
+     * @return the message id, matching \<Message\>Decoder::MessageId
      */
     [[nodiscard]] uint16_t messageId() const
     {
