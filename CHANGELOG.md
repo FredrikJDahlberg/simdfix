@@ -81,6 +81,8 @@ Breaking changes come with the steps to migrate.
 
 - Decoding is as fast as in 0.1.0 (within ±3% on the benchmarks) while skipping data fields by default:
   a message is scanned without data-field checks, and only one that holds a data field is corrected.
+- Decoding is up to 5% faster (cold-cache Logon, ExecutionReport, repeating groups) now that the
+  per-block tag scan is inlined into the tokenizer loop.
 
 ## [0.1.0] - 2026-09-25
 

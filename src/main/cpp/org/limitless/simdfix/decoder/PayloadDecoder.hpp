@@ -488,14 +488,16 @@ private:
      * @tparam SkipData whether to skip data payloads (see parse())
      * @return true once the CheckSum tag (10) has been tokenized
      */
+    // Forced inline: as a call it clobbers the vector registers holding the
+    // tokenizer's constants, which are then reloaded from the stack every block.
     template <bool SkipData>
-    bool processBlock(const uint64_t tagDigitFlags,
-                      const data_t* digits,
-                      position_t nonTagBitPos,
-                      const data_t* data,
-                      const length_t length,
-                      position_t& offset,
-                      uint64_t& blockSum)
+    [[gnu::always_inline]] bool processBlock(const uint64_t tagDigitFlags,
+                                             const data_t* digits,
+                                             position_t nonTagBitPos,
+                                             const data_t* data,
+                                             const length_t length,
+                                             position_t& offset,
+                                             uint64_t& blockSum)
     {
         const auto trailingTagFlags = static_cast<uint16_t>(tagDigitFlags >> 48);
         const auto trailingCount = std::countl_one(trailingTagFlags);
